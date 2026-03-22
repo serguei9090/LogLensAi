@@ -1,0 +1,47 @@
+name: "Build & Release (Windows Desktop)"
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  publish-tauri:
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        host: [windows-latest] # Defaulting to Windows for LogLensAi genesis
+
+    runs-on: ${{ matrix.host }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: setup bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: setup python (uv)
+        run: |
+          curl -LsSf https://astral.sh/uv/install.sh | sh
+          uv version
+
+      - name: install dependencies
+        run: bun install
+
+      - name: build tauri app
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tagName: v__VERSION__ # tauri-action replaces this with app version
+          releaseName: "LogLensAi v__VERSION__"
+          releaseBody: "Automated Build from GitHub Actions. See CHANGELOG.md for details."
+          releaseDraft: true
+          prerelease: false

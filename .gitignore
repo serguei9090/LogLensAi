@@ -1,0 +1,30 @@
+# Artifacts
+.gemini/
+.agents/
+!README.md
+!CHANGELOG.md
+
+# Node / JS
+node_modules/
+bun.lockb
+dist/
+.env
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+.ruff_cache/
+.pyright_cache/
+.uv/
+
+# Tauri / Rust
+target/
+src-tauri/target/
+
+# Data
+*.duckdb
+*.duckdb.wal
+logs/*.log
+temp/
+i:\01-Master_Code\Apps\LogLensAi\docs\reports\*.md
