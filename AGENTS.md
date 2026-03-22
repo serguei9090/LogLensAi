@@ -4,6 +4,7 @@ Welcome to the Morphic AI Engineering Framework. This workspace is governed by h
 
 ## 🗺️ Rule-Map (The Laws of Physics)
 - **Architecture**: `.agents/rules/Architecture.md` (Hexagonal + Ports/Adapters)
+- **Jules CLI**: `.agents/rules/JulesCLI.md` (Remote & Task Delegation)
 - **Tracking/Boot**: `.agents/rules/ProjectTracking.md` (Session Sync + Boot Sequence)
 - **Software Standards**: `.agents/rules/SoftwareStandards.md` (DRY, KISS, SOLID)
 - **Quality/TODO**: `.agents/rules/Quality.md` (TODO(ID) + Atomic Design)
