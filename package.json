@@ -13,7 +13,9 @@
     "lint": "biome check .",
     "lint:fix": "biome check --write .",
     "format": "biome format --write .",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.3.0",
@@ -53,6 +55,10 @@
     "autoprefixer": "^10.4.21",
     "postcss": "^8.5.1",
     "typescript": "^5.7.3",
-    "vite": "^6.0.11"
+    "vite": "^6.0.11",
+    "vitest": "^3.0.0",
+    "@testing-library/react": "^16.2.0",
+    "@testing-library/jest-dom": "^6.6.0",
+    "jsdom": "^26.0.0"
   }
 }

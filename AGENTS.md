@@ -109,6 +109,10 @@ All methods are called via `useSidecarBridge.ts`. Never change the transport.
 
 ## Golden Standards
 - **Contract → Interface → Mock → Impl**: define boundaries before writing logic
-- **get_cursor() ONLY**: every DuckDB query uses `self.db.get_cursor()` for thread safety
-- **on_cleanup must be async**: `async def on_cleanup(_)` in the aiohttp app
+- **Design Conformity**: You MUST strictly use `docs/design/theme.md` for all CSS variables and `docs/design/ui-components.md` for shadcn implementation.
+- **Pydantic API Validation**: All JSON-RPC methods MUST receive inputs and return outputs validated by strict `Pydantic` models. 
+- **Thread-safe Database**: every DuckDB query uses `self.db.get_cursor()` for thread isolation.
+- **Graceful Shutdown (Prod vs Dev)**:
+  - **Dev**: The `aiohttp` runner must use `async def on_cleanup(_): Database.reset()` to prevent Zombie processes and WAL locks.
+  - **Prod**: The `stdin/stdout` loop must gracefully catch `EOF` and `KeyboardInterrupt` and properly close the DuckDB connection before exiting.
 - **No silent gaps**: missing logic gets a `TODO(ID)` with a detail file in `docs/TODOC/`

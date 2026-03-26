@@ -2,6 +2,7 @@
 
 > Last updated: 2026-03-26
 > Source of truth for all sprint work. All Jules sessions must be anchored to items here.
+> **Note to Jules**: Your primary entry point and rule-map is `AGENTS.md`. Make sure to read it to understand the Hexagonal architecture, Tech Stack (React 19, Tauri v2, Python 3.12, DuckDB, Drain3), and atomic design requirements.
 
 ---
 
@@ -78,6 +79,15 @@
 - [ ] **SET-004**: General section
   - `Log Row Height` (compact / default / comfortable)
   - `Font Size` slider (12–16px)
+
+---
+
+### P4 — Testing & Quality
+- [ ] **TEST-001**: Set up Vitest and React Testing Library for frontend unit tests
+- [ ] **TEST-002**: Frontend generic tests (test `LogToolbar`, `TailSwitch` rendering and state)
+- [ ] **TEST-003**: Set up `pytest` and `pytest-asyncio` for sidecar backend unit tests
+- [ ] **TEST-004**: Backend unit tests (`api.py` query/tail handling, `db.py` cursor safety)
+- [ ] **TEST-005**: Integration tests (E2E simulation of loading a log file via RPC and verifying response)
 
 ---
 

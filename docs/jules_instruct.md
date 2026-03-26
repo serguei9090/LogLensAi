@@ -70,14 +70,16 @@ Build each molecule as described in `docs/design/ui-components.md`.
 #### Step 5 — Organisms
 
 **LogToolbar** (`src/components/organisms/LogToolbar.tsx`)
-- Layout: `[SearchBar] [FilterBuilder] [HighlightBuilder] [TailSwitch] [StatusDot]`
+- Layout: `[SearchBar] [FilterBuilder] [HighlightBuilder] [WrapSwitch] [TailSwitch] [StatusDot]`
 - All in a single sticky bar at top of investigation view
-- Props: `onSearch, activeFilters, onFilterChange, activeHighlights, onHighlightChange, isTailing, onTailToggle, status`
+- Props: `onSearch, activeFilters, onFilterChange, activeHighlights, onHighlightChange, isWrapping, onWrapToggle, isTailing, onTailToggle, status`
 
 **VirtualLogTable** (`src/components/organisms/VirtualLogTable.tsx`)
 - Use TanStack Virtual for row virtualization
-- Columns: `#` (row index) | `Timestamp` | `Level` | `Message` | `Cluster`
+- Behavior: If `isWrapping` is true, rows use dynamic measuring for multi-line text; if false, they truncate with `...`.
+- Columns: `#` (row index) | `Timestamp` | `Level` | `Message` | `Cluster` | `Actions`
 - Row background set from level color token
+- `Actions` Cell: Contains a generic "Comment" icon button. Clicking it expands an inline text area to add/view an annotation for that row.
 - Message cell: render highlight matches with `<mark>` styled with highlight color
 - Click row → show expanded raw text in a slide-out panel below the row
 
@@ -90,8 +92,8 @@ Build each molecule as described in `docs/design/ui-components.md`.
 
 **SettingsPanel** (`src/components/organisms/SettingsPanel.tsx`)
 - Full-page settings, not a modal
-- Three `Card` sections:
-  1. **AI Provider**: Select (gemini-cli / openai / anthropic) + API key `Input` (type=password)
+- Three `Card` sections (make them collapsible/accordion):
+  1. **AI Provider**: Select (gemini-cli / openai / anthropic) + API key `Input` (type=password) + **System Prompt** `Textarea` (default: "You are a Log Analysis Specialist. Return JSON with summary, root_cause, actions.").
   2. **Drain3**: similarity_threshold (number input 0-1) + max_children (number) + max_clusters (number); each with a `HelpTooltip`
   3. **General**: row height select (compact/default/comfortable) + font size (select 12/13/14/15/16px)
 - Save button: calls `update_settings` RPC with all values as key/value pairs
@@ -105,8 +107,12 @@ Build each molecule as described in `docs/design/ui-components.md`.
 - "Settings" nav item
 - "Dashboard" nav item (grayed out, `cursor-not-allowed`, tooltip: "Coming soon")
 
+**DiagnosticSidebar** (`src/components/organisms/DiagnosticSidebar.tsx`)
+- A slide-out right-side panel that appears when an AI analysis is requested.
+- Displays the `summary`, `root_cause`, and `actions` array retrieved from the AI RPC call.
+
 #### Step 6 — Templates & Pages
-- `AppLayout`: `<Sidebar /> + <main>{children}</main>`
+- `AppLayout`: `<Sidebar /> + <main>{children}</main> + <DiagnosticSidebar />`
 - `InvestigationPage`: `<ImportFeedModal /> + <LogToolbar /> + <VirtualLogTable />`
 - `SettingsPage`: `<SettingsPanel />`
 
@@ -165,15 +171,22 @@ interface InvestigationStore {
 - If error or parse fails, return `{"summary": "Analysis failed", "root_cause": str(e), "recommended_actions": []}`
 - Expose as RPC: `analyze_cluster`
 
+#### Step 10 — Testing Implementation
+- Use `vitest` and `@testing-library/react` to write one frontend test (`src/components/atoms/TailSwitch.test.tsx`).
+- Use `pytest` to write one backend test: `sidecar/tests/test_api.py` validating the JSON RPC format.
+- **E2E Integration Test**: Write a script `sidecar/tests/test_e2e_ingestion.py` that spins up the sidecar, calls the `start_tail` JSON-RPC method with a mock file, and asserts `total` > 0 from `get_logs`.
+
 ---
 
 ### Acceptance Criteria
 - `bun run dev:all` starts without errors
+- `bun run test` and `uv run pytest` pass successfully.
 - Opening the app shows the sidebar with one default workspace
 - Clicking "Import" opens the modal; importing a local `.log` file works
 - After import, the log table shows entries with correct level coloring
 - The TailSwitch in the toolbar toggles tailing ON/OFF
-- Filter builder allows adding/removing multiple filters
-- Highlight builder colors matching terms in the log view
-- Settings page saves Drain3 config correctly
+- WrapSwitch toggles TanStack Virtual dynamic sizing.
+- Filter builder allows adding/removing multiple filters (including `has_comment = true`)
+- Settings page saves AI System Prompt and UI is collapsible.
+- Right-side Diagnostic Sheet slides out upon AI cluster analysis.
 - No DuckDB "No open result set" errors in the console
