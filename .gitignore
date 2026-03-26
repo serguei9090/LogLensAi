@@ -22,9 +22,13 @@ __pycache__/
 target/
 src-tauri/target/
 
+# Development/Logs
+sidecar.log
+LogTest/
+
 # Data
 *.duckdb
 *.duckdb.wal
 logs/*.log
 temp/
-i:\01-Master_Code\Apps\LogLensAi\docs\reports\*.md
+docs/reports/*.md

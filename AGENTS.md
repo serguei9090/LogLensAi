@@ -1,48 +1,114 @@
-# Master AI Context: Morphic AI Engineering Framework
+# Master AI Context: LogLensAi
 
-Welcome to the Morphic AI Engineering Framework. This workspace is governed by high-performance software engineering laws.
+LogLensAi is a **Tauri v2 desktop application** for professional log analysis. It uses a Python sidecar for heavy lifting (DuckDB storage, Drain3 log clustering) and a React 19 frontend for the UI.
 
-## 🗺️ Rule-Map (The Laws of Physics)
+## 🗺️ Rule-Map (Laws of Physics)
 - **Architecture**: `.agents/rules/Architecture.md` (Hexagonal + Ports/Adapters)
 - **Jules CLI**: `.agents/rules/JulesCLI.md` (Remote & Task Delegation)
-- **Tracking/Boot**: `.agents/rules/ProjectTracking.md` (Session Sync + Boot Sequence)
+- **Tracking**: `.agents/rules/ProjectTracking.md` (Session Sync + Boot Sequence)
 - **Software Standards**: `.agents/rules/SoftwareStandards.md` (DRY, KISS, SOLID)
-- **Quality/TODO**: `.agents/rules/Quality.md` (TODO(ID) + Atomic Design)
-- **AI Expert Practices**: `.agents/rules/AI_Expert_Practices.md` (Mnemonic Anchors + Verification)
-- **Visual Law**: `.agents/rules/VisualArchitecture.md` (AVAS Visualization)
+- **Quality**: `.agents/rules/Quality.md` (TODO(ID) + Atomic Design)
 
-## Core Mandates
+## 🎯 Product Scope (STRICT)
+The **only active modules** are:
+1. **Investigation Page** — the core log analysis view
+2. **Settings Page** — AI provider + Drain3 config + general preferences
 
-1. **Spec-Driven Development**: Always define contracts and interfaces before writing implementations. Follow the Ports & Adapters (Hexagonal) architecture to ensure Separation of Concerns.
-2. **Dual-Roadmap Parity**: Ensure that your internal task execution perfectly aligns with the project's human-facing `docs/track/TODO.md`. Keep statuses continuously synced.
-3. **Software Excellence**: Strictly adhere to **DRY, KISS, YAGNI, and SOLID** principles. Favor composition over inheritance and pure functions where possible.
-4. **TODO(ID) Protocol**: Track every piece of technical debt or missing implementation with a uniquely identified TODO and a dedicated detail file in `docs/TODOC/`.
-5. **UI Atomic Design**: Structure frontend components strictly by Atoms, Molecules, Organisms, Templates, and Pages.
-6. **Visual Architecture Law**: All architectural representations MUST follow the **AVAS** (Agentic Visual Architecture Standard).
-   - **Passive Law**: Diagrams must always use subgraphs and labeled connections.
-   - **Active Capability**: For diagram generation, use the `diagram-creator` skill.
+**Explicitly OUT of scope** (backlog only, no implementation):
+- Dashboard (placeholder nav item, grayed out)
+- Metrics views
+- Multi-file merge
 
-## AI Assistant Ecosystem
-You are supported by a suite of specialized sub-agents:
-- **`@doc-agent`**: Automates documentation updates based on code changes.
-- **`@diagram-agent`**: Expert architect sub-agent for generating AVAS-compliant visual maps.
-- **`@lint-agent`**: Enforces code style and documentation consistency.
-- **`@reviewer-agent`**: Performs deep architectural audits and code reviews.
+## 🏗️ Tech Stack
+- **Frontend**: React 19, TypeScript, Vite, Zustand, TanStack Virtual, shadcn/ui
+- **Communication**: JSON-RPC 2.0 — HTTP on port 5000 in dev, stdin/stdout in prod
+- **Backend Sidecar**: Python 3.12, DuckDB, Drain3, aiohttp
+- **Desktop Shell**: Tauri v2 (Rust)
+- **Package Manager**: Bun
+- **Linter/Formatter**: Biome (TS/JS), Ruff (Python)
 
-## Core Meta-Skills
-You are equipped to evolve your own capabilities:
-- **`rule-creator`**: Create and maintain high-signal architectural and operational rules.
-- **`skill-creator`**: Build modular capabilities, workflows, and automated scripts.
-- **`diagram-creator`**: Generate multi-level (C4-style) architectural maps.
-- **`code-gap-reviewer`**: Perform specialized audits and architectural drift analysis.
-- **`session-handover`**: Perform a "Session Wrap-up" to ensure context continuity.
+### Pinned Versions (Reproduce with `bun install` + `uv sync`)
+| Layer | Package | Version |
+|---|---|---|
+| Runtime | Node.js (via Bun) | `>=22` |
+| Runtime | Python | `>=3.12` |
+| Frontend | react + react-dom | `^19.0.0` |
+| Frontend | vite | `^6.0.11` |
+| Frontend | typescript | `^5.7.3` |
+| Frontend | @tauri-apps/api | `^2.3.0` |
+| Frontend | @tauri-apps/cli | `^2.3.0` |
+| Frontend | zustand | `^5.0.3` |
+| Frontend | @tanstack/react-virtual | `^3.11.2` |
+| Frontend | lucide-react | `^0.469.0` |
+| Frontend | tailwindcss | `^3.4.17` |
+| Frontend | @biomejs/biome | `^1.9.4` |
+| Sidecar | duckdb | `>=1.2.0` |
+| Sidecar | drain3 | `>=0.9.11` |
+| Sidecar | aiohttp | `>=3.11.0` |
+| Sidecar | aiohttp-cors | `>=0.7.0` |
+| Sidecar | paramiko | `>=3.5.0` |
+| Sidecar | pydantic | `>=2.10.0` |
+| Sidecar | ruff | `>=0.9.0` |
 
-## Initialization & Operational Logic
-- **Context Injection**: Before starting a task, read `docs/track/TODO.md` to ensure your internal state matches the workspace.
-- **Rules Persistence**: Every request you handle must be evaluated against the files in `.agents/rules/`.
-- **Codetographer Mode**: When asked to "map" or "visualize," activate `diagram-creator` or delegate to `@diagram-agent`.
+
+## 📁 Mandatory Folder Structure
+```
+src/
+  components/
+    atoms/          ← smallest units (Badge, Switch, Dot, Tooltip)
+    molecules/      ← composed atoms (SearchBar, FilterBuilder, FilterTag)
+    organisms/      ← full UI sections (LogToolbar, VirtualLogTable, Sidebar)
+    templates/      ← layout wrappers (AppLayout, InvestigationLayout)
+    pages/          ← assembled views (InvestigationPage, SettingsPage)
+    ui/             ← raw shadcn primitives (do not modify logic here)
+  store/            ← Zustand stores (workspaceStore, investigationStore)
+  lib/
+    hooks/          ← custom React hooks (useSidecarBridge, useLogStream)
+    utils.ts        ← cn(), formatters
+  styles/
+    globals.css     ← CSS custom properties — ALL design tokens live here
+
+sidecar/
+  src/
+    api.py          ← JSON-RPC dispatch & all method_ implementations
+    db.py           ← DuckDB singleton (USE get_cursor() NOT get_connection())
+    parser.py       ← Drain3 log parsing
+    tailer.py       ← FileTailer background thread
+    ssh_loader.py   ← SSH remote tailing
+    ai.py           ← Gemini CLI integration
+```
+
+## 🎨 Design System
+- See `docs/design/theme.md` for the full color palette (CSS token names + hex values)
+- See `docs/design/ui-components.md` for all shadcn components and their atomic layer
+- Dark theme: `#0D0F0E` base, `#22C55E` primary green accent
+- **Hard rule**: No hardcoded hex in component files. Use CSS custom properties only.
+
+## ⚡ Boot Sequence (for AI agents)
+1. Read `docs/track/TODO.md` — understand sprint status
+2. Read `docs/design/theme.md` & `docs/design/ui-components.md`
+3. Check `.agents/rules/` for constraints
+4. Read `docs/jules_instruct.md` for the active implementation prompt
+
+## 🔌 JSON-RPC API Contract
+All methods are called via `useSidecarBridge.ts`. Never change the transport.
+
+| Method | Params | Returns |
+|---|---|---|
+| `get_logs` | `{ workspace_id, offset, limit, level?, query?, source_id? }` | `{ total, logs[], offset, limit }` |
+| `get_clusters` | `{ workspace_id }` | `ClusterEntry[]` |
+| `start_tail` | `{ filepath, workspace_id }` | `{ status }` |
+| `stop_tail` | `{ filepath, workspace_id }` | `{ status }` |
+| `is_tailing` | `{ filepath, workspace_id }` | `boolean` |
+| `start_ssh_tail` | `{ host, port, username, password?, filepath, workspace_id }` | `{ status }` |
+| `stop_ssh_tail` | `{ connection_id }` | `{ status }` |
+| `ingest_logs` | `{ logs: ManualLogEntry[] }` | `{ status }` |
+| `update_settings` | `{ settings: Record<string,string> }` | `{ status }` |
+| `get_settings` | `{}` | `Record<string,string>` |
+| `analyze_cluster` | `{ cluster_id, workspace_id }` | `{ summary, root_cause, recommended_actions[] }` |
 
 ## Golden Standards
-- **Contract -> Interface -> Mock -> Impl**: Never write logic without defining the boundary first.
-- **Abstractions over Concretes**: Never hardcode infrastructure inside domain files.
-- **100% Transparency**: Never leave silent placeholders. If it's missing, it gets a `TODO(ID)`.
+- **Contract → Interface → Mock → Impl**: define boundaries before writing logic
+- **get_cursor() ONLY**: every DuckDB query uses `self.db.get_cursor()` for thread safety
+- **on_cleanup must be async**: `async def on_cleanup(_)` in the aiohttp app
+- **No silent gaps**: missing logic gets a `TODO(ID)` with a detail file in `docs/TODOC/`
