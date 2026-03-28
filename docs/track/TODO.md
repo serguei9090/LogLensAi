@@ -72,16 +72,18 @@
 
 ---
 
-## 🟡 Sprint 04 — Analysis & AI Insights
+## 🟡 Sprint 04 — Unified Analysis Engine (Planned)
 
-### P0 — AI Integration
+### P0 — Visualization & Context
+- [ ] **ANALYSIS-001**: Log Distribution Chart (Histogram) — Toggleable via Orchestrator Hub
+- [ ] **ANALYSIS-002**: Contextual Selection Filter — Right-click/Select-to-Filter logic
+- [ ] **ANALYSIS-003**: Agentic MCP Server — Expose sidecar tools for external AI agents
 
+### P1 — Advanced Intel
+- [ ] **ANALYSIS-004**: Anomaly Engine — Statistical outlier detection (Toggle in Hub)
+- [ ] **ANALYSIS-005**: Logical Templates — Save/Load filter-highlights per log source
 - [ ] **AI-001**: Implement `analyze_cluster` calling the `gemini-cli`
-  - **Files**: `sidecar/src/api.py`, `sidecar/src/ai.py`
-- [ ] **AI-002**: Display AI explanation in a side drawer for a selected cluster
-  - **Files**: `src/components/organisms/DiagnosticSidebar.tsx`
-- [ ] **AI-003**: Root cause analysis suggestion based on cluster samples
-  - **Files**: `sidecar/src/ai.py`
+- [ ] **AI-002**: Display AI explanation in Diagnostic Sidebar
 
 ---
 
