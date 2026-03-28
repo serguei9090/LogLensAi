@@ -1,0 +1,32 @@
+$ vite
+
+  VITE v6.4.1  ready in 481 ms
+
+  ➜  Local:   http://localhost:5173/
+  ➜  Network: use --host to expose
+4:01:50 AM [vite] (client) page reload sidecar/src/tailer.py
+4:01:50 AM [vite] (client) page reload sidecar/src/api.py
+4:01:55 AM [vite] (client) page reload docs/track/TODO.md
+4:03:20 AM [vite] (client) hmr update /src/components/atoms/IconButton.tsx, /src/styles/globals.css
+4:03:20 AM [vite] (client) hmr update /src/App.tsx, /src/styles/globals.css
+4:03:20 AM [vite] vite.config.ts changed, restarting server...
+4:03:20 AM [vite] (client) page reload src-tauri/capabilities/default.json
+4:03:20 AM [vite] (client) hmr update /src/components/atoms/TailSwitch.tsx, /src/styles/globals.css
+4:03:20 AM [vite] (client) hmr update /src/components/molecules/HighlightBuilder.tsx, /src/styles/globals.css
+4:03:20 AM [vite] (client) hmr update /src/components/molecules/FilterBuilder.tsx, /src/styles/globals.css
+4:03:20 AM [vite] (client) hmr update /src/App.tsx, /src/styles/globals.css, /src/components/pages/InvestigationPage.tsx
+4:03:20 AM [vite] (client) hmr update /src/components/molecules/WorkspaceTabs.tsx, /src/styles/globals.css
+4:03:20 AM [vite] (client) hmr update /src/components/pages/InvestigationPage.tsx, /src/styles/globals.css
+4:03:20 AM [vite] (client) hmr update /src/components/organisms/CustomParserModal.tsx, /src/styles/globals.css
+4:03:20 AM [vite] (client) page reload src/main.tsx
+4:03:20 AM [vite] (client) hmr update /src/components/organisms/LogToolbar.tsx, /src/styles/globals.css
+4:03:20 AM [vite] (client) page reload src/components/ui/textarea.tsx
+4:03:20 AM [vite] (client) page reload src/components/organisms/FusionConfigEngine.tsx
+4:03:20 AM [vite] (client) hmr update /src/components/organisms/ImportFeedModal.tsx, /src/styles/globals.css
+4:03:20 AM [vite] (client) hmr update /src/components/organisms/OrchestratorHub.tsx, /src/styles/globals.css
+4:03:20 AM [vite] (client) hmr update /src/components/organisms/VirtualLogTable.tsx, /src/styles/globals.css
+4:03:20 AM [vite] (client) hmr update /src/components/organisms/SettingsPanel.tsx, /src/styles/globals.css
+4:03:20 AM [vite] (client) hmr update /src/components/organisms/Sidebar.tsx, /src/styles/globals.css
+4:03:20 AM [vite] (client) hmr update /src/components/pages/InvestigationPage.tsx, /src/styles/globals.css
+4:03:20 AM [vite] (client) hmr update /src/components/templates/InvestigationLayout.tsx, /src/styles/globals.css
+4:03:20 AM [vite] server restarted.

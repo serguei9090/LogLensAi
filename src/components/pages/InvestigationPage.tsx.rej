@@ -1,0 +1,33 @@
+diff a/src/components/pages/InvestigationPage.tsx b/src/components/pages/InvestigationPage.tsx	(rejected hunks)
+@@ -275,16 +301,16 @@ export function InvestigationPage() {
+   };
+ 
+   const handleEditFusion = (sourceId: string) => {
+-    const src = sources.find(s => s.id === sourceId);
++    const src = sources.find((s) => s.id === sourceId);
+     if (!src) return;
+-    setEditingFusionId(src.path);   // path stores fusionId for fusion-type sources
++    setEditingFusionId(src.path); // path stores fusionId for fusion-type sources
+     setEditingFusionName(src.name);
+     setIsOrchestratorOpen(true);
+   };
+ 
+   const handleFusionSaved = (fusionId: string, fusionName: string) => {
+     // Check if fusion tab already exists — update its name, otherwise add
+-    const existingSrc = sources.find(s => s.path === fusionId);
++    const existingSrc = sources.find((s) => s.path === fusionId);
+     if (!existingSrc) {
+       const newSrc = addSource(activeWorkspaceId, {
+         name: fusionName,
+@@ -293,9 +319,9 @@ export function InvestigationPage() {
+       });
+       // Auto-switch to the new fusion tab
+       setActiveSource(activeWorkspaceId, newSrc.id);
++    } else {
++      updateSource(activeWorkspaceId, existingSrc.id, { name: fusionName });
+     }
+-    // If editing, the name is stored in store.name — updating requires a store action
+-    // TODO(ORK-001): Add updateSource action to workspaceStore for renaming fusion tabs
+   };
+ 
+   // ── Render ────────────────────────────────────────────────────────────────

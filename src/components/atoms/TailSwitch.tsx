@@ -9,7 +9,12 @@ interface TailSwitchProps {
 }
 
 /** Modern pill-style Live Tail toggle with pulsing dot indicator */
-export function TailSwitch({ checked, onCheckedChange, label = "Live Tail", className }: TailSwitchProps) {
+export function TailSwitch({
+  checked,
+  onCheckedChange,
+  label = "Live Tail",
+  className,
+}: TailSwitchProps) {
   return (
     <button
       type="button"

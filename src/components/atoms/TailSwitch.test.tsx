@@ -13,5 +13,5 @@ test("renders TailSwitch and responds to clicks", () => {
   expect(switchRole).not.toBeChecked();
 
   fireEvent.click(switchRole);
-  expect(handleChange).toHaveBeenCalledWith(true, expect.anything());
+  expect(handleChange).toHaveBeenCalledWith(true);
 });

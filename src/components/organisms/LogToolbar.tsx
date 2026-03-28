@@ -1,11 +1,11 @@
-import { SearchBar } from "@/components/molecules/SearchBar";
-import { FilterBuilder, FilterEntry } from "@/components/molecules/FilterBuilder";
-import { HighlightBuilder, HighlightEntry } from "@/components/molecules/HighlightBuilder";
-import { WorkspaceTabs } from "@/components/molecules/WorkspaceTabs";
-import { TailSwitch } from "@/components/atoms/TailSwitch";
 import { StatusDot } from "@/components/atoms/StatusDot";
-import { Upload, Cpu } from "lucide-react";
+import { TailSwitch } from "@/components/atoms/TailSwitch";
+import { FilterBuilder, type FilterEntry } from "@/components/molecules/FilterBuilder";
+import { HighlightBuilder, type HighlightEntry } from "@/components/molecules/HighlightBuilder";
+import { SearchBar } from "@/components/molecules/SearchBar";
+import { WorkspaceTabs } from "@/components/molecules/WorkspaceTabs";
 import type { LogSource } from "@/store/workspaceStore";
+import { Cpu, Upload } from "lucide-react";
 
 interface LogToolbarProps {
   onSearch: (q: string) => void;

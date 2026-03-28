@@ -116,10 +116,18 @@ export function Sidebar({
                       }}
                       className="flex-1 bg-zinc-800 border border-emerald-500/30 rounded px-2 py-0.5 text-xs text-zinc-100 outline-none"
                     />
-                    <button type="button" onClick={() => handleConfirmRename(ws.id)} className="text-emerald-400 hover:text-emerald-300">
+                    <button
+                      type="button"
+                      onClick={() => handleConfirmRename(ws.id)}
+                      className="text-emerald-400 hover:text-emerald-300"
+                    >
                       <Check className="h-3.5 w-3.5" />
                     </button>
-                    <button type="button" onClick={() => setRenamingId(null)} className="text-zinc-500 hover:text-zinc-300">
+                    <button
+                      type="button"
+                      onClick={() => setRenamingId(null)}
+                      className="text-zinc-500 hover:text-zinc-300"
+                    >
                       <X className="h-3.5 w-3.5" />
                     </button>
                   </div>
@@ -134,14 +142,22 @@ export function Sidebar({
                         : "text-zinc-400 hover:bg-zinc-800/60 hover:text-zinc-200 border border-transparent",
                     )}
                   >
-                    <Database className={cn("h-3.5 w-3.5 shrink-0", activeWorkspaceId === ws.id ? "text-emerald-400" : "text-zinc-600")} />
+                    <Database
+                      className={cn(
+                        "h-3.5 w-3.5 shrink-0",
+                        activeWorkspaceId === ws.id ? "text-emerald-400" : "text-zinc-600",
+                      )}
+                    />
                     <span className="flex-1 truncate">{ws.name}</span>
                     {/* Action icons on hover */}
                     <span className="hidden group-hover:flex items-center gap-1 shrink-0">
                       <span
                         role="button"
                         tabIndex={0}
-                        onClick={(e) => { e.stopPropagation(); handleStartRename(ws.id, ws.name); }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleStartRename(ws.id, ws.name);
+                        }}
                         onKeyDown={(e) => e.key === "Enter" && handleStartRename(ws.id, ws.name)}
                         className="p-0.5 rounded text-zinc-500 hover:text-zinc-200 hover:bg-zinc-700 transition-colors text-[10px]"
                         aria-label="Rename"
@@ -152,7 +168,10 @@ export function Sidebar({
                         <span
                           role="button"
                           tabIndex={0}
-                          onClick={(e) => { e.stopPropagation(); onWorkspaceDelete?.(ws.id); }}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onWorkspaceDelete?.(ws.id);
+                          }}
                           onKeyDown={(e) => e.key === "Enter" && onWorkspaceDelete?.(ws.id)}
                           className="p-0.5 rounded text-zinc-500 hover:text-red-400 hover:bg-red-500/10 transition-colors"
                           aria-label="Delete"
@@ -180,10 +199,18 @@ export function Sidebar({
                   }}
                   className="flex-1 bg-zinc-800 border border-emerald-500/30 rounded px-2 py-1 text-xs text-zinc-100 placeholder:text-zinc-600 outline-none focus:border-emerald-400"
                 />
-                <button type="button" onClick={handleConfirmAdd} className="text-emerald-400 hover:text-emerald-300">
+                <button
+                  type="button"
+                  onClick={handleConfirmAdd}
+                  className="text-emerald-400 hover:text-emerald-300"
+                >
                   <Check className="h-3.5 w-3.5" />
                 </button>
-                <button type="button" onClick={handleCancelAdd} className="text-zinc-500 hover:text-zinc-300">
+                <button
+                  type="button"
+                  onClick={handleCancelAdd}
+                  className="text-zinc-500 hover:text-zinc-300"
+                >
                   <X className="h-3.5 w-3.5" />
                 </button>
               </div>
@@ -213,7 +240,9 @@ export function Sidebar({
                 <div className="w-full flex items-center gap-3 px-3 py-2.5 text-[13px] rounded-md text-zinc-700 cursor-not-allowed border border-transparent">
                   <LayoutDashboard className="h-4 w-4" />
                   Dashboard
-                  <span className="ml-auto text-[9px] bg-zinc-800 text-zinc-600 rounded px-1.5 py-0.5 font-medium tracking-wide">SOON</span>
+                  <span className="ml-auto text-[9px] bg-zinc-800 text-zinc-600 rounded px-1.5 py-0.5 font-medium tracking-wide">
+                    SOON
+                  </span>
                 </div>
               </TooltipTrigger>
               <TooltipContent side="right">Coming Soon</TooltipContent>

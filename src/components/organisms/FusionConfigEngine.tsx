@@ -1,9 +1,9 @@
-import { useState, useEffect, useRef } from "react";
-import { createPortal } from "react-dom";
-import { Check, Clock, Save, X, Settings2, Globe, Sparkles, ChevronDown } from "lucide-react";
+import { callSidecar } from "@/lib/hooks/useSidecarBridge";
 import { cn } from "@/lib/utils";
 import type { LogSource } from "@/store/workspaceStore";
-import { callSidecar } from "@/lib/hooks/useSidecarBridge";
+import { Check, ChevronDown, Clock, Globe, Save, Settings2, Sparkles, X } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { toast } from "sonner";
 import { CustomParserModal } from "./CustomParserModal";
 
@@ -108,7 +108,7 @@ function TimezoneSelect({
           className={cn(
             "bg-[#111613] border border-white/10 rounded-xl shadow-2xl",
             "max-h-52 overflow-y-auto",
-            "animate-in fade-in slide-in-from-top-2 duration-150"
+            "animate-in fade-in slide-in-from-top-2 duration-150",
           )}
         >
           {TIMEZONE_OPTIONS.map((opt) => (
@@ -124,14 +124,14 @@ function TimezoneSelect({
                 "w-full text-left px-3 py-2 text-[11px] font-mono transition-colors",
                 opt.value === value
                   ? "bg-primary/20 text-primary font-bold"
-                  : "text-white/70 hover:bg-white/5 hover:text-white"
+                  : "text-white/70 hover:bg-white/5 hover:text-white",
               )}
             >
               {opt.label}
             </button>
           ))}
         </div>,
-        document.body
+        document.body,
       )
     : null;
 
@@ -146,13 +146,16 @@ function TimezoneSelect({
           "bg-[#0D0F0E] border text-white",
           open
             ? "border-primary ring-1 ring-primary/40 text-primary"
-            : "border-white/10 hover:border-primary/40 hover:text-primary"
+            : "border-white/10 hover:border-primary/40 hover:text-primary",
         )}
       >
         <Clock className="size-3 opacity-60" />
         <span>{selected.label}</span>
         <ChevronDown
-          className={cn("size-3 opacity-60 transition-transform duration-200", open && "rotate-180")}
+          className={cn(
+            "size-3 opacity-60 transition-transform duration-200",
+            open && "rotate-180",
+          )}
         />
       </button>
       {panel}
@@ -208,19 +211,19 @@ export function FusionConfigEngine({
   // 2. Local state updaters
   const toggleSource = (sourceId: string) => {
     setConfigs((prev) =>
-      prev.map((c) => (c.source_id === sourceId ? { ...c, enabled: !c.enabled } : c))
+      prev.map((c) => (c.source_id === sourceId ? { ...c, enabled: !c.enabled } : c)),
     );
   };
 
   const updateOffset = (sourceId: string, offset: number) => {
     setConfigs((prev) =>
-      prev.map((c) => (c.source_id === sourceId ? { ...c, tz_offset: offset } : c))
+      prev.map((c) => (c.source_id === sourceId ? { ...c, tz_offset: offset } : c)),
     );
   };
 
   const handleParserSaved = (sourceId: string, configJson: string) => {
     setConfigs((prev) =>
-      prev.map((c) => (c.source_id === sourceId ? { ...c, parser_config: configJson } : c))
+      prev.map((c) => (c.source_id === sourceId ? { ...c, parser_config: configJson } : c)),
     );
     toast.success("Extraction pattern updated locally.");
   };
@@ -254,15 +257,18 @@ export function FusionConfigEngine({
   return (
     <div className="flex-1 flex flex-col items-center justify-center p-6 space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
       <div className="max-w-3xl w-full flex flex-col space-y-6 bg-surface-base/40 border border-border/40 rounded-xl p-8 backdrop-blur-sm shadow-2xl">
-
         {/* Header */}
         <div className="flex items-center gap-4 border-b border-border/40 pb-6">
           <div className="p-3 rounded-xl bg-primary/10 text-primary ring-1 ring-primary/20">
             <Globe className="size-6" />
           </div>
           <div>
-            <h2 className="text-xl font-bold text-text-primary tracking-tight">Fusion Orchestration</h2>
-            <p className="text-sm text-text-muted mt-0.5">Interleave and synchronize multi-source logs</p>
+            <h2 className="text-xl font-bold text-text-primary tracking-tight">
+              Fusion Orchestration
+            </h2>
+            <p className="text-sm text-text-muted mt-0.5">
+              Interleave and synchronize multi-source logs
+            </p>
           </div>
         </div>
 
@@ -280,7 +286,7 @@ export function FusionConfigEngine({
                   "flex items-center gap-4 p-4 rounded-lg border transition-all duration-200",
                   config.enabled
                     ? "bg-primary/5 border-primary/20"
-                    : "bg-black/20 border-border/20 grayscale opacity-60"
+                    : "bg-black/20 border-border/20 grayscale opacity-60",
                 )}
               >
                 {/* Enabled toggle */}
@@ -289,7 +295,7 @@ export function FusionConfigEngine({
                   onClick={() => toggleSource(config.source_id)}
                   className={cn(
                     "size-5 rounded flex-shrink-0 flex items-center justify-center transition-colors",
-                    config.enabled ? "bg-primary text-black" : "bg-white/5 border border-white/10"
+                    config.enabled ? "bg-primary text-black" : "bg-white/5 border border-white/10",
                   )}
                 >
                   {config.enabled && <Check className="size-3.5 stroke-[3]" />}
@@ -297,7 +303,9 @@ export function FusionConfigEngine({
 
                 {/* Source label + path */}
                 <div className="flex-1 min-w-0">
-                  <span className="block text-sm font-semibold text-text-secondary truncate">{label}</span>
+                  <span className="block text-sm font-semibold text-text-secondary truncate">
+                    {label}
+                  </span>
                   <span className="block text-[10px] text-text-muted truncate lowercase font-mono">
                     {config.source_id}
                   </span>
@@ -322,7 +330,7 @@ export function FusionConfigEngine({
                     "p-2.5 rounded-lg border transition-all relative flex-shrink-0 flex items-center justify-center",
                     hasParser
                       ? "bg-primary text-black border-primary shadow-[0_0_10px_rgba(34,197,94,0.3)]"
-                      : "bg-white/5 border-white/10 text-text-muted hover:text-text-primary hover:border-white/20"
+                      : "bg-white/5 border-white/10 text-text-muted hover:text-text-primary hover:border-white/20",
                   )}
                   title="Configure Extraction Parser"
                 >
@@ -348,7 +356,9 @@ export function FusionConfigEngine({
         {/* Action Footer */}
         <div className="flex items-center justify-between pt-6 border-t border-border/40">
           <div className="flex flex-col">
-            <span className="text-[11px] text-text-muted font-medium uppercase tracking-wider">Sync Strategy</span>
+            <span className="text-[11px] text-text-muted font-medium uppercase tracking-wider">
+              Sync Strategy
+            </span>
             <span className="text-sm font-bold text-primary">Interleaved Timestamp Alignment</span>
           </div>
 
@@ -358,7 +368,7 @@ export function FusionConfigEngine({
             disabled={isSaving || configs.length === 0}
             className={cn(
               "flex items-center gap-2 px-6 py-2.5 rounded-lg font-bold text-sm transition-all shadow-lg active:scale-95",
-              "bg-primary text-black hover:bg-primary-hover disabled:opacity-50 disabled:active:scale-100"
+              "bg-primary text-black hover:bg-primary-hover disabled:opacity-50 disabled:active:scale-100",
             )}
           >
             {isSaving ? (
@@ -375,7 +385,8 @@ export function FusionConfigEngine({
       <div className="max-w-md text-center">
         <p className="text-[11px] text-text-muted leading-relaxed">
           Fusion Mode merges all enabled sources into a single stream. Use{" "}
-          <span className="text-text-secondary font-bold">Sync Drift</span> to align logs living in different timezones.
+          <span className="text-text-secondary font-bold">Sync Drift</span> to align logs living in
+          different timezones.
         </p>
       </div>
 
@@ -386,7 +397,9 @@ export function FusionConfigEngine({
           sourceId={activeParserSource}
           isOpen={true}
           onClose={() => setActiveParserSource(null)}
-          initialConfig={configs.find((c) => c.source_id === activeParserSource)?.parser_config ?? null}
+          initialConfig={
+            configs.find((c) => c.source_id === activeParserSource)?.parser_config ?? null
+          }
           onSaved={(newConfig) => handleParserSaved(activeParserSource, newConfig)}
         />
       )}

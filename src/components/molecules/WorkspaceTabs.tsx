@@ -1,6 +1,6 @@
-import { X, Pencil } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { LogSource } from "@/store/workspaceStore";
+import { Pencil, X } from "lucide-react";
 
 interface WorkspaceTabsProps {
   /** All sources attached to the active workspace */
@@ -65,7 +65,9 @@ export function WorkspaceTabs({
           >
             {/* Fusion icon or live-tail indicator */}
             {isFusion ? (
-              <span className="text-violet-400/70 text-[9px] font-bold uppercase tracking-wider">⚡</span>
+              <span className="text-violet-400/70 text-[9px] font-bold uppercase tracking-wider">
+                ⚡
+              </span>
             ) : isTailing ? (
               <span aria-label="Live tailing" className="relative flex h-2 w-2 shrink-0">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-60" />

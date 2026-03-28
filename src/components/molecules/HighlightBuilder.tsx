@@ -70,7 +70,9 @@ export function HighlightBuilder({ highlights, onChange }: HighlightBuilderProps
 
           {/* Color palette */}
           <div className="px-3 pt-3 pb-2">
-            <p className="text-[10px] uppercase tracking-wider text-zinc-600 mb-2 font-medium">Color</p>
+            <p className="text-[10px] uppercase tracking-wider text-zinc-600 mb-2 font-medium">
+              Color
+            </p>
             <div className="flex gap-2">
               {PRESET_COLORS.map((c) => (
                 <button
@@ -80,7 +82,9 @@ export function HighlightBuilder({ highlights, onChange }: HighlightBuilderProps
                   title={c.name}
                   className={cn(
                     "w-6 h-6 rounded-full transition-all border-2",
-                    color === c.hex ? "border-white scale-110 shadow-md" : "border-transparent hover:scale-105 hover:border-zinc-500",
+                    color === c.hex
+                      ? "border-white scale-110 shadow-md"
+                      : "border-transparent hover:scale-105 hover:border-zinc-500",
                   )}
                   style={{ backgroundColor: c.hex }}
                 />
@@ -90,7 +94,9 @@ export function HighlightBuilder({ highlights, onChange }: HighlightBuilderProps
 
           {/* Term input */}
           <div className="px-3 pb-3">
-            <p className="text-[10px] uppercase tracking-wider text-zinc-600 mb-1.5 font-medium">Term</p>
+            <p className="text-[10px] uppercase tracking-wider text-zinc-600 mb-1.5 font-medium">
+              Term
+            </p>
             <div className="flex gap-2 items-center">
               <div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: color }} />
               <Input
@@ -114,7 +120,9 @@ export function HighlightBuilder({ highlights, onChange }: HighlightBuilderProps
           {highlights.length > 0 && (
             <div className="border-t border-zinc-800 px-3 py-2 space-y-1.5">
               <div className="flex items-center justify-between mb-1">
-                <p className="text-[10px] uppercase tracking-wider text-zinc-600 font-medium">Active</p>
+                <p className="text-[10px] uppercase tracking-wider text-zinc-600 font-medium">
+                  Active
+                </p>
                 <button
                   type="button"
                   onClick={() => onChange([])}
@@ -124,10 +132,20 @@ export function HighlightBuilder({ highlights, onChange }: HighlightBuilderProps
                 </button>
               </div>
               {highlights.map((h) => (
-                <div key={h.id} className="flex items-center gap-2 bg-zinc-800/60 rounded-md px-2 py-1.5">
-                  <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: h.color }} />
+                <div
+                  key={h.id}
+                  className="flex items-center gap-2 bg-zinc-800/60 rounded-md px-2 py-1.5"
+                >
+                  <span
+                    className="w-2.5 h-2.5 rounded-full shrink-0"
+                    style={{ backgroundColor: h.color }}
+                  />
                   <span className="text-xs text-zinc-200 font-mono flex-1 truncate">{h.term}</span>
-                  <button type="button" onClick={() => handleRemove(h.id)} className="text-zinc-600 hover:text-red-400 transition-colors">
+                  <button
+                    type="button"
+                    onClick={() => handleRemove(h.id)}
+                    className="text-zinc-600 hover:text-red-400 transition-colors"
+                  >
                     <X className="h-3 w-3" />
                   </button>
                 </div>
@@ -144,9 +162,17 @@ export function HighlightBuilder({ highlights, onChange }: HighlightBuilderProps
           className="inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 text-xs font-mono border h-6"
           style={{ backgroundColor: `${h.color}18`, borderColor: `${h.color}44`, color: h.color }}
         >
-          <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: h.color }} />
+          <span
+            className="w-1.5 h-1.5 rounded-full shrink-0"
+            style={{ backgroundColor: h.color }}
+          />
           {h.term}
-          <button type="button" onClick={() => handleRemove(h.id)} className="opacity-60 hover:opacity-100 transition-opacity" aria-label="Remove highlight">
+          <button
+            type="button"
+            onClick={() => handleRemove(h.id)}
+            className="opacity-60 hover:opacity-100 transition-opacity"
+            aria-label="Remove highlight"
+          >
             <X className="h-3 w-3" />
           </button>
         </span>

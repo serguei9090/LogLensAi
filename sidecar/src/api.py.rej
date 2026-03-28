@@ -1,0 +1,99 @@
+diff a/sidecar/src/api.py b/sidecar/src/api.py	(rejected hunks)
+@@ -86,10 +85,12 @@ class FusionSourceConfig(BaseModel):
+ 
+ class UpdateFusionConfigRequest(BaseModel):
+     workspace_id: str
++    fusion_id: str
+     sources: list[FusionSourceConfig]
+ 
+ class GetFusionConfigRequest(BaseModel):
+     workspace_id: str
++    fusion_id: str
+ 
+ class GetSampleLinesRequest(BaseModel):
+     workspace_id: str
+@@ -103,6 +104,7 @@ class UpdateSourceParserRequest(BaseModel):
+ 
+ class GetFusedLogsRequest(BaseModel):
+     workspace_id: str
++    fusion_id: str
+     offset: int = 0
+     limit: int = 100
+     filters: list[LogFilter] | None = None
+@@ -303,13 +305,40 @@ class App:
+         
+         # 1. Get enabled sources from fusion_config
+         cursor.execute(
+-            "SELECT source_id FROM fusion_configs WHERE workspace_id = ? AND enabled = TRUE", 
+-            (params.workspace_id,)
++            "SELECT source_id, tz_offset FROM fusion_configs WHERE workspace_id = ? AND fusion_id = ? AND enabled = TRUE", 
++            (params.workspace_id, params.fusion_id)
+         )
+-        enabled_ids = [row[0] for row in cursor.fetchall()]
++        rows = cursor.fetchall()
++        enabled_ids = [row[0] for row in rows]
+         
++        # Create a dictionary of tz_offsets keyed by source_id
++        tz_offsets = {row[0]: row[1] for row in rows}
++
+         # 2. delegate to internal fetcher with restricted sources
+-        return self._get_logs_internal(**params.model_dump(), source_ids=enabled_ids)
++        model_dump = params.model_dump()
++        # Remove fusion_id as _get_logs_internal doesn't expect it directly
++        model_dump.pop("fusion_id", None)
++        result = self._get_logs_internal(**model_dump, source_ids=enabled_ids)
++        
++        # 3. Apply Timezone Normalization (PARS-004)
++        from datetime import timedelta
++        
++        normalized_logs = []
++        for log in result["logs"]:
++            source_id = log.get("source_id")
++            offset = tz_offsets.get(source_id, 0)
++            if offset != 0 and log.get("timestamp"):
++                try:
++                    # Parse timestamp, assuming common format YYYY-MM-DD HH:MM:SS
++                    dt = datetime.strptime(log["timestamp"][:19], "%Y-%m-%d %H:%M:%S")
++                    dt = dt + timedelta(hours=offset)
++                    log["timestamp"] = dt.strftime("%Y-%m-%d %H:%M:%S")
++                except Exception:
++                    pass
++            normalized_logs.append(log)
++            
++        result["logs"] = normalized_logs
++        return result
+ 
+     def method_update_fusion_config(self, **kwargs) -> dict:
+         """Save source orchestration settings (Enabled toggles, Timezones)."""
+@@ -318,14 +347,14 @@ class App:
+         
+         for src in params.sources:
+             cursor.execute("""
+-                INSERT INTO fusion_configs (workspace_id, source_id, enabled, tz_offset, custom_format, parser_config)
+-                VALUES (?, ?, ?, ?, ?, ?)
+-                ON CONFLICT (workspace_id, source_id) DO UPDATE SET
++                INSERT INTO fusion_configs (workspace_id, fusion_id, source_id, enabled, tz_offset, custom_format, parser_config)
++                VALUES (?, ?, ?, ?, ?, ?, ?)
++                ON CONFLICT (workspace_id, fusion_id, source_id) DO UPDATE SET
+                     enabled = excluded.enabled,
+                     tz_offset = excluded.tz_offset,
+                     custom_format = excluded.custom_format,
+                     parser_config = excluded.parser_config
+-            """, (params.workspace_id, src.source_id, src.enabled, src.tz_offset, src.custom_format, src.parser_config))
++            """, (params.workspace_id, params.fusion_id, src.source_id, src.enabled, src.tz_offset, src.custom_format, src.parser_config))
+         
+         return {"status": "ok"}
+ 
+@@ -347,10 +376,10 @@ class App:
+         )
+         return {"status": "ok"}
+ 
+-    def method_get_fusion_config(self, workspace_id: str) -> dict:
++    def method_get_fusion_config(self, workspace_id: str, fusion_id: str) -> dict:
+         """Retrieve current Fusion orchestration setup."""
+         cursor = self.db.get_cursor()
+-        cursor.execute("SELECT source_id, enabled, tz_offset, custom_format, parser_config FROM fusion_configs WHERE workspace_id = ?", (workspace_id,))
++        cursor.execute("SELECT source_id, enabled, tz_offset, custom_format, parser_config FROM fusion_configs WHERE workspace_id = ? AND fusion_id = ?", (workspace_id, fusion_id))
+         rows = cursor.fetchall()
+         
+         sources = [

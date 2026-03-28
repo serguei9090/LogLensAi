@@ -35,9 +35,7 @@ export default function App() {
         workspaces={workspaces}
         activeWorkspaceId={activeWorkspaceId}
         onWorkspaceSelect={setActive}
-        onWorkspaceCreate={(name) =>
-          addWorkspace({ id: `ws-${Date.now()}`, name })
-        }
+        onWorkspaceCreate={(name) => addWorkspace({ id: `ws-${Date.now()}`, name })}
         onWorkspaceRename={renameWorkspace}
         onWorkspaceDelete={removeWorkspace}
         activeNav={activeNav}

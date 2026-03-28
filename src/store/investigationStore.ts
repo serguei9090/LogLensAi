@@ -43,4 +43,3 @@ export const useInvestigationStore = create<InvestigationStore>((set) => ({
   setTailing: (isTailing) => set({ isTailing }),
   setSort: (sortBy, sortOrder) => set({ sortBy, sortOrder }),
 }));
-

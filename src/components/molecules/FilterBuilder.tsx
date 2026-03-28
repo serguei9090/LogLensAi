@@ -82,7 +82,9 @@ export function FilterBuilder({ filters, onChange }: FilterBuilderProps) {
           {/* Field & Operator pills */}
           <div className="px-3 pt-3 pb-2 flex gap-2">
             <div className="flex-1">
-              <p className="text-[10px] uppercase tracking-wider text-zinc-600 mb-1 font-medium">Field</p>
+              <p className="text-[10px] uppercase tracking-wider text-zinc-600 mb-1 font-medium">
+                Field
+              </p>
               <div className="flex flex-wrap gap-1">
                 {FIELDS.map((f) => (
                   <button
@@ -104,7 +106,9 @@ export function FilterBuilder({ filters, onChange }: FilterBuilderProps) {
           </div>
 
           <div className="px-3 pb-2">
-            <p className="text-[10px] uppercase tracking-wider text-zinc-600 mb-1 font-medium">Operator</p>
+            <p className="text-[10px] uppercase tracking-wider text-zinc-600 mb-1 font-medium">
+              Operator
+            </p>
             <div className="flex flex-wrap gap-1">
               {OPERATORS.map((op) => (
                 <button
@@ -148,7 +152,9 @@ export function FilterBuilder({ filters, onChange }: FilterBuilderProps) {
           {filters.length > 0 && (
             <div className="border-t border-zinc-800 px-3 py-2 space-y-1.5">
               <div className="flex items-center justify-between mb-1">
-                <p className="text-[10px] uppercase tracking-wider text-zinc-600 font-medium">Active</p>
+                <p className="text-[10px] uppercase tracking-wider text-zinc-600 font-medium">
+                  Active
+                </p>
                 <button
                   type="button"
                   onClick={() => onChange([])}
@@ -158,33 +164,46 @@ export function FilterBuilder({ filters, onChange }: FilterBuilderProps) {
                 </button>
               </div>
               {filters.map((f, i) => (
-                <div key={f.id} className="flex items-center gap-2 bg-zinc-800/60 rounded-md px-2 py-1.5 group/f">
+                <div
+                  key={f.id}
+                  className="flex items-center gap-2 bg-zinc-800/60 rounded-md px-2 py-1.5 group/f"
+                >
                   <div className="flex flex-col opacity-0 group-hover/f:opacity-100 transition-opacity">
-                    <button 
-                      type="button" 
+                    <button
+                      type="button"
                       disabled={i === 0}
                       onClick={() => {
                         const newF = [...filters];
-                        [newF[i-1], newF[i]] = [newF[i], newF[i-1]];
+                        [newF[i - 1], newF[i]] = [newF[i], newF[i - 1]];
                         onChange(newF);
                       }}
                       className="text-[8px] text-zinc-500 hover:text-emerald-400 disabled:opacity-0"
-                    >▲</button>
-                    <button 
-                      type="button" 
+                    >
+                      ▲
+                    </button>
+                    <button
+                      type="button"
                       disabled={i === filters.length - 1}
                       onClick={() => {
                         const newF = [...filters];
-                        [newF[i+1], newF[i]] = [newF[i], newF[i+1]];
+                        [newF[i + 1], newF[i]] = [newF[i], newF[i + 1]];
                         onChange(newF);
                       }}
                       className="text-[8px] text-zinc-500 hover:text-emerald-400 disabled:opacity-0"
-                    >▼</button>
+                    >
+                      ▼
+                    </button>
                   </div>
-                  <span className="text-[10px] text-emerald-500/80 font-mono font-bold shrink-0">{f.field}</span>
+                  <span className="text-[10px] text-emerald-500/80 font-mono font-bold shrink-0">
+                    {f.field}
+                  </span>
                   <span className="text-[10px] text-zinc-600 italic shrink-0">{f.operator}</span>
                   <span className="text-xs text-zinc-200 font-mono flex-1 truncate">{f.value}</span>
-                  <button type="button" onClick={() => handleRemove(f.id)} className="text-zinc-600 hover:text-red-400 transition-colors shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => handleRemove(f.id)}
+                    className="text-zinc-600 hover:text-red-400 transition-colors shrink-0"
+                  >
                     <X className="h-3 w-3" />
                   </button>
                 </div>
@@ -203,7 +222,12 @@ export function FilterBuilder({ filters, onChange }: FilterBuilderProps) {
           <span className="text-[10px] text-emerald-500/70 font-mono">{f.field}</span>
           <span className="text-[10px] text-zinc-500">{f.operator}</span>
           <span className="text-xs font-mono max-w-[80px] truncate">{f.value}</span>
-          <button type="button" onClick={() => handleRemove(f.id)} className="hover:text-red-400 transition-colors rounded-full p-0.5" aria-label="Remove filter">
+          <button
+            type="button"
+            onClick={() => handleRemove(f.id)}
+            className="hover:text-red-400 transition-colors rounded-full p-0.5"
+            aria-label="Remove filter"
+          >
             <X className="h-3 w-3" />
           </button>
         </Badge>

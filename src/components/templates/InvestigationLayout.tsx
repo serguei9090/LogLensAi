@@ -1,8 +1,8 @@
-import { ReactNode } from "react";
+import type { FilterEntry } from "@/components/molecules/FilterBuilder";
+import type { HighlightEntry } from "@/components/molecules/HighlightBuilder";
 import { LogToolbar } from "@/components/organisms/LogToolbar";
-import { FilterEntry } from "@/components/molecules/FilterBuilder";
-import { HighlightEntry } from "@/components/molecules/HighlightBuilder";
 import type { LogSource } from "@/store/workspaceStore";
+import type { ReactNode } from "react";
 
 interface InvestigationLayoutProps {
   onSearch: (q: string) => void;
@@ -63,9 +63,7 @@ export function InvestigationLayout({
         onRemoveSource={onRemoveSource}
         onEditFusion={onEditFusion}
       />
-      <div className="flex-1 min-h-0 overflow-hidden">
-        {children}
-      </div>
+      <div className="flex-1 min-h-0 overflow-hidden">{children}</div>
     </div>
   );
 }

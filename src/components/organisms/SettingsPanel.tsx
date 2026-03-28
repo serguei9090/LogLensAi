@@ -17,7 +17,8 @@ export interface AppSettings {
 const defaultSettings: AppSettings = {
   ai_provider: "gemini-cli",
   ai_api_key: "",
-  ai_system_prompt: "You are a Log Analysis Specialist. Return JSON with summary, root_cause, actions.",
+  ai_system_prompt:
+    "You are a Log Analysis Specialist. Return JSON with summary, root_cause, actions.",
   drain_similarity_threshold: 0.4,
   drain_max_children: 100,
   drain_max_clusters: 1000,
@@ -57,23 +58,29 @@ function SettingSelect({
 }) {
   return (
     <div className="relative">
-        <select
+      <select
         value={value}
         onChange={(e) => onChange(e.target.value)}
         className="w-full h-10 px-4 rounded-xl text-sm bg-bg-surface border border-border text-text-primary focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all appearance-none cursor-pointer"
-        >
+      >
         {children}
-        </select>
-        <div className="absolute right-3 top-1/2 -translateY-1/2 pointer-events-none opacity-40">
-            <Check className="h-3 w-3 rotate-90" />
-        </div>
+      </select>
+      <div className="absolute right-3 top-1/2 -translateY-1/2 pointer-events-none opacity-40">
+        <Check className="h-3 w-3 rotate-90" />
+      </div>
     </div>
   );
 }
 
-function SectionLabel({ children, htmlFor }: { readonly children: React.ReactNode; readonly htmlFor?: string }) {
+function SectionLabel({
+  children,
+  htmlFor,
+}: { readonly children: React.ReactNode; readonly htmlFor?: string }) {
   return (
-    <label htmlFor={htmlFor} className="block text-[11px] font-bold uppercase tracking-wider text-text-muted mb-2 ml-1">
+    <label
+      htmlFor={htmlFor}
+      className="block text-[11px] font-bold uppercase tracking-wider text-text-muted mb-2 ml-1"
+    >
       {children}
     </label>
   );
@@ -98,8 +105,8 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
       {/* Sidebar Nav */}
       <aside className="w-64 shrink-0 border-r border-border bg-bg-surface/30 flex flex-col p-6">
         <div className="mb-8">
-            <h1 className="text-xl font-bold text-text-primary">Settings</h1>
-            <p className="text-xs text-text-muted mt-1">Configure your log analysis environment</p>
+          <h1 className="text-xl font-bold text-text-primary">Settings</h1>
+          <p className="text-xs text-text-muted mt-1">Configure your log analysis environment</p>
         </div>
 
         <nav className="flex flex-col gap-1.5 flex-1">
@@ -115,13 +122,20 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
                   : "text-text-secondary hover:bg-white/5 hover:text-text-primary border border-transparent",
               )}
             >
-              <Icon className={cn("h-5 w-5 shrink-0 transition-transform group-hover:scale-110", activeSection === id ? "text-primary" : "text-text-muted group-hover:text-text-secondary")} />
+              <Icon
+                className={cn(
+                  "h-5 w-5 shrink-0 transition-transform group-hover:scale-110",
+                  activeSection === id
+                    ? "text-primary"
+                    : "text-text-muted group-hover:text-text-secondary",
+                )}
+              />
               <div>
                 <p className="text-[13px] font-semibold">{label}</p>
                 <p className="text-[10px] mt-0.5 opacity-60 leading-none">{desc}</p>
               </div>
               {activeSection === id && (
-                  <div className="absolute left-0 top-1/4 bottom-1/4 w-1 bg-primary rounded-full" />
+                <div className="absolute left-0 top-1/4 bottom-1/4 w-1 bg-primary rounded-full" />
               )}
             </button>
           ))}
@@ -144,8 +158,8 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
             </>
           ) : (
             <>
-                <Save className="h-5 w-5" />
-                <span>Apply Changes</span>
+              <Save className="h-5 w-5" />
+              <span>Apply Changes</span>
             </>
           )}
         </button>
@@ -154,19 +168,23 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
       {/* Main Content Area */}
       <main className="flex-1 overflow-auto bg-bg-base/50 relative">
         <div className="max-w-3xl mx-auto px-12 py-12 space-y-12">
-
           {/* AI Intelligence Section */}
           {activeSection === "ai" && (
             <div className="space-y-8 animate-in fade-in slide-in-from-right-4 duration-300">
               <div className="border-b border-border pb-6">
                 <h2 className="text-2xl font-bold text-text-primary">AI Intelligence</h2>
-                <p className="text-sm text-text-muted mt-2">Fine-tune the reasoning engine used to summarize and root-cause log clusters.</p>
+                <p className="text-sm text-text-muted mt-2">
+                  Fine-tune the reasoning engine used to summarize and root-cause log clusters.
+                </p>
               </div>
 
               <div className="grid grid-cols-2 gap-8">
                 <div className="space-y-2">
                   <SectionLabel htmlFor="ai_provider">Model Provider</SectionLabel>
-                  <SettingSelect value={settings.ai_provider} onChange={(v) => update("ai_provider", v)}>
+                  <SettingSelect
+                    value={settings.ai_provider}
+                    onChange={(v) => update("ai_provider", v)}
+                  >
                     <option value="gemini-cli">Gemini CLI (Native Local)</option>
                     <option value="openai">OpenAI (SaaS)</option>
                     <option value="anthropic">Anthropic Claude (SaaS)</option>
@@ -181,7 +199,9 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
                     onChange={(e) => update("ai_api_key", e.target.value)}
                     placeholder="Encrypted: sk-••••••••••••••••"
                   />
-                  <p className="text-[10px] text-text-muted/50 px-1">Keys are stored securely in your local configuration.</p>
+                  <p className="text-[10px] text-text-muted/50 px-1">
+                    Keys are stored securely in your local configuration.
+                  </p>
                 </div>
               </div>
 
@@ -206,7 +226,10 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
                   </div>
                   <div>
                     <p className="text-sm font-bold text-primary">Gemini CLI Integrated</p>
-                    <p className="text-xs text-text-secondary mt-1 leading-relaxed">Runs purely on your local hardware via the configured gemini-cli. Zero data egress to third-party APIs beyond the model provider.</p>
+                    <p className="text-xs text-text-secondary mt-1 leading-relaxed">
+                      Runs purely on your local hardware via the configured gemini-cli. Zero data
+                      egress to third-party APIs beyond the model provider.
+                    </p>
                   </div>
                 </div>
               )}
@@ -218,7 +241,9 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
             <div className="space-y-8 animate-in fade-in slide-in-from-right-4 duration-300">
               <div className="border-b border-border pb-6">
                 <h2 className="text-2xl font-bold text-text-primary">Engine Core</h2>
-                <p className="text-sm text-text-muted mt-2">Adjust the Drain3 streaming parser to perfectly match your log formats.</p>
+                <p className="text-sm text-text-muted mt-2">
+                  Adjust the Drain3 streaming parser to perfectly match your log formats.
+                </p>
               </div>
 
               <div className="grid grid-cols-3 gap-8">
@@ -231,7 +256,9 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
                     min="0"
                     max="1"
                     value={settings.drain_similarity_threshold}
-                    onChange={(e) => update("drain_similarity_threshold", Number.parseFloat(e.target.value))}
+                    onChange={(e) =>
+                      update("drain_similarity_threshold", Number.parseFloat(e.target.value))
+                    }
                   />
                 </div>
                 <div className="space-y-2">
@@ -241,7 +268,9 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
                     type="number"
                     min="1"
                     value={settings.drain_max_children}
-                    onChange={(e) => update("drain_max_children", Number.parseInt(e.target.value, 10))}
+                    onChange={(e) =>
+                      update("drain_max_children", Number.parseInt(e.target.value, 10))
+                    }
                   />
                 </div>
                 <div className="space-y-2">
@@ -251,7 +280,9 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
                     type="number"
                     min="1"
                     value={settings.drain_max_clusters}
-                    onChange={(e) => update("drain_max_clusters", Number.parseInt(e.target.value, 10))}
+                    onChange={(e) =>
+                      update("drain_max_clusters", Number.parseInt(e.target.value, 10))
+                    }
                   />
                 </div>
               </div>
@@ -259,7 +290,9 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
               <div className="bg-bg-surface/50 border border-border rounded-2xl p-6">
                 <div className="flex justify-between text-xs font-bold text-text-muted mb-4 uppercase tracking-tighter">
                   <span>Permissive</span>
-                  <span className="text-primary text-sm">{settings.drain_similarity_threshold * 100}% Sensitivity</span>
+                  <span className="text-primary text-sm">
+                    {settings.drain_similarity_threshold * 100}% Sensitivity
+                  </span>
                   <span>Strict</span>
                 </div>
                 <input
@@ -268,12 +301,14 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
                   max="1"
                   step="0.01"
                   value={settings.drain_similarity_threshold}
-                  onChange={(e) => update("drain_similarity_threshold", Number.parseFloat(e.target.value))}
+                  onChange={(e) =>
+                    update("drain_similarity_threshold", Number.parseFloat(e.target.value))
+                  }
                   className="w-full h-2 bg-border rounded-lg appearance-none cursor-pointer accent-primary"
                 />
                 <p className="text-[10px] text-text-muted/60 mt-4 leading-relaxed">
-                    The similarity threshold determines how 'close' two log lines must be to share a template. 
-                    Lower values (0.1–0.4) are better for high-variance logs.
+                  The similarity threshold determines how 'close' two log lines must be to share a
+                  template. Lower values (0.1–0.4) are better for high-variance logs.
                 </p>
               </div>
             </div>
@@ -284,13 +319,18 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
             <div className="space-y-8 animate-in fade-in slide-in-from-right-4 duration-300">
               <div className="border-b border-border pb-6">
                 <h2 className="text-2xl font-bold text-text-primary">Interface</h2>
-                <p className="text-sm text-text-muted mt-2">Accessibility and display preferences for your workspace.</p>
+                <p className="text-sm text-text-muted mt-2">
+                  Accessibility and display preferences for your workspace.
+                </p>
               </div>
 
               <div className="grid grid-cols-2 gap-8">
                 <div className="space-y-2">
                   <SectionLabel htmlFor="ui_row_height">Row Density</SectionLabel>
-                  <SettingSelect value={settings.ui_row_height} onChange={(v) => update("ui_row_height", v)}>
+                  <SettingSelect
+                    value={settings.ui_row_height}
+                    onChange={(v) => update("ui_row_height", v)}
+                  >
                     <option value="compact">Ultra Compact</option>
                     <option value="default">Balanced (Default)</option>
                     <option value="comfortable">Comfortable</option>
@@ -298,7 +338,10 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
                 </div>
                 <div className="space-y-2">
                   <SectionLabel htmlFor="ui_font_size">Reading Size</SectionLabel>
-                  <SettingSelect value={settings.ui_font_size} onChange={(v) => update("ui_font_size", v)}>
+                  <SettingSelect
+                    value={settings.ui_font_size}
+                    onChange={(v) => update("ui_font_size", v)}
+                  >
                     <option value="12px">12px — Minimal</option>
                     <option value="13px">13px — Optimized</option>
                     <option value="14px">14px</option>
@@ -310,12 +353,21 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
               <div className="group relative overflow-hidden rounded-2xl border border-border bg-gradient-to-br from-bg-surface/50 to-bg-base p-1">
                 <div className="absolute inset-0 bg-primary/2 opacity-0 group-hover:opacity-100 transition-opacity" />
                 <div className="relative px-6 py-5">
-                    <p className="text-[10px] uppercase font-bold tracking-widest text-text-muted/50 mb-3">Live Typography Preview</p>
-                    <div className="font-mono leading-relaxed px-4 py-3 bg-bg-base/80 rounded-xl border border-border/40 shadow-inner" style={{ fontSize: settings.ui_font_size }}>
+                  <p className="text-[10px] uppercase font-bold tracking-widest text-text-muted/50 mb-3">
+                    Live Typography Preview
+                  </p>
+                  <div
+                    className="font-mono leading-relaxed px-4 py-3 bg-bg-base/80 rounded-xl border border-border/40 shadow-inner"
+                    style={{ fontSize: settings.ui_font_size }}
+                  >
                     <span className="text-text-muted/60">Mar 27 16:45:01 </span>
-                    <span className="text-error/80 font-bold tracking-tight px-1.5 rounded bg-error/10 mr-2">CRITICAL</span>
-                    <span className="text-text-primary">Worker[4] lost quorum connectivity to peer-93. Re-electing...</span>
-                    </div>
+                    <span className="text-error/80 font-bold tracking-tight px-1.5 rounded bg-error/10 mr-2">
+                      CRITICAL
+                    </span>
+                    <span className="text-text-primary">
+                      Worker[4] lost quorum connectivity to peer-93. Re-electing...
+                    </span>
+                  </div>
                 </div>
               </div>
             </div>
@@ -325,4 +377,3 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
     </div>
   );
 }
-

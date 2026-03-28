@@ -1,5 +1,5 @@
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { buttonVariants } from "@/components/ui/button";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import type { ReactNode } from "react";
 
@@ -12,7 +12,7 @@ interface IconButtonProps {
 
 /**
  * A standard Icon Button that includes a mandatory accessible tooltip.
- * Uses buttonVariants to ensure visual consistency with other buttons 
+ * Uses buttonVariants to ensure visual consistency with other buttons
  * while avoiding DOM nesting errors (button-inside-button).
  */
 export function IconButton({ icon, label, onClick, className }: IconButtonProps) {
