@@ -78,11 +78,27 @@ class Database:
                 count        INTEGER DEFAULT 0,
                 PRIMARY KEY (workspace_id, cluster_id)
             );
+
+            CREATE TABLE IF NOT EXISTS fusion_configs (
+                workspace_id TEXT,
+                source_id    TEXT,
+                enabled      BOOLEAN DEFAULT TRUE,
+                tz_offset    INTEGER DEFAULT 0,
+                custom_format TEXT,
+                parser_config TEXT,
+                PRIMARY KEY (workspace_id, source_id)
+            );
         """)
 
         # 3. Migrations for existing databases
         
-        # Add source_id column if missing
+        # Add parser_config column to fusion_configs if missing
+        try:
+            cursor.execute("SELECT parser_config FROM fusion_configs LIMIT 1")
+        except Exception:
+            cursor.execute("ALTER TABLE fusion_configs ADD COLUMN parser_config TEXT")
+
+        # Add source_id column if missing to logs
         try:
             cursor.execute("SELECT source_id FROM logs LIMIT 1")
         except Exception:

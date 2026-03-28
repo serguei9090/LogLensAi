@@ -1,4 +1,4 @@
-import { X } from "lucide-react";
+import { X, Pencil } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { LogSource } from "@/store/workspaceStore";
 
@@ -13,16 +13,18 @@ interface WorkspaceTabsProps {
   onSelectSource: (sourceId: string | null) => void;
   /** Called when user removes a source tab */
   onRemoveSource?: (sourceId: string) => void;
+  /** Called when user wants to edit a fusion-type tab */
+  onEditFusion?: (sourceId: string) => void;
 }
 
 /**
  * WorkspaceTabs renders a horizontal tab-strip for switching between log
  * sources within the active workspace.
  *
- * - An implicit "All" tab is always shown as the first item.
  * - Each source tab shows the filename derived from its path.
+ * - Fusion-type sources show an edit icon to re-open the Orchestrator.
  * - A pulsing green dot appears when the source is being tailed.
- * - An ✕ button lets power-users close a source from the toolbar.
+ * - An ✕ button lets users close a source from the toolbar.
  */
 export function WorkspaceTabs({
   sources,
@@ -30,8 +32,8 @@ export function WorkspaceTabs({
   tailingSourceIds = new Set(),
   onSelectSource,
   onRemoveSource,
+  onEditFusion,
 }: WorkspaceTabsProps) {
-  // No tabs to show when workspace has 0 additional sources
   if (sources.length === 0) return null;
 
   return (
@@ -40,28 +42,12 @@ export function WorkspaceTabs({
       role="tablist"
       aria-label="Log source tabs"
     >
-      {/* ── "All" aggregate tab ── */}
-      <button
-        type="button"
-        role="tab"
-        aria-selected={activeSourceId === null}
-        onClick={() => onSelectSource(null)}
-        className={cn(
-          "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[11px] font-semibold transition-all whitespace-nowrap shrink-0",
-          activeSourceId === null
-            ? "bg-primary/15 text-primary border border-primary/30"
-            : "text-text-muted hover:text-text-secondary hover:bg-white/5 border border-transparent",
-        )}
-      >
-        All
-      </button>
-
       {/* ── Per-source tabs ── */}
       {sources.map((src) => {
         const isActive = activeSourceId === src.id;
         const isTailing = tailingSourceIds.has(src.id);
-        // Extract the basename for display (cross-platform: slash and backslash)
-        const label = src.name || src.path.split(/[\\/]/).pop() || src.path;
+        const isFusion = src.type === "fusion";
+        const label = src.name || src.path.split(/[\\\/]/).pop() || src.path;
 
         return (
           <div
@@ -71,20 +57,21 @@ export function WorkspaceTabs({
             className={cn(
               "group inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[11px] font-semibold transition-all whitespace-nowrap shrink-0 border",
               isActive
-                ? "bg-primary/15 text-primary border-primary/30"
+                ? isFusion
+                  ? "bg-violet-500/15 text-violet-400 border-violet-500/30"
+                  : "bg-primary/15 text-primary border-primary/30"
                 : "text-text-muted hover:text-text-secondary hover:bg-white/5 border-transparent",
             )}
           >
-            {/* Live-tail indicator */}
-            {isTailing && (
-              <span
-                aria-label="Live tailing"
-                className="relative flex h-2 w-2 shrink-0"
-              >
+            {/* Fusion icon or live-tail indicator */}
+            {isFusion ? (
+              <span className="text-violet-400/70 text-[9px] font-bold uppercase tracking-wider">⚡</span>
+            ) : isTailing ? (
+              <span aria-label="Live tailing" className="relative flex h-2 w-2 shrink-0">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-60" />
                 <span className="relative inline-flex h-2 w-2 rounded-full bg-primary" />
               </span>
-            )}
+            ) : null}
 
             {/* Label — clickable area */}
             <button
@@ -96,7 +83,25 @@ export function WorkspaceTabs({
               {label}
             </button>
 
-            {/* Remove button — visible on tab hover */}
+            {/* Edit button for fusion tabs */}
+            {isFusion && onEditFusion && (
+              <button
+                type="button"
+                aria-label={`Edit ${label}`}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onEditFusion(src.id);
+                }}
+                className={cn(
+                  "opacity-0 group-hover:opacity-100 rounded-full p-0.5 transition-opacity hover:bg-violet-500/20 focus:outline-none",
+                  isActive && "opacity-60 hover:opacity-100",
+                )}
+              >
+                <Pencil className="h-3 w-3" />
+              </button>
+            )}
+
+            {/* Remove button */}
             {onRemoveSource && (
               <button
                 type="button"
@@ -117,7 +122,7 @@ export function WorkspaceTabs({
         );
       })}
 
-      {/* Right-side divider so tabs don't blend into surrounding toolbar */}
+      {/* Right-side divider */}
       <div className="h-4 w-px bg-border/60 mx-1 shrink-0" aria-hidden />
     </div>
   );

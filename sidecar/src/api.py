@@ -1,6 +1,8 @@
 import json
 import os
+import re
 import sys
+from datetime import datetime
 from typing import Any
 
 import aiohttp_cors
@@ -10,6 +12,8 @@ from src.ai import AIProvider
 from src.db import Database
 from src.parser import DrainParser
 from src.tailer import FileTailer
+from src.ssh_loader import SSHLoader
+from src.metadata_extractor import extract_log_metadata
 
 
 # RPC Base Models
@@ -73,6 +77,39 @@ class GetWorkspaceSourcesRequest(BaseModel):
 class ReadFileRequest(BaseModel):
     filepath: str
 
+class FusionSourceConfig(BaseModel):
+    source_id: str
+    enabled: bool = True
+    tz_offset: int = 0
+    custom_format: str | None = None
+    parser_config: str | None = None
+
+class UpdateFusionConfigRequest(BaseModel):
+    workspace_id: str
+    sources: list[FusionSourceConfig]
+
+class GetFusionConfigRequest(BaseModel):
+    workspace_id: str
+
+class GetSampleLinesRequest(BaseModel):
+    workspace_id: str
+    source_id: str
+    limit: int = 10
+
+class UpdateSourceParserRequest(BaseModel):
+    workspace_id: str
+    source_id: str
+    parser_config: str
+
+class GetFusedLogsRequest(BaseModel):
+    workspace_id: str
+    offset: int = 0
+    limit: int = 100
+    filters: list[LogFilter] | None = None
+    query: str | None = None
+    sort_by: str = "id"
+    sort_order: str = "DESC"
+
 class App:
     def __init__(self, db_path="loglens.duckdb"):
         self.db = Database(db_path)
@@ -91,8 +128,11 @@ class App:
                 )
 
             # Map method names to their validation models
-            models = {
+            models: dict[str, Any] = {
                 "get_logs": GetLogsRequest,
+                "get_fused_logs": GetFusedLogsRequest,
+                "update_fusion_config": UpdateFusionConfigRequest,
+                "get_fusion_config": GetFusionConfigRequest,
                 "start_tail": StartTailRequest,
                 "start_ssh_tail": StartSSHTailRequest,
                 "stop_tail": StartTailRequest,
@@ -100,11 +140,13 @@ class App:
                 "read_file": ReadFileRequest,
                 "update_log_comment": UpdateCommentRequest,
                 "get_workspace_sources": GetWorkspaceSourcesRequest,
+                "get_sample_lines": GetSampleLinesRequest,
+                "update_source_parser": UpdateSourceParserRequest,
                 "analyze_cluster": None,
                 "get_settings": None,
                 "update_settings": None,
             }
-
+            
             handler = getattr(self, method_name)
             
             # Perform Pydantic validation if a model is defined
@@ -137,16 +179,15 @@ class App:
             )
 
     def _parse_filters(self, filters: list[dict]) -> tuple[list[str], list[Any]]:
-        """Parses the specialized filter chain into SQL clauses and params"""
         where_clauses = []
         params = []
-        allowed_fields = {"message", "level", "source_id", "cluster_id", "raw_text", "has_comment", "comment"}
-        
+        allowed_fields = ["level", "source_id", "cluster_id", "raw_text", "has_comment"]
+
         for f in filters:
             field = f.get("field")
             value = f.get("value")
-            op = f.get("operator", "contains")
-            
+            op = f.get("operator", "equals")
+
             if field not in allowed_fields or value is None:
                 continue
 
@@ -158,7 +199,6 @@ class App:
                 params.append(f"%{value}%")
             elif op == "equals":
                 if field == "source_id":
-                    # Case-insensitive path matching for Windows drive letter differences
                     where_clauses.append(f"{field} ILIKE ?")
                 else:
                     where_clauses.append(f"{field} = ?")
@@ -172,44 +212,48 @@ class App:
             elif op == "regex":
                 where_clauses.append(f"regexp_matches({field}, ?)")
                 params.append(value)
-                
+
         return where_clauses, params
 
-    def method_get_logs(
+    def _get_logs_internal(
         self,
         workspace_id: str,
         offset: int = 0,
         limit: int = 100,
-        filters: list[LogFilter] | None = None,
+        filters: Any | None = None,
         query: str | None = None,
         sort_by: str = "id",
         sort_order: str = "DESC",
+        source_ids: list[str] | None = None,
     ) -> dict:
-        """Search and filter logs within a specific workspace with sequence-aware AND logic"""
+        """Unified internal log fetcher supporting source-filtering for Fusion mode."""
         cursor = self.db.get_cursor()
         
         where_clauses = ["workspace_id = ?"]
         params: list[Any] = [workspace_id]
         
-        # Process the ordered filter chain
+        # If source_ids is provided (Fusion mode), restrict to those sources
+        if source_ids is not None:
+            if not source_ids: # None provided = show nothing
+                 return {"total": 0, "logs": [], "offset": offset, "limit": limit}
+            placeholders = ",".join(["?"] * len(source_ids))
+            where_clauses.append(f"source_id IN ({placeholders})")
+            params.extend(source_ids)
+
         if filters:
-            # filters is a list of LogFilter objects, convert to list[dict]
             dict_filters = [f.model_dump() if hasattr(f, "model_dump") else f for f in filters]
             f_clauses, f_params = self._parse_filters(dict_filters)
             where_clauses.extend(f_clauses)
             params.extend(f_params)
 
-        # Global keyword fuzzy search
         if query:
             where_clauses.append("(message ILIKE ? OR raw_text ILIKE ?)")
             params.extend([f"%{query}%", f"%{query}%"])
             
         where_sql = " AND ".join(where_clauses)
-        
-        # We join with clusters table to get the 'count' which allows us to calculate percentage
         total_logs_subquery = "(SELECT count(*) FROM logs WHERE workspace_id = ?)"
         
-        # Map where_sql to use table alias 'l' to avoid ambiguity after join
+        # Apply table alias 'l' for safety in complex joins
         aliased = where_sql.replace("workspace_id", "l.workspace_id") \
                            .replace("source_id", "l.source_id") \
                            .replace("message", "l.message") \
@@ -236,8 +280,7 @@ class App:
 
         allowed_sort = ["id", "timestamp", "level", "source_id", "cluster_id", "has_comment", "cluster_percent"]
         final_sort_by = sort_by if sort_by in allowed_sort else "id"
-        if final_sort_by == "cluster_id":
-             final_sort_by = "cluster_percent"
+        if final_sort_by == "cluster_id": final_sort_by = "cluster_percent"
              
         final_sort_order = "ASC" if sort_order and sort_order.upper() == "ASC" else "DESC"
         data_query = base_query + f" ORDER BY {final_sort_by} {final_sort_order}, l.id {final_sort_order} LIMIT ? OFFSET ?"
@@ -247,6 +290,80 @@ class App:
         logs = [dict(zip(columns, row, strict=False)) for row in cursor.fetchall()]
 
         return {"total": total, "logs": logs, "offset": offset, "limit": limit}
+
+    def method_get_logs(self, **kwargs) -> dict:
+        """Fetch logs normally for a workspace/source."""
+        params = GetLogsRequest(**kwargs)
+        return self._get_logs_internal(**params.model_dump())
+
+    def method_get_fused_logs(self, **kwargs) -> dict:
+        """Fetch interleaved logs for Fusion mode based on enabled sources."""
+        params = GetFusedLogsRequest(**kwargs)
+        cursor = self.db.get_cursor()
+        
+        # 1. Get enabled sources from fusion_config
+        cursor.execute(
+            "SELECT source_id FROM fusion_configs WHERE workspace_id = ? AND enabled = TRUE", 
+            (params.workspace_id,)
+        )
+        enabled_ids = [row[0] for row in cursor.fetchall()]
+        
+        # 2. delegate to internal fetcher with restricted sources
+        return self._get_logs_internal(**params.model_dump(), source_ids=enabled_ids)
+
+    def method_update_fusion_config(self, **kwargs) -> dict:
+        """Save source orchestration settings (Enabled toggles, Timezones)."""
+        params = UpdateFusionConfigRequest(**kwargs)
+        cursor = self.db.get_cursor()
+        
+        for src in params.sources:
+            cursor.execute("""
+                INSERT INTO fusion_configs (workspace_id, source_id, enabled, tz_offset, custom_format, parser_config)
+                VALUES (?, ?, ?, ?, ?, ?)
+                ON CONFLICT (workspace_id, source_id) DO UPDATE SET
+                    enabled = excluded.enabled,
+                    tz_offset = excluded.tz_offset,
+                    custom_format = excluded.custom_format,
+                    parser_config = excluded.parser_config
+            """, (params.workspace_id, src.source_id, src.enabled, src.tz_offset, src.custom_format, src.parser_config))
+        
+        return {"status": "ok"}
+
+    def method_get_sample_lines(self, workspace_id: str, source_id: str, limit: int = 10) -> list[str]:
+        """Fetch raw lines from a source to help a user define a pattern."""
+        cursor = self.db.get_cursor()
+        cursor.execute(
+            "SELECT raw_text FROM logs WHERE workspace_id = ? AND source_id = ? LIMIT ?",
+            (workspace_id, source_id, limit)
+        )
+        return [row[0] for row in cursor.fetchall()]
+
+    def method_update_source_parser(self, workspace_id: str, source_id: str, parser_config: str) -> dict:
+        """Update the regex/pattern configuration for a specific log source."""
+        cursor = self.db.get_cursor()
+        cursor.execute(
+            "UPDATE fusion_configs SET parser_config = ? WHERE workspace_id = ? AND source_id = ?",
+            (parser_config, workspace_id, source_id)
+        )
+        return {"status": "ok"}
+
+    def method_get_fusion_config(self, workspace_id: str) -> dict:
+        """Retrieve current Fusion orchestration setup."""
+        cursor = self.db.get_cursor()
+        cursor.execute("SELECT source_id, enabled, tz_offset, custom_format, parser_config FROM fusion_configs WHERE workspace_id = ?", (workspace_id,))
+        rows = cursor.fetchall()
+        
+        sources = [
+            {
+                "source_id": row[0], 
+                "enabled": bool(row[1]), 
+                "tz_offset": row[2], 
+                "custom_format": row[3],
+                "parser_config": row[4]
+            }
+            for row in rows
+        ]
+        return {"sources": sources}
 
     def method_start_tail(self, filepath: str, workspace_id: str) -> dict:
         # Normalize to forward slashes for consistent source_id matching
@@ -331,11 +448,16 @@ class App:
         workspace_id = log.get("workspace_id")
         source_id = log.get("source_id", "manual")
         raw_text = log.get("raw_text", "")
-        timestamp = log.get("timestamp") or ""
-        level = log.get("level", "INFO")
+        
+        # 1. Advanced Metadata Extraction (Shared Logic)
+        metadata = extract_log_metadata(workspace_id, source_id, raw_text)
+        
+        # Override metadata with provided values if they explicitly exist (important for manual ingest)
+        timestamp = log.get("timestamp") or metadata["timestamp"]
+        level = log.get("level") or metadata["level"]
         message = log.get("message") or raw_text
         
-        # Clustering for each log line
+        # 2. Pattern Clustering (Drain3)
         try:
             res = self.parser.parse(message)
             cluster_id = res.cluster_id
@@ -344,7 +466,7 @@ class App:
             cluster_id = "unknown"
             template = "unknown"
 
-        # Update cluster stats
+        # 3. Persistence (Sync Stats table)
         cursor.execute("""
             INSERT INTO clusters (workspace_id, cluster_id, template, count) 
             VALUES (?, ?, ?, 1)

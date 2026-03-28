@@ -4,7 +4,7 @@ import { HighlightBuilder, HighlightEntry } from "@/components/molecules/Highlig
 import { WorkspaceTabs } from "@/components/molecules/WorkspaceTabs";
 import { TailSwitch } from "@/components/atoms/TailSwitch";
 import { StatusDot } from "@/components/atoms/StatusDot";
-import { Upload } from "lucide-react";
+import { Upload, Cpu } from "lucide-react";
 import type { LogSource } from "@/store/workspaceStore";
 
 interface LogToolbarProps {
@@ -17,9 +17,10 @@ interface LogToolbarProps {
   onTailToggle: (v: boolean) => void;
   status: boolean;
   onImportOpen: () => void;
+  onOrchestrateOpen: () => void;
   /** Sources attached to the active workspace (from workspaceStore) */
   sources?: LogSource[];
-  /** Currently-active source id; null = show all sources aggregated */
+  /** Currently-active source id */
   activeSourceId?: string | null;
   /** Source IDs that are currently live-tailing */
   tailingSourceIds?: Set<string>;
@@ -27,6 +28,8 @@ interface LogToolbarProps {
   onSelectSource?: (sourceId: string | null) => void;
   /** Called when user removes a source tab */
   onRemoveSource?: (sourceId: string) => void;
+  /** Called when user clicks the edit icon on a fusion tab */
+  onEditFusion?: (sourceId: string) => void;
 }
 
 export function LogToolbar({
@@ -39,14 +42,16 @@ export function LogToolbar({
   onTailToggle,
   status,
   onImportOpen,
+  onOrchestrateOpen,
   sources = [],
   activeSourceId = null,
   tailingSourceIds,
   onSelectSource,
   onRemoveSource,
+  onEditFusion,
 }: LogToolbarProps) {
   return (
-    <div className="sticky top-0 z-10 flex flex-wrap items-center gap-3 bg-[#0d0f0e]/95 backdrop-blur-sm border-b border-zinc-800/60 px-4 py-2.5 shadow-sm">
+    <div className="sticky top-0 z-10 flex flex-nowrap items-center gap-3 bg-[#0d0f0e]/95 backdrop-blur-sm border-b border-zinc-800/60 px-4 py-2.5 shadow-sm overflow-x-auto scrollbar-none">
       {/* Import button */}
       <button
         type="button"
@@ -57,16 +62,27 @@ export function LogToolbar({
         Import
       </button>
 
+      {/* Orchestrate — always visible */}
+      <button
+        type="button"
+        onClick={onOrchestrateOpen}
+        className="inline-flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-bold transition-all shadow-sm shrink-0 bg-violet-500/10 text-violet-400 hover:bg-violet-500/20 border border-violet-500/20 hover:border-violet-500/40"
+      >
+        <Cpu className="size-3.5" />
+        Orchestrate
+      </button>
+
       {/* Divider */}
       <div className="h-5 w-px bg-zinc-800 shrink-0" />
 
-      {/* Source tabs (rendered only when workspace has ≥1 source) */}
+      {/* Source tabs */}
       <WorkspaceTabs
         sources={sources}
         activeSourceId={activeSourceId}
         tailingSourceIds={tailingSourceIds}
         onSelectSource={onSelectSource ?? (() => {})}
         onRemoveSource={onRemoveSource}
+        onEditFusion={onEditFusion}
       />
 
       {/* Search */}

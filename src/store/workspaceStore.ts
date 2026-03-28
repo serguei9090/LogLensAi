@@ -3,15 +3,17 @@ import { persist } from "zustand/middleware";
 
 // ─── Domain Types ─────────────────────────────────────────────────────────────
 
-/** A single ingestion source attached to a workspace (local file, SSH path, or manual paste). */
+/** A single ingestion source attached to a workspace (local file, SSH path, manual paste, or fusion orchestration). */
 export interface LogSource {
   /** Unique stable ID for this source within the workspace */
   id: string;
   /** Human-readable display label (defaults to basename of path) */
   name: string;
-  /** Transport type – determines which RPC methods are used for tailing */
-  type: "local" | "ssh" | "manual";
-  /** Absolute file path or SSH connection string (`user@host:/path`) */
+  /** Transport type – determines which RPC methods are used for tailing.
+   *  'fusion' sources are orchestrated virtual streams managed by OrchestratorHub.
+   */
+  type: "local" | "ssh" | "manual" | "fusion";
+  /** Absolute file path, SSH connection string, or fusion ID for type='fusion' */
   path: string;
 }
 

@@ -14,13 +14,14 @@ interface InvestigationLayoutProps {
   onTailToggle: (v: boolean) => void;
   status: boolean;
   onImportOpen: () => void;
+  onOrchestrateOpen: () => void;
   children: ReactNode;
-  /** Passed through to LogToolbar → WorkspaceTabs */
   sources?: LogSource[];
   activeSourceId?: string | null;
   tailingSourceIds?: Set<string>;
   onSelectSource?: (sourceId: string | null) => void;
   onRemoveSource?: (sourceId: string) => void;
+  onEditFusion?: (sourceId: string) => void;
 }
 
 export function InvestigationLayout({
@@ -33,12 +34,14 @@ export function InvestigationLayout({
   onTailToggle,
   status,
   onImportOpen,
+  onOrchestrateOpen,
   children,
   sources,
   activeSourceId,
   tailingSourceIds,
   onSelectSource,
   onRemoveSource,
+  onEditFusion,
 }: InvestigationLayoutProps) {
   return (
     <div className="flex flex-col h-full w-full bg-[#0a0c0b]">
@@ -52,11 +55,13 @@ export function InvestigationLayout({
         onTailToggle={onTailToggle}
         status={status}
         onImportOpen={onImportOpen}
+        onOrchestrateOpen={onOrchestrateOpen}
         sources={sources}
         activeSourceId={activeSourceId}
         tailingSourceIds={tailingSourceIds}
         onSelectSource={onSelectSource}
         onRemoveSource={onRemoveSource}
+        onEditFusion={onEditFusion}
       />
       <div className="flex-1 min-h-0 overflow-hidden">
         {children}

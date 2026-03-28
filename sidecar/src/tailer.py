@@ -4,6 +4,7 @@ import time
 
 from src.db import Database
 from src.parser import DrainParser
+from src.metadata_extractor import extract_log_metadata
 
 
 class FileTailer:
@@ -30,7 +31,7 @@ class FileTailer:
 
     def _tail(self):
         try:
-            with open(self.filepath) as f:
+            with open(self.filepath, 'r', encoding='utf-8', errors='replace') as f:
                 # Seek to end for live tailing
                 f.seek(0, 2)
 
@@ -40,7 +41,7 @@ class FileTailer:
                         time.sleep(0.1)
                         continue
 
-                    self._process_line(line.strip())
+                    self._process_line(line.rstrip())
         except FileNotFoundError:
             self.running = False
 
@@ -48,26 +49,26 @@ class FileTailer:
         if not line:
             return
 
-        cluster_id = str(self.parser.parse(line))
+        # 1. Clustering (Pattern Mining)
+        try:
+            res = self.parser.parse(line)
+            cluster_id = str(res["cluster_id"])
+            message = res["template"]
+        except Exception:
+            cluster_id = "unknown"
+            message = line
 
-        # Simple heuristic for level extraction, usually this would be more robust
-        level = "INFO"
-        upper_line = line.upper()
-        for lvl in ["ERROR", "WARN", "DEBUG", "TRACE", "INFO"]:
-            if lvl in upper_line:
-                level = lvl
-                break
+        # 2. Shared Metadata Extraction (Regex/Parser logic)
+        metadata = extract_log_metadata(self.workspace_id, self.filepath, line)
+        timestamp = metadata["timestamp"]
+        level = metadata["level"]
 
-        # Timestamp placeholder (e.g. current time if missing)
-        import datetime
-
-        timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
+        # 3. Persistence
         cursor = self.db.get_cursor()
         cursor.execute(
             """
-            INSERT INTO logs (id, workspace_id, source_id, timestamp, level, message, cluster_id, raw_text)
-            VALUES (nextval('log_id_seq'), ?, ?, ?, ?, ?, ?, ?)
-        """,
-            (self.workspace_id, self.filepath, timestamp, level, line, cluster_id, line),
+            INSERT INTO logs (workspace_id, source_id, timestamp, level, message, cluster_id, raw_text)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            """,
+            (self.workspace_id, self.filepath, timestamp, level, message, cluster_id, line),
         )
