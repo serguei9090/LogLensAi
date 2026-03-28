@@ -118,3 +118,21 @@ All methods are called via `useSidecarBridge.ts`. Never change the transport.
   - **Dev**: The `aiohttp` runner must use `async def on_cleanup(_): Database.reset()` to prevent Zombie processes and WAL locks.
   - **Prod**: The `stdin/stdout` loop must gracefully catch `EOF` and `KeyboardInterrupt` and properly close the DuckDB connection before exiting.
 - **No silent gaps**: missing logic gets a `TODO(ID)` with a detail file in `docs/TODOC/`
+
+## 🤖 Automated Development Pipeline (Jules)
+When running `/startcycle`, Jules orchestrates work based on `docs/track/TODO.md`.
+
+### Role Mapping & Responsibility
+| Role | Responsibility | Primary Files |
+|---|---|---|
+| **@pm** | Roadmap & Logic Specs | `docs/track/TODO.md`, `docs/TODOC/*.md` |
+| **@architect** | API Contract & Standards | `docs/API_SPEC.md`, `sidecar/src/api.py` (models) |
+| **@backend** | Sidecar, DB, & Logic | `sidecar/src/*.py` |
+| **@frontend** | UI, Layout, & State | `src/components/*`, `src/store/*`, `src/styles/` |
+| **@qa** | Auditing & Bug Fixes | All codebase |
+| **@devops** | Deployment & Packaging | `src-tauri/`, `Dockerfile`, `scripts/` |
+
+### Working Protocol
+1. **Context First**: Always read `AGENTS.md` and `docs/track/TODO.md` before starting.
+2. **Spec Verification**: Before implementing a task, verify if its corresponding `docs/TODOC/<ID>.md` exists.
+3. **Atomic Commits**: Implement one task (TODO ID) at a time, verify, and document in `docs/track/LessonsLearned.md`.

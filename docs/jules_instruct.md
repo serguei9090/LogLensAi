@@ -1,192 +1,46 @@
-# LogLensAi — Jules Implementation Prompt
+# Jules Active Implementation Mission: Sprint 03 — Orchestrator & Parser Completion
 
-> **Usage**: Copy the prompt below verbatim into Jules CLI.
-> Context files to attach: `docs/track/TODO.md`, `docs/design/theme.md`, `docs/design/ui-components.md`, `AGENTS.md`
-
----
-
-## Prompt
-
-You are implementing **LogLensAi**, a Tauri v2 desktop application for log analysis.
-
-**Stack**: React 19 + TypeScript, Vite, Zustand, TanStack Virtual, shadcn/ui, Tailwind CSS (via shadcn tokens), Python sidecar (DuckDB, Drain3, aiohttp).
-
-**Your task is Sprint 01** of the project. Complete ALL items marked `[ ]` in `docs/track/TODO.md` under the "Sprint 01" section. Do not touch backlog items.
+## 🎯 Primary Objective
+Complete the backend and frontend wiring for the new Orchestrator Hub and the Custom Parser Engine. This includes database schema updates, multi-fusion query support, and dynamic regex application.
 
 ---
 
-### CRITICAL RULES
-
-1. **Never break the JSON-RPC interface.** All frontend↔sidecar communication is via `useSidecarBridge.ts`. Do not change the transport layer.
-2. **Atomic Design is mandatory.** All components go under the correct layer:
-   - `src/components/atoms/`, `molecules/`, `organisms/`, `templates/`, `pages/`
-   - See `docs/design/ui-components.md` for the full mapping.
-3. **Use only design tokens.** All colors, spacing, and typography must come from CSS variables defined in `src/styles/globals.css` (see `docs/design/theme.md`). No hardcoded hex values in component files.
-4. **Thread-safe DuckDB.** Every query in `sidecar/src/api.py` must call `self.db.get_cursor()` (returns `conn.cursor()`), NOT `get_connection()`. This prevents "No open result set" errors caused by concurrent threads.
-5. **Sidecar cleanup must be async.** The `on_cleanup` handler in `api.py` must be `async def`.
+## 🏗️ Technical Roles & Guardrails
+- **Design System**: Use `docs/design/theme.md` and `docs/design/ui-components.md`. NO hardcoded hex codes.
+- **Backend Architecture**: Use thread-safe `get_cursor()` in DuckDB.
+- **Frontend Architecture**: Use Atomic Design for components and Zustand for global state.
 
 ---
 
-### Step-by-Step Implementation Order
+## 📋 Task List (Atomic Implementation)
 
-#### Step 1 — Global Styles (`src/styles/globals.css`)
-- Define all CSS custom properties from `docs/design/theme.md`
-- Import Inter from Google Fonts and JetBrains Mono
-- Apply `--bg-base` to `:root body`
+### 1. Backend: Multi-Fusion Schema (ORK-BE-001)
+- **Ref**: `docs/TODOC/ORK-BE-001.md`
+- Update `sidecar/src/db.py` to add `fusion_id` column to `fusion_configs` (Primary Key: `workspace_id`, `fusion_id`).
+- Update `sidecar/src/api.py` methods `update_fusion_config` and `get_fusion_config` to handle the `fusion_id` parameter.
 
-#### Step 2 — shadcn Components (`src/components/ui/`)
-Install via `bunx shadcn@latest add`:
-`button input label switch badge tooltip dialog popover select separator scroll-area tabs card dropdown-menu table skeleton sonner`
+### 2. Backend: Multi-Fusion Querying (ORK-BE-002)
+- **Ref**: `docs/TODOC/ORK-BE-002.md`
+- Update `get_fused_logs` in `sidecar/src/api.py` to filter logs by `fusion_id` if provided.
 
-Customize each component's default CSS to use the design tokens.
+### 3. Frontend: Store & Wiring (ORK-FE-001 / ORK-FE-002)
+- **Ref**: `docs/TODOC/ORK-FE-001.md`, `docs/TODOC/ORK-FE-002.md`
+- Add `updateSource` to `src/store/workspaceStore.ts`.
+- Wire `handleFusionSaved` in `src/components/pages/InvestigationPage.tsx` to call `updateSource` for existing fusions.
 
-#### Step 3 — Atoms
-Implement exactly these atoms:
-- `LogLevelBadge` — Props: `level: "ERROR"|"WARN"|"INFO"|"DEBUG"|"TRACE"`. Renders a `Badge` using the level color token.
-- `StatusDot` — Props: `active: boolean`. A pulsing circle using `--primary` when active, `--border` when not.
-- `TailSwitch` — Props: `checked: boolean, onCheckedChange: (v: boolean) => void`. Labeled switch.
-- `HelpTooltip` — Props: `content: string`. A `?` icon that shows a Tooltip.
-- `IconButton` — Props: `icon: ReactNode, label: string, onClick: () => void`. Ghost-variant button.
+### 4. Frontend: UI Validation (ORK-FE-003)
+- **Ref**: `docs/TODOC/ORK-FE-003.md`
+- Disable "Deploy" button in `OrchestratorHub.tsx` if checked sources < 2.
 
-#### Step 4 — Molecules
-Build each molecule as described in `docs/design/ui-components.md`.
-
-**FilterBuilder** — critical design:
-- A `Popover` that opens a form for each filter entry
-- Each filter: `{ id, field, operator, value }`
-- Fields: `level` | `source_id` | `cluster_id` | `raw_text`
-- Operators: `=` | `!=` | `contains` | `not_contains` | `starts_with`
-- Multi-filter: all conditions are AND-joined server-side
-- Each filter shows as a `FilterTag` chip with a remove button
-- "Clear All" button
-
-**HighlightBuilder** — critical design:
-- A `Popover` listing active highlight rules
-- Each rule: `{ id, term, color }` where color is from a preset palette
-- Preset colors: `#FBBF24`, `#60A5FA`, `#F472B6`, `#34D399`, `#FB923C`
-- Each rule shows as a `HighlightTag` chip
-- Text matching is case-insensitive, applied client-side to rendered log line text
-
-#### Step 5 — Organisms
-
-**LogToolbar** (`src/components/organisms/LogToolbar.tsx`)
-- Layout: `[SearchBar] [FilterBuilder] [HighlightBuilder] [WrapSwitch] [TailSwitch] [StatusDot]`
-- All in a single sticky bar at top of investigation view
-- Props: `onSearch, activeFilters, onFilterChange, activeHighlights, onHighlightChange, isWrapping, onWrapToggle, isTailing, onTailToggle, status`
-
-**VirtualLogTable** (`src/components/organisms/VirtualLogTable.tsx`)
-- Use TanStack Virtual for row virtualization
-- Behavior: If `isWrapping` is true, rows use dynamic measuring for multi-line text; if false, they truncate with `...`.
-- Columns: `#` (row index) | `Timestamp` | `Level` | `Message` | `Cluster` | `Actions`
-- Row background set from level color token
-- `Actions` Cell: Contains a generic "Comment" icon button. Clicking it expands an inline text area to add/view an annotation for that row.
-- Message cell: render highlight matches with `<mark>` styled with highlight color
-- Click row → show expanded raw text in a slide-out panel below the row
-
-**ImportFeedModal** (`src/components/organisms/ImportFeedModal.tsx`)
-- `Dialog` with `Tabs`: Local | SSH | Manual
-- Each tab has a `TailSwitch` labeled "Live Tail" (default ON)
-- Local tab: path input + browse button (calls Tauri `open` dialog) + TailSwitch + Submit → `start_tail` RPC
-- SSH tab: host/port/user/pass+path inputs + TailSwitch + Submit → `start_ssh_tail` RPC
-- Manual tab: textarea + "Ingest" button → `ingest_logs` RPC (no tail switch, one-time)
-
-**SettingsPanel** (`src/components/organisms/SettingsPanel.tsx`)
-- Full-page settings, not a modal
-- Three `Card` sections (make them collapsible/accordion):
-  1. **AI Provider**: Select (gemini-cli / openai / anthropic) + API key `Input` (type=password) + **System Prompt** `Textarea` (default: "You are a Log Analysis Specialist. Return JSON with summary, root_cause, actions.").
-  2. **Drain3**: similarity_threshold (number input 0-1) + max_children (number) + max_clusters (number); each with a `HelpTooltip`
-  3. **General**: row height select (compact/default/comfortable) + font size (select 12/13/14/15/16px)
-- Save button: calls `update_settings` RPC with all values as key/value pairs
-
-**Sidebar** (`src/components/organisms/Sidebar.tsx`)
-- Fixed left sidebar
-- App logo / name at top
-- Section: "Workspaces" — list of workspace items; "+" button to create new; each item: name + click to switch + right-click to rename/delete
-- Section divider
-- "Investigation" nav item (active = primary color)
-- "Settings" nav item
-- "Dashboard" nav item (grayed out, `cursor-not-allowed`, tooltip: "Coming soon")
-
-**DiagnosticSidebar** (`src/components/organisms/DiagnosticSidebar.tsx`)
-- A slide-out right-side panel that appears when an AI analysis is requested.
-- Displays the `summary`, `root_cause`, and `actions` array retrieved from the AI RPC call.
-
-#### Step 6 — Templates & Pages
-- `AppLayout`: `<Sidebar /> + <main>{children}</main> + <DiagnosticSidebar />`
-- `InvestigationPage`: `<ImportFeedModal /> + <LogToolbar /> + <VirtualLogTable />`
-- `SettingsPage`: `<SettingsPanel />`
-
-#### Step 7 — Zustand Stores
-
-**`workspaceStore.ts`**:
-```ts
-interface Workspace {
-  id: string;
-  name: string;
-  sourceType: 'local' | 'ssh' | 'manual';
-  sourcePath: string | null;
-  createdAt: Date;
-}
-interface WorkspaceStore {
-  workspaces: Workspace[];
-  activeWorkspaceId: string;
-  setActive: (id: string) => void;
-  addWorkspace: (ws: Omit<Workspace, 'createdAt'>) => void;
-  removeWorkspace: (id: string) => void;
-  renameWorkspace: (id: string, name: string) => void;
-}
-```
-
-**`investigationStore.ts`**:
-```ts
-interface InvestigationStore {
-  searchQuery: string;
-  filters: Filter[];
-  highlights: Highlight[];
-  logs: LogEntry[];
-  total: number;
-  offset: number;
-  isTailing: boolean;
-  setSearchQuery: (q: string) => void;
-  setFilters: (f: Filter[]) => void;
-  setHighlights: (h: Highlight[]) => void;
-  setLogs: (logs: LogEntry[], total: number) => void;
-  setTailing: (v: boolean) => void;
-}
-```
-
-#### Step 8 — Sidecar Fixes (`sidecar/src/`)
-- `db.py`: rename `get_connection()` → `get_cursor()` returning `self.conn.cursor()`
-- `api.py`: replace ALL `self.db.get_connection()` → `self.db.get_cursor()`
-- `api.py` `on_cleanup`: ensure it is `async def`
-- `api.py` `method_is_tailing`: implement as described in `docs/track/TODO.md` INV-004
-- `api.py` `method_stop_tail`: fix to use `os.path.abspath` and correct tail key format
-
-#### Step 9 — Gemini CLI AI Integration (`sidecar/src/ai.py`)
-- Method: `analyze_cluster(cluster_id, workspace_id) -> dict`
-- Fetch cluster template + last 20 log samples from DuckDB
-- Build prompt: "You are a log analyst. Analyze this log cluster and return ONLY a JSON object with keys: summary, root_cause, recommended_actions (array of strings). Cluster template: {template}. Sample logs:\n{samples}"
-- Execute: `subprocess.run(["gemini", "-p", prompt, "--json"], capture_output=True, text=True, timeout=30)`
-- Parse stdout as JSON, return dict
-- If error or parse fails, return `{"summary": "Analysis failed", "root_cause": str(e), "recommended_actions": []}`
-- Expose as RPC: `analyze_cluster`
-
-#### Step 10 — Testing Implementation
-- Use `vitest` and `@testing-library/react` to write one frontend test (`src/components/atoms/TailSwitch.test.tsx`).
-- Use `pytest` to write one backend test: `sidecar/tests/test_api.py` validating the JSON RPC format.
-- **E2E Integration Test**: Write a script `sidecar/tests/test_e2e_ingestion.py` that spins up the sidecar, calls the `start_tail` JSON-RPC method with a mock file, and asserts `total` > 0 from `get_logs`.
+### 5. Parser Integration (PARS-002 / 003 / 004)
+- **Ref**: `docs/TODOC/PARS-002.md`, `PARS-003.md`, `PARS-004.md`
+- Implement `apply_custom_config` in `sidecar/src/parser.py`.
+- Integrate parser into `FileTailer` in `sidecar/src/tailer.py`.
+- Implement `tz_offset` normalization in `sidecar/src/api.py`.
 
 ---
 
-### Acceptance Criteria
-- `bun run dev:all` starts without errors
-- `bun run test` and `uv run pytest` pass successfully.
-- Opening the app shows the sidebar with one default workspace
-- Clicking "Import" opens the modal; importing a local `.log` file works
-- After import, the log table shows entries with correct level coloring
-- The TailSwitch in the toolbar toggles tailing ON/OFF
-- WrapSwitch toggles TanStack Virtual dynamic sizing.
-- Filter builder allows adding/removing multiple filters (including `has_comment = true`)
-- Settings page saves AI System Prompt and UI is collapsible.
-- Right-side Diagnostic Sheet slides out upon AI cluster analysis.
-- No DuckDB "No open result set" errors in the console
+## 🏁 Completion Protocol
+1. Run `bun run lint:fix` and `uv run ruff check --fix .`.
+2. **MANDATORY**: Update `docs/track/TODO.md` to reflect the completion of all Sprint 03 tasks.
+3. Verify that new fusion tabs can be created, edited, and renamed.
