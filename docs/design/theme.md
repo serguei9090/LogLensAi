@@ -1,74 +1,62 @@
 # LogLensAi - Design System & Theme
 
-## Color Palette
+## Master Design Philosophy: "Engine Precision"
+> High-contrast, glassmorphic obsidian interface with tactical green accents. Every pixel must feel like part of a professional diagnostic tool.
 
-> Dark base with vibrant green accents. All UI must use these tokens exclusively.
+## Color Palette
 
 | Label | Hex | Usage |
 |---|---|---|
-| `--bg-base` | `#0D0F0E` | App root background |
-| `--bg-surface` | `#111613` | Cards, panels, sidebars |
-| `--bg-surface-bright` | `#1A1F1C` | Elevated surfaces, modals |
+| `--bg-base` | `#0D0F0E` | App deep background |
+| `--bg-surface` | `#111613` | Panels, sidebars (main) |
+| `--bg-glass` | `#11161399` | Glassmorphic cards (60% opacity) |
 | `--bg-hover` | `#1E2520` | Hover state background |
-| `--border` | `#2A3430` | Dividers, borders |
-| `--border-muted` | `#1D2420` | Subtle separators |
-| `--primary` | `#22C55E` | Primary CTA, active states, tail-on indicator |
-| `--primary-hover` | `#16A34A` | Hover on primary |
-| `--primary-muted` | `#14532D` | Soft primary backgrounds, badges |
-| `--primary-glow` | `#22C55E33` | Glow/shadow on active items |
-| `--text-primary` | `#E8F5EC` | Main body text |
-| `--text-secondary` | `#8FA898` | Labels, secondary copy |
-| `--text-muted` | `#4D6057` | Placeholder text, disabled |
-| `--text-inverse` | `#0D0F0E` | Text on primary buttons |
-| `--error` | `#EF4444` | Error badge, error log level |
-| `--error-bg` | `#450A0A` | Error row background tint |
-| `--warning` | `#F59E0B` | Warning badge, warn log level |
-| `--warning-bg` | `#451A03` | Warning row background tint |
-| `--info` | `#38BDF8` | Info badge, info log level |
-| `--info-bg` | `#0C2A3E` | Info row background tint |
-| `--debug` | `#A78BFA` | Debug badge, debug log level |
-| `--debug-bg` | `#1E1333` | Debug row background tint |
-| `--success` | `#22C55E` | (same as primary) Success states |
-| `--highlight-1` | `#FBBF24` | First highlight color |
-| `--highlight-2` | `#60A5FA` | Second highlight color |
-| `--highlight-3` | `#F472B6` | Third highlight color |
-| `--scrollbar` | `#2A3430` | Scrollbar track/thumb |
+| `--border` | `#2A3430` | Main boundaries, dividers |
+| `--border-glow` | `#22C55E4D` | Subtle glow border on active focus |
+| `--primary` | `#22C55E` | Brand Green (Vibrant) |
+| `--primary-hover` | `#16A34A` | Interaction highlight |
+| `--primary-muted` | `#14532D` | Background for marks and badges |
+| `--text-primary` | `#E8F5EC` | Primary reading text |
+| `--text-muted` | `#4D6057` | Metadata, placeholders |
+| `--error` | `#EF4444` | Critical failure states |
+| `--warning` | `#F59E0B` | Cautionary warnings |
+| `--info` | `#38BDF8` | System information |
 
 ## Typography
 
-- **Font Family**: `"Inter", system-ui, sans-serif` (via Google Fonts)
-- **Mono Font**: `"JetBrains Mono", monospace` (for log lines)
-- **Base Size**: `14px`
-- **Log Line Size**: `13px`
+- **Interface Font**: `Inter` (Sans-serif) - Tracking `-0.01em` for precision look.
+- **Log Engine Font**: `JetBrains Mono` (Monospace) - Optimized for long debugging blocks.
+- **Header Weight**: `900` (Black) for primary labels, `700` (Bold) for secondary.
 
-## Radius & Spacing
+## Radius & Spacing (Premium Layer)
 
-| Token | Value | Usage |
+| Token | Value | Applied To |
 |---|---|---|
-| `--radius-sm` | `4px` | Badges, tags |
-| `--radius-md` | `8px` | Inputs, buttons |
-| `--radius-lg` | `12px` | Cards, panels |
-| `--radius-xl` | `16px` | Modals |
-| `--spacing-unit` | `4px` | Base spacing multiplier |
+| `--radius-modal` | `2rem (32px)` | Main functional modals and overlays |
+| `--radius-card` | `1.5rem (24px)` | Page sections and large containers |
+| `--radius-input` | `1rem (16px)` | Form fields, primary buttons, tabs |
+| `--radius-atom` | `0.5rem (8px)` | Tooltips, small badges |
+| `--padding-mod` | `2.5rem (40px)` | Internal modal padding for high-signal content |
 
-## Component-Level Color Mapping
+## Glassmorphic Standards
+- **Backdrop Blur**: `backdrop-blur-xl` or `20px`.
+- **Surface Filter**: Overlay `bg-white/[0.03]` on headers to differentiate from body.
+- **Shadow Signature**: `shadow-[0_30px_60px_-15px_rgba(0,0,0,0.8)]` for active dialogs.
 
-| Component | Background | Border | Text | Accent |
-|---|---|---|---|---|
-| Sidebar | `--bg-surface` | `--border-muted` | `--text-primary` | `--primary` |
-| Log Row (default) | `transparent` | none | `--text-primary` | — |
-| Log Row (ERROR) | `--error-bg` | `--error` | `--text-primary` | `--error` |
-| Log Row (WARN) | `--warning-bg` | `--warning` | `--text-primary` | `--warning` |
-| Log Row (INFO) | transparent | none | `--info` | `--info` |
-| Log Row (DEBUG) | transparent | none | `--debug` | `--debug` |
-| Log Row (highlighted) | `--primary-muted` | `--primary` | `--text-primary` | `--primary` |
-| Filter Badge | `--primary-muted` | `--primary` | `--primary` | — |
-| Button (primary) | `--primary` | none | `--text-inverse` | `--primary-hover` |
-| Button (ghost) | transparent | `--border` | `--text-secondary` | `--bg-hover` |
-| Button (danger) | `--error-bg` | `--error` | `--error` | — |
-| Input | `--bg-surface-bright` | `--border` | `--text-primary` | `--primary` |
-| Switch (on) | `--primary` | — | — | `--primary-glow` |
-| Switch (off) | `--border` | — | — | — |
-| Tooltip | `--bg-surface-bright` | `--border` | `--text-primary` | — |
-| Modal | `--bg-surface` | `--border` | `--text-primary` | — |
-| Settings Card | `--bg-surface-bright` | `--border-muted` | `--text-primary` | — |
+## Log Highlighting Protocol
+- **Row Highlight**: STRONGLY DISCOURAGED. Row background noise obscures data.
+- **Word Highlight (Standard)**: 
+  - Use `<mark>` with `bg-primary/20`, `text-primary`, and `border-primary/30`.
+  - Border radius: `2px`.
+  - Padding: `0 4px`.
+
+## Component → Design Sync
+
+| Component | State | Style Tokens |
+|---|---|---|
+| Filter Badge | Active | `bg-primary`, `text-bg-base`, `font-black` |
+| Import Tab | Active | `bg-primary`, `shadow-xl`, `shadow-primary/20` |
+| Input Field | Focus | `border-primary`, `ring-2`, `ring-primary/20` |
+| Sidebar Link | Selected | `bg-primary/10`, `text-primary`, `left-border-indicator` |
+| Log Row | ERROR | `text-error`, `font-bold` for level, `bg-error/5` |
+

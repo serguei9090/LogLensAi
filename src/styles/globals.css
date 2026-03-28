@@ -1,0 +1,104 @@
+@import "tailwindcss";
+@import "@fontsource-variable/inter";
+@import "@fontsource/jetbrains-mono";
+
+@theme {
+  --color-bg-base: #0d0f0e;
+  --color-bg-surface: #111613;
+  --color-bg-surface-bright: #1a1f1c;
+  --color-bg-hover: #1e2520;
+  --color-border: #2a3430;
+  --color-border-muted: #1d2420;
+  --color-primary: #22c55e;
+  --color-primary-hover: #16a34a;
+  --color-primary-muted: #14532d;
+  --color-primary-glow: #22c55e33;
+  --color-text-primary: #e8f5ec;
+  --color-text-secondary: #8fa898;
+  --color-text-muted: #4d6057;
+  --color-text-inverse: #0d0f0e;
+  --color-error: #ef4444;
+  --color-error-bg: #450a0a;
+  --color-warning: #f59e0b;
+  --color-warning-bg: #451a03;
+  --color-info: #38bdf8;
+  --color-info-bg: #0c2a3e;
+  --color-debug: #a78bfa;
+  --color-debug-bg: #1e1333;
+  --color-highlight-1: #fbbf24;
+  --color-highlight-2: #60a5fa;
+  --color-highlight-3: #f472b6;
+  --color-scrollbar: #2a3430;
+
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+
+  --font-sans: "Inter Variable", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", monospace;
+}
+
+:root {
+  --bg-base: var(--color-bg-base);
+  --bg-surface: var(--color-bg-surface);
+  --bg-surface-bright: var(--color-bg-surface-bright);
+  --bg-hover: var(--color-bg-hover);
+  --border: var(--color-border);
+  --border-muted: var(--color-border-muted);
+  --primary: var(--color-primary);
+  --primary-hover: var(--color-primary-hover);
+  --primary-muted: var(--color-primary-muted);
+  --primary-glow: var(--color-primary-glow);
+  --text-primary: var(--color-text-primary);
+  --text-secondary: var(--color-text-secondary);
+  --text-muted: var(--color-text-muted);
+  --text-inverse: var(--color-text-inverse);
+  --error: var(--color-error);
+  --error-bg: var(--color-error-bg);
+  --warning: var(--color-warning);
+  --warning-bg: var(--color-warning-bg);
+  --info: var(--color-info);
+  --info-bg: var(--color-info-bg);
+  --debug: var(--color-debug);
+  --debug-bg: var(--color-debug-bg);
+  --highlight-1: var(--color-highlight-1);
+  --highlight-2: var(--color-highlight-2);
+  --highlight-3: var(--color-highlight-3);
+  --scrollbar: var(--color-scrollbar);
+
+  --radius: var(--radius-md);
+}
+
+@layer base {
+  :root {
+    --background: var(--color-bg-base);
+    --foreground: var(--color-text-primary);
+    --card: var(--color-bg-surface-bright);
+    --card-foreground: var(--color-text-primary);
+    --popover: var(--color-bg-surface-bright);
+    --popover-foreground: var(--color-text-primary);
+    --primary-foreground: var(--color-text-inverse);
+    --secondary: var(--color-bg-surface);
+    --secondary-foreground: var(--color-text-secondary);
+    --muted: var(--color-bg-surface);
+    --muted-foreground: var(--color-text-muted);
+    --accent: var(--color-bg-hover);
+    --accent-foreground: var(--color-text-primary);
+    --destructive: var(--color-error);
+    --destructive-foreground: var(--color-text-inverse);
+    --input: var(--color-border);
+    --ring: var(--color-primary);
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  background-color: var(--bg-base);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  font-size: 14px;
+}

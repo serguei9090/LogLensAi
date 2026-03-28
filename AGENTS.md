@@ -5,6 +5,7 @@ LogLensAi is a **Tauri v2 desktop application** for professional log analysis. I
 ## 🗺️ Rule-Map (Laws of Physics)
 - **Architecture**: `.agents/rules/Architecture.md` (Hexagonal + Ports/Adapters)
 - **Jules CLI**: `.agents/rules/JulesCLI.md` (Remote & Task Delegation)
+- **UI Protocol**: `.agents/rules/UIReviewProtocol.md` (Mandatory Propose-First UI changes)
 - **Tracking**: `.agents/rules/ProjectTracking.md` (Session Sync + Boot Sequence)
 - **Software Standards**: `.agents/rules/SoftwareStandards.md` (DRY, KISS, SOLID)
 - **Quality**: `.agents/rules/Quality.md` (TODO(ID) + Atomic Design)
@@ -95,14 +96,15 @@ All methods are called via `useSidecarBridge.ts`. Never change the transport.
 
 | Method | Params | Returns |
 |---|---|---|
-| `get_logs` | `{ workspace_id, offset, limit, level?, query?, source_id? }` | `{ total, logs[], offset, limit }` |
+| `get_logs` | `{ workspace_id, offset, limit, filters: FilterEntry[], query?, sort_by?, sort_order? }` | `{ total, logs[], offset, limit }` |
 | `get_clusters` | `{ workspace_id }` | `ClusterEntry[]` |
 | `start_tail` | `{ filepath, workspace_id }` | `{ status }` |
 | `stop_tail` | `{ filepath, workspace_id }` | `{ status }` |
 | `is_tailing` | `{ filepath, workspace_id }` | `boolean` |
 | `start_ssh_tail` | `{ host, port, username, password?, filepath, workspace_id }` | `{ status }` |
 | `stop_ssh_tail` | `{ connection_id }` | `{ status }` |
-| `ingest_logs` | `{ logs: ManualLogEntry[] }` | `{ status }` |
+| `ingest_logs` | `{ logs: IngestLogEntry[] }` | `{ status }` |
+| `update_log_comment` | `{ log_id, comment }` | `{ status }` |
 | `update_settings` | `{ settings: Record<string,string> }` | `{ status }` |
 | `get_settings` | `{}` | `Record<string,string>` |
 | `analyze_cluster` | `{ cluster_id, workspace_id }` | `{ summary, root_cause, recommended_actions[] }` |

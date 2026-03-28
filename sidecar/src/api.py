@@ -1,0 +1,568 @@
+import json
+import os
+import sys
+from typing import Any
+
+import aiohttp_cors
+from aiohttp import web
+from pydantic import BaseModel, ValidationError
+from src.ai import AIProvider
+from src.db import Database
+from src.parser import DrainParser
+from src.tailer import FileTailer
+
+
+# RPC Base Models
+class JSONRPCRequest(BaseModel):
+    jsonrpc: str = "2.0"
+    id: Any | None = None
+    method: str
+    params: dict = {}
+
+class JSONRPCResponse(BaseModel):
+    jsonrpc: str = "2.0"
+    id: Any | None = None
+    result: Any | None = None
+    error: dict | None = None
+
+# --- Specific Request/Response Models ---
+class LogFilter(BaseModel):
+    field: str
+    value: str
+    operator: str = "contains"
+
+class GetLogsRequest(BaseModel):
+    workspace_id: str
+    offset: int = 0
+    limit: int = 100
+    filters: list[LogFilter] | None = None
+    query: str | None = None
+    sort_by: str = "id"
+    sort_order: str = "DESC"
+
+class StartTailRequest(BaseModel):
+    filepath: str
+    workspace_id: str
+
+class StartSSHTailRequest(BaseModel):
+    host: str
+    port: int = 22
+    username: str
+    password: str | None = None
+    filepath: str
+    workspace_id: str
+
+class IngestLogEntry(BaseModel):
+    workspace_id: str
+    source_id: str = "manual"
+    raw_text: str
+    timestamp: str | None = None
+    level: str = "INFO"
+    message: str | None = None
+
+class IngestLogsRequest(BaseModel):
+    logs: list[IngestLogEntry]
+
+class UpdateCommentRequest(BaseModel):
+    log_id: int
+    comment: str
+
+class GetWorkspaceSourcesRequest(BaseModel):
+    workspace_id: str
+
+class ReadFileRequest(BaseModel):
+    filepath: str
+
+class App:
+    def __init__(self, db_path="loglens.duckdb"):
+        self.db = Database(db_path)
+        self.parser = DrainParser()
+        self.tailers = {}
+        self.ai = AIProvider()
+        self.dev_mode = False
+
+    def dispatch(self, req: JSONRPCRequest) -> JSONRPCResponse:
+        try:
+            method_name = f"method_{req.method}"
+            if not hasattr(self, method_name):
+                return JSONRPCResponse(
+                    id=req.id, 
+                    error={"code": -32601, "message": f"Method not found: {req.method}"}
+                )
+
+            # Map method names to their validation models
+            models = {
+                "get_logs": GetLogsRequest,
+                "start_tail": StartTailRequest,
+                "start_ssh_tail": StartSSHTailRequest,
+                "stop_tail": StartTailRequest,
+                "ingest_logs": IngestLogsRequest,
+                "read_file": ReadFileRequest,
+                "update_log_comment": UpdateCommentRequest,
+                "get_workspace_sources": GetWorkspaceSourcesRequest,
+                "analyze_cluster": None,
+                "get_settings": None,
+                "update_settings": None,
+            }
+
+            handler = getattr(self, method_name)
+            
+            # Perform Pydantic validation if a model is defined
+            model = models.get(req.method)
+            if model:
+                try:
+                    params_model = model(**req.params)
+                    # Unroll the model into keyword arguments for the handler
+                    result = handler(**params_model.model_dump())
+                except ValidationError as ve:
+                    return JSONRPCResponse(
+                        id=req.id,
+                        error={"code": -32602, "message": "Invalid params", "data": ve.errors()}
+                    )
+            else:
+                # Direct call for unmapped methods (e.g. methods with no params or generic dicts)
+                result = handler(**req.params)
+
+            return JSONRPCResponse(id=req.id, result=result)
+        except Exception as e:
+            # Log server-side errors to stderr for backend debugging
+            import traceback
+            error_trace = traceback.format_exc()
+            sys.stderr.write(f"RPC Error in {req.method}: {error_trace}\n")
+            
+            error_data = error_trace if self.dev_mode else str(e)
+            return JSONRPCResponse(
+                id=req.id, 
+                error={"code": -32603, "message": "Internal error", "data": error_data}
+            )
+
+    def _parse_filters(self, filters: list[dict]) -> tuple[list[str], list[Any]]:
+        """Parses the specialized filter chain into SQL clauses and params"""
+        where_clauses = []
+        params = []
+        allowed_fields = {"message", "level", "source_id", "cluster_id", "raw_text", "has_comment", "comment"}
+        
+        for f in filters:
+            field = f.get("field")
+            value = f.get("value")
+            op = f.get("operator", "contains")
+            
+            if field not in allowed_fields or value is None:
+                continue
+
+            if op == "contains":
+                where_clauses.append(f"{field} ILIKE ?")
+                params.append(f"%{value}%")
+            elif op == "not_contains":
+                where_clauses.append(f"{field} NOT ILIKE ?")
+                params.append(f"%{value}%")
+            elif op == "equals":
+                if field == "source_id":
+                    # Case-insensitive path matching for Windows drive letter differences
+                    where_clauses.append(f"{field} ILIKE ?")
+                else:
+                    where_clauses.append(f"{field} = ?")
+                params.append(value)
+            elif op == "not_equals":
+                where_clauses.append(f"{field} != ?")
+                params.append(value)
+            elif op == "starts_with":
+                where_clauses.append(f"{field} ILIKE ?")
+                params.append(f"{value}%")
+            elif op == "regex":
+                where_clauses.append(f"regexp_matches({field}, ?)")
+                params.append(value)
+                
+        return where_clauses, params
+
+    def method_get_logs(
+        self,
+        workspace_id: str,
+        offset: int = 0,
+        limit: int = 100,
+        filters: list[LogFilter] | None = None,
+        query: str | None = None,
+        sort_by: str = "id",
+        sort_order: str = "DESC",
+    ) -> dict:
+        """Search and filter logs within a specific workspace with sequence-aware AND logic"""
+        cursor = self.db.get_cursor()
+        
+        where_clauses = ["workspace_id = ?"]
+        params: list[Any] = [workspace_id]
+        
+        # Process the ordered filter chain
+        if filters:
+            # filters is a list of LogFilter objects, convert to list[dict]
+            dict_filters = [f.model_dump() if hasattr(f, "model_dump") else f for f in filters]
+            f_clauses, f_params = self._parse_filters(dict_filters)
+            where_clauses.extend(f_clauses)
+            params.extend(f_params)
+
+        # Global keyword fuzzy search
+        if query:
+            where_clauses.append("(message ILIKE ? OR raw_text ILIKE ?)")
+            params.extend([f"%{query}%", f"%{query}%"])
+            
+        where_sql = " AND ".join(where_clauses)
+        
+        # We join with clusters table to get the 'count' which allows us to calculate percentage
+        total_logs_subquery = "(SELECT count(*) FROM logs WHERE workspace_id = ?)"
+        
+        # Map where_sql to use table alias 'l' to avoid ambiguity after join
+        aliased = where_sql.replace("workspace_id", "l.workspace_id") \
+                           .replace("source_id", "l.source_id") \
+                           .replace("message", "l.message") \
+                           .replace("level", "l.level") \
+                           .replace("cluster_id", "l.cluster_id") \
+                           .replace("raw_text", "l.raw_text") \
+                           .replace("has_comment", "l.has_comment")
+        
+        base_query = f"""
+            SELECT 
+                l.*, 
+                c.count as _cluster_count, 
+                c.template as cluster_template,
+                CAST(c.count AS FLOAT) * 100.0 / {total_logs_subquery} as cluster_percent
+            FROM logs l
+            LEFT JOIN clusters c ON l.workspace_id = c.workspace_id AND l.cluster_id = c.cluster_id
+            WHERE {aliased}
+        """
+        
+        params_for_data = [workspace_id] + params
+        count_query = f"SELECT COUNT(*) FROM logs WHERE {where_sql}"
+        cursor.execute(count_query, params)
+        total = cursor.fetchone()[0]
+
+        allowed_sort = ["id", "timestamp", "level", "source_id", "cluster_id", "has_comment", "cluster_percent"]
+        final_sort_by = sort_by if sort_by in allowed_sort else "id"
+        if final_sort_by == "cluster_id":
+             final_sort_by = "cluster_percent"
+             
+        final_sort_order = "ASC" if sort_order and sort_order.upper() == "ASC" else "DESC"
+        data_query = base_query + f" ORDER BY {final_sort_by} {final_sort_order}, l.id {final_sort_order} LIMIT ? OFFSET ?"
+        cursor.execute(data_query, params_for_data + [limit, offset])
+
+        columns = [desc[0] for desc in cursor.description]
+        logs = [dict(zip(columns, row, strict=False)) for row in cursor.fetchall()]
+
+        return {"total": total, "logs": logs, "offset": offset, "limit": limit}
+
+    def method_start_tail(self, filepath: str, workspace_id: str) -> dict:
+        # Normalize to forward slashes for consistent source_id matching
+        abs_path = os.path.abspath(filepath).replace("\\", "/")
+        key = f"{workspace_id}:{abs_path}"
+
+        if key in self.tailers and self.tailers[key].running:
+            return {"status": "already tailing"}
+
+        tailer = FileTailer(abs_path, workspace_id, self.parser)
+        self.tailers[key] = tailer
+        tailer.start()
+        
+        return {"status": "started"}
+
+    def method_start_ssh_tail(
+        self, host: str, port: int = 22, username: str | None = None, 
+        password: str | None = None, filepath: str | None = None, workspace_id: str | None = None
+    ) -> dict:
+        from src.ssh_loader import SSHLoader
+        
+        key = f"ssh:{workspace_id}:{host}:{filepath}"
+        if key in self.tailers and self.tailers[key].running:
+            return {"status": "already tailing"}
+
+        tailer = SSHLoader(
+            host, port, username, password, 
+            filepath, workspace_id, self.parser
+        )
+        self.tailers[key] = tailer
+        tailer.start()
+        
+        return {"status": "started"}
+
+    def method_stop_tail(self, filepath: str, workspace_id: str) -> dict:
+        """Stop one or all live stream tailers for a workspace."""
+        if filepath == "ALL":
+            count: int = 0
+            keys_to_remove = []
+            for k, t in self.tailers.items():
+                if k.startswith(f"{workspace_id}:") or k.startswith(f"ssh:{workspace_id}:"):
+                    t.stop()
+                    keys_to_remove.append(k)
+                    count = count + 1
+            for k in keys_to_remove:
+                self.tailers.pop(k, None)
+            return {"status": "stopped", "count": count}
+
+        abs_path = os.path.abspath(filepath)
+        key = f"{workspace_id}:{abs_path}"
+
+        if key in self.tailers:
+            self.tailers[key].stop()
+            self.tailers.pop(key, None)
+            return {"status": "stopped", "count": 1}
+
+        # Fallback for SSH or partial matches
+        count_stopped: int = 0
+        keys_to_remove = []
+        for k, t in self.tailers.items():
+            if (k.startswith(f"{workspace_id}:") or k.startswith(f"ssh:{workspace_id}:")) and filepath in k:
+                t.stop()
+                keys_to_remove.append(k)
+                count_stopped = count_stopped + 1
+        for k in keys_to_remove:
+            self.tailers.pop(k)
+
+        return {"status": "stopped" if count_stopped > 0 else "not found", "count": count_stopped}
+
+    def method_read_file(self, filepath: str) -> str:
+        """Reads the full content of a local file."""
+        # Normalize path for consistent cross-platform behavior
+        abs_path = os.path.abspath(filepath).replace("\\", "/")
+        if not os.path.exists(abs_path):
+            raise FileNotFoundError(f"File not found: {abs_path}")
+            
+        with open(abs_path, 'r', encoding='utf-8', errors='replace') as f:
+            return f.read()
+
+    def _ingest_single_log(self, cursor: Any, log: dict) -> list[Any]:
+        """Extracts clustering logic into a reusable helper"""
+        workspace_id = log.get("workspace_id")
+        source_id = log.get("source_id", "manual")
+        raw_text = log.get("raw_text", "")
+        timestamp = log.get("timestamp") or ""
+        level = log.get("level", "INFO")
+        message = log.get("message") or raw_text
+        
+        # Clustering for each log line
+        try:
+            res = self.parser.parse(message)
+            cluster_id = res.cluster_id
+            template = res.template
+        except Exception:
+            cluster_id = "unknown"
+            template = "unknown"
+
+        # Update cluster stats
+        cursor.execute("""
+            INSERT INTO clusters (workspace_id, cluster_id, template, count) 
+            VALUES (?, ?, ?, 1)
+            ON CONFLICT (workspace_id, cluster_id) 
+            DO UPDATE SET count = count + 1, template = excluded.template
+        """, (workspace_id, cluster_id, template))
+
+        return [workspace_id, source_id, raw_text, timestamp, level, message, cluster_id]
+
+    def method_ingest_logs(self, logs: list[IngestLogEntry]) -> dict:
+        """High-speed batch ingestion of log entries with pattern clustering"""
+        cursor = self.db.get_cursor()
+        batch_data = []
+        
+        # Map logs to dict if they are models
+        log_dicts = [l.model_dump() if hasattr(l, "model_dump") else l for l in logs]
+        
+        for log in log_dicts:
+            batch_data.append(self._ingest_single_log(cursor, log))
+            
+        if batch_data:
+            cursor.executemany(
+                "INSERT INTO logs (workspace_id, source_id, raw_text, timestamp, level, message, cluster_id) VALUES (?, ?, ?, ?, ?, ?, ?)", 
+                batch_data
+            )
+            
+        return {"status": "ok", "count": len(batch_data)}
+
+    def method_update_log_comment(self, log_id: int, comment: str) -> dict:
+        """Update annotation for a specific log entry. If empty, the note is removed."""
+        cursor = self.db.get_cursor()
+        # Automatically toggle has_comment flag based on whether text is provided
+        query = """
+            UPDATE logs 
+            SET comment = ?, 
+                has_comment = CASE WHEN length(?) > 0 THEN TRUE ELSE FALSE END 
+            WHERE id = ?
+        """
+        cursor.execute(query, (comment, comment, log_id))
+        return {"status": "success"}
+
+    def method_get_workspace_sources(self, workspace_id: str) -> list:
+        """Return the distinct source_id values present in a workspace's log table.
+
+        Args:
+            workspace_id: The ID of the workspace.
+
+        Returns:
+            Sorted list of unique source paths ingested into this workspace.
+        """
+        cursor = self.db.get_cursor()
+        cursor.execute(
+            "SELECT DISTINCT source_id FROM logs WHERE workspace_id = ? AND source_id IS NOT NULL ORDER BY source_id",
+            (workspace_id,),
+        )
+        return [row[0] for row in cursor.fetchall()]
+
+
+    def method_read_file(self, filepath: str) -> str:
+        """Read a local file's content for one-time ingestion"""
+        abs_path = os.path.abspath(filepath)
+        if not os.path.exists(abs_path):
+            raise FileNotFoundError(f"File not found: {abs_path}")
+            
+        # Limit to 5MB to avoid memory issues in JSON-RPC
+        if os.path.getsize(abs_path) > 5 * 1024 * 1024:
+            raise ValueError("File too large for one-time read (max 5MB). Use Live Tail instead.")
+            
+        with open(abs_path, 'r', encoding='utf-8', errors='replace') as f:
+            return f.read()
+
+    def method_is_tailing(self, filepath: str, workspace_id: str) -> bool:
+        abs_path = os.path.abspath(filepath)
+        key = f"{workspace_id}:{abs_path}"
+        return key in self.tailers and self.tailers[key].running
+
+    def method_get_clusters(self, workspace_id: str) -> list:
+        clusters = self.parser.get_clusters()
+        return [
+            {"id": c.cluster_id, "template": c.get_template(), "size": c.size} 
+            for c in clusters
+        ]
+
+    def method_analyze_cluster(self, cluster_id: str, workspace_id: str) -> dict:
+        cursor = self.db.get_cursor()
+        
+        cursor.execute(
+            "SELECT raw_text FROM logs WHERE workspace_id = ? AND cluster_id = ? LIMIT 20", 
+            (workspace_id, cluster_id)
+        )
+        samples = [row[0] for row in cursor.fetchall()]
+        
+        clusters = self.parser.get_clusters()
+        template = ""
+        for c in clusters:
+            if str(c.cluster_id) == str(cluster_id):
+                template = c.get_template()
+                break
+                
+        return self.ai.analyze(template, samples)
+        
+    def method_get_settings(self) -> dict:
+        cursor = self.db.get_cursor()
+        cursor.execute("SELECT key, value FROM settings")
+        return {row[0]: row[1] for row in cursor.fetchall()}
+        
+    def method_update_settings(self, settings: dict) -> dict:
+        cursor = self.db.get_cursor()
+        
+        if "ai_provider" in settings:
+            self.ai.provider = settings["ai_provider"]
+        if "ai_api_key" in settings:
+            self.ai.api_key = settings["ai_api_key"]
+        if "ai_system_prompt" in settings:
+            self.ai.system_prompt = settings["ai_system_prompt"]
+
+        query = (
+            "INSERT INTO settings (key, value) VALUES (?, ?) "
+            "ON CONFLICT (key) DO UPDATE SET value = excluded.value"
+        )
+        for k, v in settings.items():
+            cursor.execute(query, (k, str(v)))
+            
+        return {"status": "success"}
+
+    async def aiohttp_handler(self, request):
+        try:
+            body = await request.json()
+            req = JSONRPCRequest(**body)
+            res = self.dispatch(req)
+            return web.json_response(res.model_dump())
+        except ValidationError:
+            return web.json_response(
+                {
+                    "jsonrpc": "2.0", 
+                    "id": None, 
+                    "error": {"code": -32600, "message": "Invalid Request"}
+                }, 
+                status=400
+            )
+        except Exception:
+            return web.json_response(
+                {
+                    "jsonrpc": "2.0", 
+                    "id": None, 
+                    "error": {"code": -32603, "message": "Internal error"}
+                }, 
+                status=500
+            )
+
+async def on_cleanup(app):
+    Database.reset()
+
+def run_http(port=5000):
+    app = App()
+    app.dev_mode = True
+    server = web.Application()
+    
+    # Configure CORS
+    cors = aiohttp_cors.setup(server, defaults={
+        "*": aiohttp_cors.ResourceOptions(
+            allow_credentials=True,
+            expose_headers="*",
+            allow_headers="*",
+        )
+    })
+    
+    resource = server.router.add_resource("/rpc")
+    route = resource.add_route("POST", app.aiohttp_handler)
+    cors.add(route)
+    
+    server.on_cleanup.append(on_cleanup)
+    web.run_app(server, host='127.0.0.1', port=port)
+
+def run_stdio():
+    app = App()
+    app.dev_mode = False
+    
+    try:
+        for line in sys.stdin:
+            if not line.strip():
+                continue
+            try:
+                req_dict = json.loads(line)
+                req = JSONRPCRequest(**req_dict)
+                res = app.dispatch(req)
+                print(json.dumps(res.model_dump()), flush=True)
+            except json.JSONDecodeError:
+                print(
+                    json.dumps({
+                        "jsonrpc": "2.0", 
+                        "id": None, 
+                        "error": {"code": -32700, "message": "Parse error"}
+                    }), 
+                    flush=True
+                )
+            except ValidationError:
+                id_val = req_dict.get("id") if isinstance(req_dict, dict) else None
+                print(
+                    json.dumps({
+                        "jsonrpc": "2.0", 
+                        "id": id_val, 
+                        "error": {"code": -32600, "message": "Invalid Request"}
+                    }), 
+                    flush=True
+                )
+    except KeyboardInterrupt:
+        pass
+    except EOFError:
+        pass
+    finally:
+        Database.reset()
+
+def main():
+    if "--dev" in sys.argv:
+        run_http(5000)
+    else:
+        run_stdio()
+
+if __name__ == "__main__":
+    main()

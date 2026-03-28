@@ -18,58 +18,57 @@
 ## 🟡 Sprint 01 — Foundation Reset (Current Focus)
 
 ### P0 — Architecture & Design Spec
-- [ ] **ARCH-001**: Define atomic folder structure in `src/components/`
+- [x] **ARCH-001**: Define atomic folder structure in `src/components/`
   - Atoms / Molecules / Organisms / Templates / Pages
   - Ref: `docs/design/ui-components.md`
-- [ ] **ARCH-002**: Implement global CSS variables from `docs/design/theme.md`
+- [x] **ARCH-002**: Implement global CSS variables from `docs/design/theme.md`
   - All colors as CSS custom properties in `src/styles/globals.css`
   - JetBrains Mono + Inter fonts loaded
-- [ ] **ARCH-003**: Create `src/components/ui/` with all shadcn components
+- [x] **ARCH-003**: Create `src/components/ui/` with all shadcn components
   - See `docs/design/ui-components.md` for full list
 
 ### P1 — Workspace Management
-- [ ] **WS-001**: Zustand store for workspaces (`src/store/workspaceStore.ts`)
+- [x] **WS-001**: Zustand store for workspaces (`src/store/workspaceStore.ts`)
   - Each workspace has: `id`, `name`, `sourceType` (local/ssh), `sourcePath`, `createdAt`
   - Active workspace selector
-- [ ] **WS-002**: Sidebar — Workspace list UI
+- [x] **WS-002**: Sidebar — Workspace list UI
   - Create / rename / delete workspace
   - Click to switch active workspace
-- [ ] **WS-003**: Sidecar — workspace-scoped DuckDB queries
+- [x] **WS-003**: Sidecar — workspace-scoped DuckDB queries
   - All `get_logs` / `get_clusters` filtered by `workspace_id`
 
 ### P2 — Investigation Page (Core)
-- [ ] **INV-001**: `LogToolbar` organism
+- [x] **INV-001**: `LogToolbar` organism
   - `SearchBar` — debounced full-text search
   - `FilterBuilder` — add/remove filters; each filter: field + operator + value
     - Operators: `=`, `!=`, `contains`, `not contains`, `starts with`
     - Fields: `level`, `source_id`, `cluster_id`, `raw_text`
   - `HighlightBuilder` — add/remove highlight rules; each: term + color (from theme palette)
   - `TailSwitch` — ON/OFF, calls `start_tail` / `stop_tail` RPC
-- [ ] **INV-002**: `VirtualLogTable` organism
+- [x] **INV-002**: `VirtualLogTable` organism
   - TanStack Virtual for rendering 1M+ rows without lag
   - Columns: `#`, `Timestamp`, `Level`, `Message`, `Cluster`
   - Log rows colored per level (from theme)
   - Highlight terms rendered with background color in cell
   - Click row → expand raw text panel
-- [ ] **INV-003**: `ImportFeedModal` organism
+- [x] **INV-003**: `ImportFeedModal` organism
   - Tab 1 — Local file: browse + path input + TailSwitch
   - Tab 2 — SSH: host/port/user/pass/path + TailSwitch  
   - Tab 3 — Manual paste: textarea + ingest button
-- [ ] **INV-004**: Sidecar — `start_tail` / `stop_tail` / `is_tailing` RPC methods
+- [x] **INV-004**: Sidecar — `start_tail` / `stop_tail` / `is_tailing` RPC methods
   - Key: `workspace_id:filepath` prevents duplicate tailers
   - `stop_tail` stops the background thread cleanly
 
 ### P3 — Settings Page
-- [ ] **SET-001**: Settings layout with Card sections
+- [x] **SET-001**: Settings layout with Card sections
   - Section: **AI Provider**
   - Section: **Drain3 Configuration**
   - Section: **General**
-- [ ] **SET-002**: AI Provider section
+- [x] **SET-002**: AI Provider section
   - Selector: `gemini-cli` (default) | `openai` | `anthropic`
   - **Gemini CLI setup**: calls `gemini -p "<prompt>"` as a subprocess; response parsed as JSON
     - Output format: `{ "summary": "...", "root_cause": "...", "actions": ["..."] }`
     - Sidecar method: `analyze_cluster(cluster_id, workspace_id)` → returns structured JSON
-  - API key input (hidden, stored in a local `.env` file, never committed)
 - [ ] **SET-003**: Drain3 configuration section
   - Fields with tooltips:
     - `Similarity Threshold` (0.0–1.0) — Tooltip: "Controls how aggressively logs are grouped. Higher = stricter matching."
@@ -82,7 +81,23 @@
 
 ---
 
-### P4 — Testing & Quality
+### P5 — Workspace Tabs (Multi-Source support)
+- [x] **WS-TABS-001**: Update `workspaceStore.ts` model to support `sources[]` and `activeSourceId`
+- [x] **WS-TABS-002**: Sidecar — Update `FileTailer` and `SSHLoader` to populate `source_id` column
+- [x] **WS-TABS-003**: Sidecar — Add `get_workspace_sources(workspace_id)` method to `api.py`
+- [x] **WS-TABS-004**: UI — Create `WorkspaceTabs` molecule and integrate into `LogToolbar`
+- [x] **WS-TABS-005**: UI — Update `InvestigationPage` to filter logs by `activeSourceId`
+
+### P7 — Stabilization & Orchestration (Active)
+- [x] **STAB-001**: Sidecar — Implement CORS support and restrict to 127.0.0.1 binding
+- [x] **STAB-002**: UI — Remove all "Browser Mode" and Tauri-detection fallbacks (Desktop Only)
+- [x] **STAB-003**: Sidecar — Fix BUG-001 (DuckDB thread safety) and BUG-002 (Async cleanup)
+- [x] **AUDIT-001**: Complete Architectural Audit of RPC signatures and DuckDB mapping.
+- [ ] **STAB-004**: Dev Mode — Ensure sidecar is automatically started or reachable
+
+---
+
+### P6 — Testing & Quality
 - [ ] **TEST-001**: Set up Vitest and React Testing Library for frontend unit tests
 - [ ] **TEST-002**: Frontend generic tests (test `LogToolbar`, `TailSwitch` rendering and state)
 - [ ] **TEST-003**: Set up `pytest` and `pytest-asyncio` for sidecar backend unit tests
@@ -94,16 +109,15 @@
 ## 🔵 Backlog (Future Sprints)
 
 - [ ] **DASH-001**: Dashboard page (placeholder shell only — disabled in nav)
-- [ ] **MULTI-001**: Multi-file chrono-merge (multiple sources per workspace)
-- [ ] **ANN-001**: Log row annotation / notes
+- [x] **ANN-001**: Log row annotation / notes (Multi-line + Sortable)
 - [ ] **EXPORT-001**: Export filtered logs to CSV / JSON
 - [ ] **KEYBIND-001**: Keyboard shortcuts (⌘K command palette)
 
 ---
 
 ## 🔴 Known Bugs
-- [ ] **BUG-001**: DuckDB shared connection throws "No open result set" under concurrent read/write
+- [x] **BUG-001**: DuckDB shared connection throws "No open result set" under concurrent read/write
   - Root cause: single `conn` object shared between FileTailer thread and API query thread
   - Fix: use `conn.cursor()` per query call (thread-isolated)
-- [ ] **BUG-002**: Sidecar `on_cleanup` fires as a sync function inside `aiohttp`, causing `TypeError: NoneType can't be used in await`
+- [x] **BUG-002**: Sidecar `on_cleanup` fires as a sync function inside `aiohttp`, causing `TypeError: NoneType can't be used in await`
   - Fix: convert to `async def on_cleanup(_)`
