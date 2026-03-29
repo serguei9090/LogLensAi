@@ -47,3 +47,28 @@ This specification defines the architectural standards for LogLensAi, a premium 
   - Controls are globally applied to both calendars in view.
   - View-cycling (`Days` → `Months` → `Years`) provides rapid temporal context shifts without breaking the dual layout.
 - **Precision Preview**: Real-time display of normalized ISO date-time strings below the interactive grids ensures the user identifies exact investigate boundaries.
+
+## 7. AI Investigation & Interaction
+### 7.1 Multi-Provider AI Architecture
+- **Provider Tiers**: 
+  - **Gemini CLI**: Local fallback via `subprocess`. No key required.
+  - **AI Studio (Google)**: Primary cloud provider via `google-generativeai`. Requires API key.
+  - **Ollama**: Decentralized local provider via REST API (`localhost:11434`).
+- **Model Dynamic Loading**: Providers must expose a `list_models` endpoint to populate UI selectors.
+
+### 7.2 Session & Memory Management
+- **Persistence**: Chat history is stored in `ai_sessions` and `ai_messages` (DuckDB).
+- **Context Binding**: Each `ai_session` can reference one or more `workspace_id`.
+- **Memory Types**:
+  - **Workspace Memory**: Deleted upon workspace removal (ephemeral context).
+  - **Global Memory**: Persistent across workspaces (base personality/rules).
+
+### 7.3 Multi-Log Selection UI
+- **Interaction Logic**: 
+  - **Checkboxes**: Primary multi-row selection mechanism in `VirtualLogTable`.
+  - **Action Pill**: Floating toolbar triggered by selection containing "Send to AI Chat".
+  - **Contextual Icon**: Logs included in an active chat session must show an `AI` indicator in the 'Actions' column.
+
+### 7.4 AI Sidebar (The Agent)
+- **Component**: `AIInvestigationSidebar`. Collapsible, right-aligned.
+- **Streaming**: Implementation of an EventStream or chunked JSON-RPC response for real-time chat feel.

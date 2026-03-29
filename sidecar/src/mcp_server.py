@@ -60,3 +60,19 @@ def get_pattern_summary(workspace_id: str) -> list[dict]:
         {"cluster_id": row[0], "template": row[1], "count": row[2]}
         for row in cursor.fetchall()
     ]
+
+@mcp_server.tool()
+def analyze_cluster(workspace_id: str, cluster_id: str) -> dict:
+    """Analyze a specific log cluster using AI to determine summary, root cause, and recommendations."""
+    app = get_app()
+    if not app:
+        return {}
+    return app.method_analyze_cluster(cluster_id=cluster_id, workspace_id=workspace_id)
+
+@mcp_server.tool()
+def get_anomalies(workspace_id: str) -> dict:
+    """Retrieve statistical outliers and rare log patterns from the workspace."""
+    app = get_app()
+    if not app:
+        return {}
+    return app.method_get_anomalies(workspace_id=workspace_id)

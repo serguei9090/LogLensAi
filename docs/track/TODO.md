@@ -72,7 +72,7 @@
 
 ---
 
-## 🟡 Sprint 04 — Unified Analysis Engine (Planned)
+## 🟡 Sprint 04 — Unified Analysis Engine (Active)
 
 ### P0 — Visualization & Context
 - [x] **ANALYSIS-001**: Log Distribution Chart (Histogram) — Toggleable via Orchestrator Hub
@@ -92,9 +92,44 @@
 
 ---
 
+## 🟢 Sprint 05 — Quality & Stability (Active)
+
+### P0 — Sidecar Verification
+- [ ] **TEST-BE-001**: sidecar/api.py — Full JSON-RPC parity test suite (Pytest)
+  - Detail: `docs/TODOC/TEST-BE-001.md`
+- [ ] **TEST-BE-002**: sidecar/mcp_server.py — MCP tools validation
+  - Detail: `docs/TODOC/TEST-BE-002.md`
+
+### P1 — Frontend Integrity
+- [ ] **TEST-FE-001**: src/store/workspaceStore.ts — Full state management coverage (Vitest)
+  - Detail: `docs/TODOC/TEST-FE-001.md`
+- [ ] **TEST-FE-002**: src/store/investigationStore.ts — View state and source isolation verification
+  - Detail: `docs/TODOC/TEST-FE-002.md`
+
+---
+
+## 🟣 Sprint 06 — AI Investigation & Intelligence (Planning)
+
+### P0 — AI Multi-Provider Backend
+- [ ] **AI-BE-001**: Modular `AIProvider` Strategy (Gemini CLI, AI Studio, Ollama) — `sidecar/src/ai.py`
+- [ ] **AI-BE-002**: AI Persistence Schema in DuckDB (sessions, messages) — `sidecar/src/db.py`
+- [ ] **AI-BE-003**: API: `list_models`, `chat_session` orchestration — `sidecar/src/api.py`
+
+### P1 — Multi-Log Selection UI
+- [ ] **AI-FE-001**: `VirtualLogTable` row selection (checkboxes) & "Actions" column refactor
+- [ ] **AI-FE-002**: "Batch Send to AI" Action Pill logic
+
+### P2 — AI Investigation Sidebar
+- [ ] **AI-FE-003**: `AIInvestigationSidebar` (Chat interface with session history)
+- [ ] **AI-FE-004**: "Agent" Toolbar Integration & Global Settings update
+
+### P3 — Note Refinement
+- [ ] **NOTE-FE-001**: Refactor Note View into a smaller floating card/popover (Reduced height, no raw data duplicate)
+
+---
+
 ## ⚪ Backlog (Future Sprints)
 
 - [ ] **DASH-001**: Dashboard page (placeholder nav item)
 - [ ] **EXPORT-001**: Export filtered logs to CSV / JSON
 - [ ] **KEYBIND-001**: Keyboard shortcuts (⌘K command palette)
-- [ ] **TEST-00x**: Vitest unit tests for stores + Pytest for sidecar API

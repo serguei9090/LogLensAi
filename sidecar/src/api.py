@@ -137,25 +137,43 @@ class App:
         self.tailers = {}
         self.ai = AIProvider()
         self.dev_mode = False
+        
         init_mcp(self)
         self._mcp_thread = None
-        self._start_mcp_server()
+        self._mcp_server_instance = None
+        
+        # Auto-start if enabled in settings
+        settings = self.method_get_settings()
+        if settings.get("mcp_server_enabled", "false").lower() == "true":
+            self._start_mcp_server()
 
     def _start_mcp_server(self):
-        """Starts the MCP server in a background thread using FastMCP stdio or SSE if needed.
-        Currently using FastMCP internally, which supports stdio."""
+        """Starts the MCP server in a background thread using FastMCP SSE."""
+        if self._mcp_thread and self._mcp_thread.is_alive():
+            return
+
         def run_mcp():
             try:
-                # We can't use stdio for MCP if we are already using stdio for JSON-RPC in main.
-                # If dev_mode HTTP is used, stdio is free. But to be safe, we'll start SSE on a different port.
                 import uvicorn
-                uvicorn.run(mcp_server.application, host="127.0.0.1", port=5001, log_level="error")
+                from mcp.server.fastmcp import FastMCP
+                config = uvicorn.Config(mcp_server.application, host="127.0.0.1", port=5001, log_level="error")
+                self._mcp_server_instance = uvicorn.Server(config)
+                self._mcp_server_instance.run()
             except Exception as e:
                 sys.stderr.write(f"MCP Server error: {e}\n")
         
         # We start the SSE MCP Server in a daemon thread so it dies with the main process.
         self._mcp_thread = threading.Thread(target=run_mcp, daemon=True)
         self._mcp_thread.start()
+
+    def _stop_mcp_server(self):
+        """Signals the MCP server to shut down."""
+        if self._mcp_server_instance:
+            self._mcp_server_instance.should_exit = True
+            self._mcp_server_instance = None
+            if self._mcp_thread:
+                self._mcp_thread.join(timeout=2)
+                self._mcp_thread = None
 
     def dispatch(self, req: JSONRPCRequest) -> JSONRPCResponse:
         try:
@@ -289,7 +307,7 @@ class App:
             params.extend(f_params)
 
         if query:
-            where_clauses.append("(l.message ILIKE ? OR l.raw_text ILIKE ?)")
+            where_clauses.append("(message ILIKE ? OR raw_text ILIKE ?)")
             params.extend([f"%{query}%", f"%{query}%"])
 
         if start_time:
@@ -327,7 +345,7 @@ class App:
         """
         
         params_for_data = [workspace_id] + params
-        count_query = f"SELECT COUNT(*) FROM logs WHERE {where_sql}"
+        count_query = f"SELECT COUNT(*) FROM logs l WHERE {aliased}"
         cursor.execute(count_query, params)
         total = cursor.fetchone()[0]
 
@@ -748,6 +766,13 @@ class App:
             self.ai.api_key = settings["ai_api_key"]
         if "ai_system_prompt" in settings:
             self.ai.system_prompt = settings["ai_system_prompt"]
+        
+        if "mcp_server_enabled" in settings:
+            enabled = str(settings["mcp_server_enabled"]).lower() == "true"
+            if enabled:
+                self._start_mcp_server()
+            else:
+                self._stop_mcp_server()
 
         query = (
             "INSERT INTO settings (key, value) VALUES (?, ?) "

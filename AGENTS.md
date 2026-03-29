@@ -9,6 +9,9 @@ LogLensAi is a **Tauri v2 desktop application** for professional log analysis. I
 - **Tracking**: `.agents/rules/ProjectTracking.md` (Session Sync + Boot Sequence)
 - **Software Standards**: `.agents/rules/SoftwareStandards.md` (DRY, KISS, SOLID)
 - **Quality**: `.agents/rules/Quality.md` (TODO(ID) + Atomic Design)
+- **Architecture Docs**: `docs/architecture/gemini.md` (Main roadmap & personas)
+- **Test Tracking**: `docs/architecture/testing.md` (Coverage matrix & QA standards)
+- **Arch Mandate**: `.agents/rules/ArchitectureDocs.md` (Mandatory documentation rule)
 
 ## 🎯 Product Scope (STRICT)
 The **only active modules** are:

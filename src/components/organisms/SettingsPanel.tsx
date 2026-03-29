@@ -1,7 +1,9 @@
 import { HelpTooltip } from "@/components/atoms/HelpTooltip";
 import { cn } from "@/lib/utils";
-import { Bot, Check, Cpu, Layers, Palette, Save } from "lucide-react";
-import { useState } from "react";
+import { Bot, Check, Cpu, Layers, Palette, Save, Terminal } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Switch } from "@/components/ui/switch";
+import { callSidecar } from "@/lib/hooks/useSidecarBridge";
 
 export interface AppSettings {
   ai_provider: string;
@@ -12,6 +14,7 @@ export interface AppSettings {
   drain_max_clusters: number;
   ui_row_height: string;
   ui_font_size: string;
+  mcp_server_enabled: boolean;
 }
 
 const defaultSettings: AppSettings = {
@@ -24,6 +27,7 @@ const defaultSettings: AppSettings = {
   drain_max_clusters: 1000,
   ui_row_height: "default",
   ui_font_size: "13px",
+  mcp_server_enabled: false,
 };
 
 type SectionId = "ai" | "drain" | "general";
@@ -93,6 +97,29 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
 
   const update = <K extends keyof AppSettings>(key: K, value: AppSettings[K]) =>
     setSettings((prev) => ({ ...prev, [key]: value }));
+
+  // Load settings on mount
+  useEffect(() => {
+    const loadSettings = async () => {
+      try {
+        const remoteSettings = (await callSidecar({ method: "get_settings", params: {} })) as any;
+        if (remoteSettings) {
+          setSettings((prev) => ({
+            ...prev,
+            ...remoteSettings,
+            // Cast numeric/boolean strings back to proper types
+            drain_similarity_threshold: Number.parseFloat(remoteSettings.drain_similarity_threshold || "0.4"),
+            drain_max_children: Number.parseInt(remoteSettings.drain_max_children || "100", 10),
+            drain_max_clusters: Number.parseInt(remoteSettings.drain_max_clusters || "1000", 10),
+            mcp_server_enabled: remoteSettings.mcp_server_enabled === "true",
+          }));
+        }
+      } catch (error) {
+        console.error("Failed to load settings:", error);
+      }
+    };
+    loadSettings();
+  }, []);
 
   const handleSave = () => {
     onSave(settings);
@@ -233,6 +260,24 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
                   </div>
                 </div>
               )}
+
+              <div className="flex items-center justify-between bg-bg-surface/50 border border-border rounded-2xl p-5 hover:bg-bg-surface transition-colors">
+                <div className="flex items-center gap-4">
+                  <div className="bg-violet-500/10 p-2 rounded-xl">
+                    <Terminal className="h-5 w-5 text-violet-400" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-bold text-text-primary">Agentic MCP Server</p>
+                    <p className="text-[10px] text-text-muted mt-0.5">
+                      Expose log analysis tools via SSE (Port 5001) for external AI agents.
+                    </p>
+                  </div>
+                </div>
+                <Switch
+                  checked={settings.mcp_server_enabled}
+                  onCheckedChange={(checked) => update("mcp_server_enabled", checked)}
+                />
+              </div>
             </div>
           )}
 
