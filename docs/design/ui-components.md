@@ -1,7 +1,7 @@
 # LogLensAi - UI Components Registry
 
-> All UI primitives must be installed from **shadcn/ui** and styled with the project theme tokens.
-> Run `bunx shadcn@latest add <component>` for each.
+> All UI primitives must be installed from **shadcn/ui** using the **shadcn** skill and styled with the project theme tokens.
+> Run `bunx --bun shadcn@latest add <component>` for each.
 
 ## Required shadcn Components
 

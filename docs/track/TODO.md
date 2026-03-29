@@ -77,7 +77,11 @@
 ### P0 — Visualization & Context
 - [x] **ANALYSIS-001**: Log Distribution Chart (Histogram) — Toggleable via Orchestrator Hub
 - [x] **ANALYSIS-002**: Contextual Selection Filter — Right-click/Select-to-Filter logic
-- [ ] **FEA-002**: `TimeRangePicker` — Dual-Calendar Refactor (Booking pattern) [Detail](docs/TODOC/FEA-002.md)
+- [ ] **FEA-002**: Global Temporal Filtering System
+  - [ ] `FEA-002-UI-001`: Migrate `TimeRangePicker` to `LogToolbar`.
+  - [ ] `FEA-002-UI-002`: Remove redundant picker from `LogDistributionWidget`.
+  - [ ] `FEA-002-BE-001`: Audit `api.py` timestamp parsing for ISO parity.
+  - Detail: `docs/TODOC/FEA-002.md`
 - [x] **ANALYSIS-003**: Agentic MCP Server — Expose sidecar tools for external AI agents
 
 ### P1 — Advanced Intel

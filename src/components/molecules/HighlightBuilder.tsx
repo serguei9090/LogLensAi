@@ -20,8 +20,8 @@ const PRESET_COLORS = [
 ];
 
 interface HighlightBuilderProps {
-  highlights: HighlightEntry[];
-  onChange: (highlights: HighlightEntry[]) => void;
+  readonly highlights: HighlightEntry[];
+  readonly onChange: (highlights: HighlightEntry[]) => void;
 }
 
 export function HighlightBuilder({ highlights, onChange }: HighlightBuilderProps) {
@@ -155,28 +155,6 @@ export function HighlightBuilder({ highlights, onChange }: HighlightBuilderProps
         </PopoverContent>
       </Popover>
 
-      {/* Active highlight chips */}
-      {highlights.map((h) => (
-        <span
-          key={h.id}
-          className="inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 text-xs font-mono border h-6"
-          style={{ backgroundColor: `${h.color}18`, borderColor: `${h.color}44`, color: h.color }}
-        >
-          <span
-            className="w-1.5 h-1.5 rounded-full shrink-0"
-            style={{ backgroundColor: h.color }}
-          />
-          {h.term}
-          <button
-            type="button"
-            onClick={() => handleRemove(h.id)}
-            className="opacity-60 hover:opacity-100 transition-opacity"
-            aria-label="Remove highlight"
-          >
-            <X className="h-3 w-3" />
-          </button>
-        </span>
-      ))}
     </div>
   );
 }

@@ -112,6 +112,7 @@ All methods are called via `useSidecarBridge.ts`. Never change the transport.
 ## Golden Standards
 - **Contract → Interface → Mock → Impl**: define boundaries before writing logic
 - **Design Conformity**: You MUST strictly use `docs/design/theme.md` for all CSS variables and `docs/design/ui-components.md` for shadcn implementation.
+- **shadcn/ui Standards**: Always use the `shadcn` skill for UI tasks. Use `bunx --bun shadcn@latest` for all component management. Follow the critical rules in the skill (e.g. `cn()` for classes, `gap` over `space-x/y`, `data-icon` for button icons).
 - **Pydantic API Validation**: All JSON-RPC methods MUST receive inputs and return outputs validated by strict `Pydantic` models. 
 - **Thread-safe Database**: every DuckDB query uses `self.db.get_cursor()` for thread isolation.
 - **Graceful Shutdown (Prod vs Dev)**:

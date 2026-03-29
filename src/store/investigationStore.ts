@@ -3,19 +3,33 @@ import type { HighlightEntry } from "@/components/molecules/HighlightBuilder";
 import type { LogEntry } from "@/components/organisms/VirtualLogTable";
 import { create } from "zustand";
 
-export interface InvestigationStore {
+export interface SourceState {
   searchQuery: string;
   filters: FilterEntry[];
   highlights: HighlightEntry[];
   logs: LogEntry[];
   total: number;
   offset: number;
-  isTailing: boolean;
   sortBy: string;
   sortOrder: "asc" | "desc";
+  timeRange: { start: string; end: string; label?: string };
+}
+
+export interface InvestigationStore extends SourceState {
+  isTailing: boolean;
   showDistribution: boolean;
   showAnomalies: boolean;
-  timeRange: { start: string; end: string; label?: string };
+  /** The currently active source ID or 'aggregate' for the All view */
+  currentSourceId: string;
+  /** Persisted map of states for each source encountered in this session */
+  sourceStates: Record<string, SourceState>;
+
+  /** 
+   * Swaps the active state for another source's state. 
+   * Saves existing active state into the map before switching.
+   */
+  syncActiveSource: (sourceId: string | null) => void;
+
   setSearchQuery: (q: string) => void;
   setFilters: (f: FilterEntry[]) => void;
   setHighlights: (h: HighlightEntry[]) => void;
@@ -28,19 +42,60 @@ export interface InvestigationStore {
   setTimeRange: (range: { start: string; end: string; label?: string }) => void;
 }
 
-export const useInvestigationStore = create<InvestigationStore>((set) => ({
+const DEFAULT_SOURCE_STATE: SourceState = {
   searchQuery: "",
   filters: [],
   highlights: [],
   logs: [],
   total: 0,
   offset: 0,
-  isTailing: false,
   sortBy: "timestamp",
   sortOrder: "desc",
+  timeRange: { start: "", end: "" },
+};
+
+export const useInvestigationStore = create<InvestigationStore>((set, get) => ({
+  ...DEFAULT_SOURCE_STATE,
+  isTailing: false,
   showDistribution: false,
   showAnomalies: false,
-  timeRange: { start: "", end: "" },
+  currentSourceId: "aggregate",
+  sourceStates: {},
+
+  syncActiveSource: (sourceId = null) => {
+    const nextId = sourceId ?? "aggregate";
+    const { currentSourceId, sourceStates } = get();
+    if (nextId === currentSourceId) return;
+
+    // 1. Capture current values into a SourceState snapshot
+    const currentSnapshot: SourceState = {
+      searchQuery: get().searchQuery,
+      filters: get().filters,
+      highlights: get().highlights,
+      logs: get().logs,
+      total: get().total,
+      offset: get().offset,
+      sortBy: get().sortBy,
+      sortOrder: get().sortOrder,
+      timeRange: get().timeRange,
+    };
+
+    // 2. Update the sourceStates map
+    const updatedMap = {
+      ...sourceStates,
+      [currentSourceId]: currentSnapshot,
+    };
+
+    // 3. Load next state (or defaults if new source)
+    const nextState = updatedMap[nextId] || DEFAULT_SOURCE_STATE;
+
+    set({
+      ...nextState,
+      currentSourceId: nextId,
+      sourceStates: updatedMap,
+    });
+  },
+
   setSearchQuery: (searchQuery) => set({ searchQuery }),
   setFilters: (filters) => set({ filters }),
   setHighlights: (highlights) => set({ highlights }),

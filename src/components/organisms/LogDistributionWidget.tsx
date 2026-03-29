@@ -1,5 +1,4 @@
 import { useInvestigationStore } from "@/store/investigationStore";
-import { TimeRangePicker } from "@/components/molecules/TimeRangePicker";
 import type { FilterEntry } from "@/components/molecules/FilterBuilder";
 import { callSidecar } from "@/lib/hooks/useSidecarBridge";
 import { X } from "lucide-react";
@@ -33,7 +32,7 @@ export function LogDistributionWidget({
   isTailing,
   onClose,
 }: LogDistributionWidgetProps) {
-  const { timeRange, setTimeRange } = useInvestigationStore();
+  const { timeRange } = useInvestigationStore();
   const [data, setData] = useState<Bucket[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -140,8 +139,7 @@ export function LogDistributionWidget({
       {/* Header with Date Selectors */}
       <div className="flex items-center justify-between px-4 h-10 border-b border-border/20 bg-bg-base/50">
         <div className="flex items-center gap-2">
-          <span className="text-[10px] font-bold uppercase tracking-widest text-text-muted">Temporal Range</span>
-          <TimeRangePicker value={timeRange} onChange={setTimeRange} />
+          <span className="text-[10px] font-bold uppercase tracking-widest text-text-muted">Distribution Insights</span>
         </div>
 
         <div className="flex items-center gap-4">

@@ -62,13 +62,24 @@ type CalendarView = "days" | "months" | "years";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+/**
+ * Converts a date to a "Nominal ISO" string (YYYY-MM-DDTHH:MM:SS) 
+ * without applying UTC conversion. This ensures parity between 
+ * what the user sees and what is stored in log files.
+ */
+function toNominalISO(date: Date): string {
+  return format(date, "yyyy-MM-dd'T'HH:mm:ss");
+}
+
 const PRESETS = [
-  { label: "Last 15 min",  getValue: () => ({ start: subMinutes(new Date(), 15).toISOString(), end: "" }) },
-  { label: "Last 1 hour",  getValue: () => ({ start: subHours(new Date(), 1).toISOString(),    end: "" }) },
-  { label: "Last 4 hours", getValue: () => ({ start: subHours(new Date(), 4).toISOString(),    end: "" }) },
-  { label: "Last 24 hrs",  getValue: () => ({ start: subHours(new Date(), 24).toISOString(),   end: "" }) },
-  { label: "Last 7 days",  getValue: () => ({ start: subDays(new Date(), 7).toISOString(),     end: "" }) },
-  { label: "Today",        getValue: () => ({ start: startOfDay(new Date()).toISOString(),      end: "" }) },
+  { label: "Last 15 min",  getValue: () => ({ start: toNominalISO(subMinutes(new Date(), 15)), end: "" }) },
+  { label: "Last 1 hour",  getValue: () => ({ start: toNominalISO(subHours(new Date(), 1)),    end: "" }) },
+  { label: "Last 4 hours", getValue: () => ({ start: toNominalISO(subHours(new Date(), 4)),    end: "" }) },
+  { label: "Last 24 hrs",  getValue: () => ({ start: toNominalISO(subHours(new Date(), 24)),   end: "" }) },
+  { label: "Last 7 days",  getValue: () => ({ start: toNominalISO(subDays(new Date(), 7)),     end: "" }) },
+  { label: "Today",        getValue: () => ({ start: toNominalISO(startOfDay(new Date())),      end: "" }) },
 ] as const;
 
 const MONTH_NAMES = [
@@ -389,9 +400,9 @@ export function TimeRangePicker({ value, onChange, className }: TimeRangePickerP
     if (range.to) {
       const end = new Date(range.to);
       end.setHours(endH, endM, endS, 0);
-      endStr = end.toISOString();
+      endStr = toNominalISO(end);
     }
-    onChange({ start: start.toISOString(), end: endStr });
+    onChange({ start: toNominalISO(start), end: endStr });
     setOpen(false);
   }, [range, startH, startM, startS, endH, endM, endS, onChange]);
 

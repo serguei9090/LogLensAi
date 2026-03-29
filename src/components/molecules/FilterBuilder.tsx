@@ -1,4 +1,3 @@
-import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
@@ -30,8 +29,8 @@ const OPERATORS: { value: FilterEntry["operator"]; label: string }[] = [
 ];
 
 interface FilterBuilderProps {
-  filters: FilterEntry[];
-  onChange: (filters: FilterEntry[]) => void;
+  readonly filters: FilterEntry[];
+  readonly onChange: (filters: FilterEntry[]) => void;
 }
 
 export function FilterBuilder({ filters, onChange }: FilterBuilderProps) {
@@ -213,25 +212,6 @@ export function FilterBuilder({ filters, onChange }: FilterBuilderProps) {
         </PopoverContent>
       </Popover>
 
-      {/* Active filter chips in toolbar */}
-      {filters.map((f) => (
-        <Badge
-          key={f.id}
-          className="bg-emerald-950/40 text-emerald-300 border border-emerald-700/30 gap-1 pl-2 pr-1 py-0 h-6 rounded-md font-normal"
-        >
-          <span className="text-[10px] text-emerald-500/70 font-mono">{f.field}</span>
-          <span className="text-[10px] text-zinc-500">{f.operator}</span>
-          <span className="text-xs font-mono max-w-[80px] truncate">{f.value}</span>
-          <button
-            type="button"
-            onClick={() => handleRemove(f.id)}
-            className="hover:text-red-400 transition-colors rounded-full p-0.5"
-            aria-label="Remove filter"
-          >
-            <X className="h-3 w-3" />
-          </button>
-        </Badge>
-      ))}
     </div>
   );
 }

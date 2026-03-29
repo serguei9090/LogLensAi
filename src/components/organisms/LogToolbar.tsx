@@ -3,7 +3,9 @@ import { TailSwitch } from "@/components/atoms/TailSwitch";
 import { FilterBuilder, type FilterEntry } from "@/components/molecules/FilterBuilder";
 import { HighlightBuilder, type HighlightEntry } from "@/components/molecules/HighlightBuilder";
 import { SearchBar } from "@/components/molecules/SearchBar";
+import { TimeRangePicker } from "@/components/molecules/TimeRangePicker";
 import { WorkspaceTabs } from "@/components/molecules/WorkspaceTabs";
+import { useInvestigationStore } from "@/store/investigationStore";
 import type { LogSource } from "@/store/workspaceStore";
 import { Bookmark, Cpu, Upload } from "lucide-react";
 import { toast } from "sonner";
@@ -25,7 +27,6 @@ interface LogToolbarProps {
   readonly onSelectSource?: (sourceId: string | null) => void;
   readonly onRemoveSource?: (sourceId: string) => void;
   readonly onEditFusion?: (sourceId: string) => void;
-
 }
 
 export function LogToolbar({
@@ -45,8 +46,9 @@ export function LogToolbar({
   onSelectSource,
   onRemoveSource,
   onEditFusion,
-
 }: LogToolbarProps) {
+  const { timeRange, setTimeRange } = useInvestigationStore();
+
   return (
     <div className="sticky top-0 z-10 flex flex-nowrap items-center gap-3 bg-[#0d0f0e]/95 backdrop-blur-sm border-b border-zinc-800/60 px-4 py-2.5 shadow-sm overflow-x-auto scrollbar-none">
       {/* Import button */}
@@ -86,6 +88,11 @@ export function LogToolbar({
       <div className="flex-1 min-w-[180px] max-w-xs">
         <SearchBar value="" onChange={onSearch} />
       </div>
+
+      {/* Global Time Filter */}
+      <TimeRangePicker value={timeRange} onChange={setTimeRange} />
+
+      <div className="h-5 w-px bg-zinc-800 shrink-0" />
 
       {/* Filters & Highlights */}
       <div className="flex items-center gap-2">

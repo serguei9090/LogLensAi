@@ -68,6 +68,7 @@ export function InvestigationPage() {
     setShowDistribution,
     showAnomalies,
     timeRange,
+    syncActiveSource,
   } = useInvestigationStore();
 
   const { activeWorkspaceId, addSource, removeSource, setActiveSource } = useWorkspaceStore();
@@ -97,6 +98,13 @@ export function InvestigationPage() {
   // Memoized non-fusion sources — prevents new array ref on every render
   // which would cause OrchestratorHub's useEffect to reset form state.
   const nonFusionSources = useMemo(() => sources.filter((s) => s.type !== "fusion"), [sources]);
+
+  // ── State Synchronization ──────────────────────────────────────────────────
+
+  // Whenever the active tab/source changes, sync the investigation state (filters/highlights/logs)
+  useEffect(() => {
+    syncActiveSource(activeSourceId);
+  }, [activeSourceId, syncActiveSource]);
 
   // ── Log fetching ──────────────────────────────────────────────────────────
 

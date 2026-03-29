@@ -295,11 +295,11 @@ class App:
         if start_time:
             # Normalize ISO from frontend (T separator) to DB format (space separator)
             norm_start = start_time.replace("T", " ").split(".")[0].replace("Z", "")
-            where_clauses.append("l.timestamp >= ?")
+            where_clauses.append("timestamp >= ?")
             params.append(norm_start)
         if end_time:
             norm_end = end_time.replace("T", " ").split(".")[0].replace("Z", "")
-            where_clauses.append("l.timestamp <= ?")
+            where_clauses.append("timestamp <= ?")
             params.append(norm_end)
             
         where_sql = " AND ".join(where_clauses)
