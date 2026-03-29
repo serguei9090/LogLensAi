@@ -37,3 +37,13 @@ This specification defines the architectural standards for LogLensAi, a premium 
 - All paths are normalized to POSIX style (forward slashes).
 - Workspace isolation is enforced at the query level via `workspace_id` filtering.
 - Sidecar restricted to local loopback only.
+## 6. Temporal Selection & TimeRangePicker Standards
+- **Component Geometry**: Popover must use a `min-width: 620px` to accommodate dual-month view for professional investigation.
+- **Library Integration**: `react-day-picker` v9+ with `numberOfMonths: 2`.
+- **State Synchronization**: 
+  - A single `DateRange` state object in `TimeRangePicker` tracks both `from` and `to` points.
+  - The `month` state tracks the visible window's anchor (left-most month).
+- **Navigation Controls**: 
+  - Controls are globally applied to both calendars in view.
+  - View-cycling (`Days` → `Months` → `Years`) provides rapid temporal context shifts without breaking the dual layout.
+- **Precision Preview**: Real-time display of normalized ISO date-time strings below the interactive grids ensures the user identifies exact investigate boundaries.

@@ -251,8 +251,8 @@ function YearGrid({ currentYear, onSelectYear }: YearGridProps) {
 interface CalendarHeaderProps {
   readonly calendarMonth: MonthCaptionProps["calendarMonth"];
   readonly view: CalendarView;
-  readonly onPrev: () => void;
-  readonly onNext: () => void;
+  readonly onPrev?: () => void;
+  readonly onNext?: () => void;
   readonly onToggleView: () => void;
 }
 
@@ -273,17 +273,19 @@ function CalendarHeader({ calendarMonth, view, onPrev, onNext, onToggleView }: C
   };
   const label       = LABEL_BY_VIEW[view];
   const isClickable = isDays || isMonths;
+  const showPrev    = isDays ? Boolean(onPrev) : isClickable;
+  const showNext    = isDays ? Boolean(onNext) : isClickable;
 
   return (
-    <div className="flex items-center justify-between w-full mb-2 pb-2 border-b border-white/5">
+    <div className="flex items-center justify-between w-full mb-2 pb-2 border-b border-white/5 px-1">
       <button
         type="button"
         onClick={onPrev}
-        disabled={!isDays}
-        aria-hidden={!isDays}
+        disabled={!onPrev}
+        aria-hidden={!onPrev}
         className={[
           "h-8 w-8 rounded-md border flex items-center justify-center transition-all",
-          isDays
+          showPrev
             ? "bg-black/30 border-border/20 text-text-muted hover:text-text-primary hover:bg-white/10"
             : "border-transparent text-transparent pointer-events-none select-none",
         ].join(" ")}
@@ -296,7 +298,7 @@ function CalendarHeader({ calendarMonth, view, onPrev, onNext, onToggleView }: C
         type="button"
         onClick={isClickable ? onToggleView : undefined}
         className={[
-          "flex items-center gap-1.5 px-2 py-1 rounded-md text-sm font-semibold transition-colors",
+          "flex items-center justify-center gap-1.5 px-2 py-1 rounded-md text-sm font-semibold transition-colors flex-1",
           isClickable ? "hover:bg-white/8 hover:text-primary group cursor-pointer" : "cursor-default text-text-muted",
         ].join(" ")}
       >
@@ -309,11 +311,11 @@ function CalendarHeader({ calendarMonth, view, onPrev, onNext, onToggleView }: C
       <button
         type="button"
         onClick={onNext}
-        disabled={!isDays}
-        aria-hidden={!isDays}
+        disabled={!onNext}
+        aria-hidden={!onNext}
         className={[
           "h-8 w-8 rounded-md border flex items-center justify-center transition-all",
-          isDays
+          showNext
             ? "bg-black/30 border-border/20 text-text-muted hover:text-text-primary hover:bg-white/10"
             : "border-transparent text-transparent pointer-events-none select-none",
         ].join(" ")}
@@ -338,6 +340,7 @@ function CalendarHeader({ calendarMonth, view, onPrev, onNext, onToggleView }: C
 export function TimeRangePicker({ value, onChange, className }: TimeRangePickerProps) {
   const [open, setOpen]   = useState(false);
   const [view, setView]   = useState<CalendarView>("days");
+  const [activeSide, setActiveSide] = useState<"left" | "right">("left");
   const [range, setRange] = useState<DateRange | undefined>(() => {
     const from = value.start ? new Date(value.start) : undefined;
     const to   = value.end   ? new Date(value.end)   : undefined;
@@ -352,7 +355,8 @@ export function TimeRangePicker({ value, onChange, className }: TimeRangePickerP
   const [endM,   setEndM]   = useState(() => value.end   ? new Date(value.end).getMinutes()   : nowRef.getMinutes());
   const [endS,   setEndS]   = useState(() => value.end   ? new Date(value.end).getSeconds()   : nowRef.getSeconds());
 
-  const [month, setMonth] = useState<Date>(() => range?.from ?? new Date());
+  const [monthLeft, setMonthLeft]   = useState<Date>(() => value.start ? new Date(value.start) : new Date());
+  const [monthRight, setMonthRight] = useState<Date>(() => value.end ? new Date(value.end) : dateFnsAddMonths(new Date(), 1));
 
   // ── Handlers ──────────────────────────────────────────────────────────────
 
@@ -366,8 +370,13 @@ export function TimeRangePicker({ value, onChange, className }: TimeRangePickerP
       const n = new Date();
       if (to) { setEndH(to.getHours()); setEndM(to.getMinutes()); setEndS(to.getSeconds()); }
       else    { setEndH(n.getHours()); setEndM(n.getMinutes()); setEndS(n.getSeconds()); }
-      setMonth(from ?? new Date());
+      
+      const left  = from ?? new Date();
+      const right = to   ?? dateFnsAddMonths(left, 1);
+      setMonthLeft(left);
+      setMonthRight(right);
       setView("days");
+      setActiveSide("left");
     }
     setOpen(next);
   }, [value]);
@@ -392,8 +401,9 @@ export function TimeRangePicker({ value, onChange, className }: TimeRangePickerP
     setOpen(false);
   }, [onChange]);
 
-  /** Cycles forward: days → months → years. Clicking "back" in CalendarHeader also uses setView directly. */
-  const handleToggleView = useCallback(() => {
+  /** Cycles forward: days → months → years. */
+  const handleToggleView = useCallback((side: "left" | "right") => {
+    setActiveSide(side);
     setView((v) => {
       if (v === "days")   return "months";
       if (v === "months") return "years";
@@ -403,14 +413,16 @@ export function TimeRangePicker({ value, onChange, className }: TimeRangePickerP
 
 
   const handleMonthSelect = useCallback((m: number) => {
-    setMonth((prev) => dateFnsSetMonth(prev, m));
+    const setter = activeSide === "left" ? setMonthLeft : setMonthRight;
+    setter((prev) => dateFnsSetMonth(prev, m));
     setView("days");
-  }, []);
+  }, [activeSide]);
 
   const handleYearSelect = useCallback((y: number) => {
-    setMonth((prev) => dateFnsSetYear(prev, y));
-    setView("months"); // Go back to months after picking year
-  }, []);
+    const setter = activeSide === "left" ? setMonthLeft : setMonthRight;
+    setter((prev) => dateFnsSetYear(prev, y));
+    setView("months");
+  }, [activeSide]);
 
   // ── Derived ───────────────────────────────────────────────────────────────
 
@@ -423,6 +435,34 @@ export function TimeRangePicker({ value, onChange, className }: TimeRangePickerP
   }, [value]);
 
   const hasEndDate = Boolean(range?.to);
+
+  const commonPickerProps = {
+    mode: "range" as const,
+    selected: range,
+    onSelect: setRange,
+    className: "p-0 select-none",
+    classNames: {
+      months: "flex flex-col",
+      month: "space-y-0",
+      month_caption: "mb-2",
+      caption_label: "hidden",
+      nav: "hidden",
+      month_grid: "w-full border-collapse",
+      weekdays: "flex mb-1",
+      weekday: "w-9 text-center text-[10px] font-bold text-text-muted uppercase tracking-wider",
+      week: "flex transition-colors",
+      day: "h-9 w-9 relative",
+      day_button: "h-9 w-9 text-xs font-medium rounded-none transition-colors hover:bg-primary/20 hover:text-primary",
+      range_start: "bg-primary/20 rounded-l-full [&>button]:bg-primary [&>button]:text-text-inverse [&>button]:rounded-full [&>button]:font-bold",
+      range_end:   "bg-primary/20 rounded-r-full [&>button]:bg-primary [&>button]:text-text-inverse [&>button]:rounded-full [&>button]:font-bold",
+      range_middle:"bg-primary/10 [&>button]:text-primary [&>button]:rounded-none",
+      selected:    "[&>button]:bg-primary [&>button]:text-text-inverse [&>button]:rounded-full [&>button]:font-bold",
+      today:       "[&>button]:ring-1 [&>button]:ring-primary/50",
+      outside:     "opacity-30",
+      disabled:    "opacity-20 cursor-not-allowed",
+      hidden:      "invisible",
+    }
+  };
 
   // ── Render ────────────────────────────────────────────────────────────────
 
@@ -470,95 +510,102 @@ export function TimeRangePicker({ value, onChange, className }: TimeRangePickerP
             </div>
 
             {/* ── 2. Calendar ───────────────────────────────── */}
-            <div className="p-4 border-r border-border/20 shrink-0 flex flex-col" style={{ minWidth: "284px" }}>
+            <div className="p-4 border-r border-border/20 shrink-0 flex flex-col" style={{ minWidth: "600px" }}>
               <p className="text-[10px] font-bold uppercase tracking-widest text-text-muted opacity-50 mb-3">
                 Range Selection
               </p>
 
-              <div className="flex-1">
-                {/* Days view */}
-                {view === "days" && (
-                  <DayPicker
-                    mode="range"
-                    selected={range}
-                    onSelect={setRange}
-                    month={month}
-                    onMonthChange={setMonth}
-                    showOutsideDays
-                    className="p-0"
-                    classNames={{
-                      months: "flex flex-col",
-                      month: "space-y-0",
-                      month_caption: "mb-0",   // We render the header via MonthCaption override
-                      caption_label: "hidden",
-                      nav: "hidden",           // Navigation handled by our CalendarHeader
-                      month_grid: "w-full border-collapse",
-                      weekdays: "flex mb-1",
-                      weekday: "w-9 text-center text-[10px] font-bold text-text-muted uppercase tracking-wider",
-                      week: "flex",
-                      day: "h-9 w-9 relative",
-                      day_button: "h-9 w-9 text-xs font-medium rounded-none transition-colors hover:bg-primary/20 hover:text-primary",
-                      range_start: "bg-primary/20 rounded-l-full [&>button]:bg-primary [&>button]:text-text-inverse [&>button]:rounded-full [&>button]:font-bold",
-                      range_end:   "bg-primary/20 rounded-r-full [&>button]:bg-primary [&>button]:text-text-inverse [&>button]:rounded-full [&>button]:font-bold",
-                      range_middle:"bg-primary/10 [&>button]:text-primary [&>button]:rounded-none",
-                      selected:    "[&>button]:bg-primary [&>button]:text-text-inverse [&>button]:rounded-full [&>button]:font-bold",
-                      today:       "[&>button]:ring-1 [&>button]:ring-primary/50",
-                      outside:     "opacity-30",
-                      disabled:    "opacity-20 cursor-not-allowed",
-                      hidden:      "invisible",
-                    }}
-                    components={{
-                      MonthCaption: ({ calendarMonth }: MonthCaptionProps) => (
-                        <CalendarHeader
-                          calendarMonth={calendarMonth}
-                          view={view}
-                          onPrev={() => setMonth((m) => dateFnsSubMonths(m, 1))}
-                          onNext={() => setMonth((m) => dateFnsAddMonths(m, 1))}
-                          onToggleView={handleToggleView}
-                        />
-                      ),
-                    }}
-                  />
-                )}
+              <div className="flex-1 flex flex-col">
+                <div className="flex-1">
+                  {/* Days view (Individual Pickers for true Independence) */}
+                  {view === "days" && (
+                    <div className="grid grid-cols-2 gap-10">
+                      <DayPicker
+                        {...commonPickerProps}
+                        month={monthLeft}
+                        onMonthChange={setMonthLeft}
+                        components={{
+                          MonthCaption: ({ calendarMonth }: MonthCaptionProps) => (
+                            <CalendarHeader
+                              calendarMonth={calendarMonth}
+                              view={view}
+                              onPrev={() => setMonthLeft((m) => dateFnsSubMonths(m, 1))}
+                              onNext={() => setMonthLeft((m) => dateFnsAddMonths(m, 1))}
+                              onToggleView={() => handleToggleView("left")}
+                            />
+                          )
+                        }}
+                      />
+                      <DayPicker
+                        {...commonPickerProps}
+                        month={monthRight}
+                        onMonthChange={setMonthRight}
+                        components={{
+                          MonthCaption: ({ calendarMonth }: MonthCaptionProps) => (
+                            <CalendarHeader
+                              calendarMonth={calendarMonth}
+                              view={view}
+                              onPrev={() => setMonthRight((m) => dateFnsSubMonths(m, 1))}
+                              onNext={() => setMonthRight((m) => dateFnsAddMonths(m, 1))}
+                              onToggleView={() => handleToggleView("right")}
+                            />
+                          )
+                        }}
+                      />
+                    </div>
+                  )}
 
-                {/* Month selector */}
-                {view === "months" && (
-                  <>
-                    <CalendarHeader
-                      calendarMonth={{ date: month } as MonthCaptionProps["calendarMonth"]}
-                      view={view}
-                      onPrev={() => {}}
-                      onNext={() => {}}
-                      onToggleView={handleToggleView}
-                    />
-                    <MonthGrid
-                      currentMonth={getMonth(month)}
-                      onSelectMonth={handleMonthSelect}
-                    />
-                  </>
-                )}
+                  {/* Month selector (Individual) */}
+                  {view === "months" && (
+                    <div className="flex flex-col items-center">
+                      <CalendarHeader
+                        calendarMonth={{ date: activeSide === "left" ? monthLeft : monthRight } as MonthCaptionProps["calendarMonth"]}
+                        view={view}
+                        onPrev={() => {
+                          const setter = activeSide === "left" ? setMonthLeft : setMonthRight;
+                          setter((m) => dateFnsSetYear(m, getYear(m) - 1));
+                        }}
+                        onNext={() => {
+                          const setter = activeSide === "left" ? setMonthLeft : setMonthRight;
+                          setter((m) => dateFnsSetYear(m, getYear(m) + 1));
+                        }}
+                        onToggleView={() => handleToggleView(activeSide)}
+                      />
+                      <MonthGrid
+                        currentMonth={getMonth(activeSide === "left" ? monthLeft : monthRight)}
+                        onSelectMonth={handleMonthSelect}
+                      />
+                    </div>
+                  )}
 
-                {/* Year selector */}
-                {view === "years" && (
-                  <>
-                    <CalendarHeader
-                      calendarMonth={{ date: month } as MonthCaptionProps["calendarMonth"]}
-                      view={view}
-                      onPrev={() => {}}
-                      onNext={() => {}}
-                      onToggleView={handleToggleView}
-                    />
-                    <YearGrid
-                      currentYear={getYear(month)}
-                      onSelectYear={handleYearSelect}
-                    />
-                  </>
-                )}
+                  {/* Year selector (Individual) */}
+                  {view === "years" && (
+                    <div className="flex flex-col items-center">
+                      <CalendarHeader
+                        calendarMonth={{ date: activeSide === "left" ? monthLeft : monthRight } as MonthCaptionProps["calendarMonth"]}
+                        view={view}
+                        onPrev={() => {
+                          const setter = activeSide === "left" ? setMonthLeft : setMonthRight;
+                          setter((m) => dateFnsSetYear(m, getYear(m) - 5));
+                        }}
+                        onNext={() => {
+                          const setter = activeSide === "left" ? setMonthLeft : setMonthRight;
+                          setter((m) => dateFnsSetYear(m, getYear(m) + 5));
+                        }}
+                        onToggleView={() => handleToggleView(activeSide)}
+                      />
+                      <YearGrid
+                        currentYear={getYear(activeSide === "left" ? monthLeft : monthRight)}
+                        onSelectYear={handleYearSelect}
+                      />
+                    </div>
+                  )}
+                </div>
               </div>
 
               {/* ── Selection Preview ── */}
-              <div className="mt-4 pt-4 border-t border-border/10 bg-white/[0.01] rounded-lg p-3 space-y-2.5">
-                <div className="flex flex-col gap-1">
+              <div className="mt-4 pt-4 border-t border-border/10 bg-white/[0.01] rounded-lg p-3 grid grid-cols-2 gap-6">
+                <div className="flex flex-col gap-1 border-r border-border/10">
                   <div className="flex items-center gap-1.5 grayscale opacity-50">
                     <div className="size-1.5 rounded-full bg-emerald-500" />
                     <span className="text-[10px] font-bold uppercase tracking-wide">Start Selection</span>
@@ -566,7 +613,7 @@ export function TimeRangePicker({ value, onChange, className }: TimeRangePickerP
                   <div className="pl-3 text-xs font-mono text-text-primary">
                     {range?.from ? (
                       <>
-                        <span className="text-emerald-400/80">{format(range.from, "MMM d, yyyy")}</span>
+                        <span className="text-emerald-400/80 ">{format(range.from, "MMM d, yyyy")}</span>
                         <span className="mx-2 text-text-muted opacity-30">@</span>
                         <span className="text-text-secondary">
                           {String(startH).padStart(2, "0")}:{String(startM).padStart(2, "0")}:{String(startS).padStart(2, "0")}
