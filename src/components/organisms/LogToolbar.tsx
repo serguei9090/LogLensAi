@@ -25,10 +25,7 @@ interface LogToolbarProps {
   readonly onSelectSource?: (sourceId: string | null) => void;
   readonly onRemoveSource?: (sourceId: string) => void;
   readonly onEditFusion?: (sourceId: string) => void;
-  readonly showAnomalies?: boolean;
-  readonly onAnomaliesToggle?: (v: boolean) => void;
-  readonly showDistribution?: boolean;
-  readonly onDistributionToggle?: (v: boolean) => void;
+
 }
 
 export function LogToolbar({
@@ -48,10 +45,7 @@ export function LogToolbar({
   onSelectSource,
   onRemoveSource,
   onEditFusion,
-  showAnomalies = false,
-  onAnomaliesToggle = () => {},
-  showDistribution = false,
-  onDistributionToggle = () => {},
+
 }: LogToolbarProps) {
   return (
     <div className="sticky top-0 z-10 flex flex-nowrap items-center gap-3 bg-[#0d0f0e]/95 backdrop-blur-sm border-b border-zinc-800/60 px-4 py-2.5 shadow-sm overflow-x-auto scrollbar-none">
@@ -117,15 +111,6 @@ export function LogToolbar({
 
       {/* Action switches */}
       <div className="flex items-center gap-5 shrink-0 ml-2">
-        <div className="flex items-center gap-2 group cursor-help" title="Toggle anomaly detection layer">
-          <span className="text-[10px] font-bold tracking-widest text-text-muted group-hover:text-amber-400 transition-colors uppercase">Anomalies</span>
-          <TailSwitch checked={showAnomalies} onCheckedChange={onAnomaliesToggle} />
-        </div>
-
-        <div className="flex items-center gap-2 group cursor-help" title="Toggle horizontal log distribution timeline">
-          <span className="text-[10px] font-bold tracking-widest text-text-muted group-hover:text-primary transition-colors uppercase">Timeline</span>
-          <TailSwitch checked={showDistribution} onCheckedChange={onDistributionToggle} />
-        </div>
 
         <div className="flex items-center gap-2 group cursor-help" title="Toggle real-time log ingestion (Live Tail)">
           <span className="text-[10px] font-bold tracking-widest text-text-muted group-hover:text-emerald-400 transition-colors uppercase">Tail</span>

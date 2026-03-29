@@ -26,8 +26,7 @@ interface InvestigationLayoutProps {
   readonly showDistribution?: boolean;
   readonly workspaceId?: string;
   readonly onDistributionClose?: () => void;
-  readonly showAnomalies?: boolean;
-  readonly onAnomaliesChange?: (v: boolean) => void;
+
 }
 
 export function InvestigationLayout({
@@ -51,8 +50,6 @@ export function InvestigationLayout({
   showDistribution,
   workspaceId,
   onDistributionClose,
-  showAnomalies,
-  onAnomaliesChange,
 }: InvestigationLayoutProps) {
   return (
     <div className="flex flex-col h-full w-full bg-[#0a0c0b]">
@@ -73,10 +70,7 @@ export function InvestigationLayout({
         onSelectSource={onSelectSource}
         onRemoveSource={onRemoveSource}
         onEditFusion={onEditFusion}
-        showDistribution={showDistribution}
-        onDistributionToggle={onDistributionClose ? () => onDistributionClose() : undefined}
-        showAnomalies={showAnomalies}
-        onAnomaliesToggle={onAnomaliesChange}
+
       />
       {showDistribution && workspaceId && (
         <LogDistributionWidget

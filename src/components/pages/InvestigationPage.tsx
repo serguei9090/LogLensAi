@@ -67,7 +67,6 @@ export function InvestigationPage() {
     showDistribution,
     setShowDistribution,
     showAnomalies,
-    setShowAnomalies,
     timeRange,
   } = useInvestigationStore();
 
@@ -403,8 +402,6 @@ export function InvestigationPage() {
         onEditFusion={handleEditFusion}
         showDistribution={showDistribution}
         onDistributionClose={() => setShowDistribution(!showDistribution)}
-        showAnomalies={showAnomalies}
-        onAnomaliesChange={setShowAnomalies}
         workspaceId={activeWorkspaceId}
       >
         <VirtualLogTable

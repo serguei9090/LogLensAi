@@ -1,65 +1,138 @@
 "use client";
 
-import type * as React from "react";
-import { ChevronLeft, ChevronRight } from "lucide-react";
-import { DayPicker } from "react-day-picker";
+import * as React from "react";
+import { ChevronLeft, ChevronRight, ChevronDown } from "lucide-react";
+import { DayPicker, getDefaultClassNames } from "react-day-picker";
 
 import { cn } from "@/lib/utils";
 import { buttonVariants } from "@/components/ui/button";
 
 export type CalendarProps = React.ComponentProps<typeof DayPicker>;
 
+/**
+ * shadcn/ui Calendar built on react-day-picker v9.
+ *
+ * Supports `captionLayout="dropdown"` for the modern Month | Year selector
+ * pattern. Dropdowns are styled to respect the LogLensAi dark theme CSS tokens
+ * and do NOT use native <select> elements (see UIReviewProtocol §4).
+ */
 function Calendar({
   className,
   classNames,
   showOutsideDays = true,
+  captionLayout = "label",
   ...props
 }: CalendarProps) {
+  const defaultClassNames = getDefaultClassNames();
+
   return (
     <DayPicker
       showOutsideDays={showOutsideDays}
-      className={cn("p-3", className)}
+      captionLayout={captionLayout}
+      className={cn(
+        "p-3 [--cell-size:2.25rem]",
+        className
+      )}
       classNames={{
-        months: "flex flex-col sm:flex-row space-y-4 sm:space-x-4 sm:space-y-0",
-        month: "space-y-4",
-        month_caption: "flex justify-center pt-1 relative items-center",
-        caption_label: "text-sm font-medium",
-        nav: "space-x-1 flex items-center",
+        root: cn("w-fit", defaultClassNames.root),
+        months: cn("flex flex-col", defaultClassNames.months),
+        month: cn("flex flex-col gap-4", defaultClassNames.month),
+        month_caption: cn(
+          "relative flex h-[--cell-size] items-center justify-center px-[--cell-size]",
+          defaultClassNames.month_caption
+        ),
+        nav: cn(
+          "absolute inset-x-0 top-0 flex w-full items-center justify-between",
+          defaultClassNames.nav
+        ),
         button_previous: cn(
-          buttonVariants({ variant: "outline" }),
-          "h-7 w-7 bg-transparent p-0 opacity-50 hover:opacity-100",
-          "absolute left-1"
+          buttonVariants({ variant: "ghost" }),
+          "size-[--cell-size] p-0 opacity-60 hover:opacity-100 aria-disabled:opacity-30",
+          defaultClassNames.button_previous
         ),
         button_next: cn(
-          buttonVariants({ variant: "outline" }),
-          "h-7 w-7 bg-transparent p-0 opacity-50 hover:opacity-100",
-          "absolute right-1"
+          buttonVariants({ variant: "ghost" }),
+          "size-[--cell-size] p-0 opacity-60 hover:opacity-100 aria-disabled:opacity-30",
+          defaultClassNames.button_next
         ),
-        month_grid: "w-full border-collapse space-y-1",
-        weekdays: "flex",
-        weekday: "text-text-muted rounded-md w-9 font-normal text-[0.8rem]",
-        week: "flex w-full mt-2",
-        day: "h-9 w-9 text-center text-sm p-0 relative [&:has([aria-selected].day-range-end)]:rounded-r-md [&:has([aria-selected].day-outside)]:bg-accent/50 [&:has([aria-selected])]:bg-accent first:[&:has([aria-selected])]:rounded-l-md last:[&:has([aria-selected])]:rounded-r-md focus-within:relative focus-within:z-20",
+        // Dropdown caption layout
+        dropdowns: cn(
+          "flex h-[--cell-size] w-full items-center justify-center gap-1 text-sm font-semibold",
+          defaultClassNames.dropdowns
+        ),
+        dropdown_root: cn(
+          "relative rounded-md",
+          defaultClassNames.dropdown_root
+        ),
+        // The native <select> is made invisible; the visual is rendered via caption_label
+        dropdown: cn(
+          "absolute inset-0 cursor-pointer opacity-0",
+          defaultClassNames.dropdown
+        ),
+        caption_label: cn(
+          captionLayout === "label"
+            ? "text-sm font-semibold"
+            : // Dropdown mode: looks like a styled button
+              [
+                "flex h-8 cursor-pointer items-center gap-1 rounded-md px-2 py-1 text-sm font-semibold",
+                "text-text-primary hover:bg-white/10 hover:text-primary transition-colors",
+                "[&>svg]:size-3 [&>svg]:text-text-muted",
+              ].join(" "),
+          defaultClassNames.caption_label
+        ),
+        // Day grid
+        month_grid: cn("w-full border-collapse", defaultClassNames.month_grid),
+        weekdays: cn("flex", defaultClassNames.weekdays),
+        weekday: cn(
+          "w-[--cell-size] text-center font-normal text-[0.75rem] text-text-muted uppercase tracking-wider select-none",
+          defaultClassNames.weekday
+        ),
+        week: cn("mt-1 flex w-full", defaultClassNames.week),
+        day: cn(
+          "group/day relative aspect-square h-full w-full p-0 text-center select-none",
+          defaultClassNames.day
+        ),
         day_button: cn(
           buttonVariants({ variant: "ghost" }),
-          "h-9 w-9 p-0 font-normal aria-selected:opacity-100"
+          "size-[--cell-size] p-0 font-normal aria-selected:opacity-100",
+          defaultClassNames.day_button
         ),
-        range_end: "day-range-end",
-        selected:
-          "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground focus:bg-primary focus:text-primary-foreground",
-        today: "bg-accent text-accent-foreground",
-        outside:
-          "day-outside text-text-muted opacity-50 aria-selected:bg-accent/50 aria-selected:text-muted-foreground aria-selected:opacity-30",
-        disabled: "text-text-muted opacity-50",
-        range_middle:
-          "aria-selected:bg-accent aria-selected:text-accent-foreground",
+        range_start: cn(
+          "rounded-l-full bg-primary/20",
+          defaultClassNames.range_start
+        ),
+        range_end: cn(
+          "rounded-r-full bg-primary/20",
+          defaultClassNames.range_end
+        ),
+        range_middle: cn(
+          "bg-primary/10 [&>button]:rounded-none [&>button]:text-primary",
+          defaultClassNames.range_middle
+        ),
+        selected: cn(
+          "[&>button]:bg-primary [&>button]:text-text-inverse [&>button]:rounded-full [&>button]:font-bold",
+          defaultClassNames.selected
+        ),
+        today: cn(
+          "[&>button]:ring-1 [&>button]:ring-primary/50",
+          defaultClassNames.today
+        ),
+        outside: cn(
+          "opacity-30",
+          defaultClassNames.outside
+        ),
+        disabled: cn("opacity-20 cursor-not-allowed", defaultClassNames.disabled),
         hidden: "invisible",
         ...classNames,
       }}
       components={{
-        Chevron: ({ orientation }) => {
-          const Icon = orientation === "left" ? ChevronLeft : ChevronRight;
-          return <Icon className="h-4 w-4" />;
+        Chevron: ({ orientation, className: cls, ...rest }) => {
+          if (orientation === "left")
+            return <ChevronLeft className={cn("size-4", cls)} {...rest} />;
+          if (orientation === "right")
+            return <ChevronRight className={cn("size-4", cls)} {...rest} />;
+          // Used inside the dropdown caption_label
+          return <ChevronDown className={cn("size-3.5", cls)} {...rest} />;
         },
       }}
       {...props}
