@@ -77,12 +77,10 @@ export function ImportFeedModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div
-        className="absolute inset-0 bg-bg-base/90 backdrop-blur-xl cursor-default"
+      <button
+        type="button"
+        className="absolute inset-0 bg-bg-base/90 backdrop-blur-xl cursor-default border-none outline-none appearance-none"
         onClick={() => onOpenChange(false)}
-        onKeyDown={(e) => e.key === "Escape" && onOpenChange(false)}
-        role="button"
-        tabIndex={-1}
         aria-label="Close modal"
       />
 

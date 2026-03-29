@@ -1,17 +1,18 @@
-import { useState, useEffect, useMemo } from "react";
-import { InvestigationLayout } from "@/components/templates/InvestigationLayout";
-import { VirtualLogTable } from "@/components/organisms/VirtualLogTable";
-import type { LogEntry } from "@/components/organisms/VirtualLogTable";
+import { type DiagnosticData, DiagnosticSidebar } from "@/components/organisms/DiagnosticSidebar";
 import { ImportFeedModal } from "@/components/organisms/ImportFeedModal";
 import { OrchestratorHub } from "@/components/organisms/OrchestratorHub";
+import { VirtualLogTable } from "@/components/organisms/VirtualLogTable";
+import type { LogEntry } from "@/components/organisms/VirtualLogTable";
+import { InvestigationLayout } from "@/components/templates/InvestigationLayout";
+import { callSidecar } from "@/lib/hooks/useSidecarBridge";
 import { useInvestigationStore } from "@/store/investigationStore";
 import {
-  useWorkspaceStore,
-  selectActiveWorkspace,
-  selectActiveSource,
   type LogSource,
+  selectActiveSource,
+  selectActiveWorkspace,
+  useWorkspaceStore,
 } from "@/store/workspaceStore";
-import { callSidecar } from "@/lib/hooks/useSidecarBridge";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
 // ─── Local helpers ────────────────────────────────────────────────────────────
@@ -63,10 +64,14 @@ export function InvestigationPage() {
     sortBy,
     sortOrder,
     setSort,
+    showDistribution,
+    setShowDistribution,
+    showAnomalies,
+    setShowAnomalies,
+    timeRange,
   } = useInvestigationStore();
 
-  const { activeWorkspaceId, addSource, removeSource, setActiveSource } =
-    useWorkspaceStore();
+  const { activeWorkspaceId, addSource, removeSource, setActiveSource } = useWorkspaceStore();
   const activeWorkspace = useWorkspaceStore(selectActiveWorkspace);
   const activeSource = useWorkspaceStore(selectActiveSource);
 
@@ -80,14 +85,19 @@ export function InvestigationPage() {
   // Orchestrator Hub state
   const [isOrchestratorOpen, setIsOrchestratorOpen] = useState(false);
   const [editingFusionId, setEditingFusionId] = useState<string | null>(null);
+
+  // Diagnostic AI state
+  const [diagnosticOpen, setDiagnosticOpen] = useState(false);
+  const [diagnosticData, setDiagnosticData] = useState<DiagnosticData | null>(null);
+  const [diagnosticLoading, setDiagnosticLoading] = useState(false);
   const [editingFusionName, setEditingFusionName] = useState<string | null>(null);
+
+  // Anomalies state
+  const [anomalousClusters, setAnomalousClusters] = useState<Set<string>>(new Set());
 
   // Memoized non-fusion sources — prevents new array ref on every render
   // which would cause OrchestratorHub's useEffect to reset form state.
-  const nonFusionSources = useMemo(
-    () => sources.filter((s) => s.type !== "fusion"),
-    [sources]
-  );
+  const nonFusionSources = useMemo(() => sources.filter((s) => s.type !== "fusion"), [sources]);
 
   // ── Log fetching ──────────────────────────────────────────────────────────
 
@@ -96,7 +106,17 @@ export function InvestigationPage() {
 
     const fetchLogs = async () => {
       try {
-        const activeSrc = sources.find(s => s.id === activeSourceId);
+        if (showAnomalies) {
+          const anomRes = await callSidecar<{ anomalies: any[] }>({
+            method: "get_anomalies",
+            params: { workspace_id: activeWorkspaceId },
+          });
+          setAnomalousClusters(new Set(anomRes.anomalies.map((a) => a.cluster_id)));
+        } else {
+          setAnomalousClusters(new Set());
+        }
+
+        const activeSrc = sources.find((s) => s.id === activeSourceId);
         const isFusion = activeSrc?.type === "fusion";
 
         const sourceFilter =
@@ -105,9 +125,7 @@ export function InvestigationPage() {
             : [];
 
         const combinedFilters =
-          filters.length > 0 || sourceFilter.length > 0
-            ? [...sourceFilter, ...filters]
-            : undefined;
+          filters.length > 0 || sourceFilter.length > 0 ? [...sourceFilter, ...filters] : undefined;
 
         const fusionId = isFusion ? activeSrc?.path : undefined;
 
@@ -122,6 +140,8 @@ export function InvestigationPage() {
             filters: combinedFilters,
             sort_by: sortBy,
             sort_order: sortOrder,
+            start_time: timeRange.start || undefined,
+            end_time: timeRange.end || undefined,
           },
         });
         setLogs(result.logs ?? [], result.total ?? 0);
@@ -135,7 +155,19 @@ export function InvestigationPage() {
     fetchLogs();
     const interval = setInterval(fetchLogs, 2500);
     return () => clearInterval(interval);
-  }, [activeWorkspaceId, activeSource, activeSourceId, sources, searchQuery, filters, sortBy, sortOrder, setLogs]);
+  }, [
+    activeWorkspaceId,
+    activeSource,
+    activeSourceId,
+    sources,
+    searchQuery,
+    filters,
+    sortBy,
+    sortOrder,
+    setLogs,
+    showAnomalies,
+    timeRange,
+  ]);
 
   // ── Sort ──────────────────────────────────────────────────────────────────
 
@@ -146,7 +178,7 @@ export function InvestigationPage() {
   // ── Import / ingest handlers ──────────────────────────────────────────────
 
   const handleImportLocal = async (path: string, tail: boolean) => {
-    const normalizedPath = path.replace(/\\/g, "/");
+    const normalizedPath = path.replaceAll("\\", "/");
     const newSource = addSource(activeWorkspaceId, {
       name: path.split(/[/\\]/).pop() ?? path,
       type: "local",
@@ -210,7 +242,14 @@ export function InvestigationPage() {
     try {
       await callSidecar({
         method: "start_ssh_tail",
-        params: { host, port, username: user, password: pass, filepath: path, workspace_id: activeWorkspaceId },
+        params: {
+          host,
+          port,
+          username: user,
+          password: pass,
+          filepath: path,
+          workspace_id: activeWorkspaceId,
+        },
       });
       setTailingSourceIds((prev) => new Set(prev).add(newSource.id));
       setTailing(true);
@@ -233,14 +272,19 @@ export function InvestigationPage() {
       await callSidecar({ method: "ingest_logs", params: { logs: entries } });
       toast.success(`Ingested ${entries.length} log entries.`, { id: "ingest" });
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Manual ingestion failed.", { id: "ingest" });
+      toast.error(error instanceof Error ? error.message : "Manual ingestion failed.", {
+        id: "ingest",
+      });
     }
   };
 
   const handleToggleTail = async (tail: boolean) => {
     try {
       if (!tail) {
-        await callSidecar({ method: "stop_tail", params: { filepath: "ALL", workspace_id: activeWorkspaceId } });
+        await callSidecar({
+          method: "stop_tail",
+          params: { filepath: "ALL", workspace_id: activeWorkspaceId },
+        });
         setTailingSourceIds(new Set());
       }
       setTailing(tail);
@@ -259,9 +303,18 @@ export function InvestigationPage() {
     const src = sources.find((s) => s.id === sourceId);
     if (src && tailingSourceIds.has(sourceId)) {
       try {
-        await callSidecar({ method: "stop_tail", params: { filepath: src.path, workspace_id: activeWorkspaceId } });
-      } catch { /* Ignored */ }
-      setTailingSourceIds((prev) => { const next = new Set(prev); next.delete(sourceId); return next; });
+        await callSidecar({
+          method: "stop_tail",
+          params: { filepath: src.path, workspace_id: activeWorkspaceId },
+        });
+      } catch {
+        /* Ignored */
+      }
+      setTailingSourceIds((prev) => {
+        const next = new Set(prev);
+        next.delete(sourceId);
+        return next;
+      });
     }
     removeSource(activeWorkspaceId, sourceId);
   };
@@ -275,16 +328,16 @@ export function InvestigationPage() {
   };
 
   const handleEditFusion = (sourceId: string) => {
-    const src = sources.find(s => s.id === sourceId);
+    const src = sources.find((s) => s.id === sourceId);
     if (!src) return;
-    setEditingFusionId(src.path);   // path stores fusionId for fusion-type sources
+    setEditingFusionId(src.path); // path stores fusionId for fusion-type sources
     setEditingFusionName(src.name);
     setIsOrchestratorOpen(true);
   };
 
   const handleFusionSaved = (fusionId: string, fusionName: string) => {
     // Check if fusion tab already exists — update its name, otherwise add
-    const existingSrc = sources.find(s => s.path === fusionId);
+    const existingSrc = sources.find((s) => s.path === fusionId);
     if (!existingSrc) {
       const newSrc = addSource(activeWorkspaceId, {
         name: fusionName,
@@ -295,7 +348,36 @@ export function InvestigationPage() {
       setActiveSource(activeWorkspaceId, newSrc.id);
     }
     // If editing, the name is stored in store.name — updating requires a store action
-    // TODO(ORK-001): Add updateSource action to workspaceStore for renaming fusion tabs
+    // NOTE(ORK-001): Future implementation will support direct renaming via workspaceStore.updateSource
+  };
+
+  const handleAnalyzeCluster = async (clusterId: string) => {
+    if (!activeWorkspaceId || !clusterId) return;
+
+    setDiagnosticOpen(true);
+    setDiagnosticLoading(true);
+    setDiagnosticData(null);
+
+    // TODO(ANALYSIS-005): Move cluster analysis logic to dedicated analyzer service
+    try {
+      const data = await callSidecar<DiagnosticData>({
+        method: "analyze_cluster",
+        params: {
+          workspace_id: activeWorkspaceId,
+          cluster_id: clusterId,
+        },
+      });
+      setDiagnosticData(data);
+    } catch (e: any) {
+      toast.error(`Analysis failed: ${e.message || "Unknown error"}`);
+      setDiagnosticData({
+        summary: "Analysis failed to complete.",
+        root_cause: e.message || "Unknown error occurred.",
+        recommended_actions: ["Check sidecar connection.", "Verify AI provider configuration."],
+      });
+    } finally {
+      setDiagnosticLoading(false);
+    }
   };
 
   // ── Render ────────────────────────────────────────────────────────────────
@@ -319,6 +401,11 @@ export function InvestigationPage() {
         onSelectSource={handleSelectSource}
         onRemoveSource={handleRemoveSource}
         onEditFusion={handleEditFusion}
+        showDistribution={showDistribution}
+        onDistributionClose={() => setShowDistribution(!showDistribution)}
+        showAnomalies={showAnomalies}
+        onAnomaliesChange={setShowAnomalies}
+        workspaceId={activeWorkspaceId}
       >
         <VirtualLogTable
           logs={logs}
@@ -326,19 +413,32 @@ export function InvestigationPage() {
           sortBy={sortBy}
           sortOrder={sortOrder}
           onSort={handleSort}
+          anomalousClusters={anomalousClusters}
           onAddComment={(id, comment) => {
             const has_comment = comment.trim().length > 0;
             updateLog(id, { comment, has_comment });
             callSidecar({ method: "update_log_comment", params: { log_id: id, comment } })
               .then(() => toast.success("Annotation saved"))
               .catch(() => {
-                const originalLog = logs.find(l => l.id === id);
-                if (originalLog) updateLog(id, { comment: originalLog.comment, has_comment: originalLog.has_comment });
+                const originalLog = logs.find((l) => l.id === id);
+                if (originalLog)
+                  updateLog(id, {
+                    comment: originalLog.comment,
+                    has_comment: originalLog.has_comment,
+                  });
                 toast.error("Failed to save annotation");
               });
           }}
+          onAnalyzeCluster={handleAnalyzeCluster}
         />
       </InvestigationLayout>
+
+      <DiagnosticSidebar
+        open={diagnosticOpen}
+        onClose={() => setDiagnosticOpen(false)}
+        data={diagnosticData}
+        loading={diagnosticLoading}
+      />
 
       <ImportFeedModal
         open={isImportOpen}

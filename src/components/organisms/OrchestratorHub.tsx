@@ -1,5 +1,7 @@
+import { Switch } from "@/components/ui/switch";
 import { callSidecar } from "@/lib/hooks/useSidecarBridge";
 import { cn } from "@/lib/utils";
+import { useInvestigationStore } from "@/store/investigationStore";
 import type { LogSource } from "@/store/workspaceStore";
 import {
   Check,
@@ -208,6 +210,10 @@ export function OrchestratorHub({
 }: OrchestratorHubProps) {
   // "picker" = strategy selection, "fusion-form" = fusion configuration
   const [view, setView] = useState<"picker" | "fusion-form">("picker");
+  const showDistribution = useInvestigationStore((s) => s.showDistribution);
+  const setShowDistribution = useInvestigationStore((s) => s.setShowDistribution);
+  const showAnomalies = useInvestigationStore((s) => s.showAnomalies);
+  const setShowAnomalies = useInvestigationStore((s) => s.setShowAnomalies);
   const [fusionName, setFusionName] = useState("");
   const [configs, setConfigs] = useState<FusionSourceConfig[]>([]);
   const [isSaving, setIsSaving] = useState(false);
@@ -355,6 +361,45 @@ export function OrchestratorHub({
         <div className="flex-1 overflow-y-auto custom-scrollbar">
           {view === "picker" && (
             <div className="p-5 space-y-4">
+              <div className="space-y-3">
+                <p className="text-[11px] text-text-muted uppercase tracking-widest font-bold">
+                  Visual Layers
+                </p>
+                <div className="flex items-center justify-between p-3 rounded-xl border border-white/5 bg-black/20">
+                  <div>
+                    <span className="block text-sm font-semibold text-text-primary">
+                      Log Distribution
+                    </span>
+                    <span className="block text-[11px] text-text-muted mt-0.5">
+                      Timeline histogram of log volume
+                    </span>
+                  </div>
+                  <Switch
+                    checked={showDistribution}
+                    onCheckedChange={setShowDistribution}
+                    className="data-[checked]:bg-violet-500"
+                  />
+                </div>
+
+                <div className="flex items-center justify-between p-3 rounded-xl border border-white/5 bg-black/20 mt-2">
+                  <div>
+                    <span className="block text-sm font-semibold text-text-primary">
+                      Anomaly Engine
+                    </span>
+                    <span className="block text-[11px] text-text-muted mt-0.5">
+                      Highlight statistical outliers in logs
+                    </span>
+                  </div>
+                  <Switch
+                    checked={showAnomalies}
+                    onCheckedChange={setShowAnomalies}
+                    className="data-[checked]:bg-orange-500"
+                  />
+                </div>
+              </div>
+
+              <div className="w-full h-px bg-border/40 my-2" />
+
               <p className="text-[11px] text-text-muted uppercase tracking-widest font-bold">
                 Available Strategies
               </p>

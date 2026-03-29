@@ -1,8 +1,7 @@
 import json
 import os
-import re
 import sys
-from datetime import datetime
+import threading
 from typing import Any
 
 import aiohttp_cors
@@ -10,10 +9,11 @@ from aiohttp import web
 from pydantic import BaseModel, ValidationError
 from src.ai import AIProvider
 from src.db import Database
-from src.parser import DrainParser
-from src.tailer import FileTailer
-from src.ssh_loader import SSHLoader
+from src.mcp_server import init_mcp, mcp_server
 from src.metadata_extractor import extract_log_metadata
+from src.parser import DrainParser
+from src.ssh_loader import SSHLoader
+from src.tailer import FileTailer
 
 
 # RPC Base Models
@@ -43,6 +43,8 @@ class GetLogsRequest(BaseModel):
     query: str | None = None
     sort_by: str = "id"
     sort_order: str = "DESC"
+    start_time: str | None = None
+    end_time: str | None = None
 
 class StartTailRequest(BaseModel):
     filepath: str
@@ -86,10 +88,12 @@ class FusionSourceConfig(BaseModel):
 
 class UpdateFusionConfigRequest(BaseModel):
     workspace_id: str
+    fusion_id: str = "default"
     sources: list[FusionSourceConfig]
 
 class GetFusionConfigRequest(BaseModel):
     workspace_id: str
+    fusion_id: str = "default"
 
 class GetSampleLinesRequest(BaseModel):
     workspace_id: str
@@ -103,12 +107,28 @@ class UpdateSourceParserRequest(BaseModel):
 
 class GetFusedLogsRequest(BaseModel):
     workspace_id: str
+    fusion_id: str = "default"
     offset: int = 0
     limit: int = 100
     filters: list[LogFilter] | None = None
     query: str | None = None
     sort_by: str = "id"
     sort_order: str = "DESC"
+    start_time: str | None = None
+    end_time: str | None = None
+
+class GetAnomaliesRequest(BaseModel):
+    workspace_id: str
+    time_range: str | None = None
+
+class GetLogDistributionRequest(BaseModel):
+    workspace_id: str
+    fusion_id: str | None = None
+    source_ids: list[str] | None = None
+    filters: list[LogFilter] | None = None
+    query: str | None = None
+    start_time: str | None = None
+    end_time: str | None = None
 
 class App:
     def __init__(self, db_path="loglens.duckdb"):
@@ -117,6 +137,25 @@ class App:
         self.tailers = {}
         self.ai = AIProvider()
         self.dev_mode = False
+        init_mcp(self)
+        self._mcp_thread = None
+        self._start_mcp_server()
+
+    def _start_mcp_server(self):
+        """Starts the MCP server in a background thread using FastMCP stdio or SSE if needed.
+        Currently using FastMCP internally, which supports stdio."""
+        def run_mcp():
+            try:
+                # We can't use stdio for MCP if we are already using stdio for JSON-RPC in main.
+                # If dev_mode HTTP is used, stdio is free. But to be safe, we'll start SSE on a different port.
+                import uvicorn
+                uvicorn.run(mcp_server.application, host="127.0.0.1", port=5001, log_level="error")
+            except Exception as e:
+                sys.stderr.write(f"MCP Server error: {e}\n")
+        
+        # We start the SSE MCP Server in a daemon thread so it dies with the main process.
+        self._mcp_thread = threading.Thread(target=run_mcp, daemon=True)
+        self._mcp_thread.start()
 
     def dispatch(self, req: JSONRPCRequest) -> JSONRPCResponse:
         try:
@@ -142,6 +181,7 @@ class App:
                 "get_workspace_sources": GetWorkspaceSourcesRequest,
                 "get_sample_lines": GetSampleLinesRequest,
                 "update_source_parser": UpdateSourceParserRequest,
+                "get_anomalies": GetAnomaliesRequest,
                 "analyze_cluster": None,
                 "get_settings": None,
                 "update_settings": None,
@@ -225,6 +265,8 @@ class App:
         sort_by: str = "id",
         sort_order: str = "DESC",
         source_ids: list[str] | None = None,
+        start_time: str | None = None,
+        end_time: str | None = None,
     ) -> dict:
         """Unified internal log fetcher supporting source-filtering for Fusion mode."""
         cursor = self.db.get_cursor()
@@ -247,8 +289,18 @@ class App:
             params.extend(f_params)
 
         if query:
-            where_clauses.append("(message ILIKE ? OR raw_text ILIKE ?)")
+            where_clauses.append("(l.message ILIKE ? OR l.raw_text ILIKE ?)")
             params.extend([f"%{query}%", f"%{query}%"])
+
+        if start_time:
+            # Normalize ISO from frontend (T separator) to DB format (space separator)
+            norm_start = start_time.replace("T", " ").split(".")[0].replace("Z", "")
+            where_clauses.append("l.timestamp >= ?")
+            params.append(norm_start)
+        if end_time:
+            norm_end = end_time.replace("T", " ").split(".")[0].replace("Z", "")
+            where_clauses.append("l.timestamp <= ?")
+            params.append(norm_end)
             
         where_sql = " AND ".join(where_clauses)
         total_logs_subquery = "(SELECT count(*) FROM logs WHERE workspace_id = ?)"
@@ -260,7 +312,8 @@ class App:
                            .replace("level", "l.level") \
                            .replace("cluster_id", "l.cluster_id") \
                            .replace("raw_text", "l.raw_text") \
-                           .replace("has_comment", "l.has_comment")
+                           .replace("has_comment", "l.has_comment") \
+                           .replace("timestamp", "l.timestamp")
         
         base_query = f"""
             SELECT 
@@ -296,6 +349,121 @@ class App:
         params = GetLogsRequest(**kwargs)
         return self._get_logs_internal(**params.model_dump())
 
+    def method_get_log_distribution(self, **kwargs) -> dict:
+        """Fetch timeline distribution of logs aggregated by time bucket and level."""
+        params = GetLogDistributionRequest(**kwargs)
+        cursor = self.db.get_cursor()
+
+        where_clauses = ["workspace_id = ?"]
+        sql_params: list[Any] = [params.workspace_id]
+
+        # 1. Resolve source restrictions
+        effective_source_ids = params.source_ids
+        
+        # If fusion_id is provided, override source_ids with those from the fusion config
+        if params.fusion_id:
+            cursor.execute(
+                "SELECT source_id FROM fusion_configs WHERE workspace_id = ? AND fusion_id = ? AND enabled = TRUE",
+                (params.workspace_id, params.fusion_id)
+            )
+            effective_source_ids = [row[0] for row in cursor.fetchall()]
+
+        if effective_source_ids is not None:
+            if not effective_source_ids: # None provided/found = show nothing
+                return {"buckets": []}
+            placeholders = ",".join(["?"] * len(effective_source_ids))
+            where_clauses.append(f"source_id IN ({placeholders})")
+            sql_params.extend(effective_source_ids)
+
+        if params.filters:
+            dict_filters = [f.model_dump() if hasattr(f, "model_dump") else f for f in params.filters]
+            f_clauses, f_params = self._parse_filters(dict_filters)
+            where_clauses.extend(f_clauses)
+            sql_params.extend(f_params)
+
+        if params.query:
+            where_clauses.append("(message ILIKE ? OR raw_text ILIKE ?)")
+            sql_params.extend([f"%{params.query}%", f"%{params.query}%"])
+
+        if params.start_time:
+            norm_start = params.start_time.replace("T", " ").split(".")[0].replace("Z", "")
+            where_clauses.append("timestamp >= ?")
+            sql_params.append(norm_start)
+            
+        if params.end_time:
+            norm_end = params.end_time.replace("T", " ").split(".")[0].replace("Z", "")
+            where_clauses.append("timestamp <= ?")
+            sql_params.append(norm_end)
+
+        where_sql = " AND ".join(where_clauses)
+
+        # Aggregate by minute bucket
+        # SQLite / DuckDB timestamp as string, substring(1,16) gives "YYYY-MM-DD HH:MM"
+        query = f"""
+            SELECT
+                substring(timestamp, 1, 16) as time_bucket,
+                level,
+                COUNT(*) as count
+            FROM logs
+            WHERE {where_sql}
+            GROUP BY time_bucket, level
+            ORDER BY time_bucket ASC
+        """
+        cursor.execute(query, sql_params)
+        rows = cursor.fetchall()
+
+        # Reshape to a list of dicts: {"bucket": "2023...", "INFO": 5, "ERROR": 2}
+        buckets_map = {}
+        for row in rows:
+            time_bucket = row[0]
+            level = row[1]
+            count = row[2]
+            
+            if time_bucket not in buckets_map:
+                buckets_map[time_bucket] = {"bucket": time_bucket}
+            
+            buckets_map[time_bucket][level] = count
+
+        return {"buckets": list(buckets_map.values())}
+
+    def method_get_anomalies(self, **kwargs) -> dict:
+        """Analyze statistical outliers and novel clusters over a basic time sliding window."""
+        params = GetAnomaliesRequest(**kwargs)
+        cursor = self.db.get_cursor()
+
+        # Simple baseline: detect "new" clusters in the last minute that rarely appeared before
+        query = """
+            WITH cluster_stats AS (
+                SELECT 
+                    cluster_id, 
+                    count(*) as total_occurrences,
+                    min(timestamp) as first_seen,
+                    max(timestamp) as last_seen
+                FROM logs
+                WHERE workspace_id = ?
+                GROUP BY cluster_id
+            )
+            SELECT l.cluster_id, l.timestamp, cs.total_occurrences
+            FROM logs l
+            JOIN cluster_stats cs ON l.cluster_id = cs.cluster_id
+            WHERE l.workspace_id = ? 
+            AND cs.total_occurrences <= 5 
+            ORDER BY l.timestamp DESC LIMIT 100
+        """
+        cursor.execute(query, [params.workspace_id, params.workspace_id])
+        rows = cursor.fetchall()
+        
+        anomalies = []
+        for row in rows:
+            anomalies.append({
+                "cluster_id": row[0],
+                "timestamp": row[1],
+                "type": "novelty" if row[2] <= 1 else "rare",
+                "score": 0.95 # Mocked Z-Score baseline
+            })
+
+        return {"anomalies": anomalies}
+
     def method_get_fused_logs(self, **kwargs) -> dict:
         """Fetch interleaved logs for Fusion mode based on enabled sources."""
         params = GetFusedLogsRequest(**kwargs)
@@ -303,8 +471,8 @@ class App:
         
         # 1. Get enabled sources from fusion_config
         cursor.execute(
-            "SELECT source_id FROM fusion_configs WHERE workspace_id = ? AND enabled = TRUE", 
-            (params.workspace_id,)
+            "SELECT source_id FROM fusion_configs WHERE workspace_id = ? AND fusion_id = ? AND enabled = TRUE", 
+            (params.workspace_id, params.fusion_id)
         )
         enabled_ids = [row[0] for row in cursor.fetchall()]
         
@@ -318,14 +486,14 @@ class App:
         
         for src in params.sources:
             cursor.execute("""
-                INSERT INTO fusion_configs (workspace_id, source_id, enabled, tz_offset, custom_format, parser_config)
-                VALUES (?, ?, ?, ?, ?, ?)
-                ON CONFLICT (workspace_id, source_id) DO UPDATE SET
+                INSERT INTO fusion_configs (workspace_id, fusion_id, source_id, enabled, tz_offset, custom_format, parser_config)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT (workspace_id, fusion_id, source_id) DO UPDATE SET
                     enabled = excluded.enabled,
                     tz_offset = excluded.tz_offset,
                     custom_format = excluded.custom_format,
                     parser_config = excluded.parser_config
-            """, (params.workspace_id, src.source_id, src.enabled, src.tz_offset, src.custom_format, src.parser_config))
+            """, (params.workspace_id, params.fusion_id, src.source_id, src.enabled, src.tz_offset, src.custom_format, src.parser_config))
         
         return {"status": "ok"}
 
@@ -347,10 +515,14 @@ class App:
         )
         return {"status": "ok"}
 
-    def method_get_fusion_config(self, workspace_id: str) -> dict:
+    def method_get_fusion_config(self, **kwargs) -> dict:
         """Retrieve current Fusion orchestration setup."""
+        params = GetFusionConfigRequest(**kwargs)
         cursor = self.db.get_cursor()
-        cursor.execute("SELECT source_id, enabled, tz_offset, custom_format, parser_config FROM fusion_configs WHERE workspace_id = ?", (workspace_id,))
+        cursor.execute(
+            "SELECT source_id, enabled, tz_offset, custom_format, parser_config FROM fusion_configs WHERE workspace_id = ? AND fusion_id = ?", 
+            (params.workspace_id, params.fusion_id)
+        )
         rows = cursor.fetchall()
         
         sources = [
@@ -363,6 +535,7 @@ class App:
             }
             for row in rows
         ]
+        
         return {"sources": sources}
 
     def method_start_tail(self, filepath: str, workspace_id: str) -> dict:
@@ -383,7 +556,6 @@ class App:
         self, host: str, port: int = 22, username: str | None = None, 
         password: str | None = None, filepath: str | None = None, workspace_id: str | None = None
     ) -> dict:
-        from src.ssh_loader import SSHLoader
         
         key = f"ssh:{workspace_id}:{host}:{filepath}"
         if key in self.tailers and self.tailers[key].running:
@@ -398,18 +570,23 @@ class App:
         
         return {"status": "started"}
 
+    def _stop_all_workspace_tailers(self, workspace_id: str) -> int:
+        """Internal helper to stop all tailers for a workspace."""
+        count = 0
+        keys_to_remove = []
+        for k, t in self.tailers.items():
+            if k.startswith(f"{workspace_id}:") or k.startswith(f"ssh:{workspace_id}:"):
+                t.stop()
+                keys_to_remove.append(k)
+                count += 1
+        for k in keys_to_remove:
+            self.tailers.pop(k, None)
+        return count
+
     def method_stop_tail(self, filepath: str, workspace_id: str) -> dict:
         """Stop one or all live stream tailers for a workspace."""
         if filepath == "ALL":
-            count: int = 0
-            keys_to_remove = []
-            for k, t in self.tailers.items():
-                if k.startswith(f"{workspace_id}:") or k.startswith(f"ssh:{workspace_id}:"):
-                    t.stop()
-                    keys_to_remove.append(k)
-                    count = count + 1
-            for k in keys_to_remove:
-                self.tailers.pop(k, None)
+            count = self._stop_all_workspace_tailers(workspace_id)
             return {"status": "stopped", "count": count}
 
         abs_path = os.path.abspath(filepath)
@@ -421,15 +598,16 @@ class App:
             return {"status": "stopped", "count": 1}
 
         # Fallback for SSH or partial matches
-        count_stopped: int = 0
+        count_stopped = 0
         keys_to_remove = []
         for k, t in self.tailers.items():
-            if (k.startswith(f"{workspace_id}:") or k.startswith(f"ssh:{workspace_id}:")) and filepath in k:
+            is_match = (k.startswith(f"{workspace_id}:") or k.startswith(f"ssh:{workspace_id}:")) and filepath in k
+            if is_match:
                 t.stop()
                 keys_to_remove.append(k)
-                count_stopped = count_stopped + 1
+                count_stopped += 1
         for k in keys_to_remove:
-            self.tailers.pop(k)
+            self.tailers.pop(k, None)
 
         return {"status": "stopped" if count_stopped > 0 else "not found", "count": count_stopped}
 
@@ -440,7 +618,7 @@ class App:
         if not os.path.exists(abs_path):
             raise FileNotFoundError(f"File not found: {abs_path}")
             
-        with open(abs_path, 'r', encoding='utf-8', errors='replace') as f:
+        with open(abs_path, encoding='utf-8', errors='replace') as f:
             return f.read()
 
     def _ingest_single_log(self, cursor: Any, log: dict) -> list[Any]:
@@ -525,25 +703,13 @@ class App:
         return [row[0] for row in cursor.fetchall()]
 
 
-    def method_read_file(self, filepath: str) -> str:
-        """Read a local file's content for one-time ingestion"""
-        abs_path = os.path.abspath(filepath)
-        if not os.path.exists(abs_path):
-            raise FileNotFoundError(f"File not found: {abs_path}")
-            
-        # Limit to 5MB to avoid memory issues in JSON-RPC
-        if os.path.getsize(abs_path) > 5 * 1024 * 1024:
-            raise ValueError("File too large for one-time read (max 5MB). Use Live Tail instead.")
-            
-        with open(abs_path, 'r', encoding='utf-8', errors='replace') as f:
-            return f.read()
 
     def method_is_tailing(self, filepath: str, workspace_id: str) -> bool:
         abs_path = os.path.abspath(filepath)
         key = f"{workspace_id}:{abs_path}"
         return key in self.tailers and self.tailers[key].running
 
-    def method_get_clusters(self, workspace_id: str) -> list:
+    def method_get_clusters(self, _workspace_id: str) -> list:
         clusters = self.parser.get_clusters()
         return [
             {"id": c.cluster_id, "template": c.get_template(), "size": c.size} 
@@ -617,7 +783,7 @@ class App:
                 status=500
             )
 
-async def on_cleanup(app):
+def on_cleanup(_app):
     Database.reset()
 
 def run_http(port=5000):

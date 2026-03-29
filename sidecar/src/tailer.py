@@ -3,8 +3,8 @@ import threading
 import time
 
 from src.db import Database
-from src.parser import DrainParser
 from src.metadata_extractor import extract_log_metadata
+from src.parser import DrainParser
 
 
 class FileTailer:
@@ -31,7 +31,7 @@ class FileTailer:
 
     def _tail(self):
         try:
-            with open(self.filepath, 'r', encoding='utf-8', errors='replace') as f:
+            with open(self.filepath, encoding='utf-8', errors='replace') as f:
                 # Seek to end for live tailing
                 f.seek(0, 2)
 

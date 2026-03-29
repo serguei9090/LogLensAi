@@ -1,8 +1,8 @@
 import os
 import threading
+from typing import Any
 
 import duckdb
-from typing import Any
 
 
 class Database:
@@ -81,12 +81,13 @@ class Database:
 
             CREATE TABLE IF NOT EXISTS fusion_configs (
                 workspace_id TEXT,
+                fusion_id    TEXT DEFAULT 'default',
                 source_id    TEXT,
                 enabled      BOOLEAN DEFAULT TRUE,
                 tz_offset    INTEGER DEFAULT 0,
                 custom_format TEXT,
                 parser_config TEXT,
-                PRIMARY KEY (workspace_id, source_id)
+                PRIMARY KEY (workspace_id, fusion_id, source_id)
             );
         """)
 
@@ -97,6 +98,14 @@ class Database:
             cursor.execute("SELECT parser_config FROM fusion_configs LIMIT 1")
         except Exception:
             cursor.execute("ALTER TABLE fusion_configs ADD COLUMN parser_config TEXT")
+
+        # Add fusion_id column to fusion_configs if missing
+        try:
+            cursor.execute("SELECT fusion_id FROM fusion_configs LIMIT 1")
+        except Exception:
+            cursor.execute("ALTER TABLE fusion_configs ADD COLUMN fusion_id TEXT DEFAULT 'default'")
+            # Note: We can't easily change composite PK in DuckDB without recreating, 
+            # but 'ALTER' will suffice for column existence. New installs get the proper PK.
 
         # Add source_id column if missing to logs
         try:

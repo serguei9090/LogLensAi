@@ -13,6 +13,9 @@ export interface InvestigationStore {
   isTailing: boolean;
   sortBy: string;
   sortOrder: "asc" | "desc";
+  showDistribution: boolean;
+  showAnomalies: boolean;
+  timeRange: { start: string; end: string; label?: string };
   setSearchQuery: (q: string) => void;
   setFilters: (f: FilterEntry[]) => void;
   setHighlights: (h: HighlightEntry[]) => void;
@@ -20,6 +23,9 @@ export interface InvestigationStore {
   updateLog: (id: number, updates: Partial<LogEntry>) => void;
   setTailing: (v: boolean) => void;
   setSort: (by: string, order: "asc" | "desc") => void;
+  setShowDistribution: (v: boolean) => void;
+  setShowAnomalies: (v: boolean) => void;
+  setTimeRange: (range: { start: string; end: string; label?: string }) => void;
 }
 
 export const useInvestigationStore = create<InvestigationStore>((set) => ({
@@ -32,6 +38,9 @@ export const useInvestigationStore = create<InvestigationStore>((set) => ({
   isTailing: false,
   sortBy: "timestamp",
   sortOrder: "desc",
+  showDistribution: false,
+  showAnomalies: false,
+  timeRange: { start: "", end: "" },
   setSearchQuery: (searchQuery) => set({ searchQuery }),
   setFilters: (filters) => set({ filters }),
   setHighlights: (highlights) => set({ highlights }),
@@ -42,4 +51,7 @@ export const useInvestigationStore = create<InvestigationStore>((set) => ({
     })),
   setTailing: (isTailing) => set({ isTailing }),
   setSort: (sortBy, sortOrder) => set({ sortBy, sortOrder }),
+  setShowDistribution: (showDistribution) => set({ showDistribution }),
+  setShowAnomalies: (showAnomalies) => set({ showAnomalies }),
+  setTimeRange: (timeRange) => set({ timeRange }),
 }));

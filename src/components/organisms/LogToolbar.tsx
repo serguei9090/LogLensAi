@@ -5,31 +5,30 @@ import { HighlightBuilder, type HighlightEntry } from "@/components/molecules/Hi
 import { SearchBar } from "@/components/molecules/SearchBar";
 import { WorkspaceTabs } from "@/components/molecules/WorkspaceTabs";
 import type { LogSource } from "@/store/workspaceStore";
-import { Cpu, Upload } from "lucide-react";
+import { Bookmark, Cpu, Upload } from "lucide-react";
+import { toast } from "sonner";
 
 interface LogToolbarProps {
-  onSearch: (q: string) => void;
-  activeFilters: FilterEntry[];
-  onFilterChange: (f: FilterEntry[]) => void;
-  activeHighlights: HighlightEntry[];
-  onHighlightChange: (h: HighlightEntry[]) => void;
-  isTailing: boolean;
-  onTailToggle: (v: boolean) => void;
-  status: boolean;
-  onImportOpen: () => void;
-  onOrchestrateOpen: () => void;
-  /** Sources attached to the active workspace (from workspaceStore) */
-  sources?: LogSource[];
-  /** Currently-active source id */
-  activeSourceId?: string | null;
-  /** Source IDs that are currently live-tailing */
-  tailingSourceIds?: Set<string>;
-  /** Called when user clicks a source tab */
-  onSelectSource?: (sourceId: string | null) => void;
-  /** Called when user removes a source tab */
-  onRemoveSource?: (sourceId: string) => void;
-  /** Called when user clicks the edit icon on a fusion tab */
-  onEditFusion?: (sourceId: string) => void;
+  readonly onSearch: (q: string) => void;
+  readonly activeFilters: FilterEntry[];
+  readonly onFilterChange: (f: FilterEntry[]) => void;
+  readonly activeHighlights: HighlightEntry[];
+  readonly onHighlightChange: (h: HighlightEntry[]) => void;
+  readonly isTailing: boolean;
+  readonly onTailToggle: (v: boolean) => void;
+  readonly status: boolean;
+  readonly onImportOpen: () => void;
+  readonly onOrchestrateOpen: () => void;
+  readonly sources?: LogSource[];
+  readonly activeSourceId?: string | null;
+  readonly tailingSourceIds?: Set<string>;
+  readonly onSelectSource?: (sourceId: string | null) => void;
+  readonly onRemoveSource?: (sourceId: string) => void;
+  readonly onEditFusion?: (sourceId: string) => void;
+  readonly showAnomalies?: boolean;
+  readonly onAnomaliesToggle?: (v: boolean) => void;
+  readonly showDistribution?: boolean;
+  readonly onDistributionToggle?: (v: boolean) => void;
 }
 
 export function LogToolbar({
@@ -49,6 +48,10 @@ export function LogToolbar({
   onSelectSource,
   onRemoveSource,
   onEditFusion,
+  showAnomalies = false,
+  onAnomaliesToggle = () => {},
+  showDistribution = false,
+  onDistributionToggle = () => {},
 }: LogToolbarProps) {
   return (
     <div className="sticky top-0 z-10 flex flex-nowrap items-center gap-3 bg-[#0d0f0e]/95 backdrop-blur-sm border-b border-zinc-800/60 px-4 py-2.5 shadow-sm overflow-x-auto scrollbar-none">
@@ -95,13 +98,40 @@ export function LogToolbar({
         <FilterBuilder filters={activeFilters} onChange={onFilterChange} />
         <div className="h-5 w-px bg-zinc-800" />
         <HighlightBuilder highlights={activeHighlights} onChange={onHighlightChange} />
+
+        {/* Template Summary Button */}
+        <button
+          onClick={() =>
+            toast.info("Template functionality coming soon.", {
+              description: "You will be able to save highlights and filters for later.",
+            })
+          }
+          className="p-1.5 rounded-md hover:bg-white/5 text-text-muted hover:text-text-primary transition-colors ml-1"
+          title="Save as Template"
+        >
+          <Bookmark className="size-4" />
+        </button>
       </div>
 
       <div className="flex-1" />
 
-      {/* Live Tail + Status */}
-      <div className="flex items-center gap-3 shrink-0">
-        <TailSwitch checked={isTailing} onCheckedChange={onTailToggle} />
+      {/* Action switches */}
+      <div className="flex items-center gap-5 shrink-0 ml-2">
+        <div className="flex items-center gap-2 group cursor-help" title="Toggle anomaly detection layer">
+          <span className="text-[10px] font-bold tracking-widest text-text-muted group-hover:text-amber-400 transition-colors uppercase">Anomalies</span>
+          <TailSwitch checked={showAnomalies} onCheckedChange={onAnomaliesToggle} />
+        </div>
+
+        <div className="flex items-center gap-2 group cursor-help" title="Toggle horizontal log distribution timeline">
+          <span className="text-[10px] font-bold tracking-widest text-text-muted group-hover:text-primary transition-colors uppercase">Timeline</span>
+          <TailSwitch checked={showDistribution} onCheckedChange={onDistributionToggle} />
+        </div>
+
+        <div className="flex items-center gap-2 group cursor-help" title="Toggle real-time log ingestion (Live Tail)">
+          <span className="text-[10px] font-bold tracking-widest text-text-muted group-hover:text-emerald-400 transition-colors uppercase">Tail</span>
+          <TailSwitch checked={isTailing} onCheckedChange={onTailToggle} />
+        </div>
+        
         <StatusDot active={status} />
       </div>
     </div>

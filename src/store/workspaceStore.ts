@@ -85,17 +85,13 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
           return {
             workspaces: remaining,
             activeWorkspaceId:
-              state.activeWorkspaceId === id
-                ? (remaining[0]?.id ?? "")
-                : state.activeWorkspaceId,
+              state.activeWorkspaceId === id ? (remaining[0]?.id ?? "") : state.activeWorkspaceId,
           };
         }),
 
       renameWorkspace: (id, name) =>
         set((state) => ({
-          workspaces: state.workspaces.map((w) =>
-            w.id === id ? { ...w, name } : w,
-          ),
+          workspaces: state.workspaces.map((w) => (w.id === id ? { ...w, name } : w)),
         })),
 
       addSource: (workspaceId, sourceData) => {
@@ -124,9 +120,7 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
               ...w,
               sources: remaining,
               // Fall back to first remaining source or null (aggregate)
-              activeSourceId: wasActive
-                ? (remaining[0]?.id ?? null)
-                : w.activeSourceId,
+              activeSourceId: wasActive ? (remaining[0]?.id ?? null) : w.activeSourceId,
             };
           }),
         })),

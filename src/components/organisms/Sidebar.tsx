@@ -16,14 +16,14 @@ import { useRef, useState } from "react";
 import type { Workspace } from "@/store/workspaceStore";
 
 interface SidebarProps {
-  workspaces: Workspace[];
-  activeWorkspaceId: string;
-  onWorkspaceSelect: (id: string) => void;
-  onWorkspaceCreate: (name: string) => void;
-  onWorkspaceRename?: (id: string, name: string) => void;
-  onWorkspaceDelete?: (id: string) => void;
-  activeNav: "investigation" | "settings";
-  onNavSelect: (nav: "investigation" | "settings") => void;
+  readonly workspaces: readonly Workspace[];
+  readonly activeWorkspaceId: string;
+  readonly onWorkspaceSelect: (id: string) => void;
+  readonly onWorkspaceCreate: (name: string) => void;
+  readonly onWorkspaceRename?: (id: string, name: string) => void;
+  readonly onWorkspaceDelete?: (id: string) => void;
+  readonly activeNav: "investigation" | "settings";
+  readonly onNavSelect: (nav: "investigation" | "settings") => void;
 }
 
 export function Sidebar({
@@ -151,33 +151,29 @@ export function Sidebar({
                     <span className="flex-1 truncate">{ws.name}</span>
                     {/* Action icons on hover */}
                     <span className="hidden group-hover:flex items-center gap-1 shrink-0">
-                      <span
-                        role="button"
-                        tabIndex={0}
+                      <button
+                        type="button"
                         onClick={(e) => {
                           e.stopPropagation();
                           handleStartRename(ws.id, ws.name);
                         }}
-                        onKeyDown={(e) => e.key === "Enter" && handleStartRename(ws.id, ws.name)}
-                        className="p-0.5 rounded text-zinc-500 hover:text-zinc-200 hover:bg-zinc-700 transition-colors text-[10px]"
+                        className="p-0.5 rounded text-zinc-500 hover:text-zinc-200 hover:bg-zinc-700 transition-colors text-[10px] outline-none focus-visible:ring-1 focus-visible:ring-emerald-500/50"
                         aria-label="Rename"
                       >
                         ✏
-                      </span>
+                      </button>
                       {workspaces.length > 1 && (
-                        <span
-                          role="button"
-                          tabIndex={0}
+                        <button
+                          type="button"
                           onClick={(e) => {
                             e.stopPropagation();
                             onWorkspaceDelete?.(ws.id);
                           }}
-                          onKeyDown={(e) => e.key === "Enter" && onWorkspaceDelete?.(ws.id)}
-                          className="p-0.5 rounded text-zinc-500 hover:text-red-400 hover:bg-red-500/10 transition-colors"
+                          className="p-0.5 rounded text-zinc-500 hover:text-red-400 hover:bg-red-500/10 transition-colors outline-none focus-visible:ring-1 focus-visible:ring-red-500/50"
                           aria-label="Delete"
                         >
                           <Trash2 className="h-3 w-3" />
-                        </span>
+                        </button>
                       )}
                     </span>
                   </button>
