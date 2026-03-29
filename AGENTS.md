@@ -121,6 +121,8 @@ All methods are called via `useSidecarBridge.ts`. Never change the transport.
 - **Graceful Shutdown (Prod vs Dev)**:
   - **Dev**: The `aiohttp` runner must use `async def on_cleanup(_): Database.reset()` to prevent Zombie processes and WAL locks.
   - **Prod**: The `stdin/stdout` loop must gracefully catch `EOF` and `KeyboardInterrupt` and properly close the DuckDB connection before exiting.
+- **Testing (ADK Standard)**: Real code over mocks. Test public interface behavior. Fast and isolated tests. High coverage for edge cases.
+- **Conventional Commits**: ALL commits must follow the `feat|fix|refactor|docs|test|chore` format.
 - **No silent gaps**: missing logic gets a `TODO(ID)` with a detail file in `docs/TODOC/`
 
 ## 🤖 Automated Development Pipeline (Jules)

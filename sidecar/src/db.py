@@ -89,6 +89,25 @@ class Database:
                 parser_config TEXT,
                 PRIMARY KEY (workspace_id, fusion_id, source_id)
             );
+
+            CREATE TABLE IF NOT EXISTS ai_sessions (
+                session_id   TEXT PRIMARY KEY,
+                workspace_id TEXT,
+                title        TEXT,
+                provider     TEXT,
+                model        TEXT,
+                created_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+
+            CREATE TABLE IF NOT EXISTS ai_messages (
+                id           INTEGER PRIMARY KEY DEFAULT nextval('log_id_seq'),
+                session_id   TEXT,
+                role         TEXT,
+                content      TEXT,
+                context_logs TEXT, -- JSON array of log IDs
+                timestamp    TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
         """)
 
         # 3. Migrations for existing databases

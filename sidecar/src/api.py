@@ -7,7 +7,7 @@ from typing import Any
 import aiohttp_cors
 from aiohttp import web
 from pydantic import BaseModel, ValidationError
-from src.ai import AIProvider
+from src.ai import AIProvider, AIChatMessage, AIProviderFactory
 from src.db import Database
 from src.mcp_server import init_mcp, mcp_server
 from src.metadata_extractor import extract_log_metadata
@@ -130,20 +130,41 @@ class GetLogDistributionRequest(BaseModel):
     start_time: str | None = None
     end_time: str | None = None
 
+# AI Models
+class SendAiMessageRequest(BaseModel):
+    workspace_id: str
+    session_id: str | None = None # UUID if existing, None to create
+    session_name: str | None = None # Optional name if creating
+    message: str
+    model: str | None = None
+    context_logs: list[int] | None = None # List of log IDs to include as context
+
+class GetAiSessionsRequest(BaseModel):
+    workspace_id: str
+
+class GetAiMessagesRequest(BaseModel):
+    session_id: str
+
 class App:
     def __init__(self, db_path="loglens.duckdb"):
         self.db = Database(db_path)
         self.parser = DrainParser()
         self.tailers = {}
-        self.ai = AIProvider()
         self.dev_mode = False
+        
+        # Initialize AI Provider from settings
+        settings = self.method_get_settings()
+        self.ai = AIProviderFactory.get_provider(
+            settings.get("ai_provider", "gemini-cli"),
+            api_key=settings.get("ai_api_key", ""),
+            host=settings.get("ai_ollama_host", "http://localhost:11434")
+        )
         
         init_mcp(self)
         self._mcp_thread = None
         self._mcp_server_instance = None
         
         # Auto-start if enabled in settings
-        settings = self.method_get_settings()
         if settings.get("mcp_server_enabled", "false").lower() == "true":
             self._start_mcp_server()
 
@@ -203,6 +224,10 @@ class App:
                 "analyze_cluster": None,
                 "get_settings": None,
                 "update_settings": None,
+                "list_ai_models": None,
+                "send_ai_message": SendAiMessageRequest,
+                "get_ai_sessions": GetAiSessionsRequest,
+                "get_ai_messages": GetAiMessagesRequest,
             }
             
             handler = getattr(self, method_name)
@@ -750,7 +775,100 @@ class App:
                 template = c.get_template()
                 break
                 
-        return self.ai.analyze(template, samples)
+        return self.ai.analyze_logs(template, samples)
+
+    async def method_list_ai_models(self) -> list[str]:
+        """Fetch models available for the current AI provider."""
+        return await self.ai.list_models()
+
+    async def method_send_ai_message(self, **kwargs) -> dict:
+        """Handle multi-turn AI chat investigation session with log context."""
+        params = SendAiMessageRequest(**kwargs)
+        cursor = self.db.get_cursor()
+        
+        import uuid
+        from datetime import datetime
+
+        session_id = params.session_id
+        if not session_id:
+            session_id = str(uuid.uuid4())
+            name = params.session_name or f"Investigation {datetime.now().strftime('%Y-%m-%d %H:%M')}"
+            cursor.execute(
+                "INSERT INTO ai_sessions (session_id, workspace_id, name) VALUES (?, ?, ?)",
+                (session_id, params.workspace_id, name)
+            )
+
+        # 1. Fetch contextual logs if IDs provided
+        log_context = ""
+        if params.context_logs:
+            placeholders = ",".join(["?"] * len(params.context_logs))
+            cursor.execute(
+                f"SELECT raw_text FROM logs WHERE id IN ({placeholders})",
+                params.context_logs
+            )
+            logs = cursor.fetchall()
+            if logs:
+                log_context = "\n\nContextual Log Lines:\n" + "\n".join([l[0] for l in logs])
+
+        # 2. Record User Message
+        cursor.execute(
+            "INSERT INTO ai_messages (session_id, role, content, context_logs) VALUES (?, ?, ?, ?)",
+            (session_id, "user", params.message, json.dumps(params.context_logs or []))
+        )
+
+        # 3. Pull Full History for the LLM
+        cursor.execute(
+            "SELECT role, content FROM ai_messages WHERE session_id = ? ORDER BY timestamp ASC",
+            (session_id,)
+        )
+        history = [AIChatMessage(role=row[0], content=row[1]) for row in cursor.fetchall()]
+        
+        # Inject log context into the prompt if needed (usually in the last user message or as a system prompt modification)
+        if log_context:
+             history[-1].content += log_context
+
+        # 4. Call AI synchronously for simplicity in JSON-RPC (async handled by provider)
+        response_msg = await self.ai.chat(history, model=params.model)
+
+        # 5. Record Assistant Message
+        cursor.execute(
+            "INSERT INTO ai_messages (session_id, role, content) VALUES (?, ?, ?)",
+            (session_id, "assistant", response_msg.content)
+        )
+
+        return {
+            "session_id": session_id,
+            "response": response_msg.content
+        }
+
+    def method_get_ai_sessions(self, workspace_id: str) -> list:
+        """Fetch all investigation sessions for a workspace."""
+        cursor = self.db.get_cursor()
+        cursor.execute(
+            "SELECT session_id, name, created_at, last_modified FROM ai_sessions WHERE workspace_id = ? ORDER BY last_modified DESC",
+            (workspace_id,)
+        )
+        return [
+            {"session_id": row[0], "name": row[1], "created_at": row[2], "last_modified": row[3]} 
+            for row in cursor.fetchall()
+        ]
+
+    def method_get_ai_messages(self, session_id: str) -> list:
+        """Fetch all messages for a specific session."""
+        cursor = self.db.get_cursor()
+        cursor.execute(
+            "SELECT role, content, context_logs, timestamp FROM ai_messages WHERE session_id = ? ORDER BY timestamp ASC",
+            (session_id,)
+        )
+        return [
+            {
+                "role": row[0], 
+                "content": row[1], 
+                "context_logs": json.loads(row[2]) if row[2] else [], 
+                "timestamp": row[3]
+            } 
+            for row in cursor.fetchall()
+        ]
         
     def method_get_settings(self) -> dict:
         cursor = self.db.get_cursor()
@@ -774,12 +892,22 @@ class App:
             else:
                 self._stop_mcp_server()
 
+        # Update persistent settings
         query = (
             "INSERT INTO settings (key, value) VALUES (?, ?) "
             "ON CONFLICT (key) DO UPDATE SET value = excluded.value"
         )
         for k, v in settings.items():
             cursor.execute(query, (k, str(v)))
+
+        # Re-initialize AI Provider if relevant settings changed
+        if any(k in settings for k in ["ai_provider", "ai_api_key", "ai_ollama_host"]):
+            current_settings = self.method_get_settings()
+            self.ai = AIProviderFactory.get_provider(
+                current_settings.get("ai_provider", "gemini-cli"),
+                api_key=current_settings.get("ai_api_key", ""),
+                host=current_settings.get("ai_ollama_host", "http://localhost:11434")
+            )
             
         return {"status": "success"}
 

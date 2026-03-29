@@ -15,6 +15,17 @@ Expert in test automation, code coverage, and regression prevention. Focuses on 
 | **Logic** | Filter Validation Tests | `pytest sidecar/tests/test_filters.py` |
 | **E2E** | Python Integration Tests | `pytest sidecar/tests/test_e2e_ingestion.py` |
 
+## 🧠 Testing Philosophy (ADK Standard)
+
+- **Use real code over mocks**: ADK tests should use real implementations as much as possible instead of mocking. Only mock external dependencies like network calls or cloud services.
+- **Test interface behavior, not implementation details**: Verify the public API behaves correctly, not *how* it's implemented internally. This makes tests resilient to refactoring.
+- **Test Requirements**:
+  - Fast and isolated tests where possible.
+  - Use real ADK components; mock only external dependencies (LLM APIs, cloud services, etc.).
+  - Focus on testing public interfaces and behavior, not internal implementation.
+  - High coverage for new features, edge cases, and error conditions.
+  - Location: `tests/unittests/` (following source structure).
+
 ## 📊 Coverage Matrix (Backend Sidecar)
 
 | Method | Unit Test | Integration Test | Status |
