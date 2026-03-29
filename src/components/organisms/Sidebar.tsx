@@ -132,14 +132,21 @@ export function Sidebar({
                     </button>
                   </div>
                 ) : (
-                  <button
-                    type="button"
+                  <div
+                    role="button"
+                    tabIndex={0}
                     onClick={() => onWorkspaceSelect(ws.id)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        onWorkspaceSelect(ws.id);
+                      }
+                    }}
                     className={cn(
-                      "w-full flex items-center gap-2.5 px-3 py-2 text-[13px] rounded-md transition-colors text-left",
+                      "group w-full flex items-center gap-2.5 px-3 py-2 text-[13px] rounded-md transition-colors text-left cursor-pointer outline-none",
                       activeWorkspaceId === ws.id
                         ? "bg-emerald-500/10 text-emerald-400 font-medium border border-emerald-500/20"
-                        : "text-zinc-400 hover:bg-zinc-800/60 hover:text-zinc-200 border border-transparent",
+                        : "text-zinc-400 hover:bg-zinc-800/60 hover:text-zinc-200 border border-transparent focus-visible:bg-zinc-800/60",
                     )}
                   >
                     <Database
@@ -176,7 +183,7 @@ export function Sidebar({
                         </button>
                       )}
                     </span>
-                  </button>
+                  </div>
                 )}
               </div>
             ))}

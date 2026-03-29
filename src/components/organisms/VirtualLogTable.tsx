@@ -4,16 +4,18 @@ import type { HighlightEntry } from "@/components/molecules/HighlightBuilder";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useInvestigationStore } from "@/store/investigationStore";
+import { useAiStore } from "@/store/aiStore";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import {
   ArrowDown,
   ArrowUp,
   ArrowUpDown,
   ChevronDown,
-  MessageSquarePlus,
   Minus,
   Plus,
   Settings2,
+  Sparkles,
+  StickyNote,
   X,
 } from "lucide-react";
 import { Fragment, useCallback, useEffect, useRef, useState } from "react";
@@ -63,8 +65,16 @@ export function VirtualLogTable({
     y: number;
     field: string;
   } | null>(null);
+  const [lastSelectedId, setLastSelectedId] = useState<number | null>(null);
 
-  const { filters, setFilters } = useInvestigationStore();
+  const { 
+    filters, 
+    setFilters, 
+    selectedLogIds, 
+    toggleLogSelection, 
+    clearSelection,
+    setSelectedLogIds 
+  } = useInvestigationStore();
   const addFilter = (f: any) => setFilters([...filters, f]);
 
   const handleSelection = useCallback(() => {
@@ -180,12 +190,38 @@ export function VirtualLogTable({
     );
   };
 
-  const toggleRow = (id: number) => {
+  const handleToggleView = (id: number) => {
     const row = logs.find((l) => l.id === id);
     if (row && expandedRow !== id) {
       setCommentText(row.comment || "");
     }
     setExpandedRow(expandedRow === id ? null : id);
+  };
+
+  const handleSelectRow = (id: number, event: React.MouseEvent | React.KeyboardEvent) => {
+    const isShift = event.shiftKey;
+    const isMeta = event.metaKey || event.ctrlKey;
+
+    if (isShift && lastSelectedId !== null) {
+      const lastIndex = logs.findIndex((l) => l.id === lastSelectedId);
+      const currentIndex = logs.findIndex((l) => l.id === id);
+      const [start, end] = [Math.min(lastIndex, currentIndex), Math.max(lastIndex, currentIndex)];
+      const rangeIds = logs.slice(start, end + 1).map((l) => l.id);
+      
+      // If meta is pressed, add to existing; otherwise replace
+      const newSelection = isMeta 
+        ? Array.from(new Set([...selectedLogIds, ...rangeIds]))
+        : rangeIds;
+      
+      setSelectedLogIds(newSelection);
+    } else if (isMeta) {
+      toggleLogSelection(id);
+    } else {
+      // Standard click: if already selected, we might want to keep it or toggle it. 
+      // For log analysis, "Toggle" on single click is usually intuitive if there's no checkbox.
+      toggleLogSelection(id);
+    }
+    setLastSelectedId(id);
   };
 
   const renderSortIcon = (field: string) => {
@@ -217,9 +253,26 @@ export function VirtualLogTable({
             position: "relative",
           }}
         >
-          <table className="w-full text-left text-sm whitespace-nowrap table-fixed">
+          <table className="w-full text-left text-sm whitespace-nowrap table-fixed border-separate border-spacing-0">
             <thead className="sticky top-0 bg-bg-surface border-b border-border z-10 text-text-muted text-[10px] font-bold uppercase tracking-widest h-10 select-none">
               <tr>
+                <th 
+                  className="w-[12px] p-0 cursor-pointer hover:bg-white/5 transition-colors group/select-all" 
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (selectedLogIds.length === logs.length) {
+                      clearSelection();
+                    } else {
+                      setSelectedLogIds(logs.map(l => l.id));
+                    }
+                  }}
+                  title={selectedLogIds.length === logs.length ? "Deselect All" : "Select All"}
+                >
+                  <div className={cn(
+                    "w-1 h-4 mx-auto rounded-full transition-all",
+                    selectedLogIds.length === logs.length ? "bg-emerald-500" : "bg-white/10 group-hover/select-all:bg-white/30"
+                  )} />
+                </th>
                 <th className="w-[60px] p-0 text-center" aria-sort={getAriaSort("id")}>
                   <button
                     type="button"
@@ -257,14 +310,10 @@ export function VirtualLogTable({
                     Cluster {renderSortIcon("cluster_id")}
                   </button>
                 </th>
-                <th className="w-[90px] p-0 text-center" aria-sort={getAriaSort("has_comment")}>
-                  <button
-                    type="button"
-                    className="w-full h-10 px-3 flex items-center justify-center gap-1.5 hover:text-text-primary transition-colors focus-visible:bg-primary/5 outline-none"
-                    onClick={() => onSort("has_comment")}
-                  >
-                    Note {renderSortIcon("has_comment")}
-                  </button>
+                <th className="w-[100px] p-0 text-center">
+                  <div className="w-full h-10 px-3 flex items-center justify-center gap-1.5">
+                    Actions
+                  </div>
                 </th>
               </tr>
             </thead>
@@ -284,6 +333,8 @@ export function VirtualLogTable({
                   rowStyle = "bg-debug/2 hover:bg-debug/5 text-debug/80";
                 }
 
+                const isSelected = selectedLogIds.includes(log.id);
+
                 return (
                   <tr
                     key={virtualRow.key}
@@ -293,8 +344,10 @@ export function VirtualLogTable({
                     aria-expanded={isExpanded}
                     aria-controls={isExpanded ? `row-details-${log.id}` : undefined}
                     className={cn(
-                      "group cursor-pointer transition-all border-b border-border/40 outline-none focus-visible:bg-bg-hover focus-visible:ring-1 focus-visible:ring-primary/30",
+                      "group cursor-pointer transition-all border-b border-border/40 outline-none focus-visible:bg-bg-hover focus-visible:ring-1 focus-visible:ring-primary/30 relative",
                       rowStyle,
+                      isSelected && "bg-emerald-500/[0.04] !border-l-emerald-500",
+                      !isSelected && "border-l-transparent",
                       isExpanded && "bg-bg-hover ring-1 ring-primary/20 z-10",
                     )}
                     style={{
@@ -303,15 +356,20 @@ export function VirtualLogTable({
                       left: 0,
                       width: "100%",
                       transform: `translateY(${virtualRow.start}px)`,
+                      borderLeftWidth: "3px",
+                      borderLeftStyle: "solid",
                     }}
-                    onClick={() => toggleRow(log.id)}
+                    onClick={(e) => {
+                       handleSelectRow(log.id, e);
+                    }}
                     onKeyDown={(e) => {
                       if (e.key === "Enter" || e.key === " ") {
                         e.preventDefault();
-                        toggleRow(log.id);
+                        handleSelectRow(log.id, e);
                       }
                     }}
                   >
+                    <td className="w-0 p-0 overflow-hidden" /> {/* Spacer for accent */}
                     <td className="w-[60px] px-3 py-2 text-center text-text-muted/50 select-none group-hover:text-text-secondary align-top font-bold">
                       {log.id}
                     </td>
@@ -356,26 +414,36 @@ export function VirtualLogTable({
                       )}
                     </td>
                     <td
-                      className="w-[90px] px-3 py-2 text-center relative align-top"
-                      data-field="has_comment"
+                      className="w-[100px] px-3 py-2 text-center relative align-top"
                     >
-                      <div className="flex items-center justify-center gap-1.5">
+                      <div className="flex items-center justify-center gap-1" onClick={(e) => e.stopPropagation()}>
                         <IconButton
                           icon={
-                            <MessageSquarePlus
+                            <StickyNote
                               className={cn(
                                 "h-3.5 w-3.5",
                                 log.has_comment && "text-primary fill-primary/20",
                               )}
                             />
                           }
-                          label={log.has_comment ? "View Note" : "Annotate"}
-                          onClick={() => toggleRow(log.id)}
+                          label={log.has_comment ? "View Note" : "Add Note"}
+                          onClick={() => handleToggleView(log.id)}
                           className={cn(
                             "transition-all h-7 w-7 rounded-lg text-text-muted hover:text-primary hover:bg-primary/10",
                             !log.has_comment && "opacity-0 group-hover:opacity-100",
-                            log.has_comment && "opacity-100 text-primary bg-primary/5",
+                            log.has_comment && "opacity-100 text-primary bg-primary/20",
                           )}
+                        />
+                        <IconButton
+                          icon={<Sparkles className="h-3.5 w-3.5" />}
+                          label="AI Analysis"
+                          onClick={() => {
+                            useAiStore.getState().setSidebarOpen(true);
+                            if (!selectedLogIds.includes(log.id)) {
+                               toggleLogSelection(log.id);
+                            }
+                          }}
+                          className="transition-all h-7 w-7 rounded-lg text-text-muted hover:text-violet-400 hover:bg-violet-500/10 opacity-0 group-hover:opacity-100"
                         />
                       </div>
                     </td>
@@ -485,7 +553,36 @@ export function VirtualLogTable({
         )}
       </section>
 
-      {/* Floating Action Pill */}
+      {/* Batch Selection Action Pill */}
+      {selectedLogIds.length > 0 && (
+        <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-[100] animate-in slide-in-from-bottom-4 duration-300">
+          <div className="bg-[#111312] border border-white/10 shadow-2xl rounded-full p-1.5 flex items-center gap-2 backdrop-blur-xl">
+            <span className="pl-4 pr-2 text-xs font-bold text-text-primary">
+              {selectedLogIds.length} lines selected
+            </span>
+            <div className="w-px h-4 bg-white/10" />
+            <Button
+            size="sm"
+            className="rounded-full bg-violet-600 hover:bg-violet-500 text-white shadow-lg animate-in fade-in slide-in-from-bottom-5 duration-300"
+            onClick={() => useAiStore.getState().setSidebarOpen(true)}
+          >
+            <Sparkles className="h-4 w-4 mr-2" />
+            Batch AI Analysis ({selectedLogIds.length})
+          </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="rounded-full h-8 w-8 p-0 text-text-muted hover:text-text-primary hover:bg-white/5"
+              onClick={clearSelection}
+              title="Clear Selection"
+            >
+              <X className="size-4" />
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* Floating Selection Tooltip (for text) */}
       {selectionInfo &&
         createPortal(
           <div

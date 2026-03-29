@@ -13,6 +13,7 @@ export interface SourceState {
   sortBy: string;
   sortOrder: "asc" | "desc";
   timeRange: { start: string; end: string; label?: string };
+  selectedLogIds: number[];
 }
 
 export interface InvestigationStore extends SourceState {
@@ -40,6 +41,9 @@ export interface InvestigationStore extends SourceState {
   setShowDistribution: (v: boolean) => void;
   setShowAnomalies: (v: boolean) => void;
   setTimeRange: (range: { start: string; end: string; label?: string }) => void;
+  setSelectedLogIds: (ids: number[]) => void;
+  toggleLogSelection: (id: number) => void;
+  clearSelection: () => void;
 }
 
 const DEFAULT_SOURCE_STATE: SourceState = {
@@ -52,6 +56,7 @@ const DEFAULT_SOURCE_STATE: SourceState = {
   sortBy: "timestamp",
   sortOrder: "desc",
   timeRange: { start: "", end: "" },
+  selectedLogIds: [],
 };
 
 export const useInvestigationStore = create<InvestigationStore>((set, get) => ({
@@ -78,6 +83,7 @@ export const useInvestigationStore = create<InvestigationStore>((set, get) => ({
       sortBy: get().sortBy,
       sortOrder: get().sortOrder,
       timeRange: get().timeRange,
+      selectedLogIds: get().selectedLogIds,
     };
 
     // 2. Update the sourceStates map
@@ -109,4 +115,12 @@ export const useInvestigationStore = create<InvestigationStore>((set, get) => ({
   setShowDistribution: (showDistribution) => set({ showDistribution }),
   setShowAnomalies: (showAnomalies) => set({ showAnomalies }),
   setTimeRange: (timeRange) => set({ timeRange }),
+  setSelectedLogIds: (selectedLogIds) => set({ selectedLogIds }),
+  toggleLogSelection: (id) =>
+    set((state) => ({
+      selectedLogIds: state.selectedLogIds.includes(id)
+        ? state.selectedLogIds.filter((x) => x !== id)
+        : [...state.selectedLogIds, id],
+    })),
+  clearSelection: () => set({ selectedLogIds: [] }),
 }));

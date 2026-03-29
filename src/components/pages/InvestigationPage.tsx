@@ -1,4 +1,4 @@
-import { type DiagnosticData, DiagnosticSidebar } from "@/components/organisms/DiagnosticSidebar";
+import { AIInvestigationSidebar } from "@/components/organisms/AIInvestigationSidebar";
 import { ImportFeedModal } from "@/components/organisms/ImportFeedModal";
 import { OrchestratorHub } from "@/components/organisms/OrchestratorHub";
 import { VirtualLogTable } from "@/components/organisms/VirtualLogTable";
@@ -86,10 +86,6 @@ export function InvestigationPage() {
   const [isOrchestratorOpen, setIsOrchestratorOpen] = useState(false);
   const [editingFusionId, setEditingFusionId] = useState<string | null>(null);
 
-  // Diagnostic AI state
-  const [diagnosticOpen, setDiagnosticOpen] = useState(false);
-  const [diagnosticData, setDiagnosticData] = useState<DiagnosticData | null>(null);
-  const [diagnosticLoading, setDiagnosticLoading] = useState(false);
   const [editingFusionName, setEditingFusionName] = useState<string | null>(null);
 
   // Anomalies state
@@ -359,32 +355,9 @@ export function InvestigationPage() {
   };
 
   const handleAnalyzeCluster = async (clusterId: string) => {
-    if (!activeWorkspaceId || !clusterId) return;
-
-    setDiagnosticOpen(true);
-    setDiagnosticLoading(true);
-    setDiagnosticData(null);
-
-    // TODO(ANALYSIS-005): Move cluster analysis logic to dedicated analyzer service
-    try {
-      const data = await callSidecar<DiagnosticData>({
-        method: "analyze_cluster",
-        params: {
-          workspace_id: activeWorkspaceId,
-          cluster_id: clusterId,
-        },
-      });
-      setDiagnosticData(data);
-    } catch (e: any) {
-      toast.error(`Analysis failed: ${e.message || "Unknown error"}`);
-      setDiagnosticData({
-        summary: "Analysis failed to complete.",
-        root_cause: e.message || "Unknown error occurred.",
-        recommended_actions: ["Check sidecar connection.", "Verify AI provider configuration."],
-      });
-    } finally {
-      setDiagnosticLoading(false);
-    }
+    // Legacy mapping to new AI Hub
+    toast.info(`Analyzing Cluster ${clusterId} in Investigation Hub...`);
+    // Future: implement specific cluster-to-ai-context logic
   };
 
   // ── Render ────────────────────────────────────────────────────────────────
@@ -438,12 +411,7 @@ export function InvestigationPage() {
         />
       </InvestigationLayout>
 
-      <DiagnosticSidebar
-        open={diagnosticOpen}
-        onClose={() => setDiagnosticOpen(false)}
-        data={diagnosticData}
-        loading={diagnosticLoading}
-      />
+      <AIInvestigationSidebar />
 
       <ImportFeedModal
         open={isImportOpen}

@@ -93,11 +93,11 @@ class Database:
             CREATE TABLE IF NOT EXISTS ai_sessions (
                 session_id   TEXT PRIMARY KEY,
                 workspace_id TEXT,
-                title        TEXT,
+                name         TEXT,
                 provider     TEXT,
                 model        TEXT,
                 created_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                last_modified TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
 
             CREATE TABLE IF NOT EXISTS ai_messages (
@@ -111,6 +111,28 @@ class Database:
         """)
 
         # 3. Migrations for existing databases
+        
+        # Check for AI tables in existing DB and add them if missing
+        # (IF NOT EXISTS in CREATE TABLE already handles this, but some older DuckDB versions 
+        # might need explicit checks if combined in a multi-statement block)
+        
+        # Ensure name column exists in ai_sessions (if it was created with title before)
+        try:
+            cursor.execute("SELECT name FROM ai_sessions LIMIT 1")
+        except Exception:
+            try:
+                cursor.execute("ALTER TABLE ai_sessions RENAME COLUMN title TO name")
+            except Exception:
+                pass # Table might not exist yet or other issue, creation handled above
+        
+        # Ensure last_modified column exists in ai_sessions
+        try:
+            cursor.execute("SELECT last_modified FROM ai_sessions LIMIT 1")
+        except Exception:
+            try:
+                cursor.execute("ALTER TABLE ai_sessions RENAME COLUMN last_updated TO last_modified")
+            except Exception:
+                pass
         
         # Add parser_config column to fusion_configs if missing
         try:

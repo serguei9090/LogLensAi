@@ -17,6 +17,7 @@ dependencies = [
     "pydantic>=2.10.0",
     # MCP Server
     "mcp>=1.26.0",
+    "google-adk>=2.0.0a2",
 ]
 
 [project.optional-dependencies]
