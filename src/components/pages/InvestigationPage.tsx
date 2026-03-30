@@ -85,19 +85,16 @@ export function InvestigationPage() {
   // Orchestrator Hub state
   const [isOrchestratorOpen, setIsOrchestratorOpen] = useState(false);
   const [editingFusionId, setEditingFusionId] = useState<string | null>(null);
-
   const [editingFusionName, setEditingFusionName] = useState<string | null>(null);
 
   // Anomalies state
   const [anomalousClusters, setAnomalousClusters] = useState<Set<string>>(new Set());
 
-  // Memoized non-fusion sources — prevents new array ref on every render
-  // which would cause OrchestratorHub's useEffect to reset form state.
+  // Memoized non-fusion sources
   const nonFusionSources = useMemo(() => sources.filter((s) => s.type !== "fusion"), [sources]);
 
   // ── State Synchronization ──────────────────────────────────────────────────
 
-  // Whenever the active tab/source changes, sync the investigation state (filters/highlights/logs)
   useEffect(() => {
     syncActiveSource(activeSourceId);
   }, [activeSourceId, syncActiveSource]);
@@ -121,15 +118,8 @@ export function InvestigationPage() {
 
         const activeSrc = sources.find((s) => s.id === activeSourceId);
         const isFusion = activeSrc?.type === "fusion";
-
-        const sourceFilter =
-          activeSrc && !isFusion
-            ? [{ field: "source_id", operator: "equals", value: activeSrc.path }]
-            : [];
-
-        const combinedFilters =
-          filters.length > 0 || sourceFilter.length > 0 ? [...sourceFilter, ...filters] : undefined;
-
+        const sourceFilter = activeSrc && !isFusion ? [{ field: "source_id", operator: "equals", value: activeSrc.path }] : [];
+        const combinedFilters = filters.length > 0 || sourceFilter.length > 0 ? [...sourceFilter, ...filters] : undefined;
         const fusionId = isFusion ? activeSrc?.path : undefined;
 
         const result = await callSidecar<{ logs: LogEntry[]; total: number }>({
@@ -172,13 +162,9 @@ export function InvestigationPage() {
     timeRange,
   ]);
 
-  // ── Sort ──────────────────────────────────────────────────────────────────
-
   const handleSort = (field: string) => {
     setSort(field, sortBy === field && sortOrder === "asc" ? "desc" : "asc");
   };
-
-  // ── Import / ingest handlers ──────────────────────────────────────────────
 
   const handleImportLocal = async (path: string, tail: boolean) => {
     const normalizedPath = path.replaceAll("\\", "/");
@@ -217,42 +203,25 @@ export function InvestigationPage() {
         toast.success(`Live monitoring active for ${path}`);
       }
     } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : "Failed to import file.";
-      toast.error(msg, { id: "ingest" });
+      toast.error(e instanceof Error ? e.message : "Failed to import file.", { id: "ingest" });
     }
   };
 
-  const handleImportSSH = async (
-    host: string,
-    port: number,
-    user: string,
-    pass: string,
-    path: string,
-    tail: boolean,
-  ) => {
+  const handleImportSSH = async (host: string, port: number, user: string, pass: string, path: string, tail: boolean) => {
     const connectionPath = `${user}@${host}:${path}`;
     const newSource = addSource(activeWorkspaceId, {
       name: `${host}: ${path.split("/").pop() ?? path}`,
       type: "ssh",
       path: connectionPath,
     });
-
     if (!tail) {
       toast.info("Non-tail SSH import is not yet supported. Enable Live Stream.");
       return;
     }
-
     try {
       await callSidecar({
         method: "start_ssh_tail",
-        params: {
-          host,
-          port,
-          username: user,
-          password: pass,
-          filepath: path,
-          workspace_id: activeWorkspaceId,
-        },
+        params: { host, port, username: user, password: pass, filepath: path, workspace_id: activeWorkspaceId },
       });
       setTailingSourceIds((prev) => new Set(prev).add(newSource.id));
       setTailing(true);
@@ -263,10 +232,7 @@ export function InvestigationPage() {
   };
 
   const handleIngestManual = async (rawText: string) => {
-    const entries = parseManualLogs(rawText).map((e) => ({
-      ...e,
-      workspace_id: activeWorkspaceId,
-    }));
+    const entries = parseManualLogs(rawText).map((e) => ({ ...e, workspace_id: activeWorkspaceId }));
     if (entries.length === 0) {
       toast.warning("Manual buffer is empty or invalid.");
       return;
@@ -275,19 +241,14 @@ export function InvestigationPage() {
       await callSidecar({ method: "ingest_logs", params: { logs: entries } });
       toast.success(`Ingested ${entries.length} log entries.`, { id: "ingest" });
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Manual ingestion failed.", {
-        id: "ingest",
-      });
+      toast.error(error instanceof Error ? error.message : "Manual ingestion failed.", { id: "ingest" });
     }
   };
 
   const handleToggleTail = async (tail: boolean) => {
     try {
       if (!tail) {
-        await callSidecar({
-          method: "stop_tail",
-          params: { filepath: "ALL", workspace_id: activeWorkspaceId },
-        });
+        await callSidecar({ method: "stop_tail", params: { filepath: "ALL", workspace_id: activeWorkspaceId } });
         setTailingSourceIds(new Set());
       }
       setTailing(tail);
@@ -296,23 +257,13 @@ export function InvestigationPage() {
     }
   };
 
-  // ── Source tab handlers ────────────────────────────────────────────────────
-
-  const handleSelectSource = (sourceId: string | null) => {
-    setActiveSource(activeWorkspaceId, sourceId);
-  };
-
+  const handleSelectSource = (sourceId: string | null) => setActiveSource(activeWorkspaceId, sourceId);
   const handleRemoveSource = async (sourceId: string) => {
     const src = sources.find((s) => s.id === sourceId);
     if (src && tailingSourceIds.has(sourceId)) {
       try {
-        await callSidecar({
-          method: "stop_tail",
-          params: { filepath: src.path, workspace_id: activeWorkspaceId },
-        });
-      } catch {
-        /* Ignored */
-      }
+        await callSidecar({ method: "stop_tail", params: { filepath: src.path, workspace_id: activeWorkspaceId } });
+      } catch { /* Ignored */ }
       setTailingSourceIds((prev) => {
         const next = new Set(prev);
         next.delete(sourceId);
@@ -321,8 +272,6 @@ export function InvestigationPage() {
     }
     removeSource(activeWorkspaceId, sourceId);
   };
-
-  // ── Orchestrator Hub handlers ──────────────────────────────────────────────
 
   const handleOrchestrateOpen = () => {
     setEditingFusionId(null);
@@ -333,34 +282,22 @@ export function InvestigationPage() {
   const handleEditFusion = (sourceId: string) => {
     const src = sources.find((s) => s.id === sourceId);
     if (!src) return;
-    setEditingFusionId(src.path); // path stores fusionId for fusion-type sources
+    setEditingFusionId(src.path);
     setEditingFusionName(src.name);
     setIsOrchestratorOpen(true);
   };
 
   const handleFusionSaved = (fusionId: string, fusionName: string) => {
-    // Check if fusion tab already exists — update its name, otherwise add
     const existingSrc = sources.find((s) => s.path === fusionId);
     if (!existingSrc) {
-      const newSrc = addSource(activeWorkspaceId, {
-        name: fusionName,
-        type: "fusion",
-        path: fusionId,
-      });
-      // Auto-switch to the new fusion tab
+      const newSrc = addSource(activeWorkspaceId, { name: fusionName, type: "fusion", path: fusionId });
       setActiveSource(activeWorkspaceId, newSrc.id);
     }
-    // If editing, the name is stored in store.name — updating requires a store action
-    // NOTE(ORK-001): Future implementation will support direct renaming via workspaceStore.updateSource
   };
 
   const handleAnalyzeCluster = async (clusterId: string) => {
-    // Legacy mapping to new AI Hub
     toast.info(`Analyzing Cluster ${clusterId} in Investigation Hub...`);
-    // Future: implement specific cluster-to-ai-context logic
   };
-
-  // ── Render ────────────────────────────────────────────────────────────────
 
   return (
     <>
@@ -384,6 +321,7 @@ export function InvestigationPage() {
         showDistribution={showDistribution}
         onDistributionClose={() => setShowDistribution(!showDistribution)}
         workspaceId={activeWorkspaceId}
+        rightPanel={<AIInvestigationSidebar />}
       >
         <VirtualLogTable
           logs={logs}
@@ -399,19 +337,13 @@ export function InvestigationPage() {
               .then(() => toast.success("Annotation saved"))
               .catch(() => {
                 const originalLog = logs.find((l) => l.id === id);
-                if (originalLog)
-                  updateLog(id, {
-                    comment: originalLog.comment,
-                    has_comment: originalLog.has_comment,
-                  });
+                if (originalLog) updateLog(id, { comment: originalLog.comment, has_comment: originalLog.has_comment });
                 toast.error("Failed to save annotation");
               });
           }}
           onAnalyzeCluster={handleAnalyzeCluster}
         />
       </InvestigationLayout>
-
-      <AIInvestigationSidebar />
 
       <ImportFeedModal
         open={isImportOpen}

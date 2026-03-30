@@ -23,10 +23,12 @@ interface AiStore {
   messages: AiMessage[];
   isLoading: boolean;
   isSidebarOpen: boolean;
+  sidebarWidth: number;
   error: string | null;
 
   // Actions
   setSidebarOpen: (open: boolean) => void;
+  setSidebarWidth: (width: number) => void;
   setSession: (sessionId: string | null) => void;
   fetchSessions: (workspaceId: string) => Promise<void>;
   fetchMessages: (sessionId: string) => Promise<void>;
@@ -46,9 +48,11 @@ export const useAiStore = create<AiStore>((set, get) => ({
   messages: [],
   isLoading: false,
   isSidebarOpen: false,
+  sidebarWidth: 450,
   error: null,
 
   setSidebarOpen: (isSidebarOpen) => set({ isSidebarOpen }),
+  setSidebarWidth: (sidebarWidth) => set({ sidebarWidth }),
 
   setSession: (sessionId) => {
     set({ currentSessionId: sessionId });
