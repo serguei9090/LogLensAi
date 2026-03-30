@@ -6,7 +6,7 @@ import type { ReactNode } from "react";
 interface IconButtonProps {
   icon: ReactNode;
   label: string;
-  onClick: () => void;
+  onClick: (e: React.MouseEvent<HTMLButtonElement>) => void;
   className?: string;
 }
 
@@ -15,7 +15,7 @@ interface IconButtonProps {
  * Uses buttonVariants to ensure visual consistency with other buttons
  * while avoiding DOM nesting errors (button-inside-button).
  */
-export function IconButton({ icon, label, onClick, className }: IconButtonProps) {
+export function IconButton({ icon, label, onClick, className }: Readonly<IconButtonProps>) {
   return (
     <TooltipProvider>
       <Tooltip>

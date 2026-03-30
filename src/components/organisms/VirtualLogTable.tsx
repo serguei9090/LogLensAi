@@ -205,21 +205,26 @@ export function VirtualLogTable({
     if (isShift && lastSelectedId !== null) {
       const lastIndex = logs.findIndex((l) => l.id === lastSelectedId);
       const currentIndex = logs.findIndex((l) => l.id === id);
-      const [start, end] = [Math.min(lastIndex, currentIndex), Math.max(lastIndex, currentIndex)];
-      const rangeIds = logs.slice(start, end + 1).map((l) => l.id);
       
-      // If meta is pressed, add to existing; otherwise replace
-      const newSelection = isMeta 
-        ? Array.from(new Set([...selectedLogIds, ...rangeIds]))
-        : rangeIds;
-      
-      setSelectedLogIds(newSelection);
+      if (lastIndex === -1) {
+        // Fallback if lastSelectedId is no longer in the visible set
+        setSelectedLogIds([id]);
+      } else {
+        const [start, end] = [Math.min(lastIndex, currentIndex), Math.max(lastIndex, currentIndex)];
+        const rangeIds = logs.slice(start, end + 1).map((l) => l.id);
+        
+        // If meta is pressed, add range to existing selection; otherwise replace
+        const newSelection = isMeta 
+          ? Array.from(new Set([...selectedLogIds, ...rangeIds]))
+          : rangeIds;
+        
+        setSelectedLogIds(newSelection);
+      }
     } else if (isMeta) {
       toggleLogSelection(id);
     } else {
-      // Standard click: if already selected, we might want to keep it or toggle it. 
-      // For log analysis, "Toggle" on single click is usually intuitive if there's no checkbox.
-      toggleLogSelection(id);
+      // Standard click: select only this item and clear others
+      setSelectedLogIds([id]);
     }
     setLastSelectedId(id);
   };
@@ -257,21 +262,27 @@ export function VirtualLogTable({
             <thead className="sticky top-0 bg-bg-surface border-b border-border z-10 text-text-muted text-[10px] font-bold uppercase tracking-widest h-10 select-none">
               <tr>
                 <th 
-                  className="w-[12px] p-0 cursor-pointer hover:bg-white/5 transition-colors group/select-all" 
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    if (selectedLogIds.length === logs.length) {
-                      clearSelection();
-                    } else {
-                      setSelectedLogIds(logs.map(l => l.id));
-                    }
-                  }}
+                  className="w-[12px] p-0 transition-colors group/select-all" 
                   title={selectedLogIds.length === logs.length ? "Deselect All" : "Select All"}
                 >
-                  <div className={cn(
-                    "w-1 h-4 mx-auto rounded-full transition-all",
-                    selectedLogIds.length === logs.length ? "bg-emerald-500" : "bg-white/10 group-hover/select-all:bg-white/30"
-                  )} />
+                  <button
+                    type="button"
+                    className="w-full h-10 flex items-center justify-center hover:bg-white/5 outline-none focus-visible:bg-white/10"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (selectedLogIds.length === logs.length) {
+                        clearSelection();
+                      } else {
+                        setSelectedLogIds(logs.map(l => l.id));
+                      }
+                    }}
+                    aria-label={selectedLogIds.length === logs.length ? "Deselect All" : "Select All"}
+                  >
+                    <div className={cn(
+                      "w-1 h-4 rounded-full transition-all",
+                      selectedLogIds.length === logs.length ? "bg-emerald-500" : "bg-white/10 group-hover/select-all:bg-white/30"
+                    )} />
+                  </button>
                 </th>
                 <th className="w-[60px] p-0 text-center" aria-sort={getAriaSort("id")}>
                   <button
@@ -416,7 +427,7 @@ export function VirtualLogTable({
                     <td
                       className="w-[100px] px-3 py-2 text-center relative align-top"
                     >
-                      <div className="flex items-center justify-center gap-1" onClick={(e) => e.stopPropagation()}>
+                      <div className="flex items-center justify-center gap-1">
                         <IconButton
                           icon={
                             <StickyNote
@@ -427,7 +438,10 @@ export function VirtualLogTable({
                             />
                           }
                           label={log.has_comment ? "View Note" : "Add Note"}
-                          onClick={() => handleToggleView(log.id)}
+                          onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
+                            e.stopPropagation();
+                            handleToggleView(log.id);
+                          }}
                           className={cn(
                             "transition-all h-7 w-7 rounded-lg text-text-muted hover:text-primary hover:bg-primary/10",
                             !log.has_comment && "opacity-0 group-hover:opacity-100",
@@ -437,10 +451,11 @@ export function VirtualLogTable({
                         <IconButton
                           icon={<Sparkles className="h-3.5 w-3.5" />}
                           label="AI Analysis"
-                          onClick={() => {
+                          onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
+                            e.stopPropagation();
                             useAiStore.getState().setSidebarOpen(true);
                             if (!selectedLogIds.includes(log.id)) {
-                               toggleLogSelection(log.id);
+                               setSelectedLogIds([log.id]);
                             }
                           }}
                           className="transition-all h-7 w-7 rounded-lg text-text-muted hover:text-violet-400 hover:bg-violet-500/10 opacity-0 group-hover:opacity-100"
