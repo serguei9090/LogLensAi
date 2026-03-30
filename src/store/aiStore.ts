@@ -25,6 +25,7 @@ interface AiStore {
   isSidebarOpen: boolean;
   sidebarWidth: number;
   error: string | null;
+  logSessionMap: Record<number, string>; // log_id -> session_id
 
   // Actions
   setSidebarOpen: (open: boolean) => void;
@@ -32,6 +33,9 @@ interface AiStore {
   setSession: (sessionId: string | null) => void;
   fetchSessions: (workspaceId: string) => Promise<void>;
   fetchMessages: (sessionId: string) => Promise<void>;
+  fetchMapping: (workspaceId: string) => Promise<void>;
+  renameSession: (sessionId: string, name: string, workspaceId: string) => Promise<void>;
+  deleteSession: (sessionId: string, workspaceId: string) => Promise<void>;
   sendMessage: (params: {
     workspace_id: string;
     message: string;
@@ -50,6 +54,7 @@ export const useAiStore = create<AiStore>((set, get) => ({
   isSidebarOpen: false,
   sidebarWidth: 450,
   error: null,
+  logSessionMap: {},
 
   setSidebarOpen: (isSidebarOpen) => set({ isSidebarOpen }),
   setSidebarWidth: (sidebarWidth) => set({ sidebarWidth }),
@@ -75,6 +80,46 @@ export const useAiStore = create<AiStore>((set, get) => ({
     }
   },
 
+  fetchMapping: async (workspaceId) => {
+    try {
+      const logSessionMap = await callSidecar<Record<number, string>>({
+        method: "get_ai_mapping",
+        params: { workspace_id: workspaceId },
+      });
+      set({ logSessionMap });
+    } catch (err) {
+      console.error("Failed to fetch AI mappings:", err);
+    }
+  },
+
+  renameSession: async (sessionId, name, workspaceId) => {
+    try {
+      await callSidecar({
+        method: "rename_ai_session",
+        params: { session_id: sessionId, name },
+      });
+      await get().fetchSessions(workspaceId);
+    } catch (err) {
+      set({ error: (err as Error).message });
+    }
+  },
+
+  deleteSession: async (sessionId, workspaceId) => {
+    try {
+      await callSidecar({
+        method: "delete_ai_session",
+        params: { session_id: sessionId },
+      });
+      if (get().currentSessionId === sessionId) {
+        set({ currentSessionId: null, messages: [] });
+      }
+      await get().fetchSessions(workspaceId);
+      await get().fetchMapping(workspaceId);
+    } catch (err) {
+      set({ error: (err as Error).message });
+    }
+  },
+
   fetchMessages: async (sessionId) => {
     set({ isLoading: true });
     try {
@@ -92,8 +137,6 @@ export const useAiStore = create<AiStore>((set, get) => ({
     const { currentSessionId } = get();
     set({ isLoading: true, error: null });
 
-    // Optimistically add the user message if we have context
-    // (Actual ID will be updated on refetch)
     const tempUserMsg: AiMessage = {
       id: Date.now(),
       session_id: currentSessionId || "temp",
@@ -116,13 +159,12 @@ export const useAiStore = create<AiStore>((set, get) => ({
         },
       });
 
-      // Update session if it's new
       if (!currentSessionId) {
         set({ currentSessionId: result.session_id });
         await get().fetchSessions(params.workspace_id);
       }
 
-      // Final sync of messages from DB to ensure consistency
+      await get().fetchMapping(params.workspace_id);
       await get().fetchMessages(result.session_id);
     } catch (err) {
       set({ error: (err as Error).message, isLoading: false });

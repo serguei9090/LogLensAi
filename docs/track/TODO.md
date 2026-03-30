@@ -49,10 +49,20 @@
 
 - [x] **FIX-UX-002**: Selection Logic Parity (Normalize row selection in `VirtualLogTable`)
 - [x] **FIX-UX-003**: Note Editor Refinement (Remove Raw Data + Hide AI Pill during Note editing)
-  - **Files**: `src/components/organisms/VirtualLogTable.tsx`
-  - **Detail**: `docs/TODOC/FIX-UX-003.md`
-  - **Files**: `src/components/organisms/VirtualLogTable.tsx`
-  - **Detail**: `docs/TODOC/FIX-UX-002.md`
+- [ ] **FIX-AI-001**: AI Persistence & Context Strategy (Commit transactions + Multi-turn history)
+  - **Files**: `sidecar/src/api.py`, `sidecar/src/ai/ai_studio.py`
+  - **Detail**: `docs/TODOC/FIX-AI-001.md`
+- [ ] **FIX-FE-001**: Sidebar Button Nesting & Sync (Fix component recursion + Initial fetch)
+  - **Files**: `src/components/organisms/AIInvestigationSidebar.tsx`, `src/store/aiStore.ts`
+- [ ] **FIX-UX-004**: Context-Aware AI Hub (Highlight session logs + VS Code style history + Renaming)
+  - **Files**: `src/components/organisms/AIInvestigationSidebar.tsx`, `src/components/organisms/VirtualLogTable.tsx`, `sidecar/src/api.py`, `src/store/aiStore.ts`
+  - **Detail**: `docs/TODOC/FIX-UX-004.md`
+- [x] **FIX-UX-005**: Async LLM Provider Stability (Non-blocking CLI execution)
+  - **Files**: `sidecar/src/ai/gemini_cli.py`
+  - **Detail**: `docs/TODOC/FIX-UX-005.md`
+- [x] **FIX-FE-002**: Sidebar Accessibility & Type Safety (Standard native buttons + Readonly props)
+  - **Files**: `src/components/organisms/Sidebar.tsx`, `src/components/organisms/AIInvestigationSidebar.tsx`
+  - **Detail**: `docs/TODOC/FIX-FE-002.md`
 
 ---
 

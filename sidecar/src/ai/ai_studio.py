@@ -49,15 +49,20 @@ class AIStudioProvider(AIProvider):
         # Actually ADK uses the environment variable 'GOOGLE_API_KEY'
         os.environ["GOOGLE_API_KEY"] = self.api_key
         
+        # Reconstruct context for the runner
+        # Since we use InMemorySessionService, we must populate it with history
+        # of the current session before running the new message.
         session_service = InMemorySessionService()
-        runner = Runner(agent=agent, app_name="LogLensAi", session_service=session_service)
-        
-        # Reconstruct context for the runner (ADK keeps its own session history)
-        # For a simple 'chat' call, we might just send the last message if history is in DB
-        # But if we want ADK to handle it, we'd use the same SESSION_ID
-        
         user_id = "default_user"
         session_id = "temp_session"
+
+        # Populate history (all except last message)
+        for msg in messages[:-1]:
+            role = "user" if msg.role == "user" else "model"
+            content = types.Content(role=role, parts=[types.Part(text=msg.content)])
+            await session_service.add_message(user_id, session_id, content)
+
+        runner = Runner(agent=agent, app_name="LogLensAi", session_service=session_service)
         
         last_msg = messages[-1]
         content = types.Content(role="user", parts=[types.Part(text=last_msg.content)])

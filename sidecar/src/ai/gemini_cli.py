@@ -38,7 +38,7 @@ class GeminiCLIProvider(AIProvider):
             try:
                  parsed = json.loads(stdout.decode())
                  content = parsed.get("content", stdout.decode())
-            except:
+            except Exception:
                  content = stdout.decode()
                  
             return AIChatMessage(role="assistant", content=content)
@@ -53,12 +53,17 @@ class GeminiCLIProvider(AIProvider):
         )
         
         try:
-             # Synchronous wait since this is one-off, but keep same interface
-             result = subprocess.run(
-                ["gemini", "-p", prompt, "--json"], 
-                capture_output=True, text=True, timeout=30
+             # Use asyncio for non-blocking execution in async function
+             process = await asyncio.create_subprocess_exec(
+                "gemini", "-p", prompt, "--json",
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE
              )
-             if result.returncode != 0: raise RuntimeError(result.stderr)
-             return json.loads(result.stdout)
+             stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=30)
+             
+             if process.returncode != 0:
+                  raise RuntimeError(stderr.decode())
+                  
+             return json.loads(stdout.decode())
         except Exception as e:
              return {"summary": "Analysis failed", "root_cause": str(e), "recommended_actions": []}

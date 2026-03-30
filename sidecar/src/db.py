@@ -181,6 +181,10 @@ class Database:
         # BUG-001 Fix: Use thread-local cursor for DuckDB thread safety
         return self.conn.cursor()
 
+    def commit(self):
+        """Thread-safe commit for DuckDB write operations."""
+        self.conn.commit()
+
     @classmethod
     def reset(cls):
         with cls._lock:

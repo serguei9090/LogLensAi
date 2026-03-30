@@ -196,7 +196,7 @@ class App:
                 self._mcp_thread.join(timeout=2)
                 self._mcp_thread = None
 
-    def dispatch(self, req: JSONRPCRequest) -> JSONRPCResponse:
+    async def dispatch(self, req: JSONRPCRequest) -> JSONRPCResponse:
         try:
             method_name = f"method_{req.method}"
             if not hasattr(self, method_name):
@@ -228,37 +228,46 @@ class App:
                 "send_ai_message": SendAiMessageRequest,
                 "get_ai_sessions": GetAiSessionsRequest,
                 "get_ai_messages": GetAiMessagesRequest,
+                "rename_ai_session": None,
+                "delete_ai_session": None,
+                "get_ai_mapping": None,
             }
             
             handler = getattr(self, method_name)
             
             # Perform Pydantic validation if a model is defined
             model = models.get(req.method)
+            import inspect
+            
             if model:
                 try:
                     params_model = model(**req.params)
                     # Unroll the model into keyword arguments for the handler
-                    result = handler(**params_model.model_dump())
+                    res = handler(**params_model.model_dump())
+                    if inspect.iscoroutine(res):
+                        result = await res
+                    else:
+                        result = res
                 except ValidationError as ve:
                     return JSONRPCResponse(
                         id=req.id,
                         error={"code": -32602, "message": "Invalid params", "data": ve.errors()}
                     )
             else:
-                # Direct call for unmapped methods (e.g. methods with no params or generic dicts)
-                result = handler(**req.params)
+                # Direct call for unmapped methods
+                res = handler(**req.params)
+                if inspect.iscoroutine(res):
+                    result = await res
+                else:
+                    result = res
 
             return JSONRPCResponse(id=req.id, result=result)
         except Exception as e:
-            # Log server-side errors to stderr for backend debugging
             import traceback
-            error_trace = traceback.format_exc()
-            sys.stderr.write(f"RPC Error in {req.method}: {error_trace}\n")
-            
-            error_data = error_trace if self.dev_mode else str(e)
+            traceback.print_exc()
             return JSONRPCResponse(
                 id=req.id, 
-                error={"code": -32603, "message": "Internal error", "data": error_data}
+                error={"code": -32603, "message": "Internal error", "data": str(e)}
             )
 
     def _parse_filters(self, filters: list[dict]) -> tuple[list[str], list[Any]]:
@@ -538,6 +547,7 @@ class App:
                     parser_config = excluded.parser_config
             """, (params.workspace_id, params.fusion_id, src.source_id, src.enabled, src.tz_offset, src.custom_format, src.parser_config))
         
+        self.db.commit()
         return {"status": "ok"}
 
     def method_get_sample_lines(self, workspace_id: str, source_id: str, limit: int = 10) -> list[str]:
@@ -556,6 +566,7 @@ class App:
             "UPDATE fusion_configs SET parser_config = ? WHERE workspace_id = ? AND source_id = ?",
             (parser_config, workspace_id, source_id)
         )
+        self.db.commit()
         return {"status": "ok"}
 
     def method_get_fusion_config(self, **kwargs) -> dict:
@@ -713,6 +724,7 @@ class App:
                 "INSERT INTO logs (workspace_id, source_id, raw_text, timestamp, level, message, cluster_id) VALUES (?, ?, ?, ?, ?, ?, ?)", 
                 batch_data
             )
+            self.db.commit()
             
         return {"status": "ok", "count": len(batch_data)}
 
@@ -727,6 +739,7 @@ class App:
             WHERE id = ?
         """
         cursor.execute(query, (comment, comment, log_id))
+        self.db.commit()
         return {"status": "success"}
 
     def method_get_workspace_sources(self, workspace_id: str) -> list:
@@ -835,6 +848,14 @@ class App:
             "INSERT INTO ai_messages (session_id, role, content) VALUES (?, ?, ?)",
             (session_id, "assistant", response_msg.content)
         )
+        
+        # 6. Update session last_modified timestamp
+        cursor.execute(
+            "UPDATE ai_sessions SET last_modified = ? WHERE session_id = ?",
+            (datetime.now().strftime("%Y-%m-%d %H:%M:%S"), session_id)
+        )
+        
+        self.db.commit()
 
         return {
             "session_id": session_id,
@@ -869,6 +890,46 @@ class App:
             } 
             for row in cursor.fetchall()
         ]
+
+    def method_rename_ai_session(self, session_id: str, name: str) -> dict:
+        """Update an investigation session name."""
+        from datetime import datetime
+        cursor = self.db.get_cursor()
+        cursor.execute(
+            "UPDATE ai_sessions SET name = ?, last_modified = ? WHERE session_id = ?",
+            (name, datetime.now().strftime("%Y-%m-%d %H:%M:%S"), session_id)
+        )
+        self.db.commit()
+        return {"status": "ok"}
+
+    def method_delete_ai_session(self, session_id: str) -> dict:
+        """Wipe an investigation session and its messages."""
+        cursor = self.db.get_cursor()
+        cursor.execute("DELETE FROM ai_messages WHERE session_id = ?", (session_id,))
+        cursor.execute("DELETE FROM ai_sessions WHERE session_id = ?", (session_id,))
+        self.db.commit()
+        return {"status": "ok"}
+
+    def method_get_ai_mapping(self, workspace_id: str) -> dict:
+        """Return a mapping of { log_id: session_id } for all session-linked logs."""
+        cursor = self.db.get_cursor()
+        cursor.execute("""
+            SELECT m.context_logs, s.session_id 
+            FROM ai_messages m
+            JOIN ai_sessions s ON m.session_id = s.session_id
+            WHERE s.workspace_id = ? AND m.context_logs IS NOT NULL
+        """, (workspace_id,))
+        rows = cursor.fetchall()
+        
+        mapping = {}
+        for row in rows:
+            try:
+                log_ids = json.loads(row[0])
+                for lid in log_ids:
+                    mapping[lid] = row[1]
+            except Exception:
+                continue
+        return mapping
         
     def method_get_settings(self) -> dict:
         cursor = self.db.get_cursor()
@@ -908,14 +969,15 @@ class App:
                 api_key=current_settings.get("ai_api_key", ""),
                 host=current_settings.get("ai_ollama_host", "http://localhost:11434")
             )
-            
+        
+        self.db.commit()
         return {"status": "success"}
 
     async def aiohttp_handler(self, request):
         try:
             body = await request.json()
             req = JSONRPCRequest(**body)
-            res = self.dispatch(req)
+            res = await self.dispatch(req)
             return web.json_response(res.model_dump())
         except ValidationError:
             return web.json_response(
@@ -960,18 +1022,27 @@ def run_http(port=5000):
     server.on_cleanup.append(on_cleanup)
     web.run_app(server, host='127.0.0.1', port=port)
 
-def run_stdio():
+async def run_stdio_async():
     app = App()
     app.dev_mode = False
     
     try:
-        for line in sys.stdin:
+        # Use aioconsole or simple async iterator for stdin
+        import asyncio
+        loop = asyncio.get_event_loop()
+        
+        while True:
+            line = await loop.run_in_executor(None, sys.stdin.readline)
+            if not line:
+                break
+                
             if not line.strip():
                 continue
+                
             try:
                 req_dict = json.loads(line)
                 req = JSONRPCRequest(**req_dict)
-                res = app.dispatch(req)
+                res = await app.dispatch(req)
                 print(json.dumps(res.model_dump()), flush=True)
             except json.JSONDecodeError:
                 print(
@@ -998,6 +1069,10 @@ def run_stdio():
         pass
     finally:
         Database.reset()
+
+def run_stdio():
+    import asyncio
+    asyncio.run(run_stdio_async())
 
 def main():
     if "--dev" in sys.argv:

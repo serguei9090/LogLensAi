@@ -122,9 +122,64 @@ export function Sidebar({
         <ScrollArea className="flex-1">
           <div className="pb-2 space-y-1 px-2">
             <TooltipProvider delay={0}>
-              {workspaces.map((ws) => (
-                <div key={ws.id} className="w-full">
-                  {renamingId === ws.id ? (
+              {workspaces.map((ws) => {
+                const isRenaming = renamingId === ws.id;
+                const WorkspaceItem = (
+                  <button
+                    type="button"
+                    onClick={() => onWorkspaceSelect(ws.id)}
+                    className={cn(
+                      "group w-full flex items-center px-3 py-2.5 text-[13px] rounded-md transition-all text-left outline-none overflow-hidden border-none bg-transparent",
+                      activeWorkspaceId === ws.id
+                        ? "bg-[#22C55E10] text-[#22C55E] font-medium border border-[#22C55E20]"
+                        : "text-[#8FA898] hover:bg-[#1E2520] hover:text-[#E8F5EC]",
+                      sidebarCollapsed && "justify-center"
+                    )}
+                  >
+                    <Database
+                      className={cn(
+                        "h-4 w-4 shrink-0 transition-colors",
+                        activeWorkspaceId === ws.id ? "text-[#22C55E]" : "text-[#4D6057]",
+                      )}
+                    />
+                    {!sidebarCollapsed && (
+                      <span className="flex-1 truncate ml-3 font-medium">
+                        {ws.name}
+                      </span>
+                    )}
+                    {!sidebarCollapsed && (
+                      <div className="hidden group-hover:flex items-center gap-2 shrink-0">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setRenamingId(ws.id);
+                            setRenameValue(ws.name);
+                          }}
+                          className="p-0.5 rounded text-[#4D6057] hover:text-[#22C55E] border-none bg-transparent"
+                        >
+                          <Pencil className="h-3.5 w-3.5" />
+                        </button>
+                        {workspaces.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onWorkspaceDelete?.(ws.id);
+                            }}
+                            className="p-0.5 rounded text-[#EF444490] hover:text-[#EF4444] border-none bg-transparent"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </button>
+                );
+
+                let finalItem = WorkspaceItem;
+                if (isRenaming) {
+                  finalItem = (
                     <div className="px-1 py-1 flex items-center gap-1">
                       <input
                         autoFocus
@@ -136,80 +191,30 @@ export function Sidebar({
                         }}
                         className="flex-1 bg-black/40 border border-[#22C55E30] rounded px-2 py-0.5 text-xs text-[#E8F5EC] outline-none"
                       />
-                      <button type="button" onClick={() => handleConfirmRename(ws.id)} className="text-[#22C55E]">
+                      <button type="button" onClick={() => handleConfirmRename(ws.id)} className="text-[#22C55E] border-none bg-transparent">
                         <Check className="h-3.5 w-3.5" />
                       </button>
                     </div>
-                  ) : (
+                  );
+                } else if (sidebarCollapsed) {
+                  finalItem = (
                     <Tooltip>
                       <TooltipTrigger className="w-full">
-                        <div
-                          role="button"
-                          tabIndex={0}
-                          onClick={() => onWorkspaceSelect(ws.id)}
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter" || e.key === " ") {
-                              e.preventDefault();
-                              onWorkspaceSelect(ws.id);
-                            }
-                          }}
-                          className={cn(
-                            "group w-full flex items-center px-3 py-2.5 text-[13px] rounded-md transition-all text-left cursor-pointer outline-none overflow-hidden",
-                            activeWorkspaceId === ws.id
-                              ? "bg-[#22C55E10] text-[#22C55E] font-medium border border-[#22C55E20]"
-                              : "text-[#8FA898] hover:bg-[#1E2520] hover:text-[#E8F5EC]",
-                            sidebarCollapsed && "justify-center"
-                          )}
-                        >
-                          <Database
-                            className={cn(
-                              "h-4 w-4 shrink-0 transition-colors",
-                              activeWorkspaceId === ws.id ? "text-[#22C55E]" : "text-[#4D6057]",
-                            )}
-                          />
-                          {sidebarCollapsed ? null : (
-                            <span className="flex-1 truncate ml-3 font-medium">
-                              {ws.name}
-                            </span>
-                          )}
-                          {sidebarCollapsed ? null : (
-                            <div className="hidden group-hover:flex items-center gap-2 shrink-0">
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setRenamingId(ws.id);
-                                  setRenameValue(ws.name);
-                                }}
-                                className="p-0.5 rounded text-[#4D6057] hover:text-[#22C55E]"
-                              >
-                                <Pencil className="h-3.5 w-3.5" />
-                              </button>
-                              {workspaces.length > 1 && (
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    onWorkspaceDelete?.(ws.id);
-                                  }}
-                                  className="p-0.5 rounded text-[#EF444490] hover:text-[#EF4444]"
-                                >
-                                  <Trash2 className="h-3.5 w-3.5" />
-                                </button>
-                              )}
-                            </div>
-                          )}
-                        </div>
+                        {WorkspaceItem}
                       </TooltipTrigger>
-                      {sidebarCollapsed && (
-                        <TooltipContent side="right" className="bg-[#1A1F1C] border-[#2A3430] text-[#E8F5EC]">
-                          {ws.name}
-                        </TooltipContent>
-                      )}
+                      <TooltipContent side="right" className="bg-[#1A1F1C] border-[#2A3430] text-[#E8F5EC]">
+                        {ws.name}
+                      </TooltipContent>
                     </Tooltip>
-                  )}
-                </div>
-              ))}
+                  );
+                }
+
+                return (
+                  <div key={ws.id} className="w-full">
+                    {finalItem}
+                  </div>
+                );
+              })}
             </TooltipProvider>
 
             {isAdding && !sidebarCollapsed && (
@@ -291,30 +296,24 @@ interface SidebarNavItemProps {
   className?: string;
 }
 
-function SidebarNavItem({ icon, label, active, collapsed, onClick, disabled, badge, className }: SidebarNavItemProps) {
-  const content = (
-    <div
-      role="button"
-      tabIndex={active ? -1 : 0}
+function SidebarNavItem({ icon, label, active, collapsed, onClick, disabled, badge, className }: Readonly<SidebarNavItemProps>) {
+  const navContent = (
+    <button
+      type="button"
+      disabled={disabled || active}
       onClick={disabled ? undefined : onClick}
-      onKeyDown={(e) => {
-          if ((e.key === "Enter" || e.key === " ") && !disabled && onClick) {
-              e.preventDefault();
-              onClick();
-          }
-      }}
       className={cn(
-        "flex items-center px-3 py-2.5 text-[13px] rounded-md transition-all text-left outline-none overflow-hidden cursor-pointer",
+        "flex items-center px-3 py-2.5 text-[13px] rounded-md transition-all text-left outline-none overflow-hidden border-none bg-transparent w-full",
         active
-          ? "bg-[#22C55E10] text-[#22C55E] font-medium border border-[#22C55E20]"
-          : "text-[#8FA898] hover:bg-[#1E2520] hover:text-[#E8F5EC]",
+          ? "bg-[#22C55E10] text-[#22C55E] font-medium border border-[#22C55E20] cursor-default"
+          : "text-[#8FA898] hover:bg-[#1E2520] hover:text-[#E8F5EC] cursor-pointer",
         disabled && "opacity-40 cursor-not-allowed",
         collapsed ? "justify-center" : "gap-3",
         className
       )}
     >
       <span className="shrink-0">{icon}</span>
-      {collapsed ? null : (
+      {!collapsed && (
         <span className="flex-1 whitespace-nowrap truncate">
           {label}
         </span>
@@ -324,13 +323,13 @@ function SidebarNavItem({ icon, label, active, collapsed, onClick, disabled, bad
           {badge}
         </span>
       )}
-    </div>
+    </button>
   );
 
   if (collapsed) {
     return (
       <Tooltip>
-        <TooltipTrigger className="w-full">{content}</TooltipTrigger>
+        <TooltipTrigger className="w-full">{navContent}</TooltipTrigger>
         <TooltipContent side="right" className="bg-[#1A1F1C] border-[#2A3430] text-[#E8F5EC]">
           {label} {badge && `(${badge})`}
         </TooltipContent>
@@ -338,5 +337,5 @@ function SidebarNavItem({ icon, label, active, collapsed, onClick, disabled, bad
     );
   }
 
-  return content;
+  return navContent;
 }

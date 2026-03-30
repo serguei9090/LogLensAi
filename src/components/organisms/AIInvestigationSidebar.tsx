@@ -13,7 +13,7 @@ import {
   Plus, 
   MessageSquare,
   Clock,
-  ChevronDown,
+  Pencil,
   X
 } from "lucide-react";
 import { useEffect, useRef, useState, useCallback } from "react";
@@ -36,6 +36,8 @@ export function AIInvestigationSidebar() {
     currentSessionId,
     setSession,
     fetchSessions,
+    renameSession,
+    deleteSession,
     sendMessage,
     isLoading 
   } = useAiStore();
@@ -44,13 +46,38 @@ export function AIInvestigationSidebar() {
   const { selectedLogIds, clearSelection } = useInvestigationStore();
   
   const [inputValue, setInputValue] = useState("");
+  const [isEditingTitle, setIsEditingTitle] = useState(false);
+  const [editedTitle, setEditedTitle] = useState("");
+  const [pendingSessionName, setPendingSessionName] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  const generateDefaultName = useCallback(() => {
+    const rand = Math.floor(100000 + Math.random() * 900000);
+    return `LOG-${rand}`;
+  }, []);
+
+  const currentSession = sessions.find(s => s.session_id === currentSessionId);
+  const displayTitle = currentSession?.name || pendingSessionName || "Investigation Hub";
 
   useEffect(() => {
     if (activeWorkspace?.id) {
       fetchSessions(activeWorkspace.id);
     }
   }, [activeWorkspace?.id, fetchSessions]);
+
+  useEffect(() => {
+    if (!currentSessionId && !pendingSessionName) {
+      setPendingSessionName(generateDefaultName());
+    }
+  }, [currentSessionId, pendingSessionName, generateDefaultName]);
+
+  useEffect(() => {
+    if (currentSession) {
+      setEditedTitle(currentSession.name);
+    } else {
+      setEditedTitle(pendingSessionName);
+    }
+  }, [currentSession, pendingSessionName]);
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -69,6 +96,7 @@ export function AIInvestigationSidebar() {
       message,
       context_logs: selectedLogIds,
       model: "gemini-2.0-flash",
+      session_name: currentSessionId ? undefined : pendingSessionName
     });
     
     if (selectedLogIds.length > 0) {
@@ -76,8 +104,21 @@ export function AIInvestigationSidebar() {
     }
   };
 
+  const handleRename = async () => {
+    if (!editedTitle.trim()) return;
+    
+    if (currentSessionId && activeWorkspace?.id) {
+        await renameSession(currentSessionId, editedTitle, activeWorkspace.id);
+    } else {
+        setPendingSessionName(editedTitle);
+    }
+    setIsEditingTitle(false);
+  };
+
   const handleNewSession = () => {
     setSession(null);
+    setPendingSessionName(generateDefaultName());
+    setIsEditingTitle(false);
   };
 
   const isResizing = useRef(false);
@@ -112,58 +153,95 @@ export function AIInvestigationSidebar() {
       style={{ width: `${sidebarWidth}px` }}
     >
       {/* Resize Handle */}
-      <div
+      <button
+        type="button"
+        aria-label="Resize Sidebar"
         onMouseDown={startResizing}
-        className="absolute left-[-2px] top-0 w-[4px] h-full cursor-col-resize hover:bg-emerald-500/50 transition-colors z-[100]"
+        className="absolute left-[-2px] top-0 w-[4px] h-full cursor-col-resize hover:bg-emerald-500/50 transition-colors z-[100] border-none bg-transparent block p-0"
       />
 
       <div className="p-4 border-b border-zinc-800/60 flex items-center justify-between shrink-0 h-[65px]">
-        <div className="flex items-center gap-3">
-          <div className="bg-violet-500/10 p-2 rounded-xl">
+        <div className="flex items-center gap-3 overflow-hidden">
+          <div className="bg-violet-500/10 p-2 rounded-xl shrink-0">
             <Sparkles className="h-4 w-4 text-violet-400" />
           </div>
-          <div>
-            <h2 className="text-sm font-bold text-white leading-tight">Investigation Hub</h2>
+          <div className="min-w-0">
+            {isEditingTitle ? (
+              <input
+                autoFocus
+                className="bg-zinc-900 border border-emerald-500/30 rounded px-2 py-0.5 text-[13px] font-bold text-white focus:outline-none w-full"
+                value={editedTitle}
+                onChange={(e) => setEditedTitle(e.target.value)}
+                onBlur={handleRename}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") handleRename();
+                  if (e.key === "Escape") setIsEditingTitle(false);
+                }}
+              />
+            ) : (
+              <button 
+                type="button"
+                className="flex items-center gap-2 group/title cursor-pointer outline-none focus-visible:ring-1 focus-visible:ring-emerald-500/50 rounded bg-transparent p-0 border-none text-left" 
+                onClick={() => setIsEditingTitle(true)}
+              >
+                <h2 className="text-sm font-bold text-white leading-tight truncate">
+                  {displayTitle}
+                </h2>
+                <Pencil className="h-3 w-3 text-zinc-500 opacity-0 group-hover/title:opacity-100 transition-opacity hover:text-emerald-400" />
+              </button>
+            )}
             <p className="text-[10px] text-zinc-500 uppercase tracking-widest opacity-60 font-medium">
-              Agentic Analysis
+              {currentSessionId ? "Active Session" : "New Investigation"}
             </p>
           </div>
         </div>
-        
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1 shrink-0">
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            className="h-8 w-8 text-zinc-500 hover:text-emerald-400 hover:bg-emerald-500/10"
+            onClick={handleNewSession}
+            title="New Investigation"
+          >
+            <Plus className="h-4 w-4" />
+          </Button>
+
           <DropdownMenu>
-            <DropdownMenuTrigger>
-              <Button variant="ghost" size="sm" className="h-8 gap-2 bg-white/5 border border-white/5 hover:bg-white/10">
-                <Clock className="h-3.5 w-3.5" />
-                <span className="max-w-[100px] truncate text-xs">
-                  {sessions.find(s => s.session_id === currentSessionId)?.name || "History"}
-                </span>
-                <ChevronDown className="h-3 w-3 opacity-50" />
-              </Button>
+            <DropdownMenuTrigger className="inline-flex items-center justify-center p-0 h-8 w-8 rounded-lg text-zinc-500 hover:text-white hover:bg-zinc-800/80 transition-colors">
+              <Clock className="h-3.5 w-3.5" />
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-[240px] bg-[#111312] border-zinc-800/80 p-1">
-              <DropdownMenuItem onClick={handleNewSession} className="gap-2 focus:bg-emerald-500/10 focus:text-emerald-400 py-2">
-                <Plus className="h-4 w-4" /> New Investigation
-              </DropdownMenuItem>
-              <div className="h-px bg-zinc-800/60 my-1" />
-              <ScrollArea className="h-[300px]">
-                 {sessions.length === 0 ? (
-                    <div className="p-4 text-center text-xs text-zinc-500 italic">No sessions yet</div>
-                 ) : (
-                    sessions.map(s => (
-                      <DropdownMenuItem 
-                        key={s.session_id} 
-                        onClick={() => setSession(s.session_id)}
-                        className={cn(
-                          "flex flex-col items-start gap-1 p-3 focus:bg-zinc-800/60 transition-all mb-1",
-                          currentSessionId === s.session_id && "bg-emerald-500/5 border-l-2 border-emerald-500"
-                        )}
-                      >
-                        <span className="font-bold text-xs truncate w-full text-zinc-200">{s.name}</span>
-                        <span className="text-[10px] text-zinc-500">{new Date(s.last_modified).toLocaleString()}</span>
-                      </DropdownMenuItem>
-                    ))
-                 )}
+            <DropdownMenuContent align="end" className="w-[280px] bg-[#111312] border-zinc-800/80 p-1">
+              <ScrollArea className="h-[400px]">
+                 <div className="p-2">
+                    <h3 className="text-[10px] uppercase tracking-widest text-zinc-500 font-bold mb-2 pl-2">Investigation History</h3>
+                    {sessions.length === 0 ? (
+                        <div className="p-4 text-center text-xs text-zinc-500 italic">No sessions yet</div>
+                    ) : (
+                        sessions.map(s => (
+                          <div key={s.session_id} className="relative group">
+                            <DropdownMenuItem 
+                              onClick={() => setSession(s.session_id)}
+                              className={cn(
+                                "flex flex-col items-start gap-1 p-3 focus:bg-zinc-800/60 transition-all mb-1 rounded-xl",
+                                currentSessionId === s.session_id && "bg-emerald-500/5 border-l-2 border-emerald-500"
+                              )}
+                            >
+                              <span className="font-bold text-xs truncate w-full text-zinc-200">{s.name}</span>
+                              <span className="text-[10px] text-zinc-500">{new Date(s.last_modified).toLocaleString()}</span>
+                            </DropdownMenuItem>
+                            <button
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    if (activeWorkspace?.id) deleteSession(s.session_id, activeWorkspace.id);
+                                }}
+                                className="absolute top-3 right-2 opacity-0 group-hover:opacity-100 p-1.5 hover:bg-red-500/20 rounded-lg transition-all"
+                            >
+                                <Trash2 className="h-3 w-3 text-red-500" />
+                            </button>
+                          </div>
+                        ))
+                    )}
+                 </div>
               </ScrollArea>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -182,16 +260,43 @@ export function AIInvestigationSidebar() {
       <ScrollArea className="flex-1">
         <div className="p-6 space-y-8">
           {messages.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-20 text-center space-y-4">
-              <div className="w-16 h-16 bg-emerald-500/5 rounded-full flex items-center justify-center text-emerald-500/20 border border-emerald-500/10">
-                <MessageSquare className="size-8" />
+            <div className="space-y-12">
+              <div className="flex flex-col items-center justify-center pt-10 text-center space-y-4">
+                <div className="w-16 h-16 bg-emerald-500/5 rounded-full flex items-center justify-center text-emerald-500/20 border border-emerald-500/10">
+                  <MessageSquare className="size-8" />
+                </div>
+                <div>
+                  <h4 className="font-bold text-sm text-zinc-100">AI Investigator Ready</h4>
+                  <p className="text-xs text-zinc-500 mt-2 px-10 leading-relaxed max-w-sm mx-auto">
+                    Select logs to start a context-aware analysis or resume a previous investigation.
+                  </p>
+                </div>
               </div>
-              <div>
-                <h4 className="font-bold text-sm text-zinc-100">AI Investigator Ready</h4>
-                <p className="text-xs text-zinc-500 mt-2 px-10 leading-relaxed">
-                  Analyze your logs, find anomalies, or reconstruct error traces with ADK agents.
-                </p>
-              </div>
+
+              {sessions.length > 0 && (
+                <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-700">
+                  <div className="flex items-center justify-between px-1">
+                    <h3 className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Recent Investigations</h3>
+                  </div>
+                  <div className="grid grid-cols-1 gap-2">
+                    {sessions.slice(0, 4).map(s => (
+                      <button
+                        key={s.session_id}
+                        onClick={() => setSession(s.session_id)}
+                        className="flex flex-col items-start p-4 text-left bg-zinc-900/40 border border-zinc-800/60 rounded-2xl hover:border-emerald-500/30 hover:bg-emerald-500/[0.02] transition-all group"
+                      >
+                         <span className="text-xs font-bold text-zinc-200 group-hover:text-emerald-400 transition-colors mb-1 truncate w-full">{s.name}</span>
+                         <div className="flex items-center gap-2 text-[10px] text-zinc-500">
+                            <Clock className="w-3 h-3" />
+                            <span>{new Date(s.last_modified).toLocaleDateString()}</span>
+                            <span>•</span>
+                            <span>Investigation</span>
+                         </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           ) : (
             messages.map((m) => (
@@ -305,9 +410,24 @@ export function AIInvestigationSidebar() {
   );
 }
 
-function IconButton({ icon, label, onClick, className }: { readonly icon: any, readonly label: string, readonly onClick: () => void, readonly className?: string }) {
+function IconButton({ 
+  icon, 
+  label, 
+  onClick, 
+  className 
+}: { 
+  readonly icon: React.ReactNode, 
+  readonly label: string, 
+  readonly onClick: () => void, 
+  readonly className?: string 
+}) {
   return (
-    <button type="button" className={cn("inline-flex items-center justify-center rounded-lg hover:bg-zinc-800/80 transition-colors h-8 w-8", className)} onClick={onClick} title={label}>
+    <button 
+      type="button" 
+      className={cn("inline-flex items-center justify-center rounded-lg hover:bg-zinc-800/80 transition-colors h-8 w-8", className)} 
+      onClick={onClick} 
+      title={label}
+    >
       {icon}
     </button>
   );
