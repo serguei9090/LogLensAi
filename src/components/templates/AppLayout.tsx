@@ -4,20 +4,23 @@ import type { Workspace } from "@/store/workspaceStore";
 import type { ReactNode } from "react";
 
 interface AppLayoutProps {
-  workspaces: Workspace[];
-  activeWorkspaceId: string;
-  onWorkspaceSelect: (id: string) => void;
-  onWorkspaceCreate: (name: string) => void;
-  onWorkspaceRename?: (id: string, name: string) => void;
-  onWorkspaceDelete?: (id: string) => void;
-  activeNav: "investigation" | "settings";
-  onNavSelect: (nav: "investigation" | "settings") => void;
-  children: ReactNode;
-  diagnosticOpen: boolean;
-  onDiagnosticClose: () => void;
-  diagnosticData: DiagnosticData | null;
-  diagnosticLoading: boolean;
+  readonly workspaces: readonly Workspace[];
+  readonly activeWorkspaceId: string;
+  readonly onWorkspaceSelect: (id: string) => void;
+  readonly onWorkspaceCreate: (name: string) => void;
+  readonly onWorkspaceRename?: (id: string, name: string) => void;
+  readonly onWorkspaceDelete?: (id: string) => void;
+  readonly activeNav: "investigation" | "settings";
+  readonly onNavSelect: (nav: "investigation" | "settings") => void;
+  readonly children: ReactNode;
+  readonly diagnosticOpen: boolean;
+  readonly onDiagnosticClose: () => void;
+  readonly diagnosticData: DiagnosticData | null;
+  readonly diagnosticLoading: boolean;
 }
+
+import { useUIStore } from "@/store/uiStore";
+import { useEffect } from "react";
 
 export function AppLayout({
   workspaces,
@@ -34,8 +37,22 @@ export function AppLayout({
   diagnosticData,
   diagnosticLoading,
 }: AppLayoutProps) {
+  const { toggleSidebar } = useUIStore();
+
+  // Keyboard shortcut: Ctrl + \
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.ctrlKey && e.key === "\\") {
+        e.preventDefault();
+        toggleSidebar();
+      }
+    };
+    globalThis.addEventListener("keydown", handleKeyDown);
+    return () => globalThis.removeEventListener("keydown", handleKeyDown);
+  }, [toggleSidebar]);
+
   return (
-    <div className="flex h-screen w-full bg-bg-base overflow-hidden relative">
+    <div className="flex h-screen w-full bg-[#0a0c0b] overflow-hidden relative font-sans">
       <Sidebar
         workspaces={workspaces}
         activeWorkspaceId={activeWorkspaceId}
@@ -46,7 +63,9 @@ export function AppLayout({
         activeNav={activeNav}
         onNavSelect={onNavSelect}
       />
-      <main className="flex-1 flex flex-col min-w-0 relative h-full">{children}</main>
+      <main className="flex-1 flex flex-col min-w-0 relative h-full bg-[#0d0f0e]">
+        {children}
+      </main>
       <DiagnosticSidebar
         open={diagnosticOpen}
         onClose={onDiagnosticClose}

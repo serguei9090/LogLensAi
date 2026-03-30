@@ -128,6 +128,18 @@
 
 ---
 
+## 🎨 Sprint 07 — UI/UX Refinement (Planning)
+
+### P1 — General Ergonomics
+- [x] **UX-001**: Sidebar Collapse Functionality
+  - [x] State management for `isCollapsed`
+  - [x] Header/Logo refactor for collapsed view
+  - [x] Mini workspace icons with tooltips
+  - [x] Bottom navigation collapse
+  - Detail: `docs/TODOC/UX-001.md`
+
+---
+
 ## ⚪ Backlog (Future Sprints)
 
 - [ ] **DASH-001**: Dashboard page (placeholder nav item)

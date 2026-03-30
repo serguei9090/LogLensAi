@@ -1,14 +1,19 @@
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
+import { useUIStore } from "@/store/uiStore";
+import { motion } from "framer-motion";
 import {
   Check,
   Database,
   LayoutDashboard,
+  PanelLeftClose,
+  PanelLeftOpen,
   Plus,
   Settings,
   Terminal,
   Trash2,
+  Pencil,
   X,
 } from "lucide-react";
 import { useRef, useState } from "react";
@@ -36,6 +41,7 @@ export function Sidebar({
   activeNav,
   onNavSelect,
 }: SidebarProps) {
+  const { sidebarCollapsed, toggleSidebar } = useUIStore();
   const [isAdding, setIsAdding] = useState(false);
   const [newName, setNewName] = useState("");
   const [renamingId, setRenamingId] = useState<string | null>(null);
@@ -60,11 +66,6 @@ export function Sidebar({
     setNewName("");
   };
 
-  const handleStartRename = (id: string, currentName: string) => {
-    setRenamingId(id);
-    setRenameValue(currentName);
-  };
-
   const handleConfirmRename = (id: string) => {
     if (renameValue.trim() && onWorkspaceRename) {
       onWorkspaceRename(id, renameValue.trim());
@@ -73,200 +74,269 @@ export function Sidebar({
   };
 
   return (
-    <div className="w-60 h-screen bg-[#0a0c0b] border-r border-zinc-800/60 flex flex-col select-none">
-      {/* Logo */}
-      <div className="px-4 py-4 border-b border-zinc-800/60 flex items-center gap-3">
-        <div className="bg-emerald-500/10 border border-emerald-500/20 p-1.5 rounded-lg">
-          <Terminal className="h-4 w-4 text-emerald-400" />
+    <motion.div
+      initial={false}
+      animate={{ width: sidebarCollapsed ? 60 : 240 }}
+      transition={{ type: "spring", stiffness: 400, damping: 40 }}
+      className="h-screen bg-[#0a0c0b] border-r border-[#1D2420] flex flex-col select-none overflow-hidden relative"
+    >
+      {/* Logo Section */}
+      <div className="h-16 border-b border-[#1D2420] flex items-center px-4 shrink-0 overflow-hidden">
+        <div className="bg-[#22C55E10] border border-[#22C55E20] p-1.5 rounded-lg shrink-0 flex items-center justify-center">
+          <Terminal className="h-5 w-5 text-[#22C55E]" />
         </div>
-        <h1 className="font-bold text-[15px] tracking-tight text-zinc-100">
-          LogLens<span className="text-emerald-400">Ai</span>
-        </h1>
+        {!sidebarCollapsed && (
+          <motion.h1
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="ml-3 font-bold text-[15px] tracking-tight text-[#E8F5EC] whitespace-nowrap"
+          >
+            LogLens<span className="text-[#22C55E]">Ai</span>
+          </motion.h1>
+        )}
       </div>
 
-      {/* Workspaces section */}
       <div className="flex-1 flex flex-col min-h-0">
-        <div className="px-4 pt-4 pb-2 flex justify-between items-center">
-          <span className="text-[10px] font-semibold uppercase tracking-widest text-zinc-500">
-            Workspaces
-          </span>
-          <button
-            type="button"
-            onClick={handleStartAdd}
-            aria-label="Add Workspace"
-            className="h-5 w-5 rounded flex items-center justify-center text-zinc-500 hover:text-emerald-400 hover:bg-emerald-500/10 transition-colors"
-          >
-            <Plus className="h-3.5 w-3.5" />
-          </button>
+        <div className={cn(
+          "pt-5 pb-2 flex items-center transition-all overflow-hidden px-4",
+          sidebarCollapsed && "justify-center px-0"
+        )}>
+          {sidebarCollapsed ? (
+             <div className="h-px w-5 bg-[#1D2420]" />
+          ) : (
+            <>
+              <span className="text-[10px] font-semibold uppercase tracking-widest text-[#4D6057] whitespace-nowrap">
+                Workspaces
+              </span>
+              <button
+                type="button"
+                onClick={handleStartAdd}
+                className="text-[#4D6057] hover:text-[#22C55E] transition-colors"
+              >
+                <Plus className="h-3.5 w-3.5" />
+              </button>
+            </>
+          )}
         </div>
 
         <ScrollArea className="flex-1">
-          <div className="px-2 pb-2 space-y-0.5">
-            {workspaces.map((ws) => (
-              <div key={ws.id} className="group relative">
-                {renamingId === ws.id ? (
-                  <div className="flex items-center gap-1 px-2 py-1">
-                    <input
-                      autoFocus
-                      value={renameValue}
-                      onChange={(e) => setRenameValue(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") handleConfirmRename(ws.id);
-                        if (e.key === "Escape") setRenamingId(null);
-                      }}
-                      className="flex-1 bg-zinc-800 border border-emerald-500/30 rounded px-2 py-0.5 text-xs text-zinc-100 outline-none"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => handleConfirmRename(ws.id)}
-                      className="text-emerald-400 hover:text-emerald-300"
-                    >
-                      <Check className="h-3.5 w-3.5" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setRenamingId(null)}
-                      className="text-zinc-500 hover:text-zinc-300"
-                    >
-                      <X className="h-3.5 w-3.5" />
-                    </button>
-                  </div>
-                ) : (
-                  <div
-                    role="button"
-                    tabIndex={0}
-                    onClick={() => onWorkspaceSelect(ws.id)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" || e.key === " ") {
-                        e.preventDefault();
-                        onWorkspaceSelect(ws.id);
-                      }
-                    }}
-                    className={cn(
-                      "group w-full flex items-center gap-2.5 px-3 py-2 text-[13px] rounded-md transition-colors text-left cursor-pointer outline-none",
-                      activeWorkspaceId === ws.id
-                        ? "bg-emerald-500/10 text-emerald-400 font-medium border border-emerald-500/20"
-                        : "text-zinc-400 hover:bg-zinc-800/60 hover:text-zinc-200 border border-transparent focus-visible:bg-zinc-800/60",
-                    )}
-                  >
-                    <Database
-                      className={cn(
-                        "h-3.5 w-3.5 shrink-0",
-                        activeWorkspaceId === ws.id ? "text-emerald-400" : "text-zinc-600",
-                      )}
-                    />
-                    <span className="flex-1 truncate">{ws.name}</span>
-                    {/* Action icons on hover */}
-                    <span className="hidden group-hover:flex items-center gap-1 shrink-0">
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleStartRename(ws.id, ws.name);
+          <div className="pb-2 space-y-1 px-2">
+            <TooltipProvider delay={0}>
+              {workspaces.map((ws) => (
+                <div key={ws.id} className="w-full">
+                  {renamingId === ws.id ? (
+                    <div className="px-1 py-1 flex items-center gap-1">
+                      <input
+                        autoFocus
+                        value={renameValue}
+                        onChange={(e) => setRenameValue(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") handleConfirmRename(ws.id);
+                          if (e.key === "Escape") setRenamingId(null);
                         }}
-                        className="p-0.5 rounded text-zinc-500 hover:text-zinc-200 hover:bg-zinc-700 transition-colors text-[10px] outline-none focus-visible:ring-1 focus-visible:ring-emerald-500/50"
-                        aria-label="Rename"
-                      >
-                        ✏
+                        className="flex-1 bg-black/40 border border-[#22C55E30] rounded px-2 py-0.5 text-xs text-[#E8F5EC] outline-none"
+                      />
+                      <button type="button" onClick={() => handleConfirmRename(ws.id)} className="text-[#22C55E]">
+                        <Check className="h-3.5 w-3.5" />
                       </button>
-                      {workspaces.length > 1 && (
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onWorkspaceDelete?.(ws.id);
+                    </div>
+                  ) : (
+                    <Tooltip>
+                      <TooltipTrigger className="w-full">
+                        <div
+                          role="button"
+                          tabIndex={0}
+                          onClick={() => onWorkspaceSelect(ws.id)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" || e.key === " ") {
+                              e.preventDefault();
+                              onWorkspaceSelect(ws.id);
+                            }
                           }}
-                          className="p-0.5 rounded text-zinc-500 hover:text-red-400 hover:bg-red-500/10 transition-colors outline-none focus-visible:ring-1 focus-visible:ring-red-500/50"
-                          aria-label="Delete"
+                          className={cn(
+                            "group w-full flex items-center px-3 py-2.5 text-[13px] rounded-md transition-all text-left cursor-pointer outline-none overflow-hidden",
+                            activeWorkspaceId === ws.id
+                              ? "bg-[#22C55E10] text-[#22C55E] font-medium border border-[#22C55E20]"
+                              : "text-[#8FA898] hover:bg-[#1E2520] hover:text-[#E8F5EC]",
+                            sidebarCollapsed && "justify-center"
+                          )}
                         >
-                          <Trash2 className="h-3 w-3" />
-                        </button>
+                          <Database
+                            className={cn(
+                              "h-4 w-4 shrink-0 transition-colors",
+                              activeWorkspaceId === ws.id ? "text-[#22C55E]" : "text-[#4D6057]",
+                            )}
+                          />
+                          {sidebarCollapsed ? null : (
+                            <span className="flex-1 truncate ml-3 font-medium">
+                              {ws.name}
+                            </span>
+                          )}
+                          {sidebarCollapsed ? null : (
+                            <div className="hidden group-hover:flex items-center gap-2 shrink-0">
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setRenamingId(ws.id);
+                                  setRenameValue(ws.name);
+                                }}
+                                className="p-0.5 rounded text-[#4D6057] hover:text-[#22C55E]"
+                              >
+                                <Pencil className="h-3.5 w-3.5" />
+                              </button>
+                              {workspaces.length > 1 && (
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    onWorkspaceDelete?.(ws.id);
+                                  }}
+                                  className="p-0.5 rounded text-[#EF444490] hover:text-[#EF4444]"
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </button>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      </TooltipTrigger>
+                      {sidebarCollapsed && (
+                        <TooltipContent side="right" className="bg-[#1A1F1C] border-[#2A3430] text-[#E8F5EC]">
+                          {ws.name}
+                        </TooltipContent>
                       )}
-                    </span>
-                  </div>
-                )}
-              </div>
-            ))}
+                    </Tooltip>
+                  )}
+                </div>
+              ))}
+            </TooltipProvider>
 
-            {/* Inline add workspace input */}
-            {isAdding && (
-              <div className="flex items-center gap-1 px-2 py-1">
+            {isAdding && !sidebarCollapsed && (
+              <div className="px-2 pt-1 flex items-center gap-1">
                 <input
                   ref={inputRef}
                   value={newName}
                   onChange={(e) => setNewName(e.target.value)}
-                  placeholder="Workspace name..."
+                  placeholder="Workspace..."
                   onKeyDown={(e) => {
                     if (e.key === "Enter") handleConfirmAdd();
                     if (e.key === "Escape") handleCancelAdd();
                   }}
-                  className="flex-1 bg-zinc-800 border border-emerald-500/30 rounded px-2 py-1 text-xs text-zinc-100 placeholder:text-zinc-600 outline-none focus:border-emerald-400"
+                  className="w-full bg-black/40 border border-[#22C55E30] rounded px-2 py-1 text-xs text-[#E8F5EC] outline-none"
                 />
-                <button
-                  type="button"
-                  onClick={handleConfirmAdd}
-                  className="text-emerald-400 hover:text-emerald-300"
-                >
-                  <Check className="h-3.5 w-3.5" />
+                <button type="button" onClick={handleConfirmAdd} className="text-[#22C55E]">
+                   <Check className="h-3.5 w-3.5" />
                 </button>
-                <button
-                  type="button"
-                  onClick={handleCancelAdd}
-                  className="text-zinc-500 hover:text-zinc-300"
-                >
-                  <X className="h-3.5 w-3.5" />
+                <button type="button" onClick={handleCancelAdd} className="text-[#4D6057]">
+                   <X className="h-3.5 w-3.5" />
                 </button>
               </div>
             )}
           </div>
         </ScrollArea>
 
-        {/* Bottom Nav */}
-        <div className="px-2 pt-2 pb-4 border-t border-zinc-800/60 space-y-0.5 mt-auto">
-          <button
-            type="button"
-            onClick={() => onNavSelect("investigation")}
-            className={cn(
-              "w-full flex items-center gap-3 px-3 py-2.5 text-[13px] rounded-md transition-colors text-left",
-              activeNav === "investigation"
-                ? "bg-emerald-500/10 text-emerald-400 font-medium border border-emerald-500/20"
-                : "text-zinc-500 hover:bg-zinc-800/60 hover:text-zinc-200 border border-transparent",
-            )}
-          >
-            <Terminal className="h-4 w-4" />
-            Investigation
-          </button>
+        <div className="mt-auto border-t border-[#1D2420] bg-[#0a0c0b] px-2 py-4 space-y-1 overflow-hidden shrink-0">
+          <TooltipProvider delay={0}>
+            <SidebarNavItem
+              icon={<Terminal className="h-4 w-4" />}
+              label="Investigation"
+              active={activeNav === "investigation"}
+              collapsed={sidebarCollapsed}
+              onClick={() => onNavSelect("investigation")}
+            />
 
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger>
-                <div className="w-full flex items-center gap-3 px-3 py-2.5 text-[13px] rounded-md text-zinc-700 cursor-not-allowed border border-transparent">
-                  <LayoutDashboard className="h-4 w-4" />
-                  Dashboard
-                  <span className="ml-auto text-[9px] bg-zinc-800 text-zinc-600 rounded px-1.5 py-0.5 font-medium tracking-wide">
-                    SOON
-                  </span>
-                </div>
-              </TooltipTrigger>
-              <TooltipContent side="right">Coming Soon</TooltipContent>
-            </Tooltip>
+            <SidebarNavItem
+              icon={<LayoutDashboard className="h-4 w-4" />}
+              label="Dashboard"
+              active={false}
+              collapsed={sidebarCollapsed}
+              disabled
+              badge="SOON"
+            />
+
+            <SidebarNavItem
+              icon={<Settings className="h-4 w-4" />}
+              label="Settings"
+              active={activeNav === "settings"}
+              collapsed={sidebarCollapsed}
+              onClick={() => onNavSelect("settings")}
+            />
+
+            <div className="pt-2 border-t border-[#1D2420]/40 mt-1">
+              <SidebarNavItem
+                icon={sidebarCollapsed ? <PanelLeftOpen className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
+                label={sidebarCollapsed ? "Expand Sidebar" : "Collapse Sidebar"}
+                active={false}
+                collapsed={sidebarCollapsed}
+                onClick={toggleSidebar}
+                className="opacity-50 hover:opacity-100"
+              />
+            </div>
           </TooltipProvider>
-
-          <button
-            type="button"
-            onClick={() => onNavSelect("settings")}
-            className={cn(
-              "w-full flex items-center gap-3 px-3 py-2.5 text-[13px] rounded-md transition-colors text-left",
-              activeNav === "settings"
-                ? "bg-emerald-500/10 text-emerald-400 font-medium border border-emerald-500/20"
-                : "text-zinc-500 hover:bg-zinc-800/60 hover:text-zinc-200 border border-transparent",
-            )}
-          >
-            <Settings className="h-4 w-4" />
-            Settings
-          </button>
         </div>
       </div>
+    </motion.div>
+  );
+}
+
+interface SidebarNavItemProps {
+  icon: React.ReactNode;
+  label: string;
+  active: boolean;
+  collapsed: boolean;
+  onClick?: () => void;
+  disabled?: boolean;
+  badge?: string;
+  className?: string;
+}
+
+function SidebarNavItem({ icon, label, active, collapsed, onClick, disabled, badge, className }: SidebarNavItemProps) {
+  const content = (
+    <div
+      role="button"
+      tabIndex={active ? -1 : 0}
+      onClick={disabled ? undefined : onClick}
+      onKeyDown={(e) => {
+          if ((e.key === "Enter" || e.key === " ") && !disabled && onClick) {
+              e.preventDefault();
+              onClick();
+          }
+      }}
+      className={cn(
+        "flex items-center px-3 py-2.5 text-[13px] rounded-md transition-all text-left outline-none overflow-hidden cursor-pointer",
+        active
+          ? "bg-[#22C55E10] text-[#22C55E] font-medium border border-[#22C55E20]"
+          : "text-[#8FA898] hover:bg-[#1E2520] hover:text-[#E8F5EC]",
+        disabled && "opacity-40 cursor-not-allowed",
+        collapsed ? "justify-center" : "gap-3",
+        className
+      )}
+    >
+      <span className="shrink-0">{icon}</span>
+      {collapsed ? null : (
+        <span className="flex-1 whitespace-nowrap truncate">
+          {label}
+        </span>
+      )}
+      {!collapsed && badge && (
+        <span className="ml-auto text-[8px] bg-[#1A1F1C] text-[#4D6057] border border-[#2A3430] px-1 rounded">
+          {badge}
+        </span>
+      )}
     </div>
   );
+
+  if (collapsed) {
+    return (
+      <Tooltip>
+        <TooltipTrigger className="w-full">{content}</TooltipTrigger>
+        <TooltipContent side="right" className="bg-[#1A1F1C] border-[#2A3430] text-[#E8F5EC]">
+          {label} {badge && `(${badge})`}
+        </TooltipContent>
+      </Tooltip>
+    );
+  }
+
+  return content;
 }

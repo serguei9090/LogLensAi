@@ -132,6 +132,7 @@ When running `/startcycle`, Jules orchestrates work based on `docs/track/TODO.md
 | Role | Responsibility | Primary Files |
 |---|---|---|
 | **@pm** | Roadmap & Logic Specs | `docs/track/TODO.md`, `docs/TODOC/*.md` |
+| **@critique** | Investigative Root Cause & Solution Review | `docs/track/LessonsLearned.md`, All codebase |
 | **@architect** | API Contract & Standards | `docs/API_SPEC.md`, `sidecar/src/api.py` (models) |
 | **@backend** | Sidecar, DB, & Logic | `sidecar/src/*.py` |
 | **@frontend** | UI, Layout, & State | `src/components/*`, `src/store/*`, `src/styles/` |
