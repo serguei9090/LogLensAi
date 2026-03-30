@@ -10,7 +10,6 @@ import {
   ArrowDown,
   ArrowUp,
   ArrowUpDown,
-  ChevronDown,
   Minus,
   Plus,
   Settings2,
@@ -472,25 +471,24 @@ export function VirtualLogTable({
         {expandedRow !== null && (
           <div
             id={`row-details-${expandedRow}`}
-            className="sticky bottom-0 left-0 w-full bg-bg-surface border-t border-border p-6 shadow-2xl z-20 animate-in slide-in-from-bottom duration-300 backdrop-blur-md bg-white/5 max-h-[500px] overflow-y-auto"
-            data-field="raw_text"
+            className="sticky bottom-0 left-0 w-full bg-[#111312]/95 border-t border-white/10 p-6 shadow-2xl z-20 animate-in slide-in-from-bottom duration-300 backdrop-blur-xl max-h-[400px]"
           >
-            <div className="flex justify-between items-center mb-4">
+            <div className="flex justify-between items-center mb-6">
               <h3 className="text-sm font-bold text-text-primary flex items-center gap-3">
-                <div className="bg-primary/10 p-1.5 rounded-lg">
-                  <ChevronDown className="h-4 w-4 text-primary" />
+                <div className="bg-primary/10 p-1.5 rounded-lg border border-primary/20">
+                  <StickyNote className="h-4 w-4 text-primary" />
                 </div>
-                Detailed Entry Analysis{" "}
-                <span className="text-text-muted font-normal text-xs ml-2 opacity-60">
+                Log Entry Annotation
+                <span className="text-text-muted font-mono text-[10px] ml-2 opacity-50 bg-white/5 px-2 py-0.5 rounded-full">
                   ID: {expandedRow}
                 </span>
               </h3>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-3">
                 {logs.find((l) => l.id === expandedRow)?.has_comment && (
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="h-8 text-[10px] font-bold text-red-400 hover:text-red-300 hover:bg-red-500/10 transition-colors uppercase tracking-wider"
+                    className="h-9 px-4 text-[11px] font-bold text-red-400 hover:text-red-300 hover:bg-red-500/10 transition-colors uppercase tracking-widest"
                     onClick={() => {
                       if (expandedRow !== null) {
                         onAddComment(expandedRow, "");
@@ -505,71 +503,43 @@ export function VirtualLogTable({
                 <Button
                   variant="outline"
                   size="sm"
-                  className="h-8 text-[10px] font-bold uppercase tracking-wider border-primary/20 hover:bg-primary/5 hover:text-primary transition-all"
+                  className="h-9 px-6 text-[11px] font-bold uppercase tracking-widest border-primary/20 bg-primary/5 hover:bg-primary/10 hover:text-primary transition-all rounded-lg"
                   onClick={() => {
                     if (expandedRow !== null) {
                       onAddComment(expandedRow, commentText);
-                      toast.success("Note updated");
+                      toast.success("Note saved");
                     }
                   }}
                 >
                   Save Note
                 </Button>
+                <div className="w-px h-6 bg-white/10 mx-1" />
                 <IconButton
                   icon={<X className="h-4 w-4" />}
-                  label="Close Details"
+                  label="Close Annotation"
                   onClick={() => setExpandedRow(null)}
-                  className="text-text-muted hover:text-text-primary hover:bg-white/5 transition-colors"
+                  className="text-text-muted hover:text-text-primary hover:bg-white/10 transition-colors bg-white/5 rounded-lg h-9 w-9"
                 />
               </div>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <div className="space-y-3">
-                <label
-                  htmlFor={`raw-data-${expandedRow}`}
-                  className="text-[10px] font-bold uppercase tracking-widest text-text-muted opacity-60"
-                >
-                  Raw Data
-                </label>
-                <div className="relative group">
-                  <div className="absolute -inset-0.5 bg-gradient-to-r from-primary/20 to-transparent rounded-xl blur opacity-20 group-hover:opacity-30 transition duration-1000" />
-                  <pre
-                    id={`raw-data-${expandedRow}`}
-                    className="relative text-[11px] font-mono leading-relaxed text-text-secondary bg-bg-base/80 p-5 rounded-xl border border-border/50 overflow-x-auto h-[200px] select-text whitespace-pre-wrap scrollbar-thin"
-                  >
-                    {logs.find((l) => l.id === expandedRow)?.raw_text ||
-                      logs.find((l) => l.id === expandedRow)?.message ||
-                      "No contextual raw data available."}
-                  </pre>
-                </div>
-              </div>
-
-              <div className="space-y-3">
-                <label
-                  htmlFor={`note-editor-${expandedRow}`}
-                  className="text-[10px] font-bold uppercase tracking-widest text-text-muted opacity-60"
-                >
-                  Notes & Actions
-                </label>
-                <div className="relative group">
-                  <div className="absolute -inset-0.5 bg-gradient-to-r from-primary/10 to-transparent rounded-xl blur opacity-10 group-hover:opacity-20 transition duration-1000" />
-                  <textarea
-                    id={`note-editor-${expandedRow}`}
-                    className="relative w-full h-[200px] text-[12px] font-sans leading-relaxed text-text-primary bg-bg-base/80 p-5 rounded-xl border border-border/50 focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all resize-none placeholder:text-text-muted/30"
-                    placeholder="Add investigation notes, root causes, or pending actions for this log entry..."
-                    value={commentText}
-                    onChange={(e) => setCommentText(e.target.value)}
-                  />
-                </div>
-              </div>
+            <div className="relative group max-w-4xl mx-auto">
+              <div className="absolute -inset-1 bg-gradient-to-r from-primary/10 via-transparent to-primary/10 rounded-2xl blur-lg opacity-20 group-hover:opacity-40 transition-opacity duration-1000" />
+              <textarea
+                id={`note-editor-${expandedRow}`}
+                autoFocus
+                className="relative w-full h-[180px] text-[13px] font-sans leading-relaxed text-text-primary bg-bg-base/60 p-6 rounded-2xl border border-white/10 focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all resize-none placeholder:text-text-muted/20 scrollbar-thin"
+                placeholder="Add investigation details, identified causes, or diagnostic insights for this log entry..."
+                value={commentText}
+                onChange={(e) => setCommentText(e.target.value)}
+              />
             </div>
           </div>
         )}
       </section>
 
       {/* Batch Selection Action Pill */}
-      {selectedLogIds.length > 0 && (
+      {selectedLogIds.length > 0 && expandedRow === null && (
         <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-[100] animate-in slide-in-from-bottom-4 duration-300">
           <div className="bg-[#111312] border border-white/10 shadow-2xl rounded-full p-1.5 flex items-center gap-2 backdrop-blur-xl">
             <span className="pl-4 pr-2 text-xs font-bold text-text-primary">

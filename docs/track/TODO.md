@@ -48,6 +48,9 @@
 ## 🔵 Bug Fixes (Active)
 
 - [x] **FIX-UX-002**: Selection Logic Parity (Normalize row selection in `VirtualLogTable`)
+- [x] **FIX-UX-003**: Note Editor Refinement (Remove Raw Data + Hide AI Pill during Note editing)
+  - **Files**: `src/components/organisms/VirtualLogTable.tsx`
+  - **Detail**: `docs/TODOC/FIX-UX-003.md`
   - **Files**: `src/components/organisms/VirtualLogTable.tsx`
   - **Detail**: `docs/TODOC/FIX-UX-002.md`
 
