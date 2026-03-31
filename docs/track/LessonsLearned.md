@@ -20,3 +20,4 @@ This document tracks identified bugs, root causes, and their permanent fixes to 
 | 2026-03-30 | Blocking LLM Sidecar Calls | Log analysis used `subprocess.run` (sync) in async functions | Replaced with `asyncio.create_subprocess_exec` for non-blocking execution | @antigravity |
 | 2026-03-30 | Sidebar Accessibility Debt | Extensive use of `role="button"` on `div` elements hindered navigation | Standardized on native `<button>` elements with `tabIndex` and `disabled` support | @antigravity |
 | 2026-03-30 | Nested Ternary Toxicity | Complex conditional rendering logic triggered lint warnings and reduced readability | Flattened logic into state-driven JSX variables in `Sidebar.tsx` | @antigravity |
+| 2026-03-30 | Gemini CLI Headless Format | Lack of official `-o json` flags and schema awareness (`response` key) | Documented and implemented explicit headless mode with output parsing | @antigravity |
