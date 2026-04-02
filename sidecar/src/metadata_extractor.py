@@ -16,7 +16,7 @@ def extract_log_metadata(workspace_id: str, source_id: str, raw_line: str) -> di
     
     # Generic heuristic for level
     upper_line = raw_line.upper()
-    for lvl in ["ERROR", "WARN", "DEBUG", "TRACE", "INFO"]:
+    for lvl in ["FATAL", "ERROR", "WARN", "DEBUG", "TRACE", "INFO"]:
         if lvl in upper_line:
             level = lvl
             break

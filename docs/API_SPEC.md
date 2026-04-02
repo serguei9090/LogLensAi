@@ -60,30 +60,37 @@ Initialize a new AI investigation context.
 - **result**: `{"session_id": "uuid-...", "title": "Memory Outage analysis"}`
 
 ### `send_ai_message`
-Send a User prompt to the AI within a session context.
+Handle multi-turn AI chat investigation session with log context and **Hot Mode** taskId persistence.
 - **params**: 
-  - `session_id`: string
-  - `content`: string
+  - `workspace_id`: string (required)
+  - `message`: string (required)
+  - `session_id`: string (optional, starts new session if null)
+  - `session_name`: string (optional)
+  - `context_logs`: list[integer] (optional log references. *Note: sidecar auto-fetches raw text for these IDs*)
+  - `model`: string (optional)
+  - `provider_session_id`: string (optional, explicitly reuse a remote taskId/threadId)
 - **result**: 
   ```json
   {
-    "id": "msg-...",
-    "role": "assistant",
-    "content": "Based on these 10 logs, the issue is...",
-    "timestamp": "2024-03-29T..."
+    "session_id": "uuid-...",
+    "provider_session_id": "afc1295d-...",
+    "response": "Based on these 10 logs..."
   }
   ```
 
-### `get_ai_sessions`
-Retrieve history for a workspace.
-- **params**: `{"workspace_id": "ws-..."}`
-- **result**: `[{"session_id": "uuid-...", "title": "Crash log analysis", "last_updated": "..."}]`
+### 🧠 Auto-Healing (Context Restoration) Standard
+When `provider_session_id` is expired or newly created, the sidecar automatically prepends a `=== CONTEXT RESTORATION (AUTO-HEAL) ===` block to the prompt, ensuring the AI retains the full conversation history from the DuckDB source of truth.
+
+### `get_ai_sessions` / `get_ai_messages`
+Browse investigation history.
+- **get_ai_sessions params**: `{"workspace_id": "ws-..."}`
+- **get_ai_messages params**: `{"session_id": "uuid-..."}`
 
 ---
 
 ## ⚙️ Configuration Methods
 
 ### `get_settings` / `update_settings`
-Global preference management.
-- **params (`update`)**: `{"settings": {"ai_provider": "ai-studio", "ai_api_key": "..."}}`
-- **result**: `{"status": "success"}`
+Global preference management (AI Provider, API Keys, Drain3 Config).
+- **params (`update`)**: `{"settings": {"ai_provider": "gemini-cli", "ai_gemini_url": "http://localhost:22436", ...}}`
+- **result**: `{"status": "ok"}`

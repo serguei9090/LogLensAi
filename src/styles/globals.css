@@ -90,15 +90,16 @@
     --input: var(--color-border);
     --ring: var(--color-primary);
   }
+
+  body {
+    background-color: var(--bg-base);
+    color: var(--text-primary);
+    font-family: var(--font-sans);
+    font-size: 14px;
+    margin: 0;
+  }
 }
 
 * {
   box-sizing: border-box;
-}
-
-body {
-  background-color: var(--bg-base);
-  color: var(--text-primary);
-  font-family: var(--font-sans);
-  font-size: 14px;
 }

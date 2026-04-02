@@ -7,7 +7,7 @@ from google.adk.sessions import InMemorySessionService
 from google.genai import types, Client
 from .base import AIProvider, AIChatMessage
 
-DEFAULT_MODEL = "gemini-2.0-flash"
+DEFAULT_MODEL = "gemini-2.5-flash"
 
 class AIStudioProvider(AIProvider):
     """Direct provider using Google AI Studio (API Key)."""
@@ -20,7 +20,7 @@ class AIStudioProvider(AIProvider):
     async def list_models(self) -> List[str]:
         """Fetches available Gemini models from the API."""
         if not self._client:
-            return [DEFAULT_MODEL, "gemini-2.0-pro-exp-02-05"] # Default fallback
+            return [DEFAULT_MODEL]
             
         try:
             # Note: This is a synchronous call in google-genai currently
@@ -29,9 +29,9 @@ class AIStudioProvider(AIProvider):
             models = await loop.run_in_executor(None, self._client.models.list)
             return [m.name for m in models if "gemini" in m.name.lower()]
         except Exception:
-            return [DEFAULT_MODEL, "gemini-2.0-pro-exp-02-05"]
+            return [DEFAULT_MODEL, "gemini-2.5-pro"]
 
-    async def chat(self, messages: List[AIChatMessage], model: str = DEFAULT_MODEL, session_id: Optional[str] = None) -> AIChatMessage:
+    async def chat(self, messages: List[AIChatMessage], model: Optional[str] = None, session_id: Optional[str] = None, provider_session_id: Optional[str] = None) -> AIChatMessage:
         """Sends a message to Gemini via ADK Agent."""
         if not self.api_key:
             return AIChatMessage(role="assistant", content="Error: No API Key configured for AI Studio.")
@@ -54,7 +54,7 @@ class AIStudioProvider(AIProvider):
         # of the current session before running the new message.
         session_service = InMemorySessionService()
         user_id = "default_user"
-        # Populate history (all except last message)
+        # 1. Standard history injection via ADK Session (this is the AI Studio "Auto-Heal")
         adk_session_id = session_id or "temp_session"
         for msg in messages[:-1]:
             role = "user" if msg.role == "user" else "model"
@@ -72,7 +72,8 @@ class AIStudioProvider(AIProvider):
                 if event.is_final_response() and event.content:
                     response_text = event.content.parts[0].text
             
-            return AIChatMessage(role="assistant", content=response_text)
+            # Note: adk_session_id acts as our provider_session_id here
+            return AIChatMessage(role="assistant", content=response_text, provider_session_id=adk_session_id)
         except Exception as e:
             return AIChatMessage(role="assistant", content=f"AI Studio Error: {str(e)}")
 

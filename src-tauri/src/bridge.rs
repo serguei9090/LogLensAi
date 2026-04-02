@@ -5,7 +5,7 @@ pub async fn dispatch_sidecar(_app: AppHandle, request: String) -> Result<String
     // For now, let's implement the HTTP bridge for development as defined in AGENTS.md
     let client = reqwest::Client::new();
     let res = client
-        .post("http://localhost:5000/rpc")
+        .post("http://localhost:4001/rpc")
         .body(request)
         .header("Content-Type", "application/json")
         .send()

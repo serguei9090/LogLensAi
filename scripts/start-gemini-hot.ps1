@@ -26,14 +26,14 @@ if (!(Test-Path $projectSessions)) {
 
 $a2aPath = Join-Path $PSScriptRoot "..\gemini-cli\packages\a2a-server"
 if (!(Test-Path $a2aPath)) {
-    Write-Host "❌ Error: gemini-cli repository not found in workspace root." -ForegroundColor Red
+    Write-Host "[ERROR] gemini-cli repository not found in workspace root." -ForegroundColor Red
     Write-Host "Run 'bun run setup:gemini' first." -ForegroundColor Yellow
     exit 1
 }
 
 # [4] Navigate to the A2A package and start it
 Push-Location $a2aPath
-Write-Host "🤖 Launching Persistent A2A Server on Port 22436..." -ForegroundColor Green
-Write-Host "📦 Sessions stored in: $projectSessions" -ForegroundColor Cyan
+Write-Host "[INIT] Launching Persistent A2A Server on Port 22436..." -ForegroundColor Green
+Write-Host "[LOG] Sessions stored in: $projectSessions" -ForegroundColor Cyan
 npm start
 Pop-Location

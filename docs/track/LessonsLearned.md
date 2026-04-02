@@ -21,3 +21,7 @@ This document tracks identified bugs, root causes, and their permanent fixes to 
 | 2026-03-30 | Sidebar Accessibility Debt | Extensive use of `role="button"` on `div` elements hindered navigation | Standardized on native `<button>` elements with `tabIndex` and `disabled` support | @antigravity |
 | 2026-03-30 | Nested Ternary Toxicity | Complex conditional rendering logic triggered lint warnings and reduced readability | Flattened logic into state-driven JSX variables in `Sidebar.tsx` | @antigravity |
 | 2026-03-30 | Gemini CLI Headless Format | Lack of official `-o json` flags and schema awareness (`response` key) | Documented and implemented explicit headless mode with output parsing | @antigravity |
+| 2026-03-31 | AI Hot Mode Session Loss | Gemini A2A taskId was stored in-memory only in the sidecar | Implemented `provider_session_id` in DuckDB's `ai_sessions` table to allow Hot Mode resume across app restarts | @antigravity |
+| 2026-04-01 | A2A Server 500 Error | Presence of redundant `messageId` field in JSON-RPC payload | Aligned `gemini_cli.py` payload to match user's working `chat_session.js` exactly | @antigravity |
+| 2026-04-01 | AI Context Loss on Server Restart | A2A and AI Studio sessions are transient and lost on task expiration | Implemented **Universal Auto-Healing** (Context Injection) using DuckDB as truth | @antigravity |
+| 2026-04-01 | Gemini CLI Fallback NameError | Missing `import sys` in `gemini_cli.py` during error logging | Added missing import and standardized log output | @antigravity |

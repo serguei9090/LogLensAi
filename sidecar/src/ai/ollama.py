@@ -6,7 +6,8 @@ from .base import AIProvider, AIChatMessage
 class OllamaProvider(AIProvider):
     """Local provider using Ollama API."""
 
-    def __init__(self, host: str = "http://localhost:11434"):
+    def __init__(self, host: str = "http://localhost:11434", system_prompt: str = ""):
+        super().__init__(system_prompt=system_prompt)
         self.host = host.rstrip("/")
         self.timeout = aiohttp.ClientTimeout(total=60)
 
@@ -23,9 +24,13 @@ class OllamaProvider(AIProvider):
         except Exception:
             return ["llama3", "mistral"]
 
-    async def chat(self, messages: List[AIChatMessage], model: str = "llama3", session_id: Optional[str] = None) -> AIChatMessage:
+    async def chat(self, messages: List[AIChatMessage], model: Optional[str] = None, session_id: Optional[str] = None, provider_session_id: Optional[str] = None) -> AIChatMessage:
         """Sends a message to Ollama."""
-        ollama_messages = [{"role": msg.role, "content": msg.content} for msg in messages]
+        ollama_messages = []
+        if self.system_prompt:
+            ollama_messages.append({"role": "system", "content": self.system_prompt})
+            
+        ollama_messages.extend([{"role": msg.role, "content": msg.content} for msg in messages])
         
         payload = {
             "model": model,

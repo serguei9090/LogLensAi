@@ -96,6 +96,7 @@ class Database:
                 name         TEXT,
                 provider     TEXT,
                 model        TEXT,
+                provider_session_id TEXT, -- E.g. A2A taskId for Hot Mode resume
                 created_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 last_modified TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
@@ -106,7 +107,8 @@ class Database:
                 role         TEXT,
                 content      TEXT,
                 context_logs TEXT, -- JSON array of log IDs
-                timestamp    TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                timestamp    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                provider_session_id TEXT -- Link message to a specific remote taskId/threadId
             );
         """)
 
@@ -134,19 +136,61 @@ class Database:
             except Exception:
                 pass
         
-        # Add parser_config column to fusion_configs if missing
+        # Ensure provider_session_id exists in ai_sessions
         try:
-            cursor.execute("SELECT parser_config FROM fusion_configs LIMIT 1")
+             cursor.execute("SELECT provider_session_id FROM ai_sessions LIMIT 1")
         except Exception:
-            cursor.execute("ALTER TABLE fusion_configs ADD COLUMN parser_config TEXT")
-
-        # Add fusion_id column to fusion_configs if missing
+             cursor.execute("ALTER TABLE ai_sessions ADD COLUMN provider_session_id TEXT")
+             
+        # Ensure provider_session_id exists in ai_messages
         try:
-            cursor.execute("SELECT fusion_id FROM fusion_configs LIMIT 1")
+             cursor.execute("SELECT provider_session_id FROM ai_messages LIMIT 1")
         except Exception:
-            cursor.execute("ALTER TABLE fusion_configs ADD COLUMN fusion_id TEXT DEFAULT 'default'")
-            # Note: We can't easily change composite PK in DuckDB without recreating, 
-            # but 'ALTER' will suffice for column existence. New installs get the proper PK.
+             cursor.execute("ALTER TABLE ai_messages ADD COLUMN provider_session_id TEXT")
+        
+        # 1. Proper migration for fusion_configs if PK doesn't include fusion_id
+        try:
+            # Check if fusion_id is part of the PK
+            cursor.execute("SELECT k.name FROM pragma_table_info('fusion_configs') k WHERE k.pk > 0")
+            pk_cols = [row[0] for row in cursor.fetchall()]
+            
+            if "fusion_id" not in pk_cols:
+                print("[DB] Migrating fusion_configs to update Primary Key (including fusion_id)...")
+                # Backup existing data
+                cursor.execute("CREATE TEMP TABLE fusion_configs_backup AS SELECT * FROM fusion_configs")
+                cursor.execute("DROP TABLE fusion_configs")
+                cursor.execute("""
+                    CREATE TABLE fusion_configs (
+                        workspace_id TEXT,
+                        fusion_id    TEXT DEFAULT 'default',
+                        source_id    TEXT,
+                        enabled      BOOLEAN DEFAULT TRUE,
+                        tz_offset    INTEGER DEFAULT 0,
+                        custom_format TEXT,
+                        parser_config TEXT,
+                        PRIMARY KEY (workspace_id, fusion_id, source_id)
+                    )
+                """)
+                # Restore data (adding fusion_id if missing from backup)
+                cursor.execute("PRAGMA table_info('fusion_configs_backup')")
+                backup_cols = [row[1] for row in cursor.fetchall()]
+                
+                if "fusion_id" in backup_cols:
+                    cursor.execute("""
+                        INSERT INTO fusion_configs (workspace_id, fusion_id, source_id, enabled, tz_offset, custom_format, parser_config)
+                        SELECT workspace_id, fusion_id, source_id, enabled, tz_offset, custom_format, parser_config 
+                        FROM fusion_configs_backup
+                    """)
+                else:
+                    cursor.execute("""
+                        INSERT INTO fusion_configs (workspace_id, fusion_id, source_id, enabled, tz_offset, custom_format, parser_config)
+                        SELECT workspace_id, 'default', source_id, enabled, tz_offset, custom_format, parser_config 
+                        FROM fusion_configs_backup
+                    """)
+                cursor.execute("DROP TABLE fusion_configs_backup")
+                print("[DB] Fusion Configs PK Migration complete.")
+        except Exception as e:
+            print(f"[DB] Error migrating fusion_configs: {e}")
 
         # Add source_id column if missing to logs
         try:

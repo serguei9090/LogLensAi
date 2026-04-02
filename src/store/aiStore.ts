@@ -8,6 +8,7 @@ export interface AiMessage {
   content: string;
   context_logs?: number[];
   timestamp: string;
+  provider_session_id?: string;
 }
 
 export interface AiSession {
@@ -15,6 +16,7 @@ export interface AiSession {
   name: string;
   created_at: string;
   last_modified: string;
+  provider_session_id?: string;
 }
 
 interface AiStore {

@@ -16,20 +16,22 @@ export interface AppSettings {
   ui_font_size: string;
   mcp_server_enabled: boolean;
   ai_gemini_url: string;
+  ai_ollama_host: string;
 }
 
 const defaultSettings: AppSettings = {
   ai_provider: "gemini-cli",
   ai_api_key: "",
   ai_system_prompt:
-    "You are a Log Analysis Specialist. Return JSON with summary, root_cause, actions.",
-  drain_similarity_threshold: 0.4,
+    "You are LogLens Assistant, a senior DevOps engineer and SRE specializing in root cause analysis.",
+  drain_similarity_threshold: 0.5,
   drain_max_children: 100,
   drain_max_clusters: 1000,
-  ui_row_height: "default",
+  ui_row_height: "36px",
   ui_font_size: "13px",
   mcp_server_enabled: false,
   ai_gemini_url: "http://localhost:22436",
+  ai_ollama_host: "http://localhost:11434",
 };
 
 type SectionId = "ai" | "drain" | "general";
@@ -215,8 +217,9 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
                     onChange={(v) => update("ai_provider", v)}
                   >
                     <option value="gemini-cli">Gemini CLI (Native Local)</option>
-                    <option value="openai">OpenAI (SaaS)</option>
-                    <option value="anthropic">Anthropic Claude (SaaS)</option>
+                    <option value="ollama">Ollama (Local Llama/Mistral)</option>
+                    <option value="ai-studio">Gemini AI Studio (Free Tier)</option>
+                    <option value="openai">OpenAI (Waitlist/Future)</option>
                   </SettingSelect>
                 </div>
                 <div className="space-y-2">
@@ -249,6 +252,30 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
                   <p className="text-[10px] text-text-muted/50 px-1">
                     Hot Mode requires the A2A daemon running on this port for sub-second latency.
                   </p>
+                </div>
+              )}
+
+              {settings.ai_provider === "ollama" && (
+                <div className="space-y-4 pt-2 border-t border-border/50 animate-in slide-in-from-top-2 duration-300">
+                  <div className="space-y-2">
+                    <SectionLabel htmlFor="ai_ollama_host">Ollama Server Host</SectionLabel>
+                    <SettingInput
+                      id="ai_ollama_host"
+                      type="url"
+                      value={settings.ai_ollama_host}
+                      onChange={(e) => update("ai_ollama_host", e.target.value)}
+                      placeholder="http://localhost:11434"
+                    />
+                  </div>
+                  <div className="flex items-center gap-3 p-3 bg-primary/5 rounded-xl border border-primary/10">
+                    <div className="bg-primary/20 p-2 rounded-lg">
+                      <Cpu className="h-4 w-4 text-primary" />
+                    </div>
+                    <div>
+                      <p className="text-[11px] font-bold text-primary uppercase tracking-wider">Local Inference</p>
+                      <p className="text-[10px] text-text-muted">Ensure Ollama is running and model (e.g. llama3) is pulled.</p>
+                    </div>
+                  </div>
                 </div>
               )}
 

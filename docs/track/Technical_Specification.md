@@ -1,74 +1,63 @@
-# Technical Specification: LogLensAi Core Architecture
+# Technical Specification: Standardized AI History & Universal Auto-Healing (FIX-AI-002)
 
 ## 1. Executive Summary
-This specification defines the architectural standards for LogLensAi, a premium Tauri-based log analyzer. The system uses a Python sidecar with DuckDB for high-throughput persistence and a React 19 frontend for a virtualized, ultra-responsive UI.
+LogLensAi currently uses multiple AI providers (Gemini CLI A2A, AI Studio, etc.). Maintaining conversation history across session restarts is critical. While some providers (like A2A) have internal file-based persistence, relying on their internal temp folders is fragile. 
 
-## 2. Infrastructure & Standards
-- **Sidecar**: Python 3.12 (AIOHTTP + JSON-RPC 2.0). Binds to `127.0.0.1:5000` with CORS support for Vite dev servers.
-- **Database**: DuckDB 1.1+ with FTS (Full Text Search). Isolated cursors are mandatory for thread safety.
-- **Frontend**: Vite + React 19 + TailwindCSS. Uses TanStack Virtual for large scale log rendering.
-- **Proxy**: Tauri Rust layer bridges the frontend HTTP requests to the sidecar STDIO or HTTP.
+This specification standardizes the **"Auto-Healing"** logic:
+- The Sidecar DuckDB is the absolute **Single Source of Truth** for all chat messages.
+- If an AI provider's session (taskId, threadId) expires or the server restarts, the Sidecar will automatically "heal" the new session by prepending the full message history from the DB into the first user prompt (Context Injection).
+- This approach ensures 100% reliability, zero dependence on provider-specific filesystem structures, and a consistent UX across all AI backends.
 
-## 3. Custom Pattern Parser & Regex Normalization
-### 3.1 Functional Requirement
-- **Highlight-to-Define**: Users select a sample timestamp/level in the UI to generate an extraction rule.
-- **Dynamic Regex Generation**: Sidecar creates patterns based on selection range/type.
-- **Live Normalization**: All incoming logs are matched against the regex before ingestion to populate the `timestamp` column.
+## 2. Requirements
 
-### 3.2 Metadata Schema
-- **Table**: `fusion_configs`
-  - `workspace_id`: string
-  - `source_id`: string (file path/SSH string)
-  - `enabled`: boolean
-  - `tz_offset`: integer
-  - `parser_config`: JSON (regex pattern, offset groups)
+### 2.1 Functional Requirements
+- **Persistence**: All user and assistant messages MUST be saved to the `ai_messages` table in DuckDB immediately.
+- **Session Continuity**: When a user selects an existing session, the Sidecar must check if the provider's remote task/thread is still alive.
+- **Universal Auto-Healing**: If the remote task is gone, a new one is created, and the history is injected into the very first prompt using a standard `=== CONTEXT RESTORATION ===` block.
+- **Provider Parity**: Both `GeminiCLIProvider` and `AIStudioProvider` (and future ones) MUST follow this pattern.
+- **UI Hydration**: The frontend chat interface hydrates exclusively from the Sidecar DB, not from provider-specific local files.
 
-### 3.3 Sidecar Logic (FileTailer & Ingest)
-1. **Pre-processing**: Each raw line is matched against `parser_config.regex`.
-2. **Extraction**: Subgroups or character ranges populate the `timestamp` and `level` columns.
-3. **Fallback**: If no pattern matches, current UTC timestamp is applied to ensure sequential visibility.
+### 2.2 Non-Functional Requirements
+- **Performance**: History aggregation must be fast (local DB query).
+- **Reliability**: No direct manipulation of `C:\Users\ASCC\.gemini\tmpa2a-server` folders.
+- **Transparency**: The "Context Restoration" block should be clearly labeled in the prompt sent to the LLM but handled transparently by the engine.
 
-## 4. Multi-Source Fusion
-- **Aggregate View**: Selecting the 'Fusion' tab triggers the `get_fused_logs` core method.
-- **Interleaving**: DuckDB performs a `UNION ALL` or a workspace-wide `SELECT` ordered by normalized `timestamp`.
-- **Latency**: Queries must be paginated (default 1000 rows) to maintain 60FPS UI interaction.
+## 3. Architecture & Tech Stack
 
-## 5. Security & Isolation
-- All paths are normalized to POSIX style (forward slashes).
-- Workspace isolation is enforced at the query level via `workspace_id` filtering.
-- Sidecar restricted to local loopback only.
-## 6. Temporal Selection & TimeRangePicker Standards
-- **Component Geometry**: Popover must use a `min-width: 620px` to accommodate dual-month view for professional investigation.
-- **Library Integration**: `react-day-picker` v9+ with `numberOfMonths: 2`.
-- **State Synchronization**: 
-  - A single `DateRange` state object in `TimeRangePicker` tracks both `from` and `to` points.
-  - The `month` state tracks the visible window's anchor (left-most month).
-- **Navigation Controls**: 
-  - Controls are globally applied to both calendars in view.
-  - View-cycling (`Days` → `Months` → `Years`) provides rapid temporal context shifts without breaking the dual layout.
-- **Precision Preview**: Real-time display of normalized ISO date-time strings below the interactive grids ensures the user identifies exact investigate boundaries.
+### 3.1 Backend (Python Sidecar)
+- **`sidecar/src/ai/base.py`**: Update base class to enforce history-aware chat signatures.
+- **`sidecar/src/ai/gemini_cli.py`**: Standardize the `_chat_hot` logic to use the "Auto-Heal" block if a task is new.
+- **`sidecar/src/api.py`**: Ensure `method_send_ai_message` handles the history retrieval and persistence cycle atomically.
 
-## 7. AI Investigation & Interaction
-### 7.1 Multi-Provider AI Architecture
-- **Provider Tiers**: 
-  - **Gemini CLI**: Local fallback via `subprocess`. No key required.
-  - **AI Studio (Google)**: Primary cloud provider via `google-generativeai`. Requires API key.
-  - **Ollama**: Decentralized local provider via REST API (`localhost:11434`).
-- **Model Dynamic Loading**: Providers must expose a `list_models` endpoint to populate UI selectors.
+### 3.2 Database Schema
+- `ai_sessions`: Stores `session_id`, `name`, `workspace_id`, and `provider_session_id` (the remote taskId).
+- `ai_messages`: Stores `message_id`, `session_id`, `role`, `content`, `timestamp`, and `provider_session_id`.
 
-### 7.2 Session & Memory Management
-- **Persistence**: Chat history is stored in `ai_sessions` and `ai_messages` (DuckDB).
-- **Context Binding**: Each `ai_session` can reference one or more `workspace_id`.
-- **Memory Types**:
-  - **Workspace Memory**: Deleted upon workspace removal (ephemeral context).
-  - **Global Memory**: Persistent across workspaces (base personality/rules).
+## 4. State Management & Data Flow
+1. **User Action**: User sends "Hello" in the UI.
+2. **Sidecar API**: `method_send_ai_message` is called.
+3. **History Retrieval**: Sidecar pulls all previous `ai_messages` for that `session_id`.
+4. **Provider Logic**: 
+   - Check if `provider_session_id` (taskId) exists and is alive on the A2A/Studio server.
+   - If **NO**: Create new task, prepend aggregated history to "Hello", set `is_new_task = True`.
+   - If **YES**: Send "Hello" directly.
+5. **Persistence**: Save "Hello" and the AI response back to `ai_messages`. Update `ai_sessions.provider_session_id` if it changed.
 
-### 7.3 Multi-Log Selection UI
-- **Interaction Logic**: 
-  - **Checkboxes**: Primary multi-row selection mechanism in `VirtualLogTable`.
-  - **Action Pill**: Floating toolbar triggered by selection containing "Send to AI Chat".
-  - **Contextual Icon**: Logs included in an active chat session must show an `AI` indicator in the 'Actions' column.
+## 5. Standardized Context Restoration Block (Template)
+```text
+=== CONTEXT RESTORATION (AUTO-HEAL) ===
+The following is the history of our previous conversation which was lost from the server state. Please use this as context for our current chat:
 
-### 7.4 AI Sidebar (The Agent)
-- **Component**: `AIInvestigationSidebar`. Collapsible, right-aligned.
-- **Streaming**: Implementation of an EventStream or chunked JSON-RPC response for real-time chat feel.
+[YOU]: <message 1>
+---
+[AI]: <response 1>
+---
+[YOU]: <message 2>
+...
+=== END OF RESTORATION ===
+
+User Message: <current message>
+```
+
+---
+**Approval Gate**: Do you approve of this tech stack and specification? You can safely open `docs/track/Technical_Specification.md` and add comments or modifications if you want me to rework anything!

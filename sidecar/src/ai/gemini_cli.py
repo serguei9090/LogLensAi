@@ -1,6 +1,7 @@
 import asyncio
 import json
 import os
+import sys
 from typing import Any, List, Optional
 import aiohttp
 from .base import AIProvider, AIChatMessage
@@ -14,7 +15,8 @@ class GeminiCLIProvider(AIProvider):
     
     DEFAULT_MODEL = "gemini-2.5-flash"
 
-    def __init__(self, host: str = "http://localhost:22436"):
+    def __init__(self, host: str = "http://localhost:22436", system_prompt: str = ""):
+        super().__init__(system_prompt=system_prompt)
         self.host = host.rstrip("/")
         # session_id -> taskId mapping to achieve Hot Mode persistence
         self._task_cache = {} 
@@ -29,94 +31,133 @@ class GeminiCLIProvider(AIProvider):
         return json.loads(output[start:end+1])
 
     async def list_models(self) -> List[str]:
-        return [self.DEFAULT_MODEL, "gemini-2.0-flash", "gemini-pro"]
+        return [self.DEFAULT_MODEL, "gemini-pro"]
 
-    async def _get_or_create_task(self, session: aiohttp.ClientSession, session_id: str, messages: List[AIChatMessage]) -> str:
-        """Fetch existing taskId or create a new one and re-inject history if needed."""
-        task_id = self._task_cache.get(session_id)
+    async def _get_or_create_task(self, session: aiohttp.ClientSession, session_id: str, existing_task_id: Optional[str] = None, model: Optional[str] = None) -> str:
+        """Fetch existing taskId (from cache or DB) or create a new one."""
+        # 1. Use existing taskId if provided from DB or cache
+        task_id = existing_task_id or self._task_cache.get(session_id)
         
-        # Verify if task is still alive on server
+        # 2. Verify if task is still alive on A2A server
         if task_id:
-            try:
-                # Minimal check: try to fetch task info or just proceed
-                # If it fails during message/stream, we'll catch it and recreate
-                pass
-            except Exception:
-                task_id = None
+             try:
+                 async with session.get(f"{self.host}/tasks/{task_id}") as resp:
+                     if resp.status not in (200, 204):
+                         task_id = None # Expired on server
+             except Exception:
+                 task_id = None
 
         if not task_id:
-            # Create new task
-            async with session.post(f"{self.host}/tasks", json={"agentSettings": {"autoExecute": True}}) as resp:
-                if resp.status != 200:
-                    raise RuntimeError(f"Failed to create A2A task: {await resp.text()}")
+            # 3. Create new task if needed
+            target_model = model or self.DEFAULT_MODEL
+            payload = {
+                "model": target_model,
+                "agentSettings": {
+                    "autoExecute": True,
+                    "model": target_model # Some versions use it here
+                }
+            }
+            async with session.post(f"{self.host}/tasks", json=payload) as resp:
+                if resp.status not in (200, 201):
+                    err_text = await resp.text()
+                    raise RuntimeError(f"Failed to create A2A task ({resp.status}): {err_text}")
                 task_id = await resp.json()
                 self._task_cache[session_id] = task_id
-                
-                # Re-inject history (all messages except the very last one which is the new user prompt)
-                if len(messages) > 1:
-                    for msg in messages[:-1]:
-                        payload = {
-                            "jsonrpc": "2.0", "id": "hist", "method": "message/stream",
-                            "params": {"message": {"taskId": task_id, "parts": [{"kind": "text", "text": msg.content}]}}
-                        }
-                        # We send them sequentially to preserve order. 
-                        # Note: We don't need to consume the full stream for history injection, but the server expects it to finish.
-                        async with session.post(f"{self.host}/", json=payload) as hresp:
-                            await hresp.release() # Just ensure it's sent
+        else:
+             self._task_cache[session_id] = task_id
         
         return task_id
 
-    async def chat(self, messages: List[AIChatMessage], model: Optional[str] = None, session_id: Optional[str] = None) -> AIChatMessage:
+    async def chat(self, messages: List[AIChatMessage], model: Optional[str] = None, session_id: Optional[str] = None, provider_session_id: Optional[str] = None) -> AIChatMessage:
         """Execute chat using A2A Hot Mode if available, falling back to Cold Mode."""
         if not session_id:
             return await self._chat_cold(messages, model)
 
         try:
-            return await self._chat_hot(session_id, messages)
-        except Exception:
+            return await self._chat_hot(session_id, messages, provider_session_id, model)
+        except Exception as e:
+            # Fallback to cold mode on server failure
+            sys.stderr.write(f"A2A Hot Mode Error: {e}. Falling back to Cold Mode.\n")
             return await self._chat_cold(messages, model)
 
-    async def _chat_hot(self, session_id: str, messages: List[AIChatMessage]) -> AIChatMessage:
-        """Core Hot Mode logic via A2A Server."""
+    async def _chat_hot(self, session_id: str, messages: List[AIChatMessage], existing_task_id: Optional[str] = None, model: Optional[str] = None) -> AIChatMessage:
+        """Core Hot Mode logic via A2A Server using exact parity with chat_session.js."""
         async with aiohttp.ClientSession(timeout=self.timeout) as session:
-            task_id = await self._get_or_create_task(session, session_id, messages)
-            
-            # Send the final user message
-            last_msg = messages[-1].content
+            # 1. Task Management
+            task_id = await self._get_or_create_task(session, session_id, existing_task_id, model)
+            is_new_task = (task_id != existing_task_id) if existing_task_id else False
+
+            # 2. Context Restoration (Parity with Auto-Heal)
+            prompt = messages[-1].content
+            if is_new_task and len(messages) > 1:
+                hist_lines = []
+                for m in messages[:-1]:
+                    role = "YOU" if m.role == "user" else "AI"
+                    hist_lines.append(f"[{role}]: {m.content}")
+                
+                prompt = (
+                    "=== CONTEXT RESTORATION (AUTO-HEAL) ===\n"
+                    "The following is the history of our previous conversation which was lost from the server state. "
+                    "Please use this as context for our current chat:\n\n"
+                    + "\n---\n".join(hist_lines) +
+                    f"\n\n=== END OF RESTORATION ===\n\nUser Message: {prompt}"
+                )
+
+            # 3. Payload Parity (Match chat.js exactly)
+            message_id = os.urandom(8).hex()
             payload = {
-                "jsonrpc": "2.0", "id": "m1", "method": "message/stream",
-                "params": {"message": {"taskId": task_id, "parts": [{"kind": "text", "text": last_msg}]}}
+                "jsonrpc": "2.0",
+                "id": message_id,
+                "method": "message/stream",
+                "params": {
+                    "message": {
+                        "taskId": task_id,
+                        "messageId": message_id,
+                        "parts": [{"kind": "text", "text": prompt}]
+                    }
+                }
             }
             
             full_response = []
             async with session.post(f"{self.host}/", json=payload) as resp:
                 if resp.status != 200:
-                    self._task_cache.pop(session_id, None)
-                    raise RuntimeError(f"Server error {resp.status}")
+                    err_text = await resp.text()
+                    raise RuntimeError(f"A2A Message Error ({resp.status}): {err_text}")
                 
-                async for line in resp.content:
-                    chunk = self._parse_sse_response(line)
-                    if chunk:
-                        full_response.append(chunk)
+                # Parse Server Sent Events (SSE) stream
+                reader = resp.content
+                buffer = ""
+                
+                while True:
+                    chunk = await reader.read(4096)
+                    if not chunk:
+                        break
+                    
+                    buffer += chunk.decode(errors="replace")
+                    
+                    # Split chunks by double newline (SSE separator)
+                    while "\n\n" in buffer:
+                        block, buffer = buffer.split("\n\n", 1)
+                        block = block.strip()
+                        
+                        if block.startswith("data: "):
+                            data_str = block[6:].strip()
+                            text = self._parse_json_chunk(data_str)
+                            if text:
+                                full_response.append(text)
             
             content = "".join(full_response)
             if not content:
-                raise RuntimeError("Empty response from A2A server")
-            
-            # Persist to disk
-            messages.append(AIChatMessage(role="assistant", content=content))
-            self._sync_to_disk(session_id, messages)
-            
-            return AIChatMessage(role="assistant", content=content)
+                raise RuntimeError("No text returned from A2A server")
 
-    def _parse_sse_response(self, line: bytes) -> Optional[str]:
-        """Helper to extract text from a single SSE data line."""
-        line_str = line.decode().strip()
-        if not line_str.startswith("data: "):
-            return None
-            
+            # Update cache and return
+            self._task_cache[session_id] = task_id
+            return AIChatMessage(role="assistant", content=content, provider_session_id=task_id)
+
+    def _parse_json_chunk(self, json_str: str) -> Optional[str]:
+        """Robustly extracts agent text from a single JSON chunk."""
         try:
-            data = json.loads(line_str[6:])
+            data = json.loads(json_str)
             msg = data.get("result", {}).get("status", {}).get("message", {})
             if msg.get("role") == "agent":
                 parts = []

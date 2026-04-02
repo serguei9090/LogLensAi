@@ -95,7 +95,7 @@ export function AIInvestigationSidebar() {
       workspace_id: activeWorkspace.id,
       message,
       context_logs: selectedLogIds,
-      model: "gemini-2.0-flash",
+      model: "gemini-2.5-flash",
       session_name: currentSessionId ? undefined : pendingSessionName
     });
     

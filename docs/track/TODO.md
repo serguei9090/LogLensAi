@@ -36,6 +36,16 @@
 - [x] **AI-BE-001**: Modular `AIProvider` Strategy (Gemini CLI, AI Studio, Ollama)
 - [x] **AI-BE-002**: AI Persistence Schema in DuckDB (sessions, messages)
 - [x] **AI-BE-003**: API: `list_models`, `chat_session` orchestration
+- [x] **AI-BE-004**: Persistent Provider Session Tracking (A2A `taskId` persistence in DuckDB)
+- [x] **AI-BE-005**: Automatic Session Hydration (Recover A2A tasks from DB metadata)
+- [x] **PR-TEST-001**: Implement Unit Tests for AI Providers (Ollama, AI Studio, Gemini CLI)
+- [x] **PR-TEST-002**: Test persistent AI Session taskId Logic (Hot Mode)
+- [x] **PR-TEST-003**: Test Multi-Source Fusion with Timezone Normalization (PARS-004)
+- [x] **PR-TEST-004**: Unit Test for Metadata Extractor
+- [x] **PR-TEST-005**: Unit Test for `VirtualLogTable` virtualization & selection logic
+- [x] **PR-TEST-006**: sidecar/api.py — `method_get_health` diagnostic endpoint & uptime tracking
+- [x] **PR-TEST-007**: Test sidecar tailing lifecycle (start/stop/is_tailing) with Windows path normalization
+- [x] **PARS-004**: Timezone offset normalization in sidecar (UTC conversion using `tz_offset`)
 - [x] **AI-FE-001**: `VirtualLogTable` row selection (checkboxes) & Batch Action Pill
 - [x] **AI-FE-002**: "Batch Send to AI" logic integrated with Investigation Hub
 - [x] **AI-FE-003**: `AIInvestigationSidebar` (Chat interface with session history)
@@ -47,11 +57,12 @@
 
 ## 🔵 Bug Fixes (Active)
 
-- [x] **FIX-UX-002**: Selection Logic Parity (Normalize row selection in `VirtualLogTable`)
-- [x] **FIX-UX-003**: Note Editor Refinement (Remove Raw Data + Hide AI Pill during Note editing)
-- [ ] **FIX-AI-001**: AI Persistence & Context Strategy (Commit transactions + Multi-turn history)
+- [x] **FIX-AI-001**: AI Persistence & Context Strategy (Commit transactions + Multi-turn history)
   - **Files**: `sidecar/src/api.py`, `sidecar/src/ai/ai_studio.py`
   - **Detail**: `docs/TODOC/FIX-AI-001.md`
+- [ ] **FIX-AI-002**: Standardized AI History & Universal Auto-Healing (Context Injection)
+  - **Files**: `sidecar/src/api.py`, `sidecar/src/ai/gemini_cli.py`, `sidecar/src/ai/ai_studio.py`
+  - **Detail**: `docs/TODOC/FIX-AI-002.md`
 - [ ] **FIX-FE-001**: Sidebar Button Nesting & Sync (Fix component recursion + Initial fetch)
   - **Files**: `src/components/organisms/AIInvestigationSidebar.tsx`, `src/store/aiStore.ts`
 - [ ] **FIX-UX-004**: Context-Aware AI Hub (Highlight session logs + VS Code style history + Renaming)
@@ -88,7 +99,7 @@
   - **Files**: `sidecar/src/parser.py`, `sidecar/src/api.py`
 - [ ] **PARS-003**: Sidecar — Integrate regex parser into `FileTailer` live-tail flow
   - **Files**: `sidecar/src/tailer.py`, `sidecar/src/parser.py`
-- [ ] **PARS-004**: Timezone offset normalization in sidecar (UTC conversion using `tz_offset`)
+- [x] **PARS-004**: Timezone offset normalization in sidecar (UTC conversion using `tz_offset`)
 
 ---
 

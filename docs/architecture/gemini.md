@@ -29,6 +29,13 @@ graph TD
     DB["DuckDB Persistence (db.py)"]
     SSH["SSH Remote Loader (ssh_loader.py)"]
     Tailer["File Tailer (tailer.py)"]
+    AI["AI Interface (src/ai/)"]
+  end
+
+  subgraph AI_Cloud_Provider [External AI Engines]
+    A2A["Gemini CLI (A2A Server)"]
+    Studio["Google AI Studio"]
+    Ollama["Ollama (Local)"]
   end
 
   UI <--> Store
@@ -37,6 +44,10 @@ graph TD
   API <--> Parser
   API <--> DB
   API <--> Tailer
+  API <--> AI
+  AI <--> A2A
+  AI <--> Studio
+  AI <--> Ollama
   Tailer <--> DB
   SSH <--> Parser
   Parser <--> DB

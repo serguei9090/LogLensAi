@@ -2,6 +2,7 @@ import json
 import os
 import sys
 import threading
+import time
 from typing import Any
 
 import aiohttp_cors
@@ -138,6 +139,7 @@ class SendAiMessageRequest(BaseModel):
     message: str
     model: str | None = None
     context_logs: list[int] | None = None # List of log IDs to include as context
+    provider_session_id: str | None = None # Explicit taskId/threadId reuse
 
 class GetAiSessionsRequest(BaseModel):
     workspace_id: str
@@ -150,6 +152,7 @@ class App:
         self.db = Database(db_path)
         self.parser = DrainParser()
         self.tailers = {}
+        self._start_time = time.time()
         self.dev_mode = False
         
         # Initialize AI Provider from settings
@@ -160,6 +163,7 @@ class App:
         self.ai = AIProviderFactory.get_provider(
             provider,
             api_key=settings.get("ai_api_key", ""),
+            system_prompt=settings.get("ai_system_prompt", ""),
             host=host
         )
         
@@ -520,19 +524,46 @@ class App:
         return {"anomalies": anomalies}
 
     def method_get_fused_logs(self, **kwargs) -> dict:
-        """Fetch interleaved logs for Fusion mode based on enabled sources."""
+        """Fetch interleaved logs for Fusion mode based on enabled sources with Timezone normalization."""
         params = GetFusedLogsRequest(**kwargs)
         cursor = self.db.get_cursor()
         
-        # 1. Get enabled sources from fusion_config
+        # 1. Get enabled sources and their offsets from fusion_config
         cursor.execute(
-            "SELECT source_id FROM fusion_configs WHERE workspace_id = ? AND fusion_id = ? AND enabled = TRUE", 
+            "SELECT source_id, tz_offset FROM fusion_configs WHERE workspace_id = ? AND fusion_id = ? AND enabled = TRUE", 
             (params.workspace_id, params.fusion_id)
         )
-        enabled_ids = [row[0] for row in cursor.fetchall()]
+        rows = cursor.fetchall()
+        enabled_ids = [row[0] for row in rows]
+        tz_offsets = {row[0]: row[1] for row in rows}
         
         # 2. delegate to internal fetcher with restricted sources
-        return self._get_logs_internal(**params.model_dump(), source_ids=enabled_ids)
+        model_dump = params.model_dump()
+        model_dump.pop("fusion_id", None) # Clean for internal fetcher
+        result = self._get_logs_internal(**model_dump, source_ids=enabled_ids)
+        
+        # 3. Apply Multi-Source Timezone Normalization (PARS-004)
+        from datetime import datetime, timedelta
+        
+        normalized_logs = []
+        for log in result["logs"]:
+            source_id = log.get("source_id")
+            offset = tz_offsets.get(source_id, 0)
+            if offset != 0 and log.get("timestamp"):
+                try:
+                    # Parse timestamp, assuming common format YYYY-MM-DD HH:MM:SS
+                    # We only slice first 19 chars for standard ISO format parsing
+                    ts_str = log["timestamp"]
+                    if "T" in ts_str: ts_str = ts_str.replace("T", " ")
+                    dt = datetime.strptime(ts_str[:19], "%Y-%m-%d %H:%M:%S")
+                    dt = dt + timedelta(hours=offset)
+                    log["timestamp"] = dt.strftime("%Y-%m-%d %H:%M:%S")
+                except Exception:
+                    pass # Keep original if parsing fails
+            normalized_logs.append(log)
+            
+        result["logs"] = normalized_logs
+        return result
 
     def method_update_fusion_config(self, **kwargs) -> dict:
         """Save source orchestration settings (Enabled toggles, Timezones)."""
@@ -645,8 +676,7 @@ class App:
         if filepath == "ALL":
             count = self._stop_all_workspace_tailers(workspace_id)
             return {"status": "stopped", "count": count}
-
-        abs_path = os.path.abspath(filepath)
+        abs_path = os.path.abspath(filepath).replace("\\", "/")
         key = f"{workspace_id}:{abs_path}"
 
         if key in self.tailers:
@@ -764,7 +794,7 @@ class App:
 
 
     def method_is_tailing(self, filepath: str, workspace_id: str) -> bool:
-        abs_path = os.path.abspath(filepath)
+        abs_path = os.path.abspath(filepath).replace("\\", "/")
         key = f"{workspace_id}:{abs_path}"
         return key in self.tailers and self.tailers[key].running
 
@@ -814,6 +844,13 @@ class App:
                 (session_id, params.workspace_id, name)
             )
 
+        # 0. Fetch existing provider-specific taskId if it exists
+        provider_session_id = params.provider_session_id
+        if not provider_session_id:
+            cursor.execute("SELECT provider_session_id FROM ai_sessions WHERE session_id = ?", (session_id,))
+            row = cursor.fetchone()
+            provider_session_id = row[0] if row else None
+
         # 1. Fetch contextual logs if IDs provided
         log_context = ""
         if params.context_logs:
@@ -828,34 +865,44 @@ class App:
 
         # 2. Record User Message
         cursor.execute(
-            "INSERT INTO ai_messages (session_id, role, content, context_logs) VALUES (?, ?, ?, ?)",
-            (session_id, "user", params.message, json.dumps(params.context_logs or []))
+            "INSERT INTO ai_messages (session_id, role, content, context_logs, provider_session_id) VALUES (?, ?, ?, ?, ?)",
+            (session_id, "user", params.message, json.dumps(params.context_logs or []), provider_session_id)
         )
 
         # 3. Pull Full History for the LLM
         cursor.execute(
-            "SELECT role, content FROM ai_messages WHERE session_id = ? ORDER BY timestamp ASC",
+            "SELECT role, content, provider_session_id FROM ai_messages WHERE session_id = ? ORDER BY timestamp ASC",
             (session_id,)
         )
-        history = [AIChatMessage(role=row[0], content=row[1]) for row in cursor.fetchall()]
+        history = [AIChatMessage(role=r[0], content=r[1], provider_session_id=r[2]) for r in cursor.fetchall()]
         
-        # Inject log context into the prompt if needed (usually in the last user message or as a system prompt modification)
-        if log_context:
+        # Inject log context into the prompt
+        if log_context and history:
              history[-1].content += log_context
 
-        # 4. Call AI synchronously for simplicity in JSON-RPC (async handled by provider)
-        response_msg = await self.ai.chat(history, model=params.model, session_id=session_id)
+        # 4. Call AI with provider-specific context
+        response_msg = await self.ai.chat(
+            history, 
+            model=params.model, 
+            session_id=session_id, 
+            provider_session_id=provider_session_id
+        )
 
         # 5. Record Assistant Message
         cursor.execute(
-            "INSERT INTO ai_messages (session_id, role, content) VALUES (?, ?, ?)",
-            (session_id, "assistant", response_msg.content)
+            "INSERT INTO ai_messages (session_id, role, content, provider_session_id) VALUES (?, ?, ?, ?)",
+            (session_id, "assistant", response_msg.content, response_msg.provider_session_id)
         )
         
-        # 6. Update session last_modified timestamp
+        # 6. Update session metadata (taskId + last_modified)
+        updates = {"last_modified": datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
+        if response_msg.provider_session_id:
+             updates["provider_session_id"] = response_msg.provider_session_id
+        
+        update_clause = ", ".join([f"{k} = ?" for k in updates.keys()])
         cursor.execute(
-            "UPDATE ai_sessions SET last_modified = ? WHERE session_id = ?",
-            (datetime.now().strftime("%Y-%m-%d %H:%M:%S"), session_id)
+            f"UPDATE ai_sessions SET {update_clause} WHERE session_id = ?",
+            list(updates.values()) + [session_id]
         )
         
         self.db.commit()
@@ -989,6 +1036,7 @@ class App:
             self.ai = AIProviderFactory.get_provider(
                 provider,
                 api_key=current_settings.get("ai_api_key", ""),
+                system_prompt=current_settings.get("ai_system_prompt", ""),
                 host=host
             )
         
@@ -1020,7 +1068,36 @@ class App:
                 status=500
             )
 
-def on_cleanup(_app):
+    def method_get_health(self) -> dict:
+        """Fetch sidecar internal health and status metrics."""
+        cursor = self.db.get_cursor()
+        
+        # 1. DB Stats
+        cursor.execute("SELECT COUNT(*) FROM logs")
+        total_logs = cursor.fetchone()[0]
+        
+        cursor.execute("SELECT COUNT(*) FROM clusters")
+        total_clusters = cursor.fetchone()[0]
+
+        # 2. Tailer Stats
+        active_tailers = [k for k, t in self.tailers.items() if t.running]
+        
+        # 3. Uptime calculation
+        uptime_sec = 0
+        if hasattr(self, "_start_time"):
+            uptime_sec = int(time.time() - self._start_time)
+
+        return {
+            "status": "ok",
+            "uptime_seconds": uptime_sec,
+            "database": {
+                "logs": total_logs,
+                "clusters": total_clusters
+            },
+            "active_tailers": len(active_tailers),
+            "tailer_keys": active_tailers
+        }
+async def on_cleanup(_app):
     Database.reset()
 
 def run_http(port=5000):
@@ -1098,7 +1175,7 @@ def run_stdio():
 
 def main():
     if "--dev" in sys.argv:
-        run_http(5000)
+        run_http(4001)
     else:
         run_stdio()
 
