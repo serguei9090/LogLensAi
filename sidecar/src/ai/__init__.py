@@ -11,4 +11,4 @@ class AIProviderFactory:
         elif provider_name == "ollama":
             return OllamaProvider(host=kwargs.get("host", "http://localhost:11434"))
         else:
-            return GeminiCLIProvider()
+            return GeminiCLIProvider(host=kwargs.get("host", "http://localhost:22436"))

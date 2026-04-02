@@ -6,7 +6,9 @@
   "scripts": {
     "dev": "vite",
     "dev:api": "powershell -ExecutionPolicy Bypass -File scripts/clean-sidecar.ps1 ; uv run sidecar/main.py --dev",
-    "dev:all": "bun x concurrently \"bun run dev:api\" \"bun run tauri dev\"",
+    "dev:gemini": "powershell -ExecutionPolicy Bypass -File scripts/start-gemini-hot.ps1",
+    "setup:gemini": "powershell -ExecutionPolicy Bypass -File scripts/setup-gemini-hot.ps1",
+    "dev:all": "bun x concurrently \"bun run dev:api\" \"bun run dev:gemini\" \"bun run tauri dev\"",
     "build": "tsc && vite build",
     "preview": "vite preview",
     "tauri": "tauri",

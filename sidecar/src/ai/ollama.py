@@ -23,7 +23,7 @@ class OllamaProvider(AIProvider):
         except Exception:
             return ["llama3", "mistral"]
 
-    async def chat(self, messages: List[AIChatMessage], model: str = "llama3") -> AIChatMessage:
+    async def chat(self, messages: List[AIChatMessage], model: str = "llama3", session_id: Optional[str] = None) -> AIChatMessage:
         """Sends a message to Ollama."""
         ollama_messages = [{"role": msg.role, "content": msg.content} for msg in messages]
         

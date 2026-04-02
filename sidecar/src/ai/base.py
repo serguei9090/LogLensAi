@@ -17,7 +17,7 @@ class AIProvider(ABC):
         pass
 
     @abstractmethod
-    async def chat(self, messages: List[AIChatMessage], model: Optional[str] = None) -> AIChatMessage:
+    async def chat(self, messages: List[AIChatMessage], model: Optional[str] = None, session_id: Optional[str] = None) -> AIChatMessage:
         """Execute a chat session with memory/context."""
         pass
 

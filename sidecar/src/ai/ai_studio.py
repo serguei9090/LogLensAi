@@ -31,7 +31,7 @@ class AIStudioProvider(AIProvider):
         except Exception:
             return [DEFAULT_MODEL, "gemini-2.0-pro-exp-02-05"]
 
-    async def chat(self, messages: List[AIChatMessage], model: str = DEFAULT_MODEL) -> AIChatMessage:
+    async def chat(self, messages: List[AIChatMessage], model: str = DEFAULT_MODEL, session_id: Optional[str] = None) -> AIChatMessage:
         """Sends a message to Gemini via ADK Agent."""
         if not self.api_key:
             return AIChatMessage(role="assistant", content="Error: No API Key configured for AI Studio.")
@@ -54,13 +54,12 @@ class AIStudioProvider(AIProvider):
         # of the current session before running the new message.
         session_service = InMemorySessionService()
         user_id = "default_user"
-        session_id = "temp_session"
-
         # Populate history (all except last message)
+        adk_session_id = session_id or "temp_session"
         for msg in messages[:-1]:
             role = "user" if msg.role == "user" else "model"
             content = types.Content(role=role, parts=[types.Part(text=msg.content)])
-            await session_service.add_message(user_id, session_id, content)
+            await session_service.add_message(user_id, adk_session_id, content)
 
         runner = Runner(agent=agent, app_name="LogLensAi", session_service=session_service)
         
@@ -69,7 +68,7 @@ class AIStudioProvider(AIProvider):
         
         response_text = ""
         try:
-            async for event in runner.run_async(user_id=user_id, session_id=session_id, new_message=content):
+            async for event in runner.run_async(user_id=user_id, session_id=adk_session_id, new_message=content):
                 if event.is_final_response() and event.content:
                     response_text = event.content.parts[0].text
             

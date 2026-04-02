@@ -15,6 +15,7 @@ export interface AppSettings {
   ui_row_height: string;
   ui_font_size: string;
   mcp_server_enabled: boolean;
+  ai_gemini_url: string;
 }
 
 const defaultSettings: AppSettings = {
@@ -28,6 +29,7 @@ const defaultSettings: AppSettings = {
   ui_row_height: "default",
   ui_font_size: "13px",
   mcp_server_enabled: false,
+  ai_gemini_url: "http://localhost:22436",
 };
 
 type SectionId = "ai" | "drain" | "general";
@@ -231,6 +233,24 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
                   </p>
                 </div>
               </div>
+
+              {settings.ai_provider === "gemini-cli" && (
+                <div className="space-y-2 animate-in slide-in-from-top-2 duration-300">
+                  <SectionLabel htmlFor="ai_gemini_url">Gemini CLI A2A Server URL</SectionLabel>
+                  <div className="flex gap-2">
+                    <SettingInput
+                      id="ai_gemini_url"
+                      type="url"
+                      value={settings.ai_gemini_url}
+                      onChange={(e) => update("ai_gemini_url", e.target.value)}
+                      placeholder="http://localhost:22436"
+                    />
+                  </div>
+                  <p className="text-[10px] text-text-muted/50 px-1">
+                    Hot Mode requires the A2A daemon running on this port for sub-second latency.
+                  </p>
+                </div>
+              )}
 
               <div className="space-y-2">
                 <div className="flex items-center gap-2">

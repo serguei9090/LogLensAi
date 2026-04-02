@@ -154,10 +154,13 @@ class App:
         
         # Initialize AI Provider from settings
         settings = self.method_get_settings()
+        provider = settings.get("ai_provider", "gemini-cli")
+        host = settings.get("ai_gemini_url", "http://localhost:22436") if provider == "gemini-cli" else settings.get("ai_ollama_host", "http://localhost:11434")
+        
         self.ai = AIProviderFactory.get_provider(
-            settings.get("ai_provider", "gemini-cli"),
+            provider,
             api_key=settings.get("ai_api_key", ""),
-            host=settings.get("ai_ollama_host", "http://localhost:11434")
+            host=host
         )
         
         init_mcp(self)
@@ -841,7 +844,7 @@ class App:
              history[-1].content += log_context
 
         # 4. Call AI synchronously for simplicity in JSON-RPC (async handled by provider)
-        response_msg = await self.ai.chat(history, model=params.model)
+        response_msg = await self.ai.chat(history, model=params.model, session_id=session_id)
 
         # 5. Record Assistant Message
         cursor.execute(
@@ -856,6 +859,7 @@ class App:
         )
         
         self.db.commit()
+        self._sync_ai_sessions_to_json()
 
         return {
             "session_id": session_id,
@@ -900,6 +904,7 @@ class App:
             (name, datetime.now().strftime("%Y-%m-%d %H:%M:%S"), session_id)
         )
         self.db.commit()
+        self._sync_ai_sessions_to_json()
         return {"status": "ok"}
 
     def method_delete_ai_session(self, session_id: str) -> dict:
@@ -908,6 +913,7 @@ class App:
         cursor.execute("DELETE FROM ai_messages WHERE session_id = ?", (session_id,))
         cursor.execute("DELETE FROM ai_sessions WHERE session_id = ?", (session_id,))
         self.db.commit()
+        self._sync_ai_sessions_to_json()
         return {"status": "ok"}
 
     def method_get_ai_mapping(self, workspace_id: str) -> dict:
@@ -930,6 +936,19 @@ class App:
             except Exception:
                 continue
         return mapping
+
+    def _sync_ai_sessions_to_json(self):
+        """Helper to keep session_names.json in sync with DB for Gemini CLI parity."""
+        try:
+            cursor = self.db.get_cursor()
+            cursor.execute("SELECT session_id, name FROM ai_sessions")
+            sessions = {row[0]: row[1] for row in cursor.fetchall()}
+            
+            os.makedirs("gemini_sessions", exist_ok=True)
+            with open("gemini_sessions/session_names.json", "w", encoding="utf-8") as f:
+                json.dump(sessions, f, indent=2)
+        except Exception:
+            pass # Non-critical
         
     def method_get_settings(self) -> dict:
         cursor = self.db.get_cursor()
@@ -962,12 +981,15 @@ class App:
             cursor.execute(query, (k, str(v)))
 
         # Re-initialize AI Provider if relevant settings changed
-        if any(k in settings for k in ["ai_provider", "ai_api_key", "ai_ollama_host"]):
+        if any(k in settings for k in ["ai_provider", "ai_api_key", "ai_ollama_host", "ai_gemini_url"]):
             current_settings = self.method_get_settings()
+            provider = current_settings.get("ai_provider", "gemini-cli")
+            host = current_settings.get("ai_gemini_url", "http://localhost:22436") if provider == "gemini-cli" else current_settings.get("ai_ollama_host", "http://localhost:11434")
+            
             self.ai = AIProviderFactory.get_provider(
-                current_settings.get("ai_provider", "gemini-cli"),
+                provider,
                 api_key=current_settings.get("ai_api_key", ""),
-                host=current_settings.get("ai_ollama_host", "http://localhost:11434")
+                host=host
             )
         
         self.db.commit()
