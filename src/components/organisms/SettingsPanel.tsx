@@ -5,34 +5,9 @@ import { useState, useEffect } from "react";
 import { Switch } from "@/components/ui/switch";
 import { callSidecar } from "@/lib/hooks/useSidecarBridge";
 
-export interface AppSettings {
-  ai_provider: string;
-  ai_api_key: string;
-  ai_system_prompt: string;
-  drain_similarity_threshold: number;
-  drain_max_children: number;
-  drain_max_clusters: number;
-  ui_row_height: string;
-  ui_font_size: string;
-  mcp_server_enabled: boolean;
-  ai_gemini_url: string;
-  ai_ollama_host: string;
-}
+import { type AppSettings, defaultSettings } from "@/store/settingsStore";
 
-const defaultSettings: AppSettings = {
-  ai_provider: "gemini-cli",
-  ai_api_key: "",
-  ai_system_prompt:
-    "You are LogLens Assistant, a senior DevOps engineer and SRE specializing in root cause analysis.",
-  drain_similarity_threshold: 0.5,
-  drain_max_children: 100,
-  drain_max_clusters: 1000,
-  ui_row_height: "36px",
-  ui_font_size: "13px",
-  mcp_server_enabled: false,
-  ai_gemini_url: "http://localhost:22436",
-  ai_ollama_host: "http://localhost:11434",
-};
+// Removed local duplicate defaultSettings
 
 type SectionId = "ai" | "drain" | "general";
 
@@ -238,9 +213,26 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
               </div>
 
               {settings.ai_provider === "gemini-cli" && (
-                <div className="space-y-2 animate-in slide-in-from-top-2 duration-300">
-                  <SectionLabel htmlFor="ai_gemini_url">Gemini CLI A2A Server URL</SectionLabel>
-                  <div className="flex gap-2">
+                <div className="grid grid-cols-2 gap-8 pt-4 border-t border-border/30 animate-in slide-in-from-top-2 duration-300">
+                  <div className="space-y-2">
+                    <SectionLabel htmlFor="ai_model">Gemini Model Strategy</SectionLabel>
+                    <SettingSelect
+                      value={settings.ai_model}
+                      onChange={(v) => update("ai_model", v)}
+                    >
+                      <option value="flash">Flash (Default - Fast)</option>
+                      <option value="pro">Pro (Complex Logic)</option>
+                      <option value="flash-lite">Flash Lite (Ultra Light)</option>
+                      <option value="auto">Auto (Best Match)</option>
+                      <option value="auto-gemini-3">Auto Gemini 3</option>
+                      <option value="auto-gemini-2.5">Auto Gemini 2.5</option>
+                    </SettingSelect>
+                    <p className="text-[10px] text-text-muted/50 px-1">
+                      Choose 'Flash' for speed or 'Pro' for deeper analysis.
+                    </p>
+                  </div>
+                  <div className="space-y-2">
+                    <SectionLabel htmlFor="ai_gemini_url">A2A Server URL</SectionLabel>
                     <SettingInput
                       id="ai_gemini_url"
                       type="url"
@@ -248,10 +240,10 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
                       onChange={(e) => update("ai_gemini_url", e.target.value)}
                       placeholder="http://localhost:22436"
                     />
+                    <p className="text-[10px] text-text-muted/50 px-1">
+                      Daemon port for Hot Mode.
+                    </p>
                   </div>
-                  <p className="text-[10px] text-text-muted/50 px-1">
-                    Hot Mode requires the A2A daemon running on this port for sub-second latency.
-                  </p>
                 </div>
               )}
 

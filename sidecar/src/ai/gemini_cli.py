@@ -15,9 +15,10 @@ class GeminiCLIProvider(AIProvider):
     
     DEFAULT_MODEL = "gemini-2.5-flash"
 
-    def __init__(self, host: str = "http://localhost:22436", system_prompt: str = ""):
+    def __init__(self, host: str = "http://localhost:22436", system_prompt: str = "", model: Optional[str] = None):
         super().__init__(system_prompt=system_prompt)
         self.host = host.rstrip("/")
+        self.active_model = model or self.DEFAULT_MODEL
         # session_id -> taskId mapping to achieve Hot Mode persistence
         self._task_cache = {} 
         self.timeout = aiohttp.ClientTimeout(total=30)
@@ -49,7 +50,7 @@ class GeminiCLIProvider(AIProvider):
 
         if not task_id:
             # 3. Create new task if needed
-            target_model = model or self.DEFAULT_MODEL
+            target_model = model or self.active_model
             payload = {
                 "model": target_model,
                 "agentSettings": {
@@ -191,7 +192,7 @@ class GeminiCLIProvider(AIProvider):
 
     async def _chat_cold(self, messages: List[AIChatMessage], model: Optional[str] = None) -> AIChatMessage:
         """Original Cold Mode logic as a fallback."""
-        target_model = model or self.DEFAULT_MODEL
+        target_model = model or self.active_model
         prompt_parts = []
         for msg in messages:
             prefix = "User" if msg.role == "user" else "Assistant"
@@ -235,7 +236,7 @@ class GeminiCLIProvider(AIProvider):
         try:
              process = await asyncio.create_subprocess_exec(
                 "gemini", "-p", prompt, 
-                "-m", self.DEFAULT_MODEL,
+                "-m", self.active_model,
                 "-o", "json", 
                 "--raw-output", "--accept-raw-output-risk",
                 stdout=asyncio.subprocess.PIPE,

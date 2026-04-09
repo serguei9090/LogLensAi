@@ -25,3 +25,6 @@ This document tracks identified bugs, root causes, and their permanent fixes to 
 | 2026-04-01 | A2A Server 500 Error | Presence of redundant `messageId` field in JSON-RPC payload | Aligned `gemini_cli.py` payload to match user's working `chat_session.js` exactly | @antigravity |
 | 2026-04-01 | AI Context Loss on Server Restart | A2A and AI Studio sessions are transient and lost on task expiration | Implemented **Universal Auto-Healing** (Context Injection) using DuckDB as truth | @antigravity |
 | 2026-04-01 | Gemini CLI Fallback NameError | Missing `import sys` in `gemini_cli.py` during error logging | Added missing import and standardized log output | @antigravity |
+| 2026-04-02 | Gemini Sidecar 500 (JSON) | DuckDB datetimes are not JSON serializable | Explicitly stringify all timestamp fields before RPC return | @antigravity |
+| 2026-04-02 | Sidebar Hydration Error | Nested <button> within workspace item in Sidebar.tsx | Replaced outer button with <div role="button"> to allow inner Edit/Delete buttons | @antigravity |
+| 2026-04-02 | Sidecar Settings Desync | AI Provider not re-initialized with saved model on startup | Updated App constructor to load current ai_model from DB before creating the AI factory | @antigravity |

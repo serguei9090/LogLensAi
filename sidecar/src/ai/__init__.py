@@ -14,4 +14,8 @@ class AIProviderFactory:
         elif provider_name == "ollama":
             return OllamaProvider(host=kwargs.get("host", "http://localhost:11434"), system_prompt=system_prompt)
         else:
-            return GeminiCLIProvider(host=kwargs.get("host", "http://localhost:22436"), system_prompt=system_prompt)
+            return GeminiCLIProvider(
+                host=kwargs.get("host", "http://localhost:22436"), 
+                system_prompt=system_prompt,
+                model=kwargs.get("model")
+            )

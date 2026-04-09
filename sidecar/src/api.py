@@ -164,6 +164,7 @@ class App:
             provider,
             api_key=settings.get("ai_api_key", ""),
             system_prompt=settings.get("ai_system_prompt", ""),
+            model=settings.get("ai_model"),
             host=host
         )
         
@@ -584,6 +585,7 @@ class App:
         self.db.commit()
         return {"status": "ok"}
 
+
     def method_get_sample_lines(self, workspace_id: str, source_id: str, limit: int = 10) -> list[str]:
         """Fetch raw lines from a source to help a user define a pattern."""
         cursor = self.db.get_cursor()
@@ -921,7 +923,12 @@ class App:
             (workspace_id,)
         )
         return [
-            {"session_id": row[0], "name": row[1], "created_at": row[2], "last_modified": row[3]} 
+            {
+                "session_id": row[0], 
+                "name": row[1], 
+                "created_at": str(row[2]) if row[2] else None, 
+                "last_modified": str(row[3]) if row[3] else None
+            } 
             for row in cursor.fetchall()
         ]
 
@@ -929,18 +936,20 @@ class App:
         """Fetch all messages for a specific session."""
         cursor = self.db.get_cursor()
         cursor.execute(
-            "SELECT role, content, context_logs, timestamp FROM ai_messages WHERE session_id = ? ORDER BY timestamp ASC",
+            "SELECT id, role, content, context_logs, timestamp FROM ai_messages WHERE session_id = ? ORDER BY timestamp ASC",
             (session_id,)
         )
         return [
             {
-                "role": row[0], 
-                "content": row[1], 
-                "context_logs": json.loads(row[2]) if row[2] else [], 
-                "timestamp": row[3]
+                "id": row[0],
+                "role": row[1], 
+                "content": row[2], 
+                "context_logs": json.loads(row[3]) if row[3] else [], 
+                "timestamp": str(row[4]) if row[4] else None
             } 
             for row in cursor.fetchall()
         ]
+
 
     def method_rename_ai_session(self, session_id: str, name: str) -> dict:
         """Update an investigation session name."""
@@ -1028,7 +1037,7 @@ class App:
             cursor.execute(query, (k, str(v)))
 
         # Re-initialize AI Provider if relevant settings changed
-        if any(k in settings for k in ["ai_provider", "ai_api_key", "ai_ollama_host", "ai_gemini_url"]):
+        if any(k in settings for k in ["ai_provider", "ai_api_key", "ai_ollama_host", "ai_gemini_url", "ai_model"]):
             current_settings = self.method_get_settings()
             provider = current_settings.get("ai_provider", "gemini-cli")
             host = current_settings.get("ai_gemini_url", "http://localhost:22436") if provider == "gemini-cli" else current_settings.get("ai_ollama_host", "http://localhost:11434")
@@ -1037,6 +1046,7 @@ class App:
                 provider,
                 api_key=current_settings.get("ai_api_key", ""),
                 system_prompt=current_settings.get("ai_system_prompt", ""),
+                model=current_settings.get("ai_model"), # Pass the new model setting
                 host=host
             )
         
@@ -1058,12 +1068,14 @@ class App:
                 }, 
                 status=400
             )
-        except Exception:
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
             return web.json_response(
                 {
                     "jsonrpc": "2.0", 
                     "id": None, 
-                    "error": {"code": -32603, "message": "Internal error"}
+                    "error": {"code": -32603, "message": f"Internal error: {str(e)}"}
                 }, 
                 status=500
             )

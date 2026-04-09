@@ -4,6 +4,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useAiStore } from "@/store/aiStore";
 import { useInvestigationStore } from "@/store/investigationStore";
 import { useWorkspaceStore, selectActiveWorkspace } from "@/store/workspaceStore";
+import { useSettingsStore } from "@/store/settingsStore";
 import { 
   Sparkles, 
   Send, 
@@ -43,6 +44,7 @@ export function AIInvestigationSidebar() {
   } = useAiStore();
   
   const activeWorkspace = useWorkspaceStore(selectActiveWorkspace);
+  const { settings, fetchSettings } = useSettingsStore();
   const { selectedLogIds, clearSelection } = useInvestigationStore();
   
   const [inputValue, setInputValue] = useState("");
@@ -63,7 +65,8 @@ export function AIInvestigationSidebar() {
     if (activeWorkspace?.id) {
       fetchSessions(activeWorkspace.id);
     }
-  }, [activeWorkspace?.id, fetchSessions]);
+    fetchSettings();
+  }, [activeWorkspace?.id, fetchSessions, fetchSettings]);
 
   useEffect(() => {
     if (!currentSessionId && !pendingSessionName) {
@@ -95,7 +98,7 @@ export function AIInvestigationSidebar() {
       workspace_id: activeWorkspace.id,
       message,
       context_logs: selectedLogIds,
-      model: "gemini-2.5-flash",
+      model: settings.ai_model,
       session_name: currentSessionId ? undefined : pendingSessionName
     });
     

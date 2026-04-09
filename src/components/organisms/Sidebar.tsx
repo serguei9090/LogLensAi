@@ -125,11 +125,18 @@ export function Sidebar({
               {workspaces.map((ws) => {
                 const isRenaming = renamingId === ws.id;
                 const WorkspaceItem = (
-                  <button
-                    type="button"
+                  <div
+                    role="button"
+                    tabIndex={0}
                     onClick={() => onWorkspaceSelect(ws.id)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        onWorkspaceSelect(ws.id);
+                      }
+                    }}
                     className={cn(
-                      "group w-full flex items-center px-3 py-2.5 text-[13px] rounded-md transition-all text-left outline-none overflow-hidden border-none bg-transparent",
+                      "group w-full flex items-center px-3 py-2.5 text-[13px] rounded-md transition-all text-left outline-none overflow-hidden border-none bg-transparent cursor-pointer",
                       activeWorkspaceId === ws.id
                         ? "bg-[#22C55E10] text-[#22C55E] font-medium border border-[#22C55E20]"
                         : "text-[#8FA898] hover:bg-[#1E2520] hover:text-[#E8F5EC]",
@@ -174,7 +181,7 @@ export function Sidebar({
                         )}
                       </div>
                     )}
-                  </button>
+                  </div>
                 );
 
                 let finalItem = WorkspaceItem;
