@@ -1,7 +1,7 @@
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { callSidecar } from "@/lib/hooks/useSidecarBridge";
 import { cn } from "@/lib/utils";
-import { Clock, Info, Save, Search, Terminal, Trash2, Wand2, X } from "lucide-react";
+import { Clock, Info, Search, Terminal, Trash2, Wand2, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 

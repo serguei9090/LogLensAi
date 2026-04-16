@@ -1,9 +1,14 @@
 import { TailSwitch } from "@/components/atoms/TailSwitch";
 import { cn } from "@/lib/utils";
-import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { Code, Folder, FolderOpen, Info, Server, Terminal, Upload, X } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner"; // For environmental feedback
+
+/**
+ * Detects whether the app is running inside a Tauri desktop shell.
+ * When false, we're in web mode and must use browser-native file APIs.
+ */
+const isTauri = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 
 interface ImportFeedModalProps {
   readonly open: boolean;
@@ -53,23 +58,39 @@ export function ImportFeedModal({
   if (!open) return null;
 
   const handleBrowse = async () => {
-    try {
-      const selected = await openDialog({
-        multiple: false,
-        directory: false,
-        title: "Select Log Source",
-        filters: [
-          { name: "Common Logs", extensions: ["log", "syslog", "txt", "json", "csv"] },
-          { name: "All Files", extensions: ["*"] },
-        ],
-      });
+    if (isTauri) {
+      // Desktop mode: use Tauri native file dialog
+      try {
+        const { open: openDialog } = await import("@tauri-apps/plugin-dialog");
+        const selected = await openDialog({
+          multiple: false,
+          directory: false,
+          title: "Select Log Source",
+          filters: [
+            { name: "Common Logs", extensions: ["log", "syslog", "txt", "json", "csv"] },
+            { name: "All Files", extensions: ["*"] },
+          ],
+        });
 
-      if (selected) {
-        setLocalPath(Array.isArray(selected) ? selected[0] : selected);
+        if (selected) {
+          setLocalPath(Array.isArray(selected) ? selected[0] : selected);
+        }
+      } catch (e) {
+        console.warn("Native dialog error:", e);
+        toast.error("Could not open file picker.");
       }
-    } catch (e) {
-      console.warn("Native dialog error:", e);
-      toast.error("Could not open file picker.");
+    } else {
+      // Web mode: use browser file input
+      const input = document.createElement("input");
+      input.type = "file";
+      input.accept = ".log,.syslog,.txt,.json,.csv";
+      input.onchange = () => {
+        const file = input.files?.[0];
+        if (file) {
+          setLocalPath(file.name);
+        }
+      };
+      input.click();
     }
   };
 

@@ -1,3 +1,5 @@
+import { MarkdownContent } from "@/components/atoms/MarkdownContent";
+import { ThinkingBlock } from "@/components/atoms/ThinkingBlock";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Textarea } from "@/components/ui/textarea";
@@ -25,6 +27,19 @@ import {
   DropdownMenuItem, 
   DropdownMenuTrigger 
 } from "@/components/ui/dropdown-menu";
+
+/**
+ * Extracts <think>...</think> blocks from model responses.
+ * Returns the thinking content and the clean response separately.
+ */
+function parseThinking(content: string): { thinking: string | null; response: string } {
+  const match = content.match(/<think>([\s\S]*?)<\/think>/);
+  if (!match) return { thinking: null, response: content };
+  return {
+    thinking: match[1].trim(),
+    response: content.replace(/<think>[\s\S]*?<\/think>/, "").trim(),
+  };
+}
 
 export function AIInvestigationSidebar() {
   const { 
@@ -152,8 +167,8 @@ export function AIInvestigationSidebar() {
 
   return (
     <div 
-      className="flex flex-col border-l border-zinc-800/60 bg-[#0D0F0E] h-full relative"
-      style={{ width: `${sidebarWidth}px` }}
+      className="flex flex-col border-l border-zinc-800/60 bg-[#0D0F0E] h-full relative shrink-0 overflow-hidden"
+      style={{ width: `${sidebarWidth}px`, minWidth: `${sidebarWidth}px`, maxWidth: `${sidebarWidth}px` }}
     >
       {/* Resize Handle */}
       <button
@@ -260,7 +275,7 @@ export function AIInvestigationSidebar() {
         </div>
       </div>
 
-      <ScrollArea className="flex-1">
+      <ScrollArea className="flex-1 min-h-0">
         <div className="p-6 space-y-8">
           {messages.length === 0 ? (
             <div className="space-y-12">
@@ -302,42 +317,55 @@ export function AIInvestigationSidebar() {
               )}
             </div>
           ) : (
-            messages.map((m) => (
-              <div key={m.id} className={cn(
-                "flex gap-4 group",
-                m.role === "user" ? "flex-row-reverse" : "flex-row"
-              )}>
-                <div className={cn(
-                  "w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 border transition-transform group-hover:scale-105",
-                  m.role === "user" ? "bg-zinc-900 border-zinc-800" : "bg-violet-500/10 border-violet-500/20"
+            messages.map((m) => {
+              const isUser = m.role === "user";
+              const { thinking, response } = isUser
+                ? { thinking: null, response: m.content }
+                : parseThinking(m.content);
+
+              return (
+                <div key={m.id} className={cn(
+                  "flex gap-3 group",
+                  isUser ? "flex-row-reverse" : "flex-row"
                 )}>
-                  {m.role === "user" ? <User className="size-4 text-zinc-400" /> : <Bot className="size-4 text-violet-400" />}
-                </div>
-                <div className={cn(
-                  "flex flex-col max-w-[85%] space-y-2",
-                  m.role === "user" ? "items-end" : "items-start"
-                )}>
-                  {m.context_logs && m.context_logs.length > 0 && (
-                    <div className="flex flex-wrap gap-1 mb-1">
-                      <span className="bg-emerald-500/10 px-2 py-0.5 rounded text-[9px] text-emerald-400 border border-emerald-500/20 font-medium">
-                        {m.context_logs.length} logs attached
-                      </span>
-                    </div>
-                  )}
                   <div className={cn(
-                    "px-4 py-3 rounded-2xl text-[13px] leading-relaxed shadow-sm",
-                    m.role === "user" 
-                      ? "bg-zinc-800 text-zinc-100 border border-zinc-700/50 rounded-tr-none" 
-                      : "bg-[#111312] text-zinc-300 border border-zinc-800/60 rounded-tl-none font-medium"
+                    "w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 border transition-transform group-hover:scale-105",
+                    isUser ? "bg-zinc-900 border-zinc-800" : "bg-violet-500/10 border-violet-500/20"
                   )}>
-                    <p className="whitespace-pre-wrap">{m.content}</p>
+                    {isUser ? <User className="size-4 text-zinc-400" /> : <Bot className="size-4 text-violet-400" />}
                   </div>
-                  <span className="text-[9px] text-zinc-600 font-medium px-1 tracking-tight">
-                    {new Date(m.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                  </span>
+                  <div className={cn(
+                    "flex flex-col min-w-0 space-y-2 overflow-hidden",
+                    isUser ? "items-end max-w-[85%]" : "items-start max-w-[90%]"
+                  )}>
+                    {m.context_logs && m.context_logs.length > 0 && (
+                      <div className="flex flex-wrap gap-1 mb-1">
+                        <span className="bg-emerald-500/10 px-2 py-0.5 rounded text-[9px] text-emerald-400 border border-emerald-500/20 font-medium">
+                          {m.context_logs.length} logs attached
+                        </span>
+                      </div>
+                    )}
+                    <div className={cn(
+                      "px-4 py-3 rounded-2xl text-[13px] leading-relaxed shadow-sm overflow-hidden w-full break-words",
+                      isUser
+                        ? "bg-zinc-800 text-zinc-100 border border-zinc-700/50 rounded-tr-none" 
+                        : "bg-[#111312] text-zinc-300 border border-zinc-800/60 rounded-tl-none"
+                    )}
+                    style={{ overflowWrap: 'anywhere' }}>
+                      {thinking && <ThinkingBlock content={thinking} />}
+                      {isUser ? (
+                        <p className="whitespace-pre-wrap break-words overflow-wrap-anywhere">{response}</p>
+                      ) : (
+                        <MarkdownContent content={response} className="text-zinc-300" />
+                      )}
+                    </div>
+                    <span className="text-[9px] text-zinc-600 font-medium px-1 tracking-tight">
+                      {new Date(m.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </span>
+                  </div>
                 </div>
-              </div>
-            ))
+              );
+            })
           )}
           {isLoading && (
              <div className="flex gap-4">
@@ -380,7 +408,7 @@ export function AIInvestigationSidebar() {
               }
             }}
             placeholder="Search patterns or analyze errors..."
-            className="min-h-[120px] max-h-[400px] bg-zinc-900/50 border-zinc-800 rounded-2xl resize-none py-4 pr-12 focus:ring-emerald-500/20 text-zinc-100 placeholder:text-zinc-600 transition-all focus:border-emerald-500/30"
+            className="min-h-[72px] max-h-[300px] bg-zinc-900/50 border-zinc-800 rounded-2xl resize-none py-3 pr-12 focus:ring-emerald-500/20 text-zinc-100 placeholder:text-zinc-600 transition-all focus:border-emerald-500/30"
           />
           <Button 
             size="icon" 
