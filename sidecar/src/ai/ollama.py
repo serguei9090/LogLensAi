@@ -24,13 +24,15 @@ class OllamaProvider(AIProvider):
     async def list_models(self) -> list[str]:
         """Fetches available models from the local Ollama instance."""
         try:
-            async with aiohttp.ClientSession(timeout=self.timeout) as session:
-                async with session.get(f"{self.host}/api/tags") as resp:
-                    if resp.status != 200:
-                        return [DEFAULT_OLLAMA_MODEL, "llama3", "mistral"]
+            async with (
+                aiohttp.ClientSession(timeout=self.timeout) as session,
+                session.get(f"{self.host}/api/tags") as resp,
+            ):
+                if resp.status != 200:
+                    return [DEFAULT_OLLAMA_MODEL, "llama3", "mistral"]
 
-                    data = await resp.json()
-                    return [m["name"] for m in data.get("models", [])]
+                data = await resp.json()
+                return [m["name"] for m in data.get("models", [])]
         except Exception:
             return [DEFAULT_OLLAMA_MODEL, "llama3", "mistral"]
 
@@ -41,7 +43,7 @@ class OllamaProvider(AIProvider):
         session_id: str | None = None,
         provider_session_id: str | None = None,
     ) -> AIChatMessage:
-        """Sends a message to Ollama."""
+        """Sends a message to Ollama (Non-streaming)."""
         ollama_messages = []
         if self.system_prompt:
             ollama_messages.append({"role": "system", "content": self.system_prompt})
@@ -53,26 +55,65 @@ class OllamaProvider(AIProvider):
         payload = {"model": target_model, "messages": ollama_messages, "stream": False}
 
         try:
-            async with aiohttp.ClientSession(timeout=self.timeout) as session:
-                async with session.post(f"{self.host}/api/chat", json=payload) as resp:
-                    if resp.status != 200:
-                        error_text = await resp.text()
-                        return AIChatMessage(
-                            role="assistant", content=f"Ollama Error: {error_text}"
-                        )
+            async with (
+                aiohttp.ClientSession(timeout=self.timeout) as session,
+                session.post(f"{self.host}/api/chat", json=payload) as resp,
+            ):
+                if resp.status != 200:
+                    error_text = await resp.text()
+                    return AIChatMessage(role="assistant", content=f"Ollama Error: {error_text}")
 
-                    data = await resp.json()
-                    content = data.get("message", {}).get("content", "")
-                    return AIChatMessage(role="assistant", content=content)
+                data = await resp.json()
+                content = data.get("message", {}).get("content", "")
+                return AIChatMessage(role="assistant", content=content)
         except Exception as e:
             return AIChatMessage(role="assistant", content=f"Ollama Connection Error: {str(e)}")
+
+    async def chat_stream(
+        self, session_id: str, messages: list[AIChatMessage], model: str | None = None
+    ):
+        """Sends a message to Ollama and streams tokens."""
+        ollama_messages = []
+        if self.system_prompt:
+            ollama_messages.append({"role": "system", "content": self.system_prompt})
+
+        ollama_messages.extend([{"role": msg.role, "content": msg.content} for msg in messages])
+
+        target_model = model or self.model or DEFAULT_OLLAMA_MODEL
+
+        payload = {"model": target_model, "messages": ollama_messages, "stream": True}
+
+        try:
+            async with (
+                aiohttp.ClientSession(timeout=self.timeout) as session,
+                session.post(f"{self.host}/api/chat", json=payload) as resp,
+            ):
+                if resp.status != 200:
+                    error_text = await resp.text()
+                    yield f"Ollama Error: {error_text}"
+                    return
+
+                async for line in resp.content:
+                    if line:
+                        try:
+                            data = json.loads(line.decode("utf-8"))
+                            chunk = data.get("message", {}).get("content", "")
+                            if chunk:
+                                yield chunk
+                            if data.get("done"):
+                                break
+                        except json.JSONDecodeError:
+                            continue
+        except Exception as e:
+            yield f"Ollama Connection Error: {str(e)}"
 
     async def analyze_logs(
         self, template: str, samples: list[str], model: str | None = None
     ) -> dict:
         """Specific one-off analysis for log clusters using Ollama."""
         prompt = (
-            "You are a Log Analysis Specialist. Return JSON with 'summary', 'root_cause', 'recommended_actions'.\n\n"
+            "You are a Log Analysis Specialist. "
+            "Return JSON with 'summary', 'root_cause', 'recommended_actions'.\n\n"
             f"Cluster template: {template}\nSample logs:\n" + "\n".join(samples)
         )
 
@@ -86,12 +127,14 @@ class OllamaProvider(AIProvider):
         }
 
         try:
-            async with aiohttp.ClientSession(timeout=self.timeout) as session:
-                async with session.post(f"{self.host}/api/generate", json=payload) as resp:
-                    if resp.status != 200:
-                        raise RuntimeError(f"Ollama returned status {resp.status}")
+            async with (
+                aiohttp.ClientSession(timeout=self.timeout) as session,
+                session.post(f"{self.host}/api/generate", json=payload) as resp,
+            ):
+                if resp.status != 200:
+                    raise RuntimeError(f"Ollama returned status {resp.status}")
 
-                    data = await resp.json()
-                    return json.loads(data.get("response", "{}"))
+                data = await resp.json()
+                return json.loads(data.get("response", "{}"))
         except Exception as e:
             return {"summary": "Analysis failed", "root_cause": str(e), "recommended_actions": []}

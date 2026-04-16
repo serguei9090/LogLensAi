@@ -2,12 +2,21 @@ import { HelpTooltip } from "@/components/atoms/HelpTooltip";
 import { Switch } from "@/components/ui/switch";
 import { callSidecar } from "@/lib/hooks/useSidecarBridge";
 import { cn } from "@/lib/utils";
-import { Bot, Check, Cpu, Layers, Palette, Save, Terminal } from "lucide-react";
+import {
+  Bot,
+  Check,
+  ChevronDown,
+  ChevronRight,
+  Cpu,
+  Layers,
+  Palette,
+  Plus,
+  Save,
+  Terminal,
+} from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { type AppSettings, defaultSettings } from "@/store/settingsStore";
-
-// Removed local duplicate defaultSettings
 
 type SectionId = "ai" | "drain" | "general";
 
@@ -81,6 +90,8 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
     "llama3",
     "mistral",
   ]);
+  const [isToolsExpanded, setIsToolsExpanded] = useState(false);
+  const [isSkillModalOpen, setIsSkillModalOpen] = useState(false);
 
   const update = <K extends keyof AppSettings>(key: K, value: AppSettings[K]) =>
     setSettings((prev) => ({ ...prev, [key]: value }));
@@ -344,34 +355,67 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
                 />
               </div>
 
-              <div className="space-y-4 pt-4 border-t border-border/30">
-                <SectionLabel>Skills & Memory</SectionLabel>
-
-                <div className="flex items-center justify-between bg-bg-surface/50 border border-border rounded-xl p-4 hover:bg-bg-surface transition-colors">
-                  <div>
-                    <p className="text-sm font-bold text-text-primary">Enable Log Search Tool</p>
-                    <p className="text-[10px] text-text-muted mt-0.5">
-                      Allow AI to autonomously search the DuckDB storage for error contexts.
-                    </p>
+              <div className="pt-4 border-t border-border/30">
+                <button
+                  type="button"
+                  onClick={() => setIsToolsExpanded(!isToolsExpanded)}
+                  className="w-full flex items-center justify-between py-2 text-left group"
+                >
+                  <SectionLabel>Tools & Skills</SectionLabel>
+                  <div className="text-text-muted group-hover:text-text-primary transition-colors pr-2">
+                    {isToolsExpanded ? (
+                      <ChevronDown className="size-4" />
+                    ) : (
+                      <ChevronRight className="size-4" />
+                    )}
                   </div>
-                  <Switch
-                    checked={settings.ai_tool_search}
-                    onCheckedChange={(checked) => update("ai_tool_search", checked)}
-                  />
-                </div>
+                </button>
 
-                <div className="flex items-center justify-between bg-bg-surface/50 border border-border rounded-xl p-4 hover:bg-bg-surface transition-colors">
-                  <div>
-                    <p className="text-sm font-bold text-text-primary">Enable Associative Memory</p>
-                    <p className="text-[10px] text-text-muted mt-0.5">
-                      Allow AI to save and autonomously retrieve past issue resolutions.
-                    </p>
+                {isToolsExpanded && (
+                  <div className="mt-3 space-y-4 px-1">
+                    <div className="flex items-center justify-between bg-bg-surface/50 border border-border rounded-xl p-4 hover:bg-bg-surface transition-colors">
+                      <div>
+                        <p className="text-sm font-bold text-text-primary">
+                          Enable Log Search Tool
+                        </p>
+                        <p className="text-[10px] text-text-muted mt-0.5">
+                          Allow AI to autonomously search the DuckDB storage for error contexts.
+                        </p>
+                      </div>
+                      <Switch
+                        checked={settings.ai_tool_search}
+                        onCheckedChange={(checked) => update("ai_tool_search", checked)}
+                      />
+                    </div>
+
+                    <div className="flex items-center justify-between bg-bg-surface/50 border border-border rounded-xl p-4 hover:bg-bg-surface transition-colors">
+                      <div>
+                        <p className="text-sm font-bold text-text-primary">
+                          Enable Associative Memory
+                        </p>
+                        <p className="text-[10px] text-text-muted mt-0.5">
+                          Allow AI to save and autonomously retrieve past issue resolutions.
+                        </p>
+                      </div>
+                      <Switch
+                        checked={settings.ai_tool_memory}
+                        onCheckedChange={(checked) => update("ai_tool_memory", checked)}
+                      />
+                    </div>
+
+                    <div className="flex items-center justify-between pt-2">
+                      <p className="text-sm font-bold text-text-primary pl-2">Custom Skills</p>
+                      <button
+                        type="button"
+                        onClick={() => setIsSkillModalOpen(true)}
+                        className="flex items-center gap-1.5 px-3 py-1.5 bg-primary/10 text-primary hover:bg-primary/20 rounded-lg text-xs font-semibold transition-colors"
+                      >
+                        <Plus className="size-3" />
+                        Add Skill
+                      </button>
+                    </div>
                   </div>
-                  <Switch
-                    checked={settings.ai_tool_memory}
-                    onCheckedChange={(checked) => update("ai_tool_memory", checked)}
-                  />
-                </div>
+                )}
               </div>
 
               {settings.ai_provider === "gemini-cli" && (
@@ -549,6 +593,78 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
           )}
         </div>
       </main>
+
+      {/* Add Skill Modal overlay */}
+      {isSkillModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-[#121413] border border-white/10 rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden flex flex-col max-h-[85vh]">
+            <div className="flex items-center justify-between p-4 border-b border-white/5 bg-white/[0.02]">
+              <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                <FolderOpen className="size-4 text-primary" />
+                Add Custom AI Skill
+              </h3>
+              <button
+                type="button"
+                onClick={() => setIsSkillModalOpen(false)}
+                className="p-1 hover:bg-white/10 rounded-md transition-colors text-text-muted hover:text-white"
+              >
+                <X className="size-4" />
+              </button>
+            </div>
+
+            <div className="p-5 space-y-5 overflow-y-auto custom-scrollbar">
+              <div className="space-y-4">
+                <div className="p-3 bg-primary/10 border border-primary/20 rounded-xl">
+                  <p className="text-[11px] text-primary/90 leading-relaxed font-medium">
+                    Skills allow you to create custom AI capabilities (like scripts or prompt
+                    injections) using the Antigravity <code>.agents/skills/</code> architecture.
+                    Upload a valid skill folder containing a <code>SKILL.md</code>.
+                  </p>
+                </div>
+
+                <div className="space-y-3">
+                  <SectionLabel>Skill Name</SectionLabel>
+                  <input
+                    placeholder="e.g. log-summarizer"
+                    className="w-full px-4 py-2.5 rounded-xl text-xs bg-bg-surface border border-border text-text-primary placeholder:text-text-muted/30 focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/20 transition-all"
+                  />
+
+                  <SectionLabel>Upload Skill Directory</SectionLabel>
+                  <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-border/60 rounded-xl hover:bg-white/[0.02] hover:border-primary/50 transition-colors cursor-pointer group">
+                    <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                      <FolderOpen className="size-8 text-text-muted group-hover:text-primary transition-colors mb-2" />
+                      <p className="text-xs text-text-secondary group-hover:text-text-primary font-medium">
+                        Click to select skill folder
+                      </p>
+                      <p className="text-[10px] text-text-muted mt-1">
+                        Must contain a SKILL.md file
+                      </p>
+                    </div>
+                    {/* @ts-ignore */}
+                    <input type="file" webkitdirectory="true" directory="true" className="hidden" />
+                  </label>
+                </div>
+              </div>
+            </div>
+
+            <div className="p-4 border-t border-white/5 bg-white/[0.01] flex justify-end gap-3 shrink-0">
+              <button
+                type="button"
+                onClick={() => setIsSkillModalOpen(false)}
+                className="px-4 py-2 text-xs font-semibold text-text-muted hover:text-white transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="px-5 py-2 text-xs font-bold text-white bg-primary hover:bg-primary-hover rounded-lg transition-colors shadow-lg active:scale-95"
+              >
+                Install Skill
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

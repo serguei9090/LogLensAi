@@ -44,6 +44,7 @@ export function SearchBar({
       />
       {localValue && (
         <button
+          type="button"
           onClick={handleClear}
           className="absolute right-2 top-1/2 -translate-y-1/2 h-5 w-5 rounded-full flex items-center justify-center text-text-muted hover:text-text-primary hover:bg-bg-hover transition-colors focus:outline-none focus:ring-1 focus:ring-primary"
           aria-label="Clear search"

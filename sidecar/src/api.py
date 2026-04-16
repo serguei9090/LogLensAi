@@ -907,11 +907,10 @@ class App:
         """Fetch models available for the current AI provider."""
         return await self.ai.list_models()
 
-    async def method_send_ai_message(self, **kwargs) -> dict:
-        """Handle multi-turn AI chat investigation session with log context."""
-        params = SendAiMessageRequest(**kwargs)
+    def _prepare_ai_session(
+        self, params: SendAiMessageRequest
+    ) -> tuple[str, str | None, list[AIChatMessage]]:
         cursor = self.db.get_cursor()
-
         import uuid
         from datetime import datetime
 
@@ -926,7 +925,6 @@ class App:
                 (session_id, params.workspace_id, name),
             )
 
-        # 0. Fetch existing provider-specific taskId if it exists
         provider_session_id = params.provider_session_id
         if not provider_session_id:
             cursor.execute(
@@ -935,7 +933,6 @@ class App:
             row = cursor.fetchone()
             provider_session_id = row[0] if row else None
 
-        # 1. Fetch contextual logs if IDs provided
         log_context = ""
         if params.context_logs:
             placeholders = ",".join(["?"] * len(params.context_logs))
@@ -946,7 +943,6 @@ class App:
             if logs:
                 log_context = "\n\nContextual Log Lines:\n" + "\n".join([l[0] for l in logs])
 
-        # 2. Record User Message
         cursor.execute(
             "INSERT INTO ai_messages (session_id, role, content, context_logs, provider_session_id) VALUES (?, ?, ?, ?, ?)",
             (
@@ -958,7 +954,6 @@ class App:
             ),
         )
 
-        # 3. Pull Full History for the LLM
         cursor.execute(
             "SELECT role, content, provider_session_id FROM ai_messages WHERE session_id = ? ORDER BY timestamp ASC",
             (session_id,),
@@ -968,9 +963,41 @@ class App:
             for r in cursor.fetchall()
         ]
 
-        # Inject log context into the prompt
         if log_context and history:
             history[-1].content += log_context
+
+        self.db.commit()
+        return session_id, provider_session_id, history
+
+    def _finalize_ai_session(
+        self, session_id: str, response_content: str, provider_session_id: str | None
+    ):
+        from datetime import datetime
+
+        cursor = self.db.get_cursor()
+
+        cursor.execute(
+            "INSERT INTO ai_messages (session_id, role, content, provider_session_id) VALUES (?, ?, ?, ?)",
+            (session_id, "assistant", response_content, provider_session_id),
+        )
+
+        updates = {"last_modified": datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
+        if provider_session_id:
+            updates["provider_session_id"] = provider_session_id
+
+        update_clause = ", ".join([f"{k} = ?" for k in updates])
+        cursor.execute(
+            f"UPDATE ai_sessions SET {update_clause} WHERE session_id = ?",
+            list(updates.values()) + [session_id],
+        )
+
+        self.db.commit()
+        self._sync_ai_sessions_to_json()
+
+    async def method_send_ai_message(self, **kwargs) -> dict:
+        """Handle multi-turn AI chat investigation session with log context."""
+        params = SendAiMessageRequest(**kwargs)
+        session_id, provider_session_id, history = self._prepare_ai_session(params)
 
         # 4. Call AI with provider-specific context
         response_msg = await self.ai.chat(
@@ -981,24 +1008,9 @@ class App:
         )
 
         # 5. Record Assistant Message
-        cursor.execute(
-            "INSERT INTO ai_messages (session_id, role, content, provider_session_id) VALUES (?, ?, ?, ?)",
-            (session_id, "assistant", response_msg.content, response_msg.provider_session_id),
+        self._finalize_ai_session(
+            session_id, response_msg.content, response_msg.provider_session_id
         )
-
-        # 6. Update session metadata (taskId + last_modified)
-        updates = {"last_modified": datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
-        if response_msg.provider_session_id:
-            updates["provider_session_id"] = response_msg.provider_session_id
-
-        update_clause = ", ".join([f"{k} = ?" for k in updates])
-        cursor.execute(
-            f"UPDATE ai_sessions SET {update_clause} WHERE session_id = ?",
-            list(updates.values()) + [session_id],
-        )
-
-        self.db.commit()
-        self._sync_ai_sessions_to_json()
 
         return {"session_id": session_id, "response": response_msg.content}
 
@@ -1209,6 +1221,74 @@ class App:
                 status=500,
             )
 
+    async def aiohttp_stream_chat(self, request):
+        try:
+            body = await request.json()
+            # If standard JSON-RPC payload contains params
+            if "params" in body:
+                params = SendAiMessageRequest(**body["params"])
+            else:
+                params = SendAiMessageRequest(**body)
+        except ValidationError as e:
+            return web.Response(status=400, text=f"Invalid Params: {e.errors()}")
+        except Exception as e:
+            return web.Response(status=400, text=f"Malformed JSON: {e}")
+
+        response = web.StreamResponse(
+            status=200,
+            reason="OK",
+            headers={
+                "Content-Type": "text/event-stream",
+                "Cache-Control": "no-cache",
+                "Connection": "keep-alive",
+            },
+        )
+        await response.prepare(request)
+
+        try:
+            session_id, provider_session_id, history = self._prepare_ai_session(params)
+
+            # Send initial session ID to UI
+            await response.write(f"data: {json.dumps({'session_id': session_id})}\n\n".encode())
+
+            full_text = []
+            if hasattr(self.ai, "chat_stream"):
+                async for chunk in self.ai.chat_stream(session_id, history, params.model):
+                    full_text.append(chunk)
+                    # We pass 'provider_session_id' dynamically tracking in _task_cache later.
+                    payload = {"chunk": chunk}
+                    await response.write(f"data: {json.dumps(payload)}\n\n".encode())
+            else:
+                # Fallback to cold full fetch if provider does not support stream
+                resp_msg = await self.ai.chat(
+                    history,
+                    model=params.model,
+                    session_id=session_id,
+                    provider_session_id=provider_session_id,
+                )
+                full_text.append(resp_msg.content)
+                await response.write(
+                    f"data: {json.dumps({'chunk': resp_msg.content})}\n\n".encode()
+                )
+
+            final_text = "".join(full_text)
+
+            # Retrieve latest task id from _task_cache if using Gemini, else fall back
+            final_provider_session_id = provider_session_id
+            if hasattr(self.ai, "_task_cache") and session_id in self.ai._task_cache:
+                final_provider_session_id = self.ai._task_cache.get(session_id)
+
+            self._finalize_ai_session(session_id, final_text, final_provider_session_id)
+
+            await response.write(b"data: [DONE]\n\n")
+            return response
+        except Exception as e:
+            import traceback
+
+            traceback.print_exc()
+            await response.write(f"data: {json.dumps({'error': str(e)})}\n\n".encode())
+            return response
+
     def method_get_health(self) -> dict:
         """Fetch sidecar internal health and status metrics."""
         cursor = self.db.get_cursor()
@@ -1261,6 +1341,10 @@ def run_http(port=5000):
     resource = server.router.add_resource("/rpc")
     route = resource.add_route("POST", app.aiohttp_handler)
     cors.add(route)
+
+    stream_resource = server.router.add_resource("/api/stream_chat")
+    stream_route = stream_resource.add_route("POST", app.aiohttp_stream_chat)
+    cors.add(stream_route)
 
     server.on_cleanup.append(on_cleanup)
     web.run_app(server, host="127.0.0.1", port=port)

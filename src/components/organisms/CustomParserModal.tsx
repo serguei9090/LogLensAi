@@ -148,7 +148,7 @@ export function CustomParserModal({
     }
 
     try {
-      const jsRegexStr = regexPattern.replace(/\?P<(\w+)>/g, "").replace(/\\/g, "\\");
+      const jsRegexStr = regexPattern.replaceAll(/\?P<(\w+)>/g, "").replaceAll(/\\/g, "\\\\");
       const jsRegex = new RegExp(jsRegexStr);
 
       const previews = samples.map((line) => {

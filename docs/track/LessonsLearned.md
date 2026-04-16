@@ -4,6 +4,7 @@ This document tracks identified bugs, root causes, and their permanent fixes to 
 
 | Date | Bug Description | Root Cause | Solution/Fix | Agent |
 | :--- | :--- | :--- | :--- | :--- |
+| 2026-04-16 | UI Parse Crash & Icon 404 | Duplicate `lucide-react` imports and absent Vite generic favicon | Cleared import duplication and added empty data URI favicon link to index.html | @antigravity |
 | 2026-03-24 | DuckDB WAL Lock | Improper `aiohttp` cleanup on Ctrl+C | Implemented `on_cleanup` hook to reset DB | @jules |
 | 2026-03-25 | Workspace Duplication | Frontend race condition on init | Added Zustand `isInitializing` flag | @engineer |
 | 2026-03-29 | DuckDB Binder Error | SQL Alias mismatch in count_query | Consistent table aliasing with 'l' in all log fetch paths | @jules |
@@ -28,3 +29,4 @@ This document tracks identified bugs, root causes, and their permanent fixes to 
 | 2026-04-02 | Gemini Sidecar 500 (JSON) | DuckDB datetimes are not JSON serializable | Explicitly stringify all timestamp fields before RPC return | @antigravity |
 | 2026-04-02 | Sidebar Hydration Error | Nested <button> within workspace item in Sidebar.tsx | Replaced outer button with <div role="button"> to allow inner Edit/Delete buttons | @antigravity |
 | 2026-04-02 | Sidecar Settings Desync | AI Provider not re-initialized with saved model on startup | Updated App constructor to load current ai_model from DB before creating the AI factory | @antigravity |
+| 2026-04-16 | AI Streaming & Thinking Loss | Lack of chat_stream in Ollama and premature collapse of thinking blocks | Implemented Ollama streaming, refined unclosed <think> tag parsing, and added 2s retraction delay | @antigravity |

@@ -30,17 +30,53 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 /**
  * Extracts <think>...</think> blocks from model responses.
- * Returns the thinking content and the clean response separately.
+ * Returns the thinking content and the clean response separately,
+ * and handles unclosed tags during active streaming.
  */
-function parseThinking(content: string): { thinking: string | null; response: string } {
-  const match = content.match(/<think>([\s\S]*?)<\/think>/);
-  if (!match) {
-    return { thinking: null, response: content };
+function parseThinking(content: string): {
+  thinking: string | null;
+  response: string;
+  isStreamingThink: boolean;
+} {
+  if (!content) return { thinking: null, response: "", isStreamingThink: false };
+
+  // 1. Check for fully closed think block
+  const closedMatch = content.match(/<think>([\s\S]*?)<\/think>/);
+  if (closedMatch) {
+    const rawResponse = content.replace(/<think>[\s\S]*?<\/think>/g, "").trim();
+    return {
+      thinking: closedMatch[1].trim(),
+      response: rawResponse,
+      isStreamingThink: false,
+    };
   }
-  return {
-    thinking: match[1].trim(),
-    response: content.replace(/<think>[\s\S]*?<\/think>/, "").trim(),
-  };
+
+  // 2. Check for active unclosed think block (streaming)
+  const openTagIndex = content.indexOf("<think>");
+  if (openTagIndex !== -1) {
+    const thinkingPart = content.substring(openTagIndex + 7);
+    const responsePart = content.substring(0, openTagIndex).trim();
+
+    // If it started <think> but hasn't closed, we are streaming thinking
+    return {
+      thinking: thinkingPart,
+      response: responsePart,
+      isStreamingThink: true,
+    };
+  }
+
+  // 3. Check for partial start tag at the very end of content (e.g. "blabla <thi")
+  // This prevents the tag itself from being rendered as text during the split second it's arriving
+  const partialTagMatch = content.match(/<t(h(i(n(k)?)?)?)?$/i);
+  if (partialTagMatch) {
+    return {
+      thinking: "",
+      response: content.substring(0, partialTagMatch.index).trim(),
+      isStreamingThink: true,
+    };
+  }
+
+  return { thinking: null, response: content, isStreamingThink: false };
 }
 
 export function AIInvestigationSidebar() {
@@ -117,7 +153,8 @@ export function AIInvestigationSidebar() {
     if (scrollRef.current) {
       scrollRef.current.scrollIntoView({ behavior: "smooth" });
     }
-  }, [messages]);
+    // biome-ignore lint/correctness/useExhaustiveDependencies: Auto-scroll when messages update
+  }, [messages.length]);
 
   const handleSend = async () => {
     if (!inputValue.trim() || !activeWorkspace?.id) {
@@ -294,6 +331,7 @@ export function AIInvestigationSidebar() {
                           </span>
                         </DropdownMenuItem>
                         <button
+                          type="button"
                           onClick={(e) => {
                             e.stopPropagation();
                             if (activeWorkspace?.id) {
@@ -351,6 +389,7 @@ export function AIInvestigationSidebar() {
                     {sessions.slice(0, 4).map((s) => (
                       <button
                         key={s.session_id}
+                        type="button"
                         onClick={() => setSession(s.session_id)}
                         className="flex flex-col items-start p-4 text-left bg-zinc-900/40 border border-zinc-800/60 rounded-2xl hover:border-emerald-500/30 hover:bg-emerald-500/[0.02] transition-all group"
                       >
@@ -370,16 +409,30 @@ export function AIInvestigationSidebar() {
               )}
             </div>
           ) : (
-            messages.map((m) => {
+            messages.map((m, index) => {
               const isUser = m.role === "user";
-              const { thinking, response } = isUser
-                ? { thinking: null, response: m.content }
+              const prevMessage = index > 0 ? messages[index - 1] : null;
+              const isSameRoleAsPrev = prevMessage?.role === m.role;
+
+              const { thinking, response, isStreamingThink } = isUser
+                ? { thinking: null, response: m.content, isStreamingThink: false }
                 : parseThinking(m.content);
+
+              const isAssistantAndEmpty = !isUser && !thinking && !response;
+
+              // Hide the empty placeholder bubble if we are still 'isLoading' and it's the tip of the stream
+              if (isAssistantAndEmpty && isLoading && index === messages.length - 1) {
+                return null;
+              }
 
               return (
                 <div
                   key={m.id}
-                  className={cn("flex gap-3 group", isUser ? "flex-row-reverse" : "flex-row")}
+                  className={cn(
+                    "flex gap-3 group",
+                    isUser ? "flex-row-reverse" : "flex-row",
+                    isSameRoleAsPrev ? "mt-1" : "mt-6",
+                  )}
                 >
                   <div
                     className={cn(
@@ -387,6 +440,7 @@ export function AIInvestigationSidebar() {
                       isUser
                         ? "bg-zinc-900 border-zinc-800"
                         : "bg-violet-500/10 border-violet-500/20",
+                      isSameRoleAsPrev && "opacity-0 pointer-events-none", // Hide redundant avatars
                     )}
                   >
                     {isUser ? (
@@ -410,35 +464,45 @@ export function AIInvestigationSidebar() {
                     )}
                     <div
                       className={cn(
-                        "px-4 py-3 rounded-2xl text-[13px] leading-relaxed shadow-sm overflow-hidden w-full break-words",
+                        "px-4 py-3 rounded-2xl text-[13px] leading-relaxed shadow-sm overflow-hidden w-full break-words transition-all duration-300",
                         isUser
                           ? "bg-zinc-800 text-zinc-100 border border-zinc-700/50 rounded-tr-none"
                           : "bg-[#111312] text-zinc-300 border border-zinc-800/60 rounded-tl-none",
+                        isAssistantAndEmpty &&
+                          !isUser &&
+                          "bg-transparent border-transparent px-0 py-0 shadow-none opactiy-0",
                       )}
                       style={{ overflowWrap: "anywhere" }}
                     >
-                      {thinking && <ThinkingBlock content={thinking} />}
+                      {(thinking !== null || isStreamingThink) && (
+                        <ThinkingBlock content={thinking ?? ""} isStreaming={isStreamingThink} />
+                      )}
                       {isUser ? (
                         <p className="whitespace-pre-wrap break-words overflow-wrap-anywhere">
                           {response}
                         </p>
-                      ) : (
-                        <MarkdownContent content={response} className="text-zinc-300" />
-                      )}
+                      ) : response ? (
+                        <MarkdownContent
+                          content={response}
+                          className="text-zinc-200 selection:bg-emerald-500/30"
+                        />
+                      ) : null}
                     </div>
-                    <span className="text-[9px] text-zinc-600 font-medium px-1 tracking-tight">
-                      {new Date(m.timestamp).toLocaleTimeString([], {
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })}
-                    </span>
+                    {!isSameRoleAsPrev && (
+                      <span className="text-[9px] text-zinc-600 font-medium px-1 tracking-tight">
+                        {new Date(m.timestamp).toLocaleTimeString([], {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
+                      </span>
+                    )}
                   </div>
                 </div>
               );
             })
           )}
-          {isLoading && (
-            <div className="flex gap-4">
+          {isLoading && messages[messages.length - 1]?.role !== "assistant" && (
+            <div className="flex gap-4 mt-6">
               <div className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 bg-violet-500/10 border border-violet-500/20">
                 <Bot className="size-4 text-violet-400 animate-pulse" />
               </div>
@@ -462,6 +526,7 @@ export function AIInvestigationSidebar() {
               Context: {selectedLogIds.length} logs
             </span>
             <button
+              type="button"
               onClick={clearSelection}
               className="text-[10px] text-emerald-500 hover:text-emerald-400 transition-colors font-bold decoration-dotted underline underline-offset-2"
             >

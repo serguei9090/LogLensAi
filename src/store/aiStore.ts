@@ -1,4 +1,4 @@
-import { callSidecar } from "@/lib/hooks/useSidecarBridge";
+import { SIDECAR_BASE_URL, callSidecar } from "@/lib/hooks/useSidecarBridge";
 import { create } from "zustand";
 
 export interface AiMessage {
@@ -136,7 +136,7 @@ export const useAiStore = create<AiStore>((set, get) => ({
   },
 
   sendMessage: async (params) => {
-    const { currentSessionId } = get();
+    let { currentSessionId } = get();
     set({ isLoading: true, error: null });
 
     const tempUserMsg: AiMessage = {
@@ -148,26 +148,98 @@ export const useAiStore = create<AiStore>((set, get) => ({
       timestamp: new Date().toISOString(),
     };
 
+    const tempAssistantMsg: AiMessage = {
+      id: Date.now() + 1,
+      session_id: currentSessionId || "temp",
+      role: "assistant",
+      content: "",
+      timestamp: new Date().toISOString(),
+    };
+
     set((state) => ({
-      messages: [...state.messages, tempUserMsg],
+      messages: [...state.messages, tempUserMsg, tempAssistantMsg],
     }));
 
     try {
-      const result = await callSidecar<{ session_id: string; response: string }>({
-        method: "send_ai_message",
-        params: {
+      // Connect to SSE Endpoint
+      const response = await fetch(`${SIDECAR_BASE_URL}/api/stream_chat`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "text/event-stream",
+        },
+        body: JSON.stringify({
           ...params,
           session_id: currentSessionId,
-        },
+        }),
       });
 
-      if (!currentSessionId) {
-        set({ currentSessionId: result.session_id });
-        await get().fetchSessions(params.workspace_id);
+      if (!response.body) throw new Error("No readable stream available");
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder("utf-8");
+
+      let done = false;
+      let buffer = "";
+
+      while (!done) {
+        const { value, done: readerDone } = await reader.read();
+        done = readerDone;
+        if (value) {
+          buffer += decoder.decode(value, { stream: true });
+
+          const lines = buffer.split("\n\n");
+          buffer = lines.pop() || ""; // Keep the incomplete line in the buffer
+
+          for (const line of lines) {
+            if (line.startsWith("data: ")) {
+              const dataStr = line.slice(6).trim();
+              if (dataStr === "[DONE]") {
+                done = true;
+                break;
+              }
+
+              try {
+                const parsed = JSON.parse(dataStr);
+
+                if (parsed.error) {
+                  throw new Error(parsed.error);
+                }
+
+                if (parsed.session_id && !currentSessionId) {
+                  currentSessionId = parsed.session_id;
+                  set({ currentSessionId });
+                }
+
+                if (parsed.chunk) {
+                  set((state) => {
+                    const messages = [...state.messages];
+                    const lastMsg = messages[messages.length - 1];
+                    lastMsg.content += parsed.chunk;
+                    // Update temp session id if resolving dynamically
+                    if (currentSessionId && lastMsg.session_id === "temp") {
+                      lastMsg.session_id = currentSessionId;
+                      messages[messages.length - 2].session_id = currentSessionId;
+                    }
+                    return { messages };
+                  });
+                }
+              } catch (e) {
+                console.warn("Error parsing chunk", dataStr, e);
+              }
+            }
+          }
+        }
       }
 
-      await get().fetchMapping(params.workspace_id);
-      await get().fetchMessages(result.session_id);
+      set({ isLoading: false });
+
+      if (currentSessionId) {
+        await get().fetchSessions(params.workspace_id);
+        await get().fetchMapping(params.workspace_id);
+        // Wait for backend transactions to commit by introducing a tiny delay
+        setTimeout(() => get().fetchMessages(currentSessionId as string), 200);
+      }
     } catch (err) {
       set({ error: (err as Error).message, isLoading: false });
     }

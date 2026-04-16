@@ -74,7 +74,6 @@ export function InvestigationPage() {
 
   const { activeWorkspaceId, addSource, removeSource, setActiveSource } = useWorkspaceStore();
   const activeWorkspace = useWorkspaceStore(selectActiveWorkspace);
-  const activeSource = useWorkspaceStore(selectActiveSource);
   const { setSidebarOpen, sendMessage, setSession } = useAiStore();
 
   const sources: LogSource[] = activeWorkspace?.sources ?? [];
@@ -329,6 +328,7 @@ export function InvestigationPage() {
   };
 
   const handleEditFusion = (sourceId: string) => {
+    const src = sources.find((s) => s.id === sourceId);
     if (!src) {
       return;
     }
@@ -408,6 +408,7 @@ export function InvestigationPage() {
           anomalousClusters={anomalousClusters}
           onAddComment={(id, comment) => {
             const has_comment = comment.trim().length > 0;
+            const originalLog = logs.find((l) => l.id === id);
             updateLog(id, { comment, has_comment });
             callSidecar({ method: "update_log_comment", params: { log_id: id, comment } })
               .then(() => toast.success("Annotation saved"))

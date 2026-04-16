@@ -29,6 +29,7 @@ class GeminiCLIProvider(AIProvider):
         # session_id -> taskId mapping to achieve Hot Mode persistence
         self._task_cache = {}
         self.timeout = aiohttp.ClientTimeout(total=30)
+        self.force_cold = False  # Default to False, can be toggled for debugging
 
     def _extract_json(self, output: str) -> dict:
         """Helper to find and parse the FIRST valid JSON object in a string."""
@@ -143,6 +144,52 @@ class GeminiCLIProvider(AIProvider):
             self._task_cache[session_id] = task_id
             return AIChatMessage(role="assistant", content=content, provider_session_id=task_id)
 
+    async def chat_stream(
+        self, session_id: str, messages: list[AIChatMessage], model: str | None = None
+    ):
+        """Streaming version of hot mode chat that yields text chunks."""
+        is_new_task = not self.force_cold and session_id not in self._task_cache
+        task_id = self._task_cache.get(session_id) if not self.force_cold else None
+
+        prompt = self._prepare_hot_prompt(messages, is_new_task)
+
+        import aiohttp
+
+        async with aiohttp.ClientSession() as session:
+            if is_new_task:
+                payload = {"name": f"LogLensAi Session {session_id}", "description": ""}
+                async with session.post(f"{self.host}/tasks", json=payload) as resp:
+                    if resp.status == 200:
+                        data = await resp.json()
+                        task_id = data.get("id")
+                    else:
+                        raise RuntimeError("Failed to create A2A Task")
+
+            message_id = os.urandom(8).hex()
+            payload = {
+                "jsonrpc": "2.0",
+                "id": message_id,
+                "method": "message/stream",
+                "params": {
+                    "message": {
+                        "taskId": task_id,
+                        "messageId": message_id,
+                        "parts": [{"kind": "text", "text": prompt}],
+                    }
+                },
+            }
+
+            async with session.post(f"{self.host}/", json=payload) as resp:
+                if resp.status != 200:
+                    err_text = await resp.text()
+                    raise RuntimeError(f"A2A Message Error ({resp.status}): {err_text}")
+
+                # Yield chunks directly
+                async for chunk in self._parse_sse_stream_gen(resp.content):
+                    yield chunk
+
+            self._task_cache[session_id] = task_id
+
     def _prepare_hot_prompt(self, messages: list[AIChatMessage], is_new_task: bool) -> str:
         """Helper to prepare the prompt, injecting history if auto-healing is needed."""
         prompt = messages[-1].content
@@ -187,6 +234,20 @@ class GeminiCLIProvider(AIProvider):
         if not content:
             raise RuntimeError("No text returned from A2A server")
         return content
+
+    async def _parse_sse_stream_gen(self, content_stream):
+        """Asynchronous generator to yield chunks directly from SSE source."""
+        buffer = b""
+        async for chunk in content_stream.iter_any():
+            buffer += chunk
+            while b"\n\n" in buffer:
+                block_bytes, buffer = buffer.split(b"\n\n", 1)
+                block = block_bytes.decode("utf-8").strip()
+                if block.startswith("data: "):
+                    data_str = block[6:].strip()
+                    text = self._parse_json_chunk(data_str)
+                    if text:
+                        yield text
 
     def _parse_json_chunk(self, json_str: str) -> str | None:
         """Robustly extracts agent text from a single JSON chunk."""

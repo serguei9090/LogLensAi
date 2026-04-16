@@ -120,6 +120,8 @@
 - [x] **AI-002**: Display AI explanation in Diagnostic Sidebar
 - [x] **FEAT-AI-TOOLS-001**: Advanced AI Copilot Tools & Memory (Search, Memory, Autocompletes)
   - **Detail**: `docs/TODOC/FEAT_AI_TOOLS_001.md`
+- [ ] **FEAT-AI-TOOLS-002**: Copilot Context, Skills Manager & UX Polish
+  - **Detail**: `docs/TODOC/FEAT_AI_TOOLS_002.md`
 
 ---
 

@@ -8,6 +8,7 @@ import {
   ChevronDown,
   Clock,
   Cpu,
+  Edit2,
   Plus,
   Save,
   Settings2,
@@ -212,8 +213,8 @@ export function OrchestratorHub({
   editingFusionName,
   onFusionSaved,
 }: OrchestratorHubProps) {
-  // "picker" = strategy selection, "fusion-form" = fusion configuration
-  const [view, setView] = useState<"picker" | "fusion-form">("picker");
+  // "picker" = strategy selection, "fusion-form" = fusion configuration, "ai-context-form" = edit global context
+  const [view, setView] = useState<"picker" | "fusion-form" | "ai-context-form">("picker");
   const showDistribution = useInvestigationStore((s) => s.showDistribution);
   const setShowDistribution = useInvestigationStore((s) => s.setShowDistribution);
   const showAnomalies = useInvestigationStore((s) => s.showAnomalies);
@@ -225,6 +226,7 @@ export function OrchestratorHub({
   const [isSaving, setIsSaving] = useState(false);
   const [activeParserSource, setActiveParserSource] = useState<string | null>(null);
   const [isLoadingConfig, setIsLoadingConfig] = useState(false);
+  const [tempContext, setTempContext] = useState("");
 
   // Reset or pre-fill when opening
   useEffect(() => {
@@ -353,9 +355,11 @@ export function OrchestratorHub({
               <p className="text-[10px] text-text-muted uppercase tracking-widest font-medium">
                 {view === "picker"
                   ? "Choose a Strategy"
-                  : editingFusionId
-                    ? "Edit Fusion"
-                    : "New Fusion"}
+                  : view === "ai-context-form"
+                    ? "Global Context"
+                    : editingFusionId
+                      ? "Edit Fusion"
+                      : "New Fusion"}
               </p>
             </div>
           </div>
@@ -406,8 +410,15 @@ export function OrchestratorHub({
                     className="data-[checked]:bg-orange-500"
                   />
                 </div>
+              </div>
 
-                <div className="flex items-center justify-between p-3 rounded-xl border border-white/5 bg-black/20 mt-2">
+              <div className="w-full h-px bg-border/40 my-2" />
+
+              <div className="space-y-3">
+                <p className="text-[11px] text-text-muted uppercase tracking-widest font-bold">
+                  AI Layer
+                </p>
+                <div className="flex items-center justify-between p-3 rounded-xl border border-white/5 bg-black/20">
                   <div>
                     <span className="block text-sm font-semibold text-text-primary">
                       Workspace Global Context
@@ -416,11 +427,22 @@ export function OrchestratorHub({
                       Enable AI context ingestion across the entire workspace
                     </span>
                   </div>
-                  <Switch
-                    checked={workspaceGlobalContext}
-                    onCheckedChange={setWorkspaceGlobalContext}
-                    className="data-[checked]:bg-emerald-500"
-                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setTempContext(workspaceGlobalContext ?? "");
+                      setView("ai-context-form");
+                    }}
+                    className={cn(
+                      "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors border",
+                      workspaceGlobalContext
+                        ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30"
+                        : "bg-white/5 text-text-muted border-white/10 hover:text-white",
+                    )}
+                  >
+                    <Edit2 className="size-3" />
+                    {workspaceGlobalContext ? "Edit Context" : "Add Context"}
+                  </button>
                 </div>
               </div>
 
@@ -565,6 +587,56 @@ export function OrchestratorHub({
                 Timestamp Alignment. Use{" "}
                 <span className="text-text-secondary font-bold">Sync Drift</span> to offset logs
                 from different timezones.
+              </div>
+            </div>
+          )}
+
+          {view === "ai-context-form" && (
+            <div className="p-5 space-y-6 flex flex-col h-full">
+              <button
+                onClick={() => setView("picker")}
+                className="flex items-center gap-1.5 text-[11px] text-text-muted hover:text-text-secondary transition-colors"
+                type="button"
+              >
+                ← Back to settings
+              </button>
+
+              <div className="space-y-3 flex-1 flex flex-col">
+                <div>
+                  <p className="text-sm font-bold text-text-primary">Workspace Global Context</p>
+                  <p className="text-xs text-text-muted mt-1 leading-relaxed">
+                    Provide instructions, service specifics, or architectural details about this
+                    workspace. This context will constantly guide the AI investigator.
+                  </p>
+                </div>
+                <textarea
+                  value={tempContext}
+                  onChange={(e) => setTempContext(e.target.value)}
+                  className="flex-1 w-full bg-black/60 border border-border/40 rounded-xl p-4 text-sm text-text-primary outline-none focus:ring-2 focus:ring-emerald-500/40 focus:border-emerald-500/60 transition-all placeholder:text-text-muted/40 resize-none font-mono min-h-[200px]"
+                  placeholder="e.g. This workspace logs the Redis anomalies for the user Auth service. We are mostly looking for memory leak patterns..."
+                />
+              </div>
+              <div className="pt-2 flex justify-end gap-3 mt-auto shrink-0">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setWorkspaceGlobalContext(null);
+                    setView("picker");
+                  }}
+                  className="px-4 py-2 text-xs font-bold text-red-400 hover:bg-red-500/10 rounded-lg transition-colors border border-transparent"
+                >
+                  Clear & Disable
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setWorkspaceGlobalContext(tempContext.trim() || null);
+                    setView("picker");
+                  }}
+                  className="px-6 py-2 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-500 rounded-lg transition-colors shadow-lg active:scale-95"
+                >
+                  Save Context
+                </button>
               </div>
             </div>
           )}
