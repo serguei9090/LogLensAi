@@ -17,8 +17,8 @@ export interface AppSettings {
 }
 
 export const defaultSettings: AppSettings = {
-  ai_provider: "gemini-cli",
-  ai_model: "flash",
+  ai_provider: "ollama",
+  ai_model: "gemma4:e2b",
   ai_api_key: "",
   ai_system_prompt: "You are LogLens Assistant, a senior DevOps engineer and SRE specializing in root cause analysis.",
   ai_gemini_url: "http://localhost:22436",

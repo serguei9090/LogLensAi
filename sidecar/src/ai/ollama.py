@@ -1,7 +1,9 @@
 import json
+
 import aiohttp
-from typing import List, Optional
-from .base import AIProvider, AIChatMessage
+
+from .base import AIChatMessage, AIProvider
+
 
 class OllamaProvider(AIProvider):
     """Local provider using Ollama API."""
@@ -11,20 +13,20 @@ class OllamaProvider(AIProvider):
         self.host = host.rstrip("/")
         self.timeout = aiohttp.ClientTimeout(total=60)
 
-    async def list_models(self) -> List[str]:
+    async def list_models(self) -> list[str]:
         """Fetches available models from the local Ollama instance."""
         try:
             async with aiohttp.ClientSession(timeout=self.timeout) as session:
                 async with session.get(f"{self.host}/api/tags") as resp:
                     if resp.status != 200:
-                        return ["llama3", "mistral"]
+                        return ["gemma4:e2b", "llama3", "mistral"]
                     
                     data = await resp.json()
                     return [m["name"] for m in data.get("models", [])]
         except Exception:
-            return ["llama3", "mistral"]
+            return ["gemma4:e2b", "llama3", "mistral"]
 
-    async def chat(self, messages: List[AIChatMessage], model: Optional[str] = None, session_id: Optional[str] = None, provider_session_id: Optional[str] = None) -> AIChatMessage:
+    async def chat(self, messages: list[AIChatMessage], model: str | None = "gemma4:e2b", session_id: str | None = None, provider_session_id: str | None = None) -> AIChatMessage:
         """Sends a message to Ollama."""
         ollama_messages = []
         if self.system_prompt:
@@ -51,7 +53,7 @@ class OllamaProvider(AIProvider):
         except Exception as e:
             return AIChatMessage(role="assistant", content=f"Ollama Connection Error: {str(e)}")
 
-    async def analyze_logs(self, template: str, samples: List[str], model: str = "llama3") -> dict:
+    async def analyze_logs(self, template: str, samples: list[str], model: str = "gemma4:e2b") -> dict:
         """Specific one-off analysis for log clusters using Ollama."""
         prompt = (
             "You are a Log Analysis Specialist. Return JSON with 'summary', 'root_cause', 'recommended_actions'.\n\n"

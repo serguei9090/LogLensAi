@@ -1,4 +1,5 @@
-import { type AppSettings, SettingsPanel } from "@/components/organisms/SettingsPanel";
+import { SettingsPanel } from "@/components/organisms/SettingsPanel";
+import { type AppSettings } from "@/store/settingsStore";
 import { callSidecar } from "@/lib/hooks/useSidecarBridge";
 import { toast } from "sonner";
 

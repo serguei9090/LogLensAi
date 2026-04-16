@@ -157,14 +157,14 @@ class App:
         
         # Initialize AI Provider from settings
         settings = self.method_get_settings()
-        provider = settings.get("ai_provider", "gemini-cli")
+        provider = settings.get("ai_provider", "ollama")
         host = settings.get("ai_gemini_url", "http://localhost:22436") if provider == "gemini-cli" else settings.get("ai_ollama_host", "http://localhost:11434")
         
         self.ai = AIProviderFactory.get_provider(
             provider,
             api_key=settings.get("ai_api_key", ""),
             system_prompt=settings.get("ai_system_prompt", ""),
-            model=settings.get("ai_model"),
+            model=settings.get("ai_model", "gemma4:e2b"),
             host=host
         )
         
@@ -1039,14 +1039,14 @@ class App:
         # Re-initialize AI Provider if relevant settings changed
         if any(k in settings for k in ["ai_provider", "ai_api_key", "ai_ollama_host", "ai_gemini_url", "ai_model"]):
             current_settings = self.method_get_settings()
-            provider = current_settings.get("ai_provider", "gemini-cli")
+            provider = current_settings.get("ai_provider", "ollama")
             host = current_settings.get("ai_gemini_url", "http://localhost:22436") if provider == "gemini-cli" else current_settings.get("ai_ollama_host", "http://localhost:11434")
             
             self.ai = AIProviderFactory.get_provider(
                 provider,
                 api_key=current_settings.get("ai_api_key", ""),
                 system_prompt=current_settings.get("ai_system_prompt", ""),
-                model=current_settings.get("ai_model"), # Pass the new model setting
+                model=current_settings.get("ai_model", "gemma4:e2b"), # Pass the new model setting
                 host=host
             )
         

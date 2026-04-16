@@ -73,6 +73,7 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
   const [settings, setSettings] = useState<AppSettings>(defaultSettings);
   const [activeSection, setActiveSection] = useState<SectionId>("ai");
   const [saved, setSaved] = useState(false);
+  const [availableModels, setAvailableModels] = useState<string[]>(["gemma4:e2b", "llama3", "mistral"]);
 
   const update = <K extends keyof AppSettings>(key: K, value: AppSettings[K]) =>
     setSettings((prev) => ({ ...prev, [key]: value }));
@@ -99,6 +100,22 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
     };
     loadSettings();
   }, []);
+
+  useEffect(() => {
+    const fetchModels = async () => {
+      try {
+        const models = await callSidecar<string[]>({ method: "list_ai_models", params: {} });
+        if (models && models.length > 0) {
+          setAvailableModels(models);
+        }
+      } catch (e) {
+        console.error("Failed to fetch ai models:", e);
+      }
+    };
+    if (settings.ai_provider === "ollama") {
+      fetchModels();
+    }
+  }, [settings.ai_provider, settings.ai_ollama_host]);
 
   const handleSave = () => {
     onSave(settings);
@@ -189,7 +206,11 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
                   <SectionLabel htmlFor="ai_provider">Model Provider</SectionLabel>
                   <SettingSelect
                     value={settings.ai_provider}
-                    onChange={(v) => update("ai_provider", v)}
+                    onChange={(v) => {
+                      update("ai_provider", v);
+                      if (v === "ollama") update("ai_model", "gemma4:e2b");
+                      else if (v === "gemini-cli") update("ai_model", "flash");
+                    }}
                   >
                     <option value="gemini-cli">Gemini CLI (Native Local)</option>
                     <option value="ollama">Ollama (Local Llama/Mistral)</option>
@@ -248,7 +269,21 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
               )}
 
               {settings.ai_provider === "ollama" && (
-                <div className="space-y-4 pt-2 border-t border-border/50 animate-in slide-in-from-top-2 duration-300">
+                <div className="grid grid-cols-2 gap-8 pt-4 border-t border-border/30 animate-in slide-in-from-top-2 duration-300">
+                  <div className="space-y-2">
+                    <SectionLabel htmlFor="ai_model">Ollama Model</SectionLabel>
+                    <SettingSelect
+                      value={settings.ai_model}
+                      onChange={(v) => update("ai_model", v)}
+                    >
+                      {availableModels.map((m) => (
+                        <option key={m} value={m}>{m}</option>
+                      ))}
+                    </SettingSelect>
+                    <p className="text-[10px] text-text-muted/50 px-1">
+                      Available models are fetched dynamically.
+                    </p>
+                  </div>
                   <div className="space-y-2">
                     <SectionLabel htmlFor="ai_ollama_host">Ollama Server Host</SectionLabel>
                     <SettingInput
@@ -259,13 +294,13 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
                       placeholder="http://localhost:11434"
                     />
                   </div>
-                  <div className="flex items-center gap-3 p-3 bg-primary/5 rounded-xl border border-primary/10">
+                  <div className="col-span-2 flex items-center gap-3 p-3 bg-primary/5 rounded-xl border border-primary/10">
                     <div className="bg-primary/20 p-2 rounded-lg">
                       <Cpu className="h-4 w-4 text-primary" />
                     </div>
                     <div>
                       <p className="text-[11px] font-bold text-primary uppercase tracking-wider">Local Inference</p>
-                      <p className="text-[10px] text-text-muted">Ensure Ollama is running and model (e.g. llama3) is pulled.</p>
+                      <p className="text-[10px] text-text-muted">Ensure Ollama is running and model (e.g. gemma4:e2b) is pulled.</p>
                     </div>
                   </div>
                 </div>
