@@ -25,8 +25,8 @@ export interface InvestigationStore extends SourceState {
   /** Persisted map of states for each source encountered in this session */
   sourceStates: Record<string, SourceState>;
 
-  /** 
-   * Swaps the active state for another source's state. 
+  /**
+   * Swaps the active state for another source's state.
    * Saves existing active state into the map before switching.
    */
   syncActiveSource: (sourceId: string | null) => void;

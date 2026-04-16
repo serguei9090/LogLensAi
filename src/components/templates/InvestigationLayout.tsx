@@ -27,7 +27,6 @@ interface InvestigationLayoutProps {
   readonly workspaceId?: string;
   readonly onDistributionClose?: () => void;
   readonly rightPanel?: ReactNode;
-
 }
 
 export function InvestigationLayout({
@@ -72,18 +71,21 @@ export function InvestigationLayout({
         onSelectSource={onSelectSource}
         onRemoveSource={onRemoveSource}
         onEditFusion={onEditFusion}
-
       />
       {showDistribution && workspaceId && (
         <LogDistributionWidget
           workspaceId={workspaceId}
           sourceIds={
-            activeSourceId && sources && sources.find((s) => s.id === activeSourceId)?.type !== "fusion"
+            activeSourceId &&
+            sources &&
+            sources.find((s) => s.id === activeSourceId)?.type !== "fusion"
               ? [sources.find((s) => s.id === activeSourceId)!.path]
               : null
           }
           fusionId={
-            activeSourceId && sources && sources.find((s) => s.id === activeSourceId)?.type === "fusion"
+            activeSourceId &&
+            sources &&
+            sources.find((s) => s.id === activeSourceId)?.type === "fusion"
               ? sources.find((s) => s.id === activeSourceId)!.path
               : undefined
           }
@@ -93,9 +95,7 @@ export function InvestigationLayout({
         />
       )}
       <div className="flex-1 flex min-h-0 min-w-0 overflow-hidden">
-        <div className="flex-1 flex flex-col min-w-0 min-h-0 overflow-hidden">
-          {children}
-        </div>
+        <div className="flex-1 flex flex-col min-w-0 min-h-0 overflow-hidden">{children}</div>
         {rightPanel}
       </div>
     </div>

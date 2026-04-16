@@ -1,6 +1,7 @@
 import pytest
-from src.metadata_extractor import extract_log_metadata
 from src.api import App
+from src.metadata_extractor import extract_log_metadata
+
 
 @pytest.fixture
 def mock_db():

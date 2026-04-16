@@ -1,5 +1,5 @@
-import { create } from "zustand";
 import { callSidecar } from "@/lib/hooks/useSidecarBridge";
+import { create } from "zustand";
 
 export interface AppSettings {
   ai_provider: string;
@@ -20,7 +20,8 @@ export const defaultSettings: AppSettings = {
   ai_provider: "ollama",
   ai_model: "gemma4:e2b",
   ai_api_key: "",
-  ai_system_prompt: "You are LogLens Assistant, a senior DevOps engineer and SRE specializing in root cause analysis.",
+  ai_system_prompt:
+    "You are LogLens Assistant, a senior DevOps engineer and SRE specializing in root cause analysis.",
   ai_gemini_url: "http://localhost:22436",
   ai_ollama_host: "http://localhost:11434",
   drain_similarity_threshold: 0.5,
@@ -42,21 +43,23 @@ export const useSettingsStore = create<SettingsStore>((set) => ({
 
   fetchSettings: async () => {
     try {
-      const remote = await callSidecar<Record<string, string>>({ 
-        method: "get_settings", 
-        params: {} 
+      const remote = await callSidecar<Record<string, string>>({
+        method: "get_settings",
+        params: {},
       });
-      
+
       if (remote) {
         set({
           settings: {
             ...defaultSettings,
             ...remote,
-            drain_similarity_threshold: Number.parseFloat(remote.drain_similarity_threshold || "0.5"),
+            drain_similarity_threshold: Number.parseFloat(
+              remote.drain_similarity_threshold || "0.5",
+            ),
             drain_max_children: Number.parseInt(remote.drain_max_children || "100", 10),
             drain_max_clusters: Number.parseInt(remote.drain_max_clusters || "1000", 10),
             mcp_server_enabled: remote.mcp_server_enabled === "true",
-          }
+          },
         });
       }
     } catch (err) {

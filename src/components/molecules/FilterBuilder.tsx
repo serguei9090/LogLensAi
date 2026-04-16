@@ -211,7 +211,6 @@ export function FilterBuilder({ filters, onChange }: FilterBuilderProps) {
           )}
         </PopoverContent>
       </Popover>
-
     </div>
   );
 }

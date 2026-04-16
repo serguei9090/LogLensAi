@@ -1,9 +1,9 @@
 import { HelpTooltip } from "@/components/atoms/HelpTooltip";
-import { cn } from "@/lib/utils";
-import { Bot, Check, Cpu, Layers, Palette, Save, Terminal } from "lucide-react";
-import { useState, useEffect } from "react";
 import { Switch } from "@/components/ui/switch";
 import { callSidecar } from "@/lib/hooks/useSidecarBridge";
+import { cn } from "@/lib/utils";
+import { Bot, Check, Cpu, Layers, Palette, Save, Terminal } from "lucide-react";
+import { useEffect, useState } from "react";
 
 import { type AppSettings, defaultSettings } from "@/store/settingsStore";
 
@@ -17,7 +17,7 @@ const SECTIONS: { id: SectionId; icon: typeof Bot; label: string; desc: string }
   { id: "general", icon: Palette, label: "Interface", desc: "Display & accessibility" },
 ];
 
-function SettingInput(props: React.InputHTMLAttributes<HTMLInputElement>) {
+function SettingInput(props: Readonly<React.InputHTMLAttributes<HTMLInputElement>>) {
   return (
     <input
       {...props}
@@ -33,15 +33,18 @@ function SettingInput(props: React.InputHTMLAttributes<HTMLInputElement>) {
 function SettingSelect({
   value,
   onChange,
+  id,
   children,
 }: {
   readonly value: string;
   readonly onChange: (v: string) => void;
+  readonly id?: string;
   readonly children: React.ReactNode;
 }) {
   return (
     <div className="relative">
       <select
+        id={id}
         value={value}
         onChange={(e) => onChange(e.target.value)}
         className="w-full h-10 px-4 rounded-xl text-sm bg-bg-surface border border-border text-text-primary focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all appearance-none cursor-pointer"
@@ -73,7 +76,11 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
   const [settings, setSettings] = useState<AppSettings>(defaultSettings);
   const [activeSection, setActiveSection] = useState<SectionId>("ai");
   const [saved, setSaved] = useState(false);
-  const [availableModels, setAvailableModels] = useState<string[]>(["gemma4:e2b", "llama3", "mistral"]);
+  const [availableModels, setAvailableModels] = useState<string[]>([
+    "gemma4:e2b",
+    "llama3",
+    "mistral",
+  ]);
 
   const update = <K extends keyof AppSettings>(key: K, value: AppSettings[K]) =>
     setSettings((prev) => ({ ...prev, [key]: value }));
@@ -82,13 +89,18 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
   useEffect(() => {
     const loadSettings = async () => {
       try {
-        const remoteSettings = (await callSidecar({ method: "get_settings", params: {} })) as any;
+        const remoteSettings = (await callSidecar({
+          method: "get_settings",
+          params: {},
+        })) as Record<string, string>;
         if (remoteSettings) {
           setSettings((prev) => ({
             ...prev,
             ...remoteSettings,
             // Cast numeric/boolean strings back to proper types
-            drain_similarity_threshold: Number.parseFloat(remoteSettings.drain_similarity_threshold || "0.4"),
+            drain_similarity_threshold: Number.parseFloat(
+              remoteSettings.drain_similarity_threshold || "0.4",
+            ),
             drain_max_children: Number.parseInt(remoteSettings.drain_max_children || "100", 10),
             drain_max_clusters: Number.parseInt(remoteSettings.drain_max_clusters || "1000", 10),
             mcp_server_enabled: remoteSettings.mcp_server_enabled === "true",
@@ -115,7 +127,7 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
     if (settings.ai_provider === "ollama") {
       fetchModels();
     }
-  }, [settings.ai_provider, settings.ai_ollama_host]);
+  }, [settings.ai_provider]);
 
   const handleSave = () => {
     onSave(settings);
@@ -205,11 +217,15 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
                 <div className="space-y-2">
                   <SectionLabel htmlFor="ai_provider">Model Provider</SectionLabel>
                   <SettingSelect
+                    id="ai_provider"
                     value={settings.ai_provider}
                     onChange={(v) => {
                       update("ai_provider", v);
-                      if (v === "ollama") update("ai_model", "gemma4:e2b");
-                      else if (v === "gemini-cli") update("ai_model", "flash");
+                      if (v === "ollama") {
+                        update("ai_model", "gemma4:e2b");
+                      } else if (v === "gemini-cli") {
+                        update("ai_model", "flash");
+                      }
                     }}
                   >
                     <option value="gemini-cli">Gemini CLI (Native Local)</option>
@@ -238,6 +254,7 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
                   <div className="space-y-2">
                     <SectionLabel htmlFor="ai_model">Gemini Model Strategy</SectionLabel>
                     <SettingSelect
+                      id="ai_model"
                       value={settings.ai_model}
                       onChange={(v) => update("ai_model", v)}
                     >
@@ -261,9 +278,7 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
                       onChange={(e) => update("ai_gemini_url", e.target.value)}
                       placeholder="http://localhost:22436"
                     />
-                    <p className="text-[10px] text-text-muted/50 px-1">
-                      Daemon port for Hot Mode.
-                    </p>
+                    <p className="text-[10px] text-text-muted/50 px-1">Daemon port for Hot Mode.</p>
                   </div>
                 </div>
               )}
@@ -273,11 +288,14 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
                   <div className="space-y-2">
                     <SectionLabel htmlFor="ai_model">Ollama Model</SectionLabel>
                     <SettingSelect
+                      id="ai_model_ollama"
                       value={settings.ai_model}
                       onChange={(v) => update("ai_model", v)}
                     >
                       {availableModels.map((m) => (
-                        <option key={m} value={m}>{m}</option>
+                        <option key={m} value={m}>
+                          {m}
+                        </option>
                       ))}
                     </SettingSelect>
                     <p className="text-[10px] text-text-muted/50 px-1">
@@ -299,8 +317,12 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
                       <Cpu className="h-4 w-4 text-primary" />
                     </div>
                     <div>
-                      <p className="text-[11px] font-bold text-primary uppercase tracking-wider">Local Inference</p>
-                      <p className="text-[10px] text-text-muted">Ensure Ollama is running and model (e.g. gemma4:e2b) is pulled.</p>
+                      <p className="text-[11px] font-bold text-primary uppercase tracking-wider">
+                        Local Inference
+                      </p>
+                      <p className="text-[10px] text-text-muted">
+                        Ensure Ollama is running and model (e.g. gemma4:e2b) is pulled.
+                      </p>
                     </div>
                   </div>
                 </div>
@@ -447,6 +469,7 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
                 <div className="space-y-2">
                   <SectionLabel htmlFor="ui_row_height">Row Density</SectionLabel>
                   <SettingSelect
+                    id="ui_row_height"
                     value={settings.ui_row_height}
                     onChange={(v) => update("ui_row_height", v)}
                   >
@@ -458,6 +481,7 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
                 <div className="space-y-2">
                   <SectionLabel htmlFor="ui_font_size">Reading Size</SectionLabel>
                   <SettingSelect
+                    id="ui_font_size"
                     value={settings.ui_font_size}
                     onChange={(v) => update("ui_font_size", v)}
                   >

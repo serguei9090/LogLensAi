@@ -1,6 +1,7 @@
 import pytest
 from src.api import App
 
+
 @pytest.fixture
 def api():
     app = App(db_path=":memory:")

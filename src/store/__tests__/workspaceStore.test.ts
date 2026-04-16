@@ -13,7 +13,7 @@ describe("workspaceStore", () => {
   it("can add and remove workspaces", () => {
     const store = useWorkspaceStore.getState();
     store.addWorkspace({ id: "ws1", name: "Workspace 1" });
-    
+
     expect(useWorkspaceStore.getState().workspaces).toHaveLength(1);
     expect(useWorkspaceStore.getState().activeWorkspaceId).toBe("ws1");
 
@@ -33,9 +33,13 @@ describe("workspaceStore", () => {
   it("can add a source to a workspace", () => {
     const store = useWorkspaceStore.getState();
     store.addWorkspace({ id: "ws1", name: "WS 1" });
-    
-    const source = store.addSource("ws1", { name: "test.log", type: "local", path: "/tmp/test.log" });
-    
+
+    const source = store.addSource("ws1", {
+      name: "test.log",
+      type: "local",
+      path: "/tmp/test.log",
+    });
+
     const ws = useWorkspaceStore.getState().workspaces[0];
     expect(ws.sources).toHaveLength(1);
     expect(ws.sources[0].name).toBe("test.log");

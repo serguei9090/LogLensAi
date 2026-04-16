@@ -33,8 +33,10 @@ export function WorkspaceTabs({
   onSelectSource,
   onRemoveSource,
   onEditFusion,
-}: WorkspaceTabsProps) {
-  if (sources.length === 0) return null;
+}: Readonly<WorkspaceTabsProps>) {
+  if (sources.length === 0) {
+    return null;
+  }
 
   return (
     <div
@@ -52,74 +54,84 @@ export function WorkspaceTabs({
         return (
           <div
             key={src.id}
-            role="tab"
-            aria-selected={isActive}
             className={cn(
-              "group inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[11px] font-semibold transition-all whitespace-nowrap shrink-0 border",
+              "group inline-flex items-center gap-1 px-1 rounded-md transition-all whitespace-nowrap shrink-0 border",
               isActive
                 ? isFusion
-                  ? "bg-violet-500/15 text-violet-400 border-violet-500/30"
-                  : "bg-primary/15 text-primary border-primary/30"
-                : "text-text-muted hover:text-text-secondary hover:bg-white/5 border-transparent",
+                  ? "bg-violet-500/15 border-violet-500/30"
+                  : "bg-primary/15 border-primary/30"
+                : "border-transparent hover:bg-white/5",
             )}
           >
-            {/* Fusion icon or live-tail indicator */}
-            {isFusion ? (
-              <span className="text-violet-400/70 text-[9px] font-bold uppercase tracking-wider">
-                ⚡
-              </span>
-            ) : isTailing ? (
-              <span aria-label="Live tailing" className="relative flex h-2 w-2 shrink-0">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-60" />
-                <span className="relative inline-flex h-2 w-2 rounded-full bg-primary" />
-              </span>
-            ) : null}
-
-            {/* Label — clickable area */}
+            {/* Primary Tab Button */}
             <button
               type="button"
-              className="max-w-[140px] truncate focus:outline-none"
+              role="tab"
+              aria-selected={isActive}
               onClick={() => onSelectSource(src.id)}
               title={src.path}
+              className={cn(
+                "flex items-center gap-1.5 px-2 py-1.5 rounded text-[11px] font-semibold transition-all outline-none",
+                isActive
+                  ? isFusion
+                    ? "text-violet-400"
+                    : "text-primary"
+                  : "text-text-muted hover:text-text-secondary",
+              )}
             >
-              {label}
+              {/* Fusion icon or live-tail indicator */}
+              {isFusion ? (
+                <span className="text-violet-400/70 text-[9px] font-bold uppercase tracking-wider">
+                  ⚡
+                </span>
+              ) : isTailing ? (
+                <span aria-label="Live tailing" className="relative flex h-2 w-2 shrink-0">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-60" />
+                  <span className="relative inline-flex h-2 w-2 rounded-full bg-primary" />
+                </span>
+              ) : null}
+
+              <span className="max-w-[140px] truncate">{label}</span>
             </button>
 
-            {/* Edit button for fusion tabs */}
-            {isFusion && onEditFusion && (
-              <button
-                type="button"
-                aria-label={`Edit ${label}`}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onEditFusion(src.id);
-                }}
-                className={cn(
-                  "opacity-0 group-hover:opacity-100 rounded-full p-0.5 transition-opacity hover:bg-violet-500/20 focus:outline-none",
-                  isActive && "opacity-60 hover:opacity-100",
-                )}
-              >
-                <Pencil className="h-3 w-3" />
-              </button>
-            )}
+            {/* Action Group */}
+            <div className="flex items-center gap-0.5 pr-1">
+              {/* Edit button for fusion tabs */}
+              {isFusion && onEditFusion && (
+                <button
+                  type="button"
+                  aria-label={`Edit ${label}`}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onEditFusion(src.id);
+                  }}
+                  className={cn(
+                    "opacity-0 group-hover:opacity-100 rounded-full p-0.5 transition-opacity hover:bg-violet-500/20 focus:outline-none",
+                    isActive && "opacity-60 hover:opacity-100",
+                  )}
+                >
+                  <Pencil className="h-3 w-3" />
+                </button>
+              )}
 
-            {/* Remove button */}
-            {onRemoveSource && (
-              <button
-                type="button"
-                aria-label={`Remove ${label}`}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onRemoveSource(src.id);
-                }}
-                className={cn(
-                  "opacity-0 group-hover:opacity-100 rounded-full p-0.5 transition-opacity hover:bg-white/10 focus:outline-none",
-                  isActive && "opacity-60 hover:opacity-100",
-                )}
-              >
-                <X className="h-3 w-3" />
-              </button>
-            )}
+              {/* Remove button */}
+              {onRemoveSource && (
+                <button
+                  type="button"
+                  aria-label={`Remove ${label}`}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onRemoveSource(src.id);
+                  }}
+                  className={cn(
+                    "opacity-0 group-hover:opacity-100 rounded-full p-0.5 transition-opacity hover:bg-white/10 focus:outline-none",
+                    isActive && "opacity-60 hover:opacity-100",
+                  )}
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              )}
+            </div>
           </div>
         );
       })}

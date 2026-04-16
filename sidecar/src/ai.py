@@ -10,6 +10,9 @@ class DiagnosticResult(BaseModel):
     recommended_actions: list[str]
 
 
+ANALYSIS_FAILED = "Analysis failed"
+
+
 class AIProvider:
     def __init__(self, provider="gemini-cli", api_key="", system_prompt=""):
         self.provider = provider
@@ -22,7 +25,7 @@ class AIProvider:
     def analyze(self, cluster_template: str, samples: list[str]) -> dict:
         if self.provider != "gemini-cli":
             return {
-                "summary": "Analysis failed",
+                "summary": ANALYSIS_FAILED,
                 "root_cause": f"Unsupported provider: {self.provider}",
                 "recommended_actions": [],
             }
@@ -46,11 +49,11 @@ class AIProvider:
 
         except subprocess.TimeoutExpired:
             return {
-                "summary": "Analysis failed",
+                "summary": ANALYSIS_FAILED,
                 "root_cause": "Timeout",
                 "recommended_actions": [],
             }
         except (json.JSONDecodeError, ValidationError) as e:
-            return {"summary": "Analysis failed", "root_cause": str(e), "recommended_actions": []}
+            return {"summary": ANALYSIS_FAILED, "root_cause": str(e), "recommended_actions": []}
         except Exception as e:
-            return {"summary": "Analysis failed", "root_cause": str(e), "recommended_actions": []}
+            return {"summary": ANALYSIS_FAILED, "root_cause": str(e), "recommended_actions": []}

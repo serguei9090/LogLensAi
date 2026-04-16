@@ -1,8 +1,9 @@
+from unittest.mock import patch
+
 import pytest
-import os
-from unittest.mock import MagicMock, patch
 from src.api import App
 from src.db import Database
+
 
 @pytest.fixture
 def api_app():

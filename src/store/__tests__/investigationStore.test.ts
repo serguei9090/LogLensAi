@@ -35,7 +35,7 @@ describe("investigationStore", () => {
 
   it("isolates state between sources via syncActiveSource", () => {
     const store = useInvestigationStore.getState();
-    
+
     // 1. Setup 'aggregate' view
     store.setSearchQuery("global search");
     store.setFilters([{ id: "f1", field: "level", operator: "equals", value: "ERROR" }]);
@@ -65,12 +65,12 @@ describe("investigationStore", () => {
       { id: 1, raw_text: "log 1", has_comment: false },
       { id: 2, raw_text: "log 2", has_comment: false },
     ] as any;
-    
+
     store.setLogs(mockLogs, 2);
     store.updateLog(1, { has_comment: true, comment: "Hello" });
 
     const updated = useInvestigationStore.getState().logs;
-    expect(updated.find(l => l.id === 1)?.has_comment).toBe(true);
-    expect(updated.find(l => l.id === 2)?.has_comment).toBe(false);
+    expect(updated.find((l) => l.id === 1)?.has_comment).toBe(true);
+    expect(updated.find((l) => l.id === 2)?.has_comment).toBe(false);
   });
 });

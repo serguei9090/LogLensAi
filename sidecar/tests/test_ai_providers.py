@@ -1,10 +1,11 @@
+from unittest.mock import AsyncMock, MagicMock, patch
+
 import pytest
-import aiohttp
-from unittest.mock import MagicMock, AsyncMock, patch
-from src.ai.gemini_cli import GeminiCLIProvider
-from src.ai.ollama import OllamaProvider
 from src.ai.ai_studio import AIStudioProvider
 from src.ai.base import AIChatMessage
+from src.ai.gemini_cli import GeminiCLIProvider
+from src.ai.ollama import OllamaProvider
+
 
 @pytest.mark.asyncio
 async def test_ollama_provider_chat_mock():

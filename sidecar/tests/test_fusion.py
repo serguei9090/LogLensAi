@@ -1,6 +1,7 @@
 import pytest
 from src.api import App, FusionSourceConfig, IngestLogEntry
 
+
 @pytest.fixture
 def api():
     # Use memory DB for isolation

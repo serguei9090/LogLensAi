@@ -1,5 +1,5 @@
-import { create } from "zustand";
 import { callSidecar } from "@/lib/hooks/useSidecarBridge";
+import { create } from "zustand";
 
 export interface AiMessage {
   id: number;
@@ -148,8 +148,8 @@ export const useAiStore = create<AiStore>((set, get) => ({
       timestamp: new Date().toISOString(),
     };
 
-    set((state) => ({ 
-      messages: [...state.messages, tempUserMsg] 
+    set((state) => ({
+      messages: [...state.messages, tempUserMsg],
     }));
 
     try {

@@ -1,11 +1,12 @@
-import os
-from typing import List, Optional
 import asyncio
+import os
+
 from google.adk.agents.llm_agent import LlmAgent
 from google.adk.runners import Runner
 from google.adk.sessions import InMemorySessionService
-from google.genai import types, Client
-from .base import AIProvider, AIChatMessage
+from google.genai import Client, types
+
+from .base import AIChatMessage, AIProvider
 
 DEFAULT_MODEL = "gemini-2.5-flash"
 
@@ -17,7 +18,7 @@ class AIStudioProvider(AIProvider):
         # We wrap the client for list_models and other direct calls
         self._client = Client(api_key=api_key) if api_key else None
 
-    async def list_models(self) -> List[str]:
+    async def list_models(self) -> list[str]:
         """Fetches available Gemini models from the API."""
         if not self._client:
             return [DEFAULT_MODEL]
@@ -31,7 +32,7 @@ class AIStudioProvider(AIProvider):
         except Exception:
             return [DEFAULT_MODEL, "gemini-2.5-pro"]
 
-    async def chat(self, messages: List[AIChatMessage], model: Optional[str] = None, session_id: Optional[str] = None, provider_session_id: Optional[str] = None) -> AIChatMessage:
+    async def chat(self, messages: list[AIChatMessage], model: str | None = None, session_id: str | None = None, provider_session_id: str | None = None) -> AIChatMessage:
         """Sends a message to Gemini via ADK Agent."""
         if not self.api_key:
             return AIChatMessage(role="assistant", content="Error: No API Key configured for AI Studio.")
@@ -77,7 +78,7 @@ class AIStudioProvider(AIProvider):
         except Exception as e:
             return AIChatMessage(role="assistant", content=f"AI Studio Error: {str(e)}")
 
-    async def analyze_logs(self, template: str, samples: List[str]) -> dict:
+    async def analyze_logs(self, template: str, samples: list[str]) -> dict:
         """Specific one-off analysis for log clusters."""
         # For simple analysis, we use the direct client to avoid session overhead
         if not self._client: return {"summary": "No API Key", "root_cause": "", "recommended_actions": []}

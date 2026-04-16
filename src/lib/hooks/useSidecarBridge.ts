@@ -19,7 +19,7 @@ export interface SidecarResponse<T> {
  * When false, the app is running as a standalone web app in a browser.
  */
 function isTauriRuntime(): boolean {
-  return typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
+  return typeof globalThis !== "undefined" && "__TAURI_INTERNALS__" in globalThis;
 }
 
 /**

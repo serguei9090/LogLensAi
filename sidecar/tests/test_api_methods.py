@@ -1,6 +1,8 @@
+from unittest.mock import MagicMock
+
 import pytest
-from unittest.mock import MagicMock, patch
-from src.api import App, JSONRPCRequest, JSONRPCResponse, IngestLogEntry
+from src.api import App, IngestLogEntry
+
 
 @pytest.fixture
 def api():

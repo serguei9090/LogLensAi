@@ -1,34 +1,34 @@
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
-  format,
-  subMinutes,
-  subHours,
-  subDays,
-  startOfDay,
+  addMonths as dateFnsAddMonths,
   setMonth as dateFnsSetMonth,
   setYear as dateFnsSetYear,
-  getYear,
-  getMonth,
-  addMonths as dateFnsAddMonths,
   subMonths as dateFnsSubMonths,
+  format,
+  getMonth,
+  getYear,
+  startOfDay,
+  subDays,
+  subHours,
+  subMinutes,
 } from "date-fns";
 import {
-  Clock,
-  RotateCcw,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
   ChevronUp,
-  ChevronDown,
   ChevronsUpDown,
+  Clock,
+  RotateCcw,
 } from "lucide-react";
-import { useState, useMemo, useCallback, useRef } from "react";
-import { DayPicker, type DateRange, type MonthCaptionProps } from "react-day-picker";
+import { useCallback, useMemo, useRef, useState } from "react";
+import { type DateRange, DayPicker, type MonthCaptionProps } from "react-day-picker";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 export interface TimeRange {
   start: string; // ISO
-  end: string;   // ISO or empty
+  end: string; // ISO or empty
   label?: string;
 }
 
@@ -65,8 +65,8 @@ type CalendarView = "days" | "months" | "years";
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 /**
- * Converts a date to a "Nominal ISO" string (YYYY-MM-DDTHH:MM:SS) 
- * without applying UTC conversion. This ensures parity between 
+ * Converts a date to a "Nominal ISO" string (YYYY-MM-DDTHH:MM:SS)
+ * without applying UTC conversion. This ensures parity between
  * what the user sees and what is stored in log files.
  */
 function toNominalISO(date: Date): string {
@@ -74,17 +74,42 @@ function toNominalISO(date: Date): string {
 }
 
 const PRESETS = [
-  { label: "Last 15 min",  getValue: () => ({ start: toNominalISO(subMinutes(new Date(), 15)), end: "" }) },
-  { label: "Last 1 hour",  getValue: () => ({ start: toNominalISO(subHours(new Date(), 1)),    end: "" }) },
-  { label: "Last 4 hours", getValue: () => ({ start: toNominalISO(subHours(new Date(), 4)),    end: "" }) },
-  { label: "Last 24 hrs",  getValue: () => ({ start: toNominalISO(subHours(new Date(), 24)),   end: "" }) },
-  { label: "Last 7 days",  getValue: () => ({ start: toNominalISO(subDays(new Date(), 7)),     end: "" }) },
-  { label: "Today",        getValue: () => ({ start: toNominalISO(startOfDay(new Date())),      end: "" }) },
+  {
+    label: "Last 15 min",
+    getValue: () => ({ start: toNominalISO(subMinutes(new Date(), 15)), end: "" }),
+  },
+  {
+    label: "Last 1 hour",
+    getValue: () => ({ start: toNominalISO(subHours(new Date(), 1)), end: "" }),
+  },
+  {
+    label: "Last 4 hours",
+    getValue: () => ({ start: toNominalISO(subHours(new Date(), 4)), end: "" }),
+  },
+  {
+    label: "Last 24 hrs",
+    getValue: () => ({ start: toNominalISO(subHours(new Date(), 24)), end: "" }),
+  },
+  {
+    label: "Last 7 days",
+    getValue: () => ({ start: toNominalISO(subDays(new Date(), 7)), end: "" }),
+  },
+  { label: "Today", getValue: () => ({ start: toNominalISO(startOfDay(new Date())), end: "" }) },
 ] as const;
 
 const MONTH_NAMES = [
-  "January", "February", "March", "April", "May", "June",
-  "July", "August", "September", "October", "November", "December",
+  "January",
+  "February",
+  "March",
+  "April",
+  "May",
+  "June",
+  "July",
+  "August",
+  "September",
+  "October",
+  "November",
+  "December",
 ];
 
 // ─── TimeSegmentInput ─────────────────────────────────────────────────────────
@@ -94,9 +119,20 @@ function TimeSegmentInput({ value, max, onChange, onNext }: TimeSegmentInputProp
   const clamp = (v: number) => Math.max(0, Math.min(max, v));
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "ArrowUp")   { e.preventDefault(); onChange(clamp(value + 1)); return; }
-    if (e.key === "ArrowDown") { e.preventDefault(); onChange(clamp(value - 1)); return; }
-    if (e.key === "Backspace") { pendingRef.current = pendingRef.current.slice(0, -1); return; }
+    if (e.key === "ArrowUp") {
+      e.preventDefault();
+      onChange(clamp(value + 1));
+      return;
+    }
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      onChange(clamp(value - 1));
+      return;
+    }
+    if (e.key === "Backspace") {
+      pendingRef.current = pendingRef.current.slice(0, -1);
+      return;
+    }
     if (/^\d$/.test(e.key)) {
       e.preventDefault();
       const next = (pendingRef.current + e.key).slice(-2);
@@ -131,7 +167,9 @@ function TimeSegmentInput({ value, max, onChange, onNext }: TimeSegmentInputProp
         onFocus={(e) => e.target.select()}
         onKeyDown={handleKeyDown}
         onWheel={handleWheel}
-        onChange={() => { /* controlled via keydown */ }}
+        onChange={() => {
+          /* controlled via keydown */
+        }}
         onBlur={(e) => {
           const n = Number.parseInt(e.target.value, 10);
           if (!Number.isNaN(n)) onChange(clamp(n));
@@ -158,7 +196,17 @@ function TimeSegmentInput({ value, max, onChange, onNext }: TimeSegmentInputProp
 
 // ─── TimeInputRow ─────────────────────────────────────────────────────────────
 
-function TimeInputRow({ label, color, h, m, s, onH, onM, onS, disabled = false }: TimeInputRowProps) {
+function TimeInputRow({
+  label,
+  color,
+  h,
+  m,
+  s,
+  onH,
+  onM,
+  onS,
+  disabled = false,
+}: TimeInputRowProps) {
   const dotColor = color === "green" ? "bg-emerald-500" : "bg-amber-500";
   const mRef = useRef<HTMLDivElement>(null);
   const sRef = useRef<HTMLDivElement>(null);
@@ -198,7 +246,10 @@ interface MonthGridProps {
 /**
  * Month selector grid — header handles the year drilldown, no duplicate here.
  */
-function MonthGrid({ currentMonth, onSelectMonth }: Omit<MonthGridProps, "currentYear" | "onSelectYear">) {
+function MonthGrid({
+  currentMonth,
+  onSelectMonth,
+}: Omit<MonthGridProps, "currentYear" | "onSelectYear">) {
   return (
     <div className="w-[252px] animate-in fade-in zoom-in-95 duration-150">
       <div className="grid grid-cols-3 gap-2 p-1">
@@ -273,19 +324,25 @@ interface CalendarHeaderProps {
  * - months →  "2026 ▾"        (clickable, arrows hidden — click to go to years)
  * - years  →  "Select Year"   (no toggle arrow, arrows hidden)
  */
-function CalendarHeader({ calendarMonth, view, onPrev, onNext, onToggleView }: CalendarHeaderProps) {
-  const isDays   = view === "days";
+function CalendarHeader({
+  calendarMonth,
+  view,
+  onPrev,
+  onNext,
+  onToggleView,
+}: CalendarHeaderProps) {
+  const isDays = view === "days";
   const isMonths = view === "months";
 
   const LABEL_BY_VIEW: Record<CalendarView, string> = {
-    days:   format(calendarMonth.date, "MMMM yyyy"),
+    days: format(calendarMonth.date, "MMMM yyyy"),
     months: format(calendarMonth.date, "yyyy"),
-    years:  "Select Year",
+    years: "Select Year",
   };
-  const label       = LABEL_BY_VIEW[view];
+  const label = LABEL_BY_VIEW[view];
   const isClickable = isDays || isMonths;
-  const showPrev    = isDays ? Boolean(onPrev) : isClickable;
-  const showNext    = isDays ? Boolean(onNext) : isClickable;
+  const showPrev = isDays ? Boolean(onPrev) : isClickable;
+  const showNext = isDays ? Boolean(onNext) : isClickable;
 
   return (
     <div className="flex items-center justify-between w-full mb-2 pb-2 border-b border-white/5 px-1">
@@ -310,7 +367,9 @@ function CalendarHeader({ calendarMonth, view, onPrev, onNext, onToggleView }: C
         onClick={isClickable ? onToggleView : undefined}
         className={[
           "flex items-center justify-center gap-1.5 px-2 py-1 rounded-md text-sm font-semibold transition-colors flex-1",
-          isClickable ? "hover:bg-white/8 hover:text-primary group cursor-pointer" : "cursor-default text-text-muted",
+          isClickable
+            ? "hover:bg-white/8 hover:text-primary group cursor-pointer"
+            : "cursor-default text-text-muted",
         ].join(" ")}
       >
         <span className={isMonths ? "text-primary" : ""}>{label}</span>
@@ -349,48 +408,79 @@ function CalendarHeader({ calendarMonth, view, onPrev, onNext, onToggleView }: C
  * - Select month or year → returns to days view
  */
 export function TimeRangePicker({ value, onChange, className }: TimeRangePickerProps) {
-  const [open, setOpen]   = useState(false);
-  const [view, setView]   = useState<CalendarView>("days");
+  const [open, setOpen] = useState(false);
+  const [view, setView] = useState<CalendarView>("days");
   const [activeSide, setActiveSide] = useState<"left" | "right">("left");
   const [range, setRange] = useState<DateRange | undefined>(() => {
     const from = value.start ? new Date(value.start) : undefined;
-    const to   = value.end   ? new Date(value.end)   : undefined;
+    const to = value.end ? new Date(value.end) : undefined;
     return from ? { from, to } : undefined;
   });
 
   const nowRef = new Date();
-  const [startH, setStartH] = useState(() => value.start ? new Date(value.start).getHours()   : 0);
-  const [startM, setStartM] = useState(() => value.start ? new Date(value.start).getMinutes() : 0);
-  const [startS, setStartS] = useState(() => value.start ? new Date(value.start).getSeconds() : 0);
-  const [endH,   setEndH]   = useState(() => value.end   ? new Date(value.end).getHours()     : nowRef.getHours());
-  const [endM,   setEndM]   = useState(() => value.end   ? new Date(value.end).getMinutes()   : nowRef.getMinutes());
-  const [endS,   setEndS]   = useState(() => value.end   ? new Date(value.end).getSeconds()   : nowRef.getSeconds());
+  const [startH, setStartH] = useState(() => (value.start ? new Date(value.start).getHours() : 0));
+  const [startM, setStartM] = useState(() =>
+    value.start ? new Date(value.start).getMinutes() : 0,
+  );
+  const [startS, setStartS] = useState(() =>
+    value.start ? new Date(value.start).getSeconds() : 0,
+  );
+  const [endH, setEndH] = useState(() =>
+    value.end ? new Date(value.end).getHours() : nowRef.getHours(),
+  );
+  const [endM, setEndM] = useState(() =>
+    value.end ? new Date(value.end).getMinutes() : nowRef.getMinutes(),
+  );
+  const [endS, setEndS] = useState(() =>
+    value.end ? new Date(value.end).getSeconds() : nowRef.getSeconds(),
+  );
 
-  const [monthLeft, setMonthLeft]   = useState<Date>(() => value.start ? new Date(value.start) : new Date());
-  const [monthRight, setMonthRight] = useState<Date>(() => value.end ? new Date(value.end) : dateFnsAddMonths(new Date(), 1));
+  const [monthLeft, setMonthLeft] = useState<Date>(() =>
+    value.start ? new Date(value.start) : new Date(),
+  );
+  const [monthRight, setMonthRight] = useState<Date>(() =>
+    value.end ? new Date(value.end) : dateFnsAddMonths(new Date(), 1),
+  );
 
   // ── Handlers ──────────────────────────────────────────────────────────────
 
-  const handleOpenChange = useCallback((next: boolean) => {
-    if (next) {
-      const from = value.start ? new Date(value.start) : undefined;
-      const to   = value.end   ? new Date(value.end)   : undefined;
-      setRange(from ? { from, to } : undefined);
-      if (from) { setStartH(from.getHours()); setStartM(from.getMinutes()); setStartS(from.getSeconds()); }
-      else       { setStartH(0); setStartM(0); setStartS(0); }
-      const n = new Date();
-      if (to) { setEndH(to.getHours()); setEndM(to.getMinutes()); setEndS(to.getSeconds()); }
-      else    { setEndH(n.getHours()); setEndM(n.getMinutes()); setEndS(n.getSeconds()); }
-      
-      const left  = from ?? new Date();
-      const right = to   ?? dateFnsAddMonths(left, 1);
-      setMonthLeft(left);
-      setMonthRight(right);
-      setView("days");
-      setActiveSide("left");
-    }
-    setOpen(next);
-  }, [value]);
+  const handleOpenChange = useCallback(
+    (next: boolean) => {
+      if (next) {
+        const from = value.start ? new Date(value.start) : undefined;
+        const to = value.end ? new Date(value.end) : undefined;
+        setRange(from ? { from, to } : undefined);
+        if (from) {
+          setStartH(from.getHours());
+          setStartM(from.getMinutes());
+          setStartS(from.getSeconds());
+        } else {
+          setStartH(0);
+          setStartM(0);
+          setStartS(0);
+        }
+        const n = new Date();
+        if (to) {
+          setEndH(to.getHours());
+          setEndM(to.getMinutes());
+          setEndS(to.getSeconds());
+        } else {
+          setEndH(n.getHours());
+          setEndM(n.getMinutes());
+          setEndS(n.getSeconds());
+        }
+
+        const left = from ?? new Date();
+        const right = to ?? dateFnsAddMonths(left, 1);
+        setMonthLeft(left);
+        setMonthRight(right);
+        setView("days");
+        setActiveSide("left");
+      }
+      setOpen(next);
+    },
+    [value],
+  );
 
   const handleApply = useCallback(() => {
     if (!range?.from) return;
@@ -406,34 +496,42 @@ export function TimeRangePicker({ value, onChange, className }: TimeRangePickerP
     setOpen(false);
   }, [range, startH, startM, startS, endH, endM, endS, onChange]);
 
-  const handlePreset = useCallback((preset: typeof PRESETS[number]) => {
-    const r = preset.getValue();
-    onChange({ ...r, label: preset.label });
-    setOpen(false);
-  }, [onChange]);
+  const handlePreset = useCallback(
+    (preset: (typeof PRESETS)[number]) => {
+      const r = preset.getValue();
+      onChange({ ...r, label: preset.label });
+      setOpen(false);
+    },
+    [onChange],
+  );
 
   /** Cycles forward: days → months → years. */
   const handleToggleView = useCallback((side: "left" | "right") => {
     setActiveSide(side);
     setView((v) => {
-      if (v === "days")   return "months";
+      if (v === "days") return "months";
       if (v === "months") return "years";
       return "days";
     });
   }, []);
 
+  const handleMonthSelect = useCallback(
+    (m: number) => {
+      const setter = activeSide === "left" ? setMonthLeft : setMonthRight;
+      setter((prev) => dateFnsSetMonth(prev, m));
+      setView("days");
+    },
+    [activeSide],
+  );
 
-  const handleMonthSelect = useCallback((m: number) => {
-    const setter = activeSide === "left" ? setMonthLeft : setMonthRight;
-    setter((prev) => dateFnsSetMonth(prev, m));
-    setView("days");
-  }, [activeSide]);
-
-  const handleYearSelect = useCallback((y: number) => {
-    const setter = activeSide === "left" ? setMonthLeft : setMonthRight;
-    setter((prev) => dateFnsSetYear(prev, y));
-    setView("months");
-  }, [activeSide]);
+  const handleYearSelect = useCallback(
+    (y: number) => {
+      const setter = activeSide === "left" ? setMonthLeft : setMonthRight;
+      setter((prev) => dateFnsSetYear(prev, y));
+      setView("months");
+    },
+    [activeSide],
+  );
 
   // ── Derived ───────────────────────────────────────────────────────────────
 
@@ -463,16 +561,20 @@ export function TimeRangePicker({ value, onChange, className }: TimeRangePickerP
       weekday: "w-9 text-center text-[10px] font-bold text-text-muted uppercase tracking-wider",
       week: "flex transition-colors",
       day: "h-9 w-9 relative",
-      day_button: "h-9 w-9 text-xs font-medium rounded-none transition-colors hover:bg-primary/20 hover:text-primary",
-      range_start: "bg-primary/20 rounded-l-full [&>button]:bg-primary [&>button]:text-text-inverse [&>button]:rounded-full [&>button]:font-bold",
-      range_end:   "bg-primary/20 rounded-r-full [&>button]:bg-primary [&>button]:text-text-inverse [&>button]:rounded-full [&>button]:font-bold",
-      range_middle:"bg-primary/10 [&>button]:text-primary [&>button]:rounded-none",
-      selected:    "[&>button]:bg-primary [&>button]:text-text-inverse [&>button]:rounded-full [&>button]:font-bold",
-      today:       "[&>button]:ring-1 [&>button]:ring-primary/50",
-      outside:     "opacity-30",
-      disabled:    "opacity-20 cursor-not-allowed",
-      hidden:      "invisible",
-    }
+      day_button:
+        "h-9 w-9 text-xs font-medium rounded-none transition-colors hover:bg-primary/20 hover:text-primary",
+      range_start:
+        "bg-primary/20 rounded-l-full [&>button]:bg-primary [&>button]:text-text-inverse [&>button]:rounded-full [&>button]:font-bold",
+      range_end:
+        "bg-primary/20 rounded-r-full [&>button]:bg-primary [&>button]:text-text-inverse [&>button]:rounded-full [&>button]:font-bold",
+      range_middle: "bg-primary/10 [&>button]:text-primary [&>button]:rounded-none",
+      selected:
+        "[&>button]:bg-primary [&>button]:text-text-inverse [&>button]:rounded-full [&>button]:font-bold",
+      today: "[&>button]:ring-1 [&>button]:ring-primary/50",
+      outside: "opacity-30",
+      disabled: "opacity-20 cursor-not-allowed",
+      hidden: "invisible",
+    },
   };
 
   // ── Render ────────────────────────────────────────────────────────────────
@@ -511,7 +613,10 @@ export function TimeRangePicker({ value, onChange, className }: TimeRangePickerP
               <div className="pt-2 mt-1 border-t border-border/10">
                 <button
                   type="button"
-                  onClick={() => { onChange({ start: "", end: "" }); setOpen(false); }}
+                  onClick={() => {
+                    onChange({ start: "", end: "" });
+                    setOpen(false);
+                  }}
                   className="w-full text-left px-3 py-1.5 text-xs text-text-muted hover:text-text-primary hover:bg-white/5 rounded-md transition-all flex items-center gap-2"
                 >
                   <RotateCcw className="size-3" />
@@ -521,7 +626,10 @@ export function TimeRangePicker({ value, onChange, className }: TimeRangePickerP
             </div>
 
             {/* ── 2. Calendar ───────────────────────────────── */}
-            <div className="p-4 border-r border-border/20 shrink-0 flex flex-col" style={{ minWidth: "600px" }}>
+            <div
+              className="p-4 border-r border-border/20 shrink-0 flex flex-col"
+              style={{ minWidth: "600px" }}
+            >
               <p className="text-[10px] font-bold uppercase tracking-widest text-text-muted opacity-50 mb-3">
                 Range Selection
               </p>
@@ -544,7 +652,7 @@ export function TimeRangePicker({ value, onChange, className }: TimeRangePickerP
                               onNext={() => setMonthLeft((m) => dateFnsAddMonths(m, 1))}
                               onToggleView={() => handleToggleView("left")}
                             />
-                          )
+                          ),
                         }}
                       />
                       <DayPicker
@@ -560,7 +668,7 @@ export function TimeRangePicker({ value, onChange, className }: TimeRangePickerP
                               onNext={() => setMonthRight((m) => dateFnsAddMonths(m, 1))}
                               onToggleView={() => handleToggleView("right")}
                             />
-                          )
+                          ),
                         }}
                       />
                     </div>
@@ -570,7 +678,11 @@ export function TimeRangePicker({ value, onChange, className }: TimeRangePickerP
                   {view === "months" && (
                     <div className="flex flex-col items-center">
                       <CalendarHeader
-                        calendarMonth={{ date: activeSide === "left" ? monthLeft : monthRight } as MonthCaptionProps["calendarMonth"]}
+                        calendarMonth={
+                          {
+                            date: activeSide === "left" ? monthLeft : monthRight,
+                          } as MonthCaptionProps["calendarMonth"]
+                        }
                         view={view}
                         onPrev={() => {
                           const setter = activeSide === "left" ? setMonthLeft : setMonthRight;
@@ -593,7 +705,11 @@ export function TimeRangePicker({ value, onChange, className }: TimeRangePickerP
                   {view === "years" && (
                     <div className="flex flex-col items-center">
                       <CalendarHeader
-                        calendarMonth={{ date: activeSide === "left" ? monthLeft : monthRight } as MonthCaptionProps["calendarMonth"]}
+                        calendarMonth={
+                          {
+                            date: activeSide === "left" ? monthLeft : monthRight,
+                          } as MonthCaptionProps["calendarMonth"]
+                        }
                         view={view}
                         onPrev={() => {
                           const setter = activeSide === "left" ? setMonthLeft : setMonthRight;
@@ -619,15 +735,20 @@ export function TimeRangePicker({ value, onChange, className }: TimeRangePickerP
                 <div className="flex flex-col gap-1 border-r border-border/10">
                   <div className="flex items-center gap-1.5 grayscale opacity-50">
                     <div className="size-1.5 rounded-full bg-emerald-500" />
-                    <span className="text-[10px] font-bold uppercase tracking-wide">Start Selection</span>
+                    <span className="text-[10px] font-bold uppercase tracking-wide">
+                      Start Selection
+                    </span>
                   </div>
                   <div className="pl-3 text-xs font-mono text-text-primary">
                     {range?.from ? (
                       <>
-                        <span className="text-emerald-400/80 ">{format(range.from, "MMM d, yyyy")}</span>
+                        <span className="text-emerald-400/80 ">
+                          {format(range.from, "MMM d, yyyy")}
+                        </span>
                         <span className="mx-2 text-text-muted opacity-30">@</span>
                         <span className="text-text-secondary">
-                          {String(startH).padStart(2, "0")}:{String(startM).padStart(2, "0")}:{String(startS).padStart(2, "0")}
+                          {String(startH).padStart(2, "0")}:{String(startM).padStart(2, "0")}:
+                          {String(startS).padStart(2, "0")}
                         </span>
                       </>
                     ) : (
@@ -639,7 +760,9 @@ export function TimeRangePicker({ value, onChange, className }: TimeRangePickerP
                 <div className="flex flex-col gap-1">
                   <div className="flex items-center gap-1.5 grayscale opacity-50">
                     <div className="size-1.5 rounded-full bg-amber-500" />
-                    <span className="text-[10px] font-bold uppercase tracking-wide">End Selection</span>
+                    <span className="text-[10px] font-bold uppercase tracking-wide">
+                      End Selection
+                    </span>
                   </div>
                   <div className="pl-3 text-xs font-mono text-text-primary">
                     {range?.to ? (
@@ -647,14 +770,17 @@ export function TimeRangePicker({ value, onChange, className }: TimeRangePickerP
                         <span className="text-amber-400/80">{format(range.to, "MMM d, yyyy")}</span>
                         <span className="mx-2 text-text-muted opacity-30">@</span>
                         <span className="text-text-secondary">
-                          {String(endH).padStart(2, "0")}:{String(endM).padStart(2, "0")}:{String(endS).padStart(2, "0")}
+                          {String(endH).padStart(2, "0")}:{String(endM).padStart(2, "0")}:
+                          {String(endS).padStart(2, "0")}
                         </span>
                       </>
                     ) : (
-                      <span className={[
-                        "text-amber-400/60 font-semibold animate-pulse",
-                        range?.from ? "" : "grayscale opacity-50 italic animate-none"
-                      ].join(" ")}>
+                      <span
+                        className={[
+                          "text-amber-400/60 font-semibold animate-pulse",
+                          range?.from ? "" : "grayscale opacity-50 italic animate-none",
+                        ].join(" ")}
+                      >
                         {range?.from ? "Streaming (Now)" : "Waiting for date..."}
                       </span>
                     )}
@@ -672,8 +798,12 @@ export function TimeRangePicker({ value, onChange, className }: TimeRangePickerP
               <TimeInputRow
                 label="Start"
                 color="green"
-                h={startH} m={startM} s={startS}
-                onH={setStartH} onM={setStartM} onS={setStartS}
+                h={startH}
+                m={startM}
+                s={startS}
+                onH={setStartH}
+                onM={setStartM}
+                onS={setStartS}
               />
 
               <div className="border-t border-border/10" />
@@ -681,8 +811,12 @@ export function TimeRangePicker({ value, onChange, className }: TimeRangePickerP
               <TimeInputRow
                 label={hasEndDate ? "End" : "End (pick date)"}
                 color="amber"
-                h={endH} m={endM} s={endS}
-                onH={setEndH} onM={setEndM} onS={setEndS}
+                h={endH}
+                m={endM}
+                s={endS}
+                onH={setEndH}
+                onM={setEndM}
+                onS={setEndS}
                 disabled={!hasEndDate}
               />
 

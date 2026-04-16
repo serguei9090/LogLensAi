@@ -6,7 +6,7 @@ interface HelpTooltipProps {
   className?: string;
 }
 
-export function HelpTooltip({ content, className }: HelpTooltipProps) {
+export function HelpTooltip({ content, className }: Readonly<HelpTooltipProps>) {
   return (
     <TooltipProvider>
       <Tooltip>

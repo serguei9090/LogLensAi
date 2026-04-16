@@ -47,11 +47,13 @@ class Database:
 
     def _create_tables(self):
         cursor = self.get_cursor()
+        self._setup_schema(cursor)
+        self._run_migrations(cursor)
+        self._initialize_cluster_cache(cursor)
 
-        # 1. Ensure sequence exists first
+    def _setup_schema(self, cursor):
+        """Initial table and sequence creation."""
         cursor.execute("CREATE SEQUENCE IF NOT EXISTS log_id_seq;")
-
-        # 2. Create tables if they don't exist
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS logs (
                 id        INTEGER PRIMARY KEY DEFAULT nextval('log_id_seq'),
@@ -96,7 +98,7 @@ class Database:
                 name         TEXT,
                 provider     TEXT,
                 model        TEXT,
-                provider_session_id TEXT, -- E.g. A2A taskId for Hot Mode resume
+                provider_session_id TEXT,
                 created_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 last_modified TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
@@ -106,28 +108,29 @@ class Database:
                 session_id   TEXT,
                 role         TEXT,
                 content      TEXT,
-                context_logs TEXT, -- JSON array of log IDs
+                context_logs TEXT,
                 timestamp    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                provider_session_id TEXT -- Link message to a specific remote taskId/threadId
+                provider_session_id TEXT
             );
         """)
 
-        # 3. Migrations for existing databases
-        
-        # Check for AI tables in existing DB and add them if missing
-        # (IF NOT EXISTS in CREATE TABLE already handles this, but some older DuckDB versions 
-        # might need explicit checks if combined in a multi-statement block)
-        
-        # Ensure name column exists in ai_sessions (if it was created with title before)
+    def _run_migrations(self, cursor):
+        """Handle schema evolution for existing databases."""
+        self._migrate_ai_tables(cursor)
+        self._migrate_fusion_pk(cursor)
+        self._migrate_log_columns(cursor)
+
+    def _migrate_ai_tables(self, cursor):
+        """Ensure AI session/message tables have latest columns."""
+        # Fix column names if using old temporary names
         try:
             cursor.execute("SELECT name FROM ai_sessions LIMIT 1")
         except Exception:
             try:
                 cursor.execute("ALTER TABLE ai_sessions RENAME COLUMN title TO name")
             except Exception:
-                pass # Table might not exist yet or other issue, creation handled above
+                pass
         
-        # Ensure last_modified column exists in ai_sessions
         try:
             cursor.execute("SELECT last_modified FROM ai_sessions LIMIT 1")
         except Exception:
@@ -135,91 +138,68 @@ class Database:
                 cursor.execute("ALTER TABLE ai_sessions RENAME COLUMN last_updated TO last_modified")
             except Exception:
                 pass
-        
-        # Ensure provider_session_id exists in ai_sessions
+
+        # Add missing columns
+        for table, col in [("ai_sessions", "provider_session_id"), ("ai_messages", "provider_session_id")]:
+            try:
+                cursor.execute(f"SELECT {col} FROM {table} LIMIT 1")
+            except Exception:
+                cursor.execute(f"ALTER TABLE {table} ADD COLUMN {col} TEXT")
+
+    def _migrate_fusion_pk(self, cursor):
+        """Migrate fusion_configs to new composite PK including fusion_id."""
         try:
-             cursor.execute("SELECT provider_session_id FROM ai_sessions LIMIT 1")
-        except Exception:
-             cursor.execute("ALTER TABLE ai_sessions ADD COLUMN provider_session_id TEXT")
-             
-        # Ensure provider_session_id exists in ai_messages
-        try:
-             cursor.execute("SELECT provider_session_id FROM ai_messages LIMIT 1")
-        except Exception:
-             cursor.execute("ALTER TABLE ai_messages ADD COLUMN provider_session_id TEXT")
-        
-        # 1. Proper migration for fusion_configs if PK doesn't include fusion_id
-        try:
-            # Check if fusion_id is part of the PK
             cursor.execute("SELECT k.name FROM pragma_table_info('fusion_configs') k WHERE k.pk > 0")
             pk_cols = [row[0] for row in cursor.fetchall()]
             
             if "fusion_id" not in pk_cols:
-                print("[DB] Migrating fusion_configs to update Primary Key (including fusion_id)...")
-                # Backup existing data
+                print("[DB] Migrating fusion_configs to update Primary Key...")
                 cursor.execute("CREATE TEMP TABLE fusion_configs_backup AS SELECT * FROM fusion_configs")
                 cursor.execute("DROP TABLE fusion_configs")
-                cursor.execute("""
-                    CREATE TABLE fusion_configs (
-                        workspace_id TEXT,
-                        fusion_id    TEXT DEFAULT 'default',
-                        source_id    TEXT,
-                        enabled      BOOLEAN DEFAULT TRUE,
-                        tz_offset    INTEGER DEFAULT 0,
-                        custom_format TEXT,
-                        parser_config TEXT,
-                        PRIMARY KEY (workspace_id, fusion_id, source_id)
-                    )
-                """)
-                # Restore data (adding fusion_id if missing from backup)
+                self._setup_schema(cursor) # Re-creates with new PK structure
+                
                 cursor.execute("PRAGMA table_info('fusion_configs_backup')")
                 backup_cols = [row[1] for row in cursor.fetchall()]
                 
                 if "fusion_id" in backup_cols:
                     cursor.execute("""
                         INSERT INTO fusion_configs (workspace_id, fusion_id, source_id, enabled, tz_offset, custom_format, parser_config)
-                        SELECT workspace_id, fusion_id, source_id, enabled, tz_offset, custom_format, parser_config 
-                        FROM fusion_configs_backup
+                        SELECT workspace_id, fusion_id, source_id, enabled, tz_offset, custom_format, parser_config FROM fusion_configs_backup
                     """)
                 else:
                     cursor.execute("""
                         INSERT INTO fusion_configs (workspace_id, fusion_id, source_id, enabled, tz_offset, custom_format, parser_config)
-                        SELECT workspace_id, 'default', source_id, enabled, tz_offset, custom_format, parser_config 
-                        FROM fusion_configs_backup
+                        SELECT workspace_id, 'default', source_id, enabled, tz_offset, custom_format, parser_config FROM fusion_configs_backup
                     """)
                 cursor.execute("DROP TABLE fusion_configs_backup")
-                print("[DB] Fusion Configs PK Migration complete.")
         except Exception as e:
             print(f"[DB] Error migrating fusion_configs: {e}")
 
-        # Add source_id column if missing to logs
+    def _migrate_log_columns(self, cursor):
+        """Add missing source_id and defaults to logs table."""
         try:
             cursor.execute("SELECT source_id FROM logs LIMIT 1")
         except Exception:
             cursor.execute("ALTER TABLE logs ADD COLUMN source_id TEXT")
             
-        # Ensure id column has the sequence default attached
         try:
-            # DuckDB syntax to update default on existing column
             cursor.execute("ALTER TABLE logs ALTER id SET DEFAULT nextval('log_id_seq')")
         except Exception:
-            pass # Already has default or table is empty/new
+            pass
 
-        # 4. Data migration: populate clusters table from existing logs if empty
+    def _initialize_cluster_cache(self, cursor):
+        """Warm up the clusters table from existing log data if empty."""
         try:
             cursor.execute("SELECT count(*) FROM clusters")
             if cursor.fetchone()[0] == 0:
-                print("[DB] Initializing clusters cache from existing logs...")
+                print("[DB] Initializing clusters cache...")
                 cursor.execute("""
                     INSERT INTO clusters (workspace_id, cluster_id, template, count)
                     SELECT workspace_id, cluster_id, 'Pattern ' || cluster_id, count(*)
-                    FROM logs
-                    WHERE cluster_id IS NOT NULL
-                    GROUP BY workspace_id, cluster_id
+                    FROM logs WHERE cluster_id IS NOT NULL GROUP BY workspace_id, cluster_id
                 """)
-                print("[DB] Cluster cache initialized.")
         except Exception as e:
-            print(f"[DB] Cluster cache initialization skipped: {e}")
+            print(f"[DB] Cluster cache initialization failure: {e}")
 
     def get_cursor(self):
         # BUG-001 Fix: Use thread-local cursor for DuckDB thread safety

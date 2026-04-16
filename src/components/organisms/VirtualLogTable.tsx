@@ -3,9 +3,9 @@ import { type LogLevel, LogLevelBadge } from "@/components/atoms/LogLevelBadge";
 import type { HighlightEntry } from "@/components/molecules/HighlightBuilder";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { useInvestigationStore } from "@/store/investigationStore";
 import { useAiStore } from "@/store/aiStore";
-import { useWorkspaceStore, selectActiveWorkspace } from "@/store/workspaceStore";
+import { useInvestigationStore } from "@/store/investigationStore";
+import { selectActiveWorkspace, useWorkspaceStore } from "@/store/workspaceStore";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import {
   ArrowDown,
@@ -67,20 +67,15 @@ export function VirtualLogTable({
   } | null>(null);
   const [lastSelectedId, setLastSelectedId] = useState<number | null>(null);
 
-  const { 
-    filters, 
-    setFilters, 
-    selectedLogIds, 
-    toggleLogSelection, 
+  const {
+    filters,
+    setFilters,
+    selectedLogIds,
+    toggleLogSelection,
     clearSelection,
-    setSelectedLogIds 
+    setSelectedLogIds,
   } = useInvestigationStore();
-  const { 
-    setSidebarOpen, 
-    setSession, 
-    logSessionMap,
-    fetchMapping 
-  } = useAiStore();
+  const { setSidebarOpen, setSession, logSessionMap, fetchMapping } = useAiStore();
   const activeWorkspace = useWorkspaceStore(selectActiveWorkspace);
 
   useEffect(() => {
@@ -219,19 +214,19 @@ export function VirtualLogTable({
     if (isShift && lastSelectedId !== null) {
       const lastIndex = logs.findIndex((l) => l.id === lastSelectedId);
       const currentIndex = logs.findIndex((l) => l.id === id);
-      
+
       if (lastIndex === -1) {
         // Fallback if lastSelectedId is no longer in the visible set
         setSelectedLogIds([id]);
       } else {
         const [start, end] = [Math.min(lastIndex, currentIndex), Math.max(lastIndex, currentIndex)];
         const rangeIds = logs.slice(start, end + 1).map((l) => l.id);
-        
+
         // If meta is pressed, add range to existing selection; otherwise replace
-        const newSelection = isMeta 
+        const newSelection = isMeta
           ? Array.from(new Set([...selectedLogIds, ...rangeIds]))
           : rangeIds;
-        
+
         setSelectedLogIds(newSelection);
       }
     } else if (isMeta) {
@@ -275,8 +270,8 @@ export function VirtualLogTable({
           <table className="w-full text-left text-sm whitespace-nowrap table-fixed border-separate border-spacing-0">
             <thead className="sticky top-0 bg-bg-surface border-b border-border z-10 text-text-muted text-[10px] font-bold uppercase tracking-widest h-10 select-none">
               <tr>
-                <th 
-                  className="w-[12px] p-0 transition-colors group/select-all" 
+                <th
+                  className="w-[12px] p-0 transition-colors group/select-all"
                   title={selectedLogIds.length === logs.length ? "Deselect All" : "Select All"}
                 >
                   <button
@@ -287,15 +282,21 @@ export function VirtualLogTable({
                       if (selectedLogIds.length === logs.length) {
                         clearSelection();
                       } else {
-                        setSelectedLogIds(logs.map(l => l.id));
+                        setSelectedLogIds(logs.map((l) => l.id));
                       }
                     }}
-                    aria-label={selectedLogIds.length === logs.length ? "Deselect All" : "Select All"}
+                    aria-label={
+                      selectedLogIds.length === logs.length ? "Deselect All" : "Select All"
+                    }
                   >
-                    <div className={cn(
-                      "w-1 h-4 rounded-full transition-all",
-                      selectedLogIds.length === logs.length ? "bg-emerald-500" : "bg-white/10 group-hover/select-all:bg-white/30"
-                    )} />
+                    <div
+                      className={cn(
+                        "w-1 h-4 rounded-full transition-all",
+                        selectedLogIds.length === logs.length
+                          ? "bg-emerald-500"
+                          : "bg-white/10 group-hover/select-all:bg-white/30",
+                      )}
+                    />
                   </button>
                 </th>
                 <th className="w-[60px] p-0 text-center" aria-sort={getAriaSort("id")}>
@@ -385,7 +386,7 @@ export function VirtualLogTable({
                       borderLeftStyle: "solid",
                     }}
                     onClick={(e) => {
-                       handleSelectRow(log.id, e);
+                      handleSelectRow(log.id, e);
                     }}
                     onKeyDown={(e) => {
                       if (e.key === "Enter" || e.key === " ") {
@@ -393,7 +394,10 @@ export function VirtualLogTable({
                         handleSelectRow(log.id, e);
                       }
                     }}
-                  ><td className="w-[60px] px-3 py-2 text-center text-text-muted/50 select-none group-hover:text-text-secondary align-top font-bold">{log.id}</td>
+                  >
+                    <td className="w-[60px] px-3 py-2 text-center text-text-muted/50 select-none group-hover:text-text-secondary align-top font-bold">
+                      {log.id}
+                    </td>
                     <td className="w-[180px] px-3 py-2 text-text-secondary/70 align-top opacity-80">
                       {log.timestamp}
                     </td>
@@ -405,14 +409,22 @@ export function VirtualLogTable({
                     </td>
                     <td className="w-[110px] px-3 py-2 text-center align-top border-x border-border/5">
                       {log.cluster_id ? (
-                        <div className="flex flex-col items-center justify-center gap-0.5 group/cluster">
+                        <div
+                          className={cn(
+                            "flex flex-col items-center justify-center gap-0.5 group/cluster",
+                            log.cluster_id !== "unknown" &&
+                              "animate-in fade-in zoom-in-95 duration-500",
+                          )}
+                        >
                           <button
                             type="button"
                             className={cn(
-                              "inline-flex items-center justify-center text-primary border h-5 px-1.5 rounded-md text-[9px] font-bold transition-colors outline-none focus-visible:ring-1 focus-visible:ring-primary",
-                              anomalousClusters?.has(log.cluster_id)
-                                ? "bg-orange-500/20 border-orange-500/40 text-orange-400 hover:bg-orange-500/30"
-                                : "bg-primary/10 border-primary/20 hover:bg-primary/20",
+                              "inline-flex items-center justify-center border h-5 px-1.5 rounded-md text-[9px] font-bold transition-colors outline-none focus-visible:ring-1 focus-visible:ring-primary",
+                              log.cluster_id === "unknown"
+                                ? "bg-zinc-800/50 border-zinc-700/30 text-zinc-500"
+                                : anomalousClusters?.has(log.cluster_id)
+                                  ? "bg-orange-500/20 border-orange-500/40 text-orange-400 hover:bg-orange-500/30"
+                                  : "bg-primary/10 border-primary/20 text-primary hover:bg-primary/20",
                             )}
                             title={log.cluster_template || "Click to analyze with AI"}
                             onClick={(e) => {
@@ -434,9 +446,7 @@ export function VirtualLogTable({
                         <span className="opacity-10">—</span>
                       )}
                     </td>
-                    <td
-                      className="w-[100px] px-3 py-2 text-center relative align-top"
-                    >
+                    <td className="w-[100px] px-3 py-2 text-center relative align-top">
                       <div className="flex items-center justify-center gap-1">
                         <IconButton
                           icon={
@@ -460,18 +470,20 @@ export function VirtualLogTable({
                         />
                         <IconButton
                           icon={
-                            <Sparkles 
+                            <Sparkles
                               className={cn(
                                 "h-3.5 w-3.5 transition-all",
-                                logSessionMap[log.id] && "text-violet-400 fill-violet-400/20"
-                              )} 
+                                logSessionMap[log.id] && "text-violet-400 fill-violet-400/20",
+                              )}
                             />
                           }
-                          label={logSessionMap[log.id] ? "View AI Investigation" : "Start AI Analysis"}
+                          label={
+                            logSessionMap[log.id] ? "View AI Investigation" : "Start AI Analysis"
+                          }
                           onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
                             e.stopPropagation();
                             const existingSessionId = logSessionMap[log.id];
-                            
+
                             if (existingSessionId) {
                               setSession(existingSessionId);
                             } else {
@@ -483,9 +495,9 @@ export function VirtualLogTable({
                           }}
                           className={cn(
                             "transition-all h-7 w-7 rounded-lg",
-                            logSessionMap[log.id] 
-                              ? "opacity-100 bg-violet-500/10 border border-violet-500/20 text-violet-400" 
-                              : "text-text-muted hover:text-violet-400 hover:bg-violet-500/10 opacity-0 group-hover:opacity-100"
+                            logSessionMap[log.id]
+                              ? "opacity-100 bg-violet-500/10 border border-violet-500/20 text-violet-400"
+                              : "text-text-muted hover:text-violet-400 hover:bg-violet-500/10 opacity-0 group-hover:opacity-100",
                           )}
                         />
                       </div>
@@ -576,13 +588,13 @@ export function VirtualLogTable({
             </span>
             <div className="w-px h-4 bg-white/10" />
             <Button
-            size="sm"
-            className="rounded-full bg-violet-600 hover:bg-violet-500 text-white shadow-lg animate-in fade-in slide-in-from-bottom-5 duration-300"
-            onClick={() => useAiStore.getState().setSidebarOpen(true)}
-          >
-            <Sparkles className="h-4 w-4 mr-2" />
-            Batch AI Analysis ({selectedLogIds.length})
-          </Button>
+              size="sm"
+              className="rounded-full bg-violet-600 hover:bg-violet-500 text-white shadow-lg animate-in fade-in slide-in-from-bottom-5 duration-300"
+              onClick={() => useAiStore.getState().setSidebarOpen(true)}
+            >
+              <Sparkles className="h-4 w-4 mr-2" />
+              Batch AI Analysis ({selectedLogIds.length})
+            </Button>
             <Button
               variant="ghost"
               size="sm"

@@ -1,6 +1,6 @@
-import { useInvestigationStore } from "@/store/investigationStore";
 import type { FilterEntry } from "@/components/molecules/FilterBuilder";
 import { callSidecar } from "@/lib/hooks/useSidecarBridge";
+import { useInvestigationStore } from "@/store/investigationStore";
 import { X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Bar, BarChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
@@ -109,7 +109,9 @@ export function LogDistributionWidget({
     if (loading && data.length === 0) {
       return (
         <div className="absolute inset-0 flex items-center justify-center bg-bg-base/80 z-20">
-          <div className="animate-pulse text-text-muted text-xs">Synchronizing timeline data...</div>
+          <div className="animate-pulse text-text-muted text-xs">
+            Synchronizing timeline data...
+          </div>
         </div>
       );
     }
@@ -125,8 +127,12 @@ export function LogDistributionWidget({
     if (data.length === 0) {
       return (
         <div className="absolute inset-0 flex flex-col items-center justify-center bg-bg-base/80 z-20">
-          <div className="text-text-muted/50 text-xs mb-1">No logs matching criteria in this range</div>
-          {isTailing && <div className="text-[10px] text-text-muted/30">Waiting for live data...</div>}
+          <div className="text-text-muted/50 text-xs mb-1">
+            No logs matching criteria in this range
+          </div>
+          {isTailing && (
+            <div className="text-[10px] text-text-muted/30">Waiting for live data...</div>
+          )}
         </div>
       );
     }
@@ -139,7 +145,9 @@ export function LogDistributionWidget({
       {/* Header with Date Selectors */}
       <div className="flex items-center justify-between px-4 h-10 border-b border-border/20 bg-bg-base/50">
         <div className="flex items-center gap-2">
-          <span className="text-[10px] font-bold uppercase tracking-widest text-text-muted">Distribution Insights</span>
+          <span className="text-[10px] font-bold uppercase tracking-widest text-text-muted">
+            Distribution Insights
+          </span>
         </div>
 
         <div className="flex items-center gap-4">

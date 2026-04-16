@@ -74,6 +74,9 @@
 - [x] **FIX-FE-002**: Sidebar Accessibility & Type Safety (Standard native buttons + Readonly props)
   - **Files**: `src/components/organisms/Sidebar.tsx`, `src/components/organisms/AIInvestigationSidebar.tsx`
   - **Detail**: `docs/TODOC/FIX-FE-002.md`
+- [x] **FIX-LOG-001**: General Code Quality & Linting Overhaul (Biome/Ruff fixes)
+  - **Files**: `src/components/pages/InvestigationPage.tsx`, `sidecar/src/ai.py`, `src/components/organisms/SettingsPanel.tsx`, etc.
+  - **Detail**: `docs/TODOC/FIX_LOG_001.md`
 
 ---
 

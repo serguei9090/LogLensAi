@@ -118,12 +118,16 @@ export function LogToolbar({
 
       {/* Action switches */}
       <div className="flex items-center gap-5 shrink-0 ml-2">
-
-        <div className="flex items-center gap-2 group cursor-help" title="Toggle real-time log ingestion (Live Tail)">
-          <span className="text-[10px] font-bold tracking-widest text-text-muted group-hover:text-emerald-400 transition-colors uppercase">Tail</span>
+        <div
+          className="flex items-center gap-2 group cursor-help"
+          title="Toggle real-time log ingestion (Live Tail)"
+        >
+          <span className="text-[10px] font-bold tracking-widest text-text-muted group-hover:text-emerald-400 transition-colors uppercase">
+            Tail
+          </span>
           <TailSwitch checked={isTailing} onCheckedChange={onTailToggle} />
         </div>
-        
+
         <StatusDot active={status} />
       </div>
     </div>

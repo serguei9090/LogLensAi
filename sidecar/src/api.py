@@ -8,7 +8,7 @@ from typing import Any
 import aiohttp_cors
 from aiohttp import web
 from pydantic import BaseModel, ValidationError
-from src.ai import AIProvider, AIChatMessage, AIProviderFactory
+from src.ai import AIChatMessage, AIProviderFactory
 from src.db import Database
 from src.mcp_server import init_mcp, mcp_server
 from src.metadata_extractor import extract_log_metadata
@@ -184,7 +184,6 @@ class App:
         def run_mcp():
             try:
                 import uvicorn
-                from mcp.server.fastmcp import FastMCP
                 config = uvicorn.Config(mcp_server.application, host="127.0.0.1", port=5001, log_level="error")
                 self._mcp_server_instance = uvicorn.Server(config)
                 self._mcp_server_instance.run()
@@ -727,8 +726,8 @@ class App:
         # 2. Pattern Clustering (Drain3)
         try:
             res = self.parser.parse(message)
-            cluster_id = res.cluster_id
-            template = res.template
+            cluster_id = str(res["cluster_id"])
+            template = res["template"]
         except Exception:
             cluster_id = "unknown"
             template = "unknown"
@@ -901,7 +900,7 @@ class App:
         if response_msg.provider_session_id:
              updates["provider_session_id"] = response_msg.provider_session_id
         
-        update_clause = ", ".join([f"{k} = ?" for k in updates.keys()])
+        update_clause = ", ".join([f"{k} = ?" for k in updates])
         cursor.execute(
             f"UPDATE ai_sessions SET {update_clause} WHERE session_id = ?",
             list(updates.values()) + [session_id]
@@ -1109,7 +1108,7 @@ class App:
             "active_tailers": len(active_tailers),
             "tailer_keys": active_tailers
         }
-async def on_cleanup(_app):
+def on_cleanup(_app):
     Database.reset()
 
 def run_http(port=5000):

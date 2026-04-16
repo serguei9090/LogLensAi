@@ -2,9 +2,11 @@ import asyncio
 import json
 import os
 import sys
-from typing import Any, List, Optional
+
 import aiohttp
-from .base import AIProvider, AIChatMessage
+
+from .base import AIChatMessage, AIProvider
+
 
 class GeminiCLIProvider(AIProvider):
     """
@@ -15,7 +17,7 @@ class GeminiCLIProvider(AIProvider):
     
     DEFAULT_MODEL = "gemini-2.5-flash"
 
-    def __init__(self, host: str = "http://localhost:22436", system_prompt: str = "", model: Optional[str] = None):
+    def __init__(self, host: str = "http://localhost:22436", system_prompt: str = "", model: str | None = None):
         super().__init__(system_prompt=system_prompt)
         self.host = host.rstrip("/")
         self.active_model = model or self.DEFAULT_MODEL
@@ -31,10 +33,10 @@ class GeminiCLIProvider(AIProvider):
             raise ValueError("No valid JSON object found in output")
         return json.loads(output[start:end+1])
 
-    async def list_models(self) -> List[str]:
+    async def list_models(self) -> list[str]:
         return [self.DEFAULT_MODEL, "gemini-pro"]
 
-    async def _get_or_create_task(self, session: aiohttp.ClientSession, session_id: str, existing_task_id: Optional[str] = None, model: Optional[str] = None) -> str:
+    async def _get_or_create_task(self, session: aiohttp.ClientSession, session_id: str, existing_task_id: str | None = None, model: str | None = None) -> str:
         """Fetch existing taskId (from cache or DB) or create a new one."""
         # 1. Use existing taskId if provided from DB or cache
         task_id = existing_task_id or self._task_cache.get(session_id)
@@ -69,7 +71,7 @@ class GeminiCLIProvider(AIProvider):
         
         return task_id
 
-    async def chat(self, messages: List[AIChatMessage], model: Optional[str] = None, session_id: Optional[str] = None, provider_session_id: Optional[str] = None) -> AIChatMessage:
+    async def chat(self, messages: list[AIChatMessage], model: str | None = None, session_id: str | None = None, provider_session_id: str | None = None) -> AIChatMessage:
         """Execute chat using A2A Hot Mode if available, falling back to Cold Mode."""
         if not session_id:
             return await self._chat_cold(messages, model)
@@ -81,7 +83,7 @@ class GeminiCLIProvider(AIProvider):
             sys.stderr.write(f"A2A Hot Mode Error: {e}. Falling back to Cold Mode.\n")
             return await self._chat_cold(messages, model)
 
-    async def _chat_hot(self, session_id: str, messages: List[AIChatMessage], existing_task_id: Optional[str] = None, model: Optional[str] = None) -> AIChatMessage:
+    async def _chat_hot(self, session_id: str, messages: list[AIChatMessage], existing_task_id: str | None = None, model: str | None = None) -> AIChatMessage:
         """Core Hot Mode logic via A2A Server using exact parity with chat_session.js."""
         async with aiohttp.ClientSession(timeout=self.timeout) as session:
             # 1. Task Management
@@ -89,20 +91,7 @@ class GeminiCLIProvider(AIProvider):
             is_new_task = (task_id != existing_task_id) if existing_task_id else False
 
             # 2. Context Restoration (Parity with Auto-Heal)
-            prompt = messages[-1].content
-            if is_new_task and len(messages) > 1:
-                hist_lines = []
-                for m in messages[:-1]:
-                    role = "YOU" if m.role == "user" else "AI"
-                    hist_lines.append(f"[{role}]: {m.content}")
-                
-                prompt = (
-                    "=== CONTEXT RESTORATION (AUTO-HEAL) ===\n"
-                    "The following is the history of our previous conversation which was lost from the server state. "
-                    "Please use this as context for our current chat:\n\n"
-                    + "\n---\n".join(hist_lines) +
-                    f"\n\n=== END OF RESTORATION ===\n\nUser Message: {prompt}"
-                )
+            prompt = self._prepare_hot_prompt(messages, is_new_task)
 
             # 3. Payload Parity (Match chat.js exactly)
             message_id = os.urandom(8).hex()
@@ -119,43 +108,64 @@ class GeminiCLIProvider(AIProvider):
                 }
             }
             
-            full_response = []
+            # 4. Stream Handling
             async with session.post(f"{self.host}/", json=payload) as resp:
                 if resp.status != 200:
                     err_text = await resp.text()
                     raise RuntimeError(f"A2A Message Error ({resp.status}): {err_text}")
                 
-                # Parse Server Sent Events (SSE) stream
-                reader = resp.content
-                buffer = ""
-                
-                while True:
-                    chunk = await reader.read(4096)
-                    if not chunk:
-                        break
-                    
-                    buffer += chunk.decode(errors="replace")
-                    
-                    # Split chunks by double newline (SSE separator)
-                    while "\n\n" in buffer:
-                        block, buffer = buffer.split("\n\n", 1)
-                        block = block.strip()
-                        
-                        if block.startswith("data: "):
-                            data_str = block[6:].strip()
-                            text = self._parse_json_chunk(data_str)
-                            if text:
-                                full_response.append(text)
+                content = await self._parse_sse_stream(resp.content)
             
-            content = "".join(full_response)
-            if not content:
-                raise RuntimeError("No text returned from A2A server")
-
             # Update cache and return
             self._task_cache[session_id] = task_id
             return AIChatMessage(role="assistant", content=content, provider_session_id=task_id)
 
-    def _parse_json_chunk(self, json_str: str) -> Optional[str]:
+    def _prepare_hot_prompt(self, messages: list[AIChatMessage], is_new_task: bool) -> str:
+        """Helper to prepare the prompt, injecting history if auto-healing is needed."""
+        prompt = messages[-1].content
+        if is_new_task and len(messages) > 1:
+            hist_lines = []
+            for m in messages[:-1]:
+                role = "YOU" if m.role == "user" else "AI"
+                hist_lines.append(f"[{role}]: {m.content}")
+            
+            prompt = (
+                "=== CONTEXT RESTORATION (AUTO-HEAL) ===\n"
+                "The following is the history of our previous conversation which was lost from the server state. "
+                "Please use this as context for our current chat:\n\n"
+                + "\n---\n".join(hist_lines) +
+                f"\n\n=== END OF RESTORATION ===\n\nUser Message: {prompt}"
+            )
+        return prompt
+
+    async def _parse_sse_stream(self, reader: aiohttp.StreamReader) -> str:
+        """Robustly parse Server Sent Events (SSE) stream from A2A server."""
+        full_response = []
+        buffer = ""
+        
+        while True:
+            chunk = await reader.read(4096)
+            if not chunk:
+                break
+            
+            buffer += chunk.decode(errors="replace")
+            
+            while "\n\n" in buffer:
+                block, buffer = buffer.split("\n\n", 1)
+                block = block.strip()
+                
+                if block.startswith("data: "):
+                    data_str = block[6:].strip()
+                    text = self._parse_json_chunk(data_str)
+                    if text:
+                        full_response.append(text)
+        
+        content = "".join(full_response)
+        if not content:
+            raise RuntimeError("No text returned from A2A server")
+        return content
+
+    def _parse_json_chunk(self, json_str: str) -> str | None:
         """Robustly extracts agent text from a single JSON chunk."""
         try:
             data = json.loads(json_str)
@@ -170,7 +180,7 @@ class GeminiCLIProvider(AIProvider):
             pass
         return None
 
-    def _sync_to_disk(self, session_id: str, messages: List[AIChatMessage]):
+    def _sync_to_disk(self, session_id: str, messages: list[AIChatMessage]):
         """Persist session history to local JSON files for redundancy."""
         try:
             base_dir = "gemini_sessions"
@@ -190,7 +200,7 @@ class GeminiCLIProvider(AIProvider):
         except Exception:
             pass # Non-critical backup failure
 
-    async def _chat_cold(self, messages: List[AIChatMessage], model: Optional[str] = None) -> AIChatMessage:
+    async def _chat_cold(self, messages: list[AIChatMessage], model: str | None = None) -> AIChatMessage:
         """Original Cold Mode logic as a fallback."""
         target_model = model or self.active_model
         prompt_parts = []
@@ -226,7 +236,7 @@ class GeminiCLIProvider(AIProvider):
         except Exception as e:
             return AIChatMessage(role="assistant", content=f"Gemini Cold Fallback Error: {str(e)}")
 
-    async def analyze_logs(self, template: str, samples: List[str]) -> dict:
+    async def analyze_logs(self, template: str, samples: list[str]) -> dict:
         """Diagnostic analysis remains cold for now as it's typically a one-off."""
         prompt = (
             "You are a Log Analysis Specialist. Return JSON with summary, root_cause, actions.\n\n"

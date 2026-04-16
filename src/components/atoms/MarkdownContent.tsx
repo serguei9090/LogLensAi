@@ -44,76 +44,25 @@ function parseMarkdown(text: string): React.ReactNode[] {
 
     // Code block: ```...```
     if (line.trimStart().startsWith("```")) {
-      // Skip the language identifier after opening ```
-      const codeLines: string[] = [];
-      i++;
-      while (i < lines.length && !lines[i].trimStart().startsWith("```")) {
-        codeLines.push(lines[i]);
-        i++;
-      }
-      i++; // skip closing ```
-
-      elements.push(
-        <pre
-          key={`code-${elements.length}`}
-          className="bg-zinc-900/80 border border-zinc-800/60 rounded-lg px-3 py-2.5 overflow-x-auto custom-scrollbar"
-        >
-          <code className="text-[11px] font-mono text-emerald-300/90 leading-relaxed whitespace-pre">
-            {codeLines.join("\n")}
-          </code>
-        </pre>
-      );
+      const { element, nextIndex } = parseCodeBlock(lines, i, elements.length);
+      elements.push(element);
+      i = nextIndex;
       continue;
     }
 
     // Bullet list: - item or * item
     if (/^\s*[-*]\s+/.test(line)) {
-      const listItems: string[] = [];
-      while (i < lines.length && /^\s*[-*]\s+/.test(lines[i])) {
-        listItems.push(lines[i].replace(/^\s*[-*]\s+/, ""));
-        i++;
-      }
-      elements.push(
-        <ul
-          key={`list-${elements.length}`}
-          className="space-y-1 pl-3"
-        >
-          {listItems.map((item, li) => (
-            <li
-              key={`li-${li}`}
-              className="text-[13px] leading-relaxed flex items-start gap-2"
-            >
-              <span className="text-emerald-500/40 mt-1.5 shrink-0">•</span>
-              <span>{renderInline(item)}</span>
-            </li>
-          ))}
-        </ul>
-      );
+      const { element, nextIndex } = parseBulletList(lines, i, elements.length);
+      elements.push(element);
+      i = nextIndex;
       continue;
     }
 
     // Numbered list: 1. item
     if (/^\s*\d+[.)]\s+/.test(line)) {
-      const listItems: string[] = [];
-      while (i < lines.length && /^\s*\d+[.)]\s+/.test(lines[i])) {
-        listItems.push(lines[i].replace(/^\s*\d+[.)]\s+/, ""));
-        i++;
-      }
-      elements.push(
-        <ol
-          key={`ol-${elements.length}`}
-          className="space-y-1 pl-3 list-decimal list-inside"
-        >
-          {listItems.map((item, li) => (
-            <li
-              key={`oli-${li}`}
-              className="text-[13px] leading-relaxed"
-            >
-              {renderInline(item)}
-            </li>
-          ))}
-        </ol>
-      );
+      const { element, nextIndex } = parseOrderedList(lines, i, elements.length);
+      elements.push(element);
+      i = nextIndex;
       continue;
     }
 
@@ -123,32 +72,104 @@ function parseMarkdown(text: string): React.ReactNode[] {
       continue;
     }
 
-    // Regular paragraph — collect consecutive non-special lines
-    const paraLines: string[] = [];
-    while (
-      i < lines.length &&
-      lines[i].trim() !== "" &&
-      !lines[i].trimStart().startsWith("```") &&
-      !/^\s*[-*]\s+/.test(lines[i]) &&
-      !/^\s*\d+[.)]\s+/.test(lines[i])
-    ) {
-      paraLines.push(lines[i]);
-      i++;
-    }
-
-    if (paraLines.length > 0) {
-      elements.push(
-        <p
-          key={`p-${elements.length}`}
-          className="text-[13px] leading-relaxed"
-        >
-          {renderInline(paraLines.join("\n"))}
-        </p>
-      );
-    }
+    // Regular paragraph
+    const { element, nextIndex } = parseParagraph(lines, i, elements.length);
+    elements.push(element);
+    i = nextIndex;
   }
 
   return elements;
+}
+
+function parseCodeBlock(lines: string[], startIndex: number, elIndex: number) {
+  const codeLines: string[] = [];
+  let i = startIndex + 1;
+  while (i < lines.length && !lines[i].trimStart().startsWith("```")) {
+    codeLines.push(lines[i]);
+    i++;
+  }
+  return {
+    element: (
+      <pre
+        key={`code-${elIndex}-${codeLines.length}`}
+        className="bg-zinc-900/80 border border-zinc-800/60 rounded-lg px-3 py-2.5 overflow-x-auto custom-scrollbar"
+      >
+        <code className="text-[11px] font-mono text-emerald-300/90 leading-relaxed whitespace-pre">
+          {codeLines.join("\n")}
+        </code>
+      </pre>
+    ),
+    nextIndex: i + 1,
+  };
+}
+
+function parseBulletList(lines: string[], startIndex: number, elIndex: number) {
+  const listItems: string[] = [];
+  let i = startIndex;
+  while (i < lines.length && /^\s*[-*]\s+/.test(lines[i])) {
+    listItems.push(lines[i].replace(/^\s*[-*]\s+/, ""));
+    i++;
+  }
+  return {
+    element: (
+      <ul key={`list-${elIndex}`} className="space-y-1 pl-3">
+        {listItems.map((item, li) => (
+          <li
+            key={`li-${elIndex}-${li}`}
+            className="text-[13px] leading-relaxed flex items-start gap-2"
+          >
+            <span className="text-emerald-500/40 mt-1.5 shrink-0">•</span>
+            <span>{renderInline(item)}</span>
+          </li>
+        ))}
+      </ul>
+    ),
+    nextIndex: i,
+  };
+}
+
+function parseOrderedList(lines: string[], startIndex: number, elIndex: number) {
+  const listItems: string[] = [];
+  let i = startIndex;
+  while (i < lines.length && /^\s*\d+[.)]\s+/.test(lines[i])) {
+    listItems.push(lines[i].replace(/^\s*\d+[.)]\s+/, ""));
+    i++;
+  }
+  return {
+    element: (
+      <ol key={`ol-${elIndex}`} className="space-y-1 pl-3 list-decimal list-inside">
+        {listItems.map((item, li) => (
+          <li key={`oli-${elIndex}-${li}`} className="text-[13px] leading-relaxed">
+            {renderInline(item)}
+          </li>
+        ))}
+      </ol>
+    ),
+    nextIndex: i,
+  };
+}
+
+function parseParagraph(lines: string[], startIndex: number, elIndex: number) {
+  const paraLines: string[] = [];
+  let i = startIndex;
+  while (
+    i < lines.length &&
+    lines[i].trim() !== "" &&
+    !lines[i].trimStart().startsWith("```") &&
+    !/^\s*[-*]\s+/.test(lines[i]) &&
+    !/^\s*\d+[.)]\s+/.test(lines[i])
+  ) {
+    paraLines.push(lines[i]);
+    i++;
+  }
+  return {
+    element: (
+      <p key={`p-${elIndex}`} className="text-[13px] leading-relaxed">
+        {renderInline(paraLines.join("\n"))}
+      </p>
+    ),
+    nextIndex: i,
+  };
 }
 
 /** Renders inline markdown: **bold**, `code`, and line breaks. */
@@ -168,7 +189,7 @@ function renderInline(text: string): React.ReactNode {
       parts.push(
         <strong key={`b-${match.index}`} className="font-bold text-zinc-100">
           {token.slice(2, -2)}
-        </strong>
+        </strong>,
       );
     } else if (token.startsWith("`")) {
       parts.push(
@@ -177,7 +198,7 @@ function renderInline(text: string): React.ReactNode {
           className="px-1.5 py-0.5 rounded bg-zinc-800/80 text-emerald-400/90 text-[11px] font-mono border border-zinc-700/40"
         >
           {token.slice(1, -1)}
-        </code>
+        </code>,
       );
     }
 

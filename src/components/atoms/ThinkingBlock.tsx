@@ -16,7 +16,7 @@ interface ThinkingBlockProps {
  * - Auto-retracts when `isStreaming` transitions from true → false.
  * - Always preserved in the message so users can re-expand at any time.
  */
-export function ThinkingBlock({ content, isStreaming = false }: ThinkingBlockProps) {
+export function ThinkingBlock({ content, isStreaming = false }: Readonly<ThinkingBlockProps>) {
   const [isExpanded, setIsExpanded] = useState(false);
   const contentRef = useRef<HTMLDivElement>(null);
   const [contentHeight, setContentHeight] = useState(0);
@@ -37,7 +37,9 @@ export function ThinkingBlock({ content, isStreaming = false }: ThinkingBlockPro
     wasStreamingRef.current = isStreaming;
   }, [isStreaming]);
 
-  if (!content) return null;
+  if (!content) {
+    return null;
+  }
 
   // Extract first ~120 chars of thinking for the preview line
   const preview = content.length > 120 ? `${content.slice(0, 120)}…` : content;
@@ -47,7 +49,7 @@ export function ThinkingBlock({ content, isStreaming = false }: ThinkingBlockPro
       <button
         type="button"
         onClick={() => setIsExpanded((prev) => !prev)}
-        className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-left transition-colors hover:bg-violet-500/5"
+        className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-left transition-colors hover:bg-violet-500/5 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-violet-500/30"
       >
         {/* Animated thinking indicator while streaming */}
         {isStreaming ? (
@@ -70,9 +72,7 @@ export function ThinkingBlock({ content, isStreaming = false }: ThinkingBlockPro
 
       {/* Collapsed 2-line preview — always visible when not expanded */}
       {!isExpanded && (
-        <p className="px-2.5 pb-1.5 text-[11px] text-zinc-500/70 italic leading-snug line-clamp-2 select-none cursor-pointer"
-           onClick={() => setIsExpanded(true)}
-        >
+        <p className="px-2.5 pb-1.5 text-[11px] text-zinc-500/70 italic leading-snug line-clamp-2 select-none">
           {preview}
         </p>
       )}

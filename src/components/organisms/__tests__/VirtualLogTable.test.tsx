@@ -1,17 +1,18 @@
-import { render, screen, fireEvent } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import { VirtualLogTable, type LogEntry } from "../VirtualLogTable";
+import { type LogEntry, VirtualLogTable } from "../VirtualLogTable";
 
 // Mock virtualization
 vi.mock("@tanstack/react-virtual", () => ({
   useVirtualizer: vi.fn().mockImplementation(({ count }) => ({
     getTotalSize: () => count * 40,
-    getVirtualItems: () => Array.from({ length: count }, (_, i) => ({
-      index: i,
-      start: i * 40,
-      key: i,
-      size: 40,
-    })),
+    getVirtualItems: () =>
+      Array.from({ length: count }, (_, i) => ({
+        index: i,
+        start: i * 40,
+        key: i,
+        size: 40,
+      })),
     scrollToIndex: vi.fn(),
     measureElement: vi.fn(),
   })),
@@ -19,9 +20,15 @@ vi.mock("@tanstack/react-virtual", () => ({
 
 // Mock ResizeObserver globally to avoid issues with standard jsdom
 globalThis.ResizeObserver = class {
-  observe() { /* Mock */ }
-  unobserve() { /* Mock */ }
-  disconnect() { /* Mock */ }
+  observe() {
+    /* Mock */
+  }
+  unobserve() {
+    /* Mock */
+  }
+  disconnect() {
+    /* Mock */
+  }
 };
 
 // Mock stores
@@ -48,7 +55,7 @@ vi.mock("@/store/aiStore", () => ({
       getState: () => ({
         setSidebarOpen: vi.fn(),
       }),
-    }
+    },
   ),
 }));
 
@@ -59,17 +66,29 @@ vi.mock("@/store/workspaceStore", () => ({
 
 // Mock portal
 vi.mock("react-dom", async () => {
-    const actual = await vi.importActual("react-dom");
-    return {
-        ...actual as any,
-        createPortal: (node: any) => node,
-    };
+  const actual = await vi.importActual("react-dom");
+  return {
+    ...(actual as any),
+    createPortal: (node: any) => node,
+  };
 });
 
 describe("VirtualLogTable", () => {
   const mockLogs: LogEntry[] = [
-    { id: 1, timestamp: "2023-10-25 10:00:00", level: "INFO", message: "Test log 1", cluster_id: "c1" },
-    { id: 2, timestamp: "2023-10-25 10:01:00", level: "ERROR", message: "Test log 2", cluster_id: "c2" },
+    {
+      id: 1,
+      timestamp: "2023-10-25 10:00:00",
+      level: "INFO",
+      message: "Test log 1",
+      cluster_id: "c1",
+    },
+    {
+      id: 2,
+      timestamp: "2023-10-25 10:01:00",
+      level: "ERROR",
+      message: "Test log 2",
+      cluster_id: "c2",
+    },
   ];
 
   const defaultProps = {

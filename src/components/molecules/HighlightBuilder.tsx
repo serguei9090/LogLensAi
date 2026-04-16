@@ -154,7 +154,6 @@ export function HighlightBuilder({ highlights, onChange }: HighlightBuilderProps
           )}
         </PopoverContent>
       </Popover>
-
     </div>
   );
 }

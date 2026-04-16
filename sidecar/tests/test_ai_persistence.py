@@ -1,9 +1,10 @@
-import pytest
 import uuid
-import json
-from unittest.mock import MagicMock, AsyncMock
-from src.api import App, SendAiMessageRequest
+from unittest.mock import AsyncMock, MagicMock
+
+import pytest
 from src.ai.base import AIChatMessage
+from src.api import App
+
 
 @pytest.fixture
 def api():
