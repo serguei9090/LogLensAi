@@ -18,17 +18,17 @@ def app():
     """)
     return a
 
+
 def test_mcp_tools(app):
     from src.mcp_server import get_pattern_summary, ls_sources, query_logs
-    
+
     sources = ls_sources("ws1")
     assert "src1" in sources
-    
+
     logs = query_logs("ws1", query="test")
     assert logs["total"] == 1
     assert logs["logs"][0]["message"] == "test message"
-    
+
     patterns = get_pattern_summary("ws1")
     assert len(patterns) == 1
     assert patterns[0]["cluster_id"] == "c1"
-

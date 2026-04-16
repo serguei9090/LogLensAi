@@ -112,6 +112,14 @@ class Database:
                 timestamp    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 provider_session_id TEXT
             );
+
+            CREATE TABLE IF NOT EXISTS ai_memory (
+                workspace_id TEXT,
+                issue_signature TEXT,
+                resolution TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (workspace_id, issue_signature)
+            );
         """)
 
     def _run_migrations(self, cursor):
@@ -130,37 +138,60 @@ class Database:
                 cursor.execute("ALTER TABLE ai_sessions RENAME COLUMN title TO name")
             except Exception:
                 pass
-        
+
         try:
             cursor.execute("SELECT last_modified FROM ai_sessions LIMIT 1")
         except Exception:
             try:
-                cursor.execute("ALTER TABLE ai_sessions RENAME COLUMN last_updated TO last_modified")
+                cursor.execute(
+                    "ALTER TABLE ai_sessions RENAME COLUMN last_updated TO last_modified"
+                )
             except Exception:
                 pass
 
         # Add missing columns
-        for table, col in [("ai_sessions", "provider_session_id"), ("ai_messages", "provider_session_id")]:
+        for table, col in [
+            ("ai_sessions", "provider_session_id"),
+            ("ai_messages", "provider_session_id"),
+        ]:
             try:
                 cursor.execute(f"SELECT {col} FROM {table} LIMIT 1")
             except Exception:
                 cursor.execute(f"ALTER TABLE {table} ADD COLUMN {col} TEXT")
 
+        # Add ai_memory table if it doesn't exist
+        try:
+            cursor.execute("SELECT workspace_id FROM ai_memory LIMIT 1")
+        except Exception:
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS ai_memory (
+                    workspace_id TEXT,
+                    issue_signature TEXT,
+                    resolution TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    PRIMARY KEY (workspace_id, issue_signature)
+                );
+            """)
+
     def _migrate_fusion_pk(self, cursor):
         """Migrate fusion_configs to new composite PK including fusion_id."""
         try:
-            cursor.execute("SELECT k.name FROM pragma_table_info('fusion_configs') k WHERE k.pk > 0")
+            cursor.execute(
+                "SELECT k.name FROM pragma_table_info('fusion_configs') k WHERE k.pk > 0"
+            )
             pk_cols = [row[0] for row in cursor.fetchall()]
-            
+
             if "fusion_id" not in pk_cols:
                 print("[DB] Migrating fusion_configs to update Primary Key...")
-                cursor.execute("CREATE TEMP TABLE fusion_configs_backup AS SELECT * FROM fusion_configs")
+                cursor.execute(
+                    "CREATE TEMP TABLE fusion_configs_backup AS SELECT * FROM fusion_configs"
+                )
                 cursor.execute("DROP TABLE fusion_configs")
-                self._setup_schema(cursor) # Re-creates with new PK structure
-                
+                self._setup_schema(cursor)  # Re-creates with new PK structure
+
                 cursor.execute("PRAGMA table_info('fusion_configs_backup')")
                 backup_cols = [row[1] for row in cursor.fetchall()]
-                
+
                 if "fusion_id" in backup_cols:
                     cursor.execute("""
                         INSERT INTO fusion_configs (workspace_id, fusion_id, source_id, enabled, tz_offset, custom_format, parser_config)
@@ -181,7 +212,7 @@ class Database:
             cursor.execute("SELECT source_id FROM logs LIMIT 1")
         except Exception:
             cursor.execute("ALTER TABLE logs ADD COLUMN source_id TEXT")
-            
+
         try:
             cursor.execute("ALTER TABLE logs ALTER id SET DEFAULT nextval('log_id_seq')")
         except Exception:

@@ -14,6 +14,8 @@ export interface AppSettings {
   ui_row_height: string;
   ui_font_size: string;
   mcp_server_enabled: boolean;
+  ai_tool_search: boolean;
+  ai_tool_memory: boolean;
 }
 
 export const defaultSettings: AppSettings = {
@@ -30,6 +32,8 @@ export const defaultSettings: AppSettings = {
   ui_row_height: "36px",
   ui_font_size: "13px",
   mcp_server_enabled: false,
+  ai_tool_search: true,
+  ai_tool_memory: true,
 };
 
 interface SettingsStore {
@@ -59,6 +63,8 @@ export const useSettingsStore = create<SettingsStore>((set) => ({
             drain_max_children: Number.parseInt(remote.drain_max_children || "100", 10),
             drain_max_clusters: Number.parseInt(remote.drain_max_clusters || "1000", 10),
             mcp_server_enabled: remote.mcp_server_enabled === "true",
+            ai_tool_search: remote.ai_tool_search !== "false", // default true
+            ai_tool_memory: remote.ai_tool_memory !== "false", // default true
           },
         });
       }

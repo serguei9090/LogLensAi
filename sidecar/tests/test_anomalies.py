@@ -23,9 +23,9 @@ def app():
     """)
     return a
 
+
 def test_get_anomalies(app):
-    res = app.method_get_anomalies(workspace_id='ws1')
+    res = app.method_get_anomalies(workspace_id="ws1")
     assert "anomalies" in res
     # For now just checking it returns successfully and we can structure the mock response
     assert isinstance(res["anomalies"], list)
-

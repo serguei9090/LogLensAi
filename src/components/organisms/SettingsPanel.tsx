@@ -104,6 +104,8 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
             drain_max_children: Number.parseInt(remoteSettings.drain_max_children || "100", 10),
             drain_max_clusters: Number.parseInt(remoteSettings.drain_max_clusters || "1000", 10),
             mcp_server_enabled: remoteSettings.mcp_server_enabled === "true",
+            ai_tool_search: remoteSettings.ai_tool_search !== "false",
+            ai_tool_memory: remoteSettings.ai_tool_memory !== "false",
           }));
         }
       } catch (error) {
@@ -340,6 +342,36 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
                   rows={6}
                   className="w-full px-4 py-3 rounded-2xl text-xs font-mono bg-bg-surface border border-border text-text-primary placeholder:text-text-muted/30 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 resize-none transition-all"
                 />
+              </div>
+
+              <div className="space-y-4 pt-4 border-t border-border/30">
+                <SectionLabel>Skills & Memory</SectionLabel>
+
+                <div className="flex items-center justify-between bg-bg-surface/50 border border-border rounded-xl p-4 hover:bg-bg-surface transition-colors">
+                  <div>
+                    <p className="text-sm font-bold text-text-primary">Enable Log Search Tool</p>
+                    <p className="text-[10px] text-text-muted mt-0.5">
+                      Allow AI to autonomously search the DuckDB storage for error contexts.
+                    </p>
+                  </div>
+                  <Switch
+                    checked={settings.ai_tool_search}
+                    onCheckedChange={(checked) => update("ai_tool_search", checked)}
+                  />
+                </div>
+
+                <div className="flex items-center justify-between bg-bg-surface/50 border border-border rounded-xl p-4 hover:bg-bg-surface transition-colors">
+                  <div>
+                    <p className="text-sm font-bold text-text-primary">Enable Associative Memory</p>
+                    <p className="text-[10px] text-text-muted mt-0.5">
+                      Allow AI to save and autonomously retrieve past issue resolutions.
+                    </p>
+                  </div>
+                  <Switch
+                    checked={settings.ai_tool_memory}
+                    onCheckedChange={(checked) => update("ai_tool_memory", checked)}
+                  />
+                </div>
               </div>
 
               {settings.ai_provider === "gemini-cli" && (

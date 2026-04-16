@@ -45,11 +45,11 @@ export function ThinkingBlock({ content, isStreaming = false }: Readonly<Thinkin
   const preview = content.length > 120 ? `${content.slice(0, 120)}…` : content;
 
   return (
-    <div className="mb-2 group/think">
+    <div className="mb-3 group/think border-l-2 border-violet-500/20 hover:border-violet-500/40 transition-colors ml-1">
       <button
         type="button"
         onClick={() => setIsExpanded((prev) => !prev)}
-        className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-left transition-colors hover:bg-violet-500/5 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-violet-500/30"
+        className="w-full flex items-center gap-2 pl-3 pr-2 py-1.5 rounded-r-lg text-left transition-colors hover:bg-violet-500/5 focus-visible:outline-none focus-visible:bg-violet-500/5"
       >
         {/* Animated thinking indicator while streaming */}
         {isStreaming ? (
@@ -70,12 +70,7 @@ export function ThinkingBlock({ content, isStreaming = false }: Readonly<Thinkin
         />
       </button>
 
-      {/* Collapsed 2-line preview — always visible when not expanded */}
-      {!isExpanded && (
-        <p className="px-2.5 pb-1.5 text-[11px] text-zinc-500/70 italic leading-snug line-clamp-2 select-none">
-          {preview}
-        </p>
-      )}
+      {/* No standard 2-line preview, just keep it clean when collapsed */}
 
       {/* Expanded full thinking — animated height */}
       <div
@@ -87,9 +82,9 @@ export function ThinkingBlock({ content, isStreaming = false }: Readonly<Thinkin
       >
         <div
           ref={contentRef}
-          className="px-2.5 pb-2 max-h-[300px] overflow-y-auto custom-scrollbar"
+          className="pl-3 pr-2 pb-2 mt-1 max-h-[400px] overflow-y-auto custom-scrollbar"
         >
-          <p className="text-[11px] text-zinc-400/70 whitespace-pre-wrap leading-relaxed break-words">
+          <p className="text-[12px] text-zinc-400/80 whitespace-pre-wrap leading-relaxed break-words font-mono">
             {content}
           </p>
         </div>

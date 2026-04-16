@@ -68,7 +68,9 @@ function TimezoneSelect({
   const selected = TIMEZONE_OPTIONS.find((o) => o.value === value) ?? TIMEZONE_OPTIONS[12];
 
   const updatePosition = () => {
-    if (!triggerRef.current) return;
+    if (!triggerRef.current) {
+      return;
+    }
     const rect = triggerRef.current.getBoundingClientRect();
     setPanelStyle({
       position: "fixed",
@@ -80,7 +82,9 @@ function TimezoneSelect({
   };
 
   useEffect(() => {
-    if (!open) return;
+    if (!open) {
+      return;
+    }
     const handler = (e: MouseEvent) => {
       if (
         !triggerRef.current?.contains(e.target as Node) &&
@@ -214,6 +218,8 @@ export function OrchestratorHub({
   const setShowDistribution = useInvestigationStore((s) => s.setShowDistribution);
   const showAnomalies = useInvestigationStore((s) => s.showAnomalies);
   const setShowAnomalies = useInvestigationStore((s) => s.setShowAnomalies);
+  const workspaceGlobalContext = useInvestigationStore((s) => s.workspaceGlobalContext);
+  const setWorkspaceGlobalContext = useInvestigationStore((s) => s.setWorkspaceGlobalContext);
   const [fusionName, setFusionName] = useState("");
   const [configs, setConfigs] = useState<FusionSourceConfig[]>([]);
   const [isSaving, setIsSaving] = useState(false);
@@ -222,7 +228,9 @@ export function OrchestratorHub({
 
   // Reset or pre-fill when opening
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isOpen) {
+      return;
+    }
 
     if (editingFusionId) {
       // Pre-fill for editing
@@ -314,7 +322,9 @@ export function OrchestratorHub({
     }
   };
 
-  if (!isOpen) return null;
+  if (!isOpen) {
+    return null;
+  }
 
   return createPortal(
     <>
@@ -394,6 +404,22 @@ export function OrchestratorHub({
                     checked={showAnomalies}
                     onCheckedChange={setShowAnomalies}
                     className="data-[checked]:bg-orange-500"
+                  />
+                </div>
+
+                <div className="flex items-center justify-between p-3 rounded-xl border border-white/5 bg-black/20 mt-2">
+                  <div>
+                    <span className="block text-sm font-semibold text-text-primary">
+                      Workspace Global Context
+                    </span>
+                    <span className="block text-[11px] text-text-muted mt-0.5">
+                      Enable AI context ingestion across the entire workspace
+                    </span>
+                  </div>
+                  <Switch
+                    checked={workspaceGlobalContext}
+                    onCheckedChange={setWorkspaceGlobalContext}
+                    className="data-[checked]:bg-emerald-500"
                   />
                 </div>
               </div>

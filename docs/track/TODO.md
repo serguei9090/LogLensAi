@@ -118,6 +118,8 @@
 - [x] **ANALYSIS-005**: Logical Templates — Save/Load filter-highlights per log source
 - [x] **AI-001**: Implement `analyze_cluster` calling the `gemini-cli`
 - [x] **AI-002**: Display AI explanation in Diagnostic Sidebar
+- [x] **FEAT-AI-TOOLS-001**: Advanced AI Copilot Tools & Memory (Search, Memory, Autocompletes)
+  - **Detail**: `docs/TODOC/FEAT_AI_TOOLS_001.md`
 
 ---
 

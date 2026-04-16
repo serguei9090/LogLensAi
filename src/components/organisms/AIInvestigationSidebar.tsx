@@ -34,7 +34,9 @@ import { useCallback, useEffect, useRef, useState } from "react";
  */
 function parseThinking(content: string): { thinking: string | null; response: string } {
   const match = content.match(/<think>([\s\S]*?)<\/think>/);
-  if (!match) return { thinking: null, response: content };
+  if (!match) {
+    return { thinking: null, response: content };
+  }
   return {
     thinking: match[1].trim(),
     response: content.replace(/<think>[\s\S]*?<\/think>/, "").trim(),
@@ -66,7 +68,21 @@ export function AIInvestigationSidebar() {
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [editedTitle, setEditedTitle] = useState("");
   const [pendingSessionName, setPendingSessionName] = useState("");
+  const [showCommands, setShowCommands] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  const AI_COMMANDS = [
+    { cmd: "/search", label: "Search Memory", desc: "Search previously saved issues" },
+    { cmd: "/save", label: "Save Memory", desc: "Force save the current context as memory" },
+    { cmd: "/query", label: "Query Logs", desc: "Search across active workspace logs" },
+    {
+      cmd: "/analyze",
+      label: "Analyze Cluster",
+      desc: "Perform deep-dive analysis on a log pattern",
+    },
+    { cmd: "/anomalies", label: "Find Anomalies", desc: "Scan workspace for statistical outliers" },
+  ];
 
   const generateDefaultName = useCallback(() => {
     const rand = Math.floor(100000 + Math.random() * 900000);
@@ -104,7 +120,9 @@ export function AIInvestigationSidebar() {
   }, [messages]);
 
   const handleSend = async () => {
-    if (!inputValue.trim() || !activeWorkspace?.id) return;
+    if (!inputValue.trim() || !activeWorkspace?.id) {
+      return;
+    }
 
     const message = inputValue;
     setInputValue("");
@@ -123,7 +141,9 @@ export function AIInvestigationSidebar() {
   };
 
   const handleRename = async () => {
-    if (!editedTitle.trim()) return;
+    if (!editedTitle.trim()) {
+      return;
+    }
 
     if (currentSessionId && activeWorkspace?.id) {
       await renameSession(currentSessionId, editedTitle, activeWorkspace.id);
@@ -143,7 +163,9 @@ export function AIInvestigationSidebar() {
 
   const handleMouseMove = useCallback(
     (e: MouseEvent) => {
-      if (!isResizing.current) return;
+      if (!isResizing.current) {
+        return;
+      }
       const newWidth = window.innerWidth - e.clientX;
       if (newWidth > 320 && newWidth < 800) {
         setSidebarWidth(newWidth);
@@ -166,7 +188,9 @@ export function AIInvestigationSidebar() {
     document.body.style.cursor = "col-resize";
   }, [handleMouseMove, stopResizing]);
 
-  if (!isSidebarOpen) return null;
+  if (!isSidebarOpen) {
+    return null;
+  }
 
   return (
     <div
@@ -193,14 +217,17 @@ export function AIInvestigationSidebar() {
           <div className="min-w-0">
             {isEditingTitle ? (
               <input
-                autoFocus
                 className="bg-zinc-900 border border-emerald-500/30 rounded px-2 py-0.5 text-[13px] font-bold text-white focus:outline-none w-full"
                 value={editedTitle}
                 onChange={(e) => setEditedTitle(e.target.value)}
                 onBlur={handleRename}
                 onKeyDown={(e) => {
-                  if (e.key === "Enter") handleRename();
-                  if (e.key === "Escape") setIsEditingTitle(false);
+                  if (e.key === "Enter") {
+                    handleRename();
+                  }
+                  if (e.key === "Escape") {
+                    setIsEditingTitle(false);
+                  }
                 }}
               />
             ) : (
@@ -269,8 +296,9 @@ export function AIInvestigationSidebar() {
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
-                            if (activeWorkspace?.id)
+                            if (activeWorkspace?.id) {
                               deleteSession(s.session_id, activeWorkspace.id);
+                            }
                           }}
                           className="absolute top-3 right-2 opacity-0 group-hover:opacity-100 p-1.5 hover:bg-red-500/20 rounded-lg transition-all"
                         >
@@ -443,13 +471,53 @@ export function AIInvestigationSidebar() {
         )}
 
         <div className="relative group/input">
+          {showCommands && (
+            <div className="absolute bottom-full left-0 mb-2 w-full bg-[#111312] border border-zinc-800 rounded-xl overflow-hidden shadow-2xl z-50 animate-in fade-in slide-in-from-bottom-2">
+              <div className="p-2 space-y-1">
+                {AI_COMMANDS.filter((c) => c.cmd.startsWith(inputValue.toLowerCase())).map(
+                  (cmd) => (
+                    <button
+                      key={cmd.cmd}
+                      type="button"
+                      className="w-full flex flex-col items-start px-3 py-2 text-left rounded-lg bg-transparent hover:bg-emerald-500/10 focus:bg-emerald-500/10 outline-none transition-colors group"
+                      onClick={() => {
+                        setInputValue(`${cmd.cmd} `);
+                        setShowCommands(false);
+                        textareaRef.current?.focus();
+                      }}
+                    >
+                      <span className="text-xs font-bold text-emerald-400 font-mono">
+                        {cmd.cmd}
+                      </span>
+                      <span className="text-[10px] text-zinc-500 group-hover:text-zinc-400 mt-0.5">
+                        {cmd.desc}
+                      </span>
+                    </button>
+                  ),
+                )}
+              </div>
+            </div>
+          )}
           <Textarea
+            ref={textareaRef}
             value={inputValue}
-            onChange={(e) => setInputValue(e.target.value)}
+            onChange={(e) => {
+              const val = e.target.value;
+              setInputValue(val);
+              if (val.startsWith("/")) {
+                setShowCommands(true);
+              } else {
+                setShowCommands(false);
+              }
+            }}
             onKeyDown={(e) => {
               if (e.key === "Enter" && !e.shiftKey) {
                 e.preventDefault();
+                setShowCommands(false);
                 handleSend();
+              }
+              if (e.key === "Escape") {
+                setShowCommands(false);
               }
             }}
             placeholder="Search patterns or analyze errors..."

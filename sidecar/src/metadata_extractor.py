@@ -13,7 +13,7 @@ def extract_log_metadata(workspace_id: str, source_id: str, raw_line: str) -> di
     # Defaults
     timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     level = "INFO"
-    
+
     # Generic heuristic for level
     upper_line = raw_line.upper()
     for lvl in ["FATAL", "ERROR", "WARN", "DEBUG", "TRACE", "INFO"]:
@@ -27,10 +27,10 @@ def extract_log_metadata(workspace_id: str, source_id: str, raw_line: str) -> di
     try:
         cursor.execute(
             "SELECT parser_config, tz_offset FROM fusion_configs WHERE workspace_id = ? AND source_id = ?",
-            (workspace_id, source_id)
+            (workspace_id, source_id),
         )
         row = cursor.fetchone()
-        
+
         if row and row[0]:
             config = json.loads(row[0])
             pattern = config.get("regex")
@@ -45,13 +45,13 @@ def extract_log_metadata(workspace_id: str, source_id: str, raw_line: str) -> di
                         extracted_ts = match.group(1)
                     else:
                         extracted_ts = match.group(0)
-                    
+
                     if extracted_ts:
                         # PARS-004: Basic Timezone Normalization
                         # In a real-world scenario, we'd use a robust parser like dateutil.
                         # For now, if it looks like a standard format, we apply the offset.
                         timestamp = extracted_ts
-                        
+
                         try:
                             # Attempt to parse common formats: YYYY-MM-DD HH:MM:SS
                             # If it matches, we apply the offset to normalize to UTC
@@ -61,8 +61,8 @@ def extract_log_metadata(workspace_id: str, source_id: str, raw_line: str) -> di
                                 dt = dt + datetime.timedelta(hours=offset_hrs)
                                 timestamp = dt.strftime("%Y-%m-%d %H:%M:%S")
                         except Exception:
-                            pass # Keep raw extracted string if parsing fails
-                    
+                            pass  # Keep raw extracted string if parsing fails
+
                     if "level" in groups:
                         level = groups["level"].upper()
     except Exception as e:

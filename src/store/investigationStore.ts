@@ -20,6 +20,7 @@ export interface InvestigationStore extends SourceState {
   isTailing: boolean;
   showDistribution: boolean;
   showAnomalies: boolean;
+  workspaceGlobalContext: boolean;
   /** The currently active source ID or 'aggregate' for the All view */
   currentSourceId: string;
   /** Persisted map of states for each source encountered in this session */
@@ -40,6 +41,7 @@ export interface InvestigationStore extends SourceState {
   setSort: (by: string, order: "asc" | "desc") => void;
   setShowDistribution: (v: boolean) => void;
   setShowAnomalies: (v: boolean) => void;
+  setWorkspaceGlobalContext: (v: boolean) => void;
   setTimeRange: (range: { start: string; end: string; label?: string }) => void;
   setSelectedLogIds: (ids: number[]) => void;
   toggleLogSelection: (id: number) => void;
@@ -64,13 +66,16 @@ export const useInvestigationStore = create<InvestigationStore>((set, get) => ({
   isTailing: false,
   showDistribution: false,
   showAnomalies: false,
+  workspaceGlobalContext: false,
   currentSourceId: "aggregate",
   sourceStates: {},
 
   syncActiveSource: (sourceId = null) => {
     const nextId = sourceId ?? "aggregate";
     const { currentSourceId, sourceStates } = get();
-    if (nextId === currentSourceId) return;
+    if (nextId === currentSourceId) {
+      return;
+    }
 
     // 1. Capture current values into a SourceState snapshot
     const currentSnapshot: SourceState = {
@@ -114,6 +119,7 @@ export const useInvestigationStore = create<InvestigationStore>((set, get) => ({
   setSort: (sortBy, sortOrder) => set({ sortBy, sortOrder }),
   setShowDistribution: (showDistribution) => set({ showDistribution }),
   setShowAnomalies: (showAnomalies) => set({ showAnomalies }),
+  setWorkspaceGlobalContext: (workspaceGlobalContext) => set({ workspaceGlobalContext }),
   setTimeRange: (timeRange) => set({ timeRange }),
   setSelectedLogIds: (selectedLogIds) => set({ selectedLogIds }),
   toggleLogSelection: (id) =>

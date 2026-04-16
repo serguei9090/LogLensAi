@@ -17,10 +17,7 @@ class DrainParser:
         """Returns a dict with cluster_id and template for the given log line."""
         with self.lock:
             result = self.miner.add_log_message(log_line)
-            return {
-                "cluster_id": str(result["cluster_id"]),
-                "template": result["template_mined"]
-            }
+            return {"cluster_id": str(result["cluster_id"]), "template": result["template_mined"]}
 
     def get_clusters(self):
         return self.miner.drain.clusters

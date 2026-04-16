@@ -31,7 +31,7 @@ class FileTailer:
 
     def _tail(self):
         try:
-            with open(self.filepath, encoding='utf-8', errors='replace') as f:
+            with open(self.filepath, encoding="utf-8", errors="replace") as f:
                 # Seek to end for live tailing
                 f.seek(0, 2)
 

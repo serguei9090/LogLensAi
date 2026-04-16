@@ -8,13 +8,16 @@ mcp_server = FastMCP("loglens_mcp")
 # Store the global app instance reference for tool access
 _app_instance: Any = None
 
+
 def get_app() -> Any:
     return _app_instance
+
 
 def init_mcp(app_instance: Any):
     global _app_instance
     _app_instance = app_instance
     return mcp_server
+
 
 @mcp_server.tool()
 def ls_sources(workspace_id: str) -> list[str]:
@@ -23,6 +26,7 @@ def ls_sources(workspace_id: str) -> list[str]:
     if not app:
         return []
     return app.method_get_workspace_sources(workspace_id)
+
 
 @mcp_server.tool()
 def query_logs(workspace_id: str, query: str = "", limit: int = 100) -> dict:
@@ -39,11 +43,12 @@ def query_logs(workspace_id: str, query: str = "", limit: int = 100) -> dict:
                 "level": log.get("level"),
                 "message": log.get("message"),
                 "source": log.get("source_id"),
-                "cluster_template": log.get("cluster_template")
+                "cluster_template": log.get("cluster_template"),
             }
             for log in res.get("logs", [])
-        ]
+        ],
     }
+
 
 @mcp_server.tool()
 def get_pattern_summary(workspace_id: str) -> list[dict]:
@@ -53,13 +58,13 @@ def get_pattern_summary(workspace_id: str) -> list[dict]:
         return []
     cursor = app.db.get_cursor()
     cursor.execute(
-        "SELECT cluster_id, template, count FROM clusters WHERE workspace_id = ? ORDER BY count DESC LIMIT 50", 
-        (workspace_id,)
+        "SELECT cluster_id, template, count FROM clusters WHERE workspace_id = ? ORDER BY count DESC LIMIT 50",
+        (workspace_id,),
     )
     return [
-        {"cluster_id": row[0], "template": row[1], "count": row[2]}
-        for row in cursor.fetchall()
+        {"cluster_id": row[0], "template": row[1], "count": row[2]} for row in cursor.fetchall()
     ]
+
 
 @mcp_server.tool()
 def analyze_cluster(workspace_id: str, cluster_id: str) -> dict:
@@ -69,6 +74,7 @@ def analyze_cluster(workspace_id: str, cluster_id: str) -> dict:
         return {}
     return app.method_analyze_cluster(cluster_id=cluster_id, workspace_id=workspace_id)
 
+
 @mcp_server.tool()
 def get_anomalies(workspace_id: str) -> dict:
     """Retrieve statistical outliers and rare log patterns from the workspace."""
@@ -76,3 +82,23 @@ def get_anomalies(workspace_id: str) -> dict:
     if not app:
         return {}
     return app.method_get_anomalies(workspace_id=workspace_id)
+
+
+@mcp_server.tool()
+def save_memory(workspace_id: str, issue_signature: str, resolution: str) -> dict:
+    """Save a learned resolution to the workspace long-term memory."""
+    app = get_app()
+    if not app:
+        return {}
+    return app.method_save_memory(
+        workspace_id=workspace_id, issue_signature=issue_signature, resolution=resolution
+    )
+
+
+@mcp_server.tool()
+def search_memory(workspace_id: str, query: str, limit: int = 5) -> list:
+    """Search the workspace long-term memory for an issue signature or resolution."""
+    app = get_app()
+    if not app:
+        return []
+    return app.method_search_memory(workspace_id=workspace_id, query=query, limit=limit)
