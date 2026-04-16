@@ -27,6 +27,7 @@ import {
   X,
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { TypingIndicator } from "../atoms/TypingIndicator";
 
 /**
  * Extracts <think>...</think> blocks from model responses.
@@ -38,12 +39,20 @@ function parseThinking(content: string): {
   response: string;
   isStreamingThink: boolean;
 } {
-  if (!content) return { thinking: null, response: "", isStreamingThink: false };
+  if (!content) {
+    return { thinking: null, response: "", isStreamingThink: false };
+  }
 
-  // 1. Check for fully closed think block
-  const closedMatch = content.match(/<think>([\s\S]*?)<\/think>/);
+  // 1. Check for fully closed think block (Standard or Gemma 4 variant)
+  const standardClosed = content.match(/<think>([\s\S]*?)<\/think>/);
+  const gemmaClosed = content.match(/<\|channel>thought([\s\S]*?)<channel\|>/);
+  const closedMatch = standardClosed || gemmaClosed;
+
   if (closedMatch) {
-    const rawResponse = content.replace(/<think>[\s\S]*?<\/think>/g, "").trim();
+    const rawResponse = content
+      .replace(/<think>[\s\S]*?<\/think>/g, "")
+      .replace(/<\|channel>thought[\s\S]*?<channel\|>/g, "")
+      .trim();
     return {
       thinking: closedMatch[1].trim(),
       response: rawResponse,
@@ -52,12 +61,17 @@ function parseThinking(content: string): {
   }
 
   // 2. Check for active unclosed think block (streaming)
-  const openTagIndex = content.indexOf("<think>");
-  if (openTagIndex !== -1) {
-    const thinkingPart = content.substring(openTagIndex + 7);
-    const responsePart = content.substring(0, openTagIndex).trim();
+  const standardIndex = content.indexOf("<think>");
+  const gemmaIndex = content.indexOf("<|channel>thought");
 
-    // If it started <think> but hasn't closed, we are streaming thinking
+  if (standardIndex !== -1 || gemmaIndex !== -1) {
+    const isGemma = gemmaIndex !== -1 && (standardIndex === -1 || gemmaIndex < standardIndex);
+    const startIndex = isGemma ? gemmaIndex : standardIndex;
+    const offset = isGemma ? 17 : 7; // Length of "<|channel>thought" vs "<think>"
+
+    const thinkingPart = content.substring(startIndex + offset);
+    const responsePart = content.substring(0, startIndex).trim();
+
     return {
       thinking: thinkingPart,
       response: responsePart,
@@ -65,9 +79,8 @@ function parseThinking(content: string): {
     };
   }
 
-  // 3. Check for partial start tag at the very end of content (e.g. "blabla <thi")
-  // This prevents the tag itself from being rendered as text during the split second it's arriving
-  const partialTagMatch = content.match(/<t(h(i(n(k)?)?)?)?$/i);
+  // 3. Check for partial start tag at the very end (prevent rendering the tag)
+  const partialTagMatch = content.match(/(<t(h(i(n(k)?)?)?)?|<\|c(h(a(n(n(e(l)?)?)?)?)?)?)$/i);
   if (partialTagMatch) {
     return {
       thinking: "",
@@ -154,7 +167,7 @@ export function AIInvestigationSidebar() {
       scrollRef.current.scrollIntoView({ behavior: "smooth" });
     }
     // biome-ignore lint/correctness/useExhaustiveDependencies: Auto-scroll when messages update
-  }, [messages.length]);
+  }, [messages]);
 
   const handleSend = async () => {
     if (!inputValue.trim() || !activeWorkspace?.id) {
@@ -420,10 +433,9 @@ export function AIInvestigationSidebar() {
 
               const isAssistantAndEmpty = !isUser && !thinking && !response;
 
-              // Hide the empty placeholder bubble if we are still 'isLoading' and it's the tip of the stream
-              if (isAssistantAndEmpty && isLoading && index === messages.length - 1) {
-                return null;
-              }
+              // If assistant is empty and we're loading, show the typing indicator
+              const showTypingIndicator =
+                isAssistantAndEmpty && isLoading && index === messages.length - 1;
 
               return (
                 <div
@@ -468,25 +480,37 @@ export function AIInvestigationSidebar() {
                         isUser
                           ? "bg-zinc-800 text-zinc-100 border border-zinc-700/50 rounded-tr-none"
                           : "bg-[#111312] text-zinc-300 border border-zinc-800/60 rounded-tl-none",
-                        isAssistantAndEmpty &&
-                          !isUser &&
-                          "bg-transparent border-transparent px-0 py-0 shadow-none opactiy-0",
                       )}
-                      style={{ overflowWrap: "anywhere" }}
                     >
-                      {(thinking !== null || isStreamingThink) && (
-                        <ThinkingBlock content={thinking ?? ""} isStreaming={isStreamingThink} />
+                      {showTypingIndicator ? (
+                        <div className="flex items-center gap-3">
+                          <TypingIndicator />
+                          <span className="text-[11px] font-medium text-zinc-500 animate-pulse lowercase">
+                            thinking…
+                          </span>
+                        </div>
+                      ) : (
+                        <>
+                          {!isUser && (thinking !== null || isStreamingThink) && (
+                            <ThinkingBlock
+                              content={thinking ?? ""}
+                              isStreaming={isStreamingThink}
+                            />
+                          )}
+                          <div
+                            className={cn(
+                              "prose prose-invert prose-sm max-w-none",
+                              isUser && "text-right",
+                            )}
+                          >
+                            {isUser ? (
+                              <p className="whitespace-pre-wrap">{m.content}</p>
+                            ) : (
+                              <MarkdownContent content={response} className="text-zinc-200" />
+                            )}
+                          </div>
+                        </>
                       )}
-                      {isUser ? (
-                        <p className="whitespace-pre-wrap break-words overflow-wrap-anywhere">
-                          {response}
-                        </p>
-                      ) : response ? (
-                        <MarkdownContent
-                          content={response}
-                          className="text-zinc-200 selection:bg-emerald-500/30"
-                        />
-                      ) : null}
                     </div>
                     {!isSameRoleAsPrev && (
                       <span className="text-[9px] text-zinc-600 font-medium px-1 tracking-tight">
@@ -500,20 +524,6 @@ export function AIInvestigationSidebar() {
                 </div>
               );
             })
-          )}
-          {isLoading && messages[messages.length - 1]?.role !== "assistant" && (
-            <div className="flex gap-4 mt-6">
-              <div className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 bg-violet-500/10 border border-violet-500/20">
-                <Bot className="size-4 text-violet-400 animate-pulse" />
-              </div>
-              <div className="bg-[#111312] border border-zinc-800/60 px-5 py-3 rounded-2xl rounded-tl-none shadow-sm">
-                <div className="flex gap-1.5 items-center">
-                  <div className="size-1.5 bg-violet-400/50 rounded-full animate-bounce" />
-                  <div className="size-1.5 bg-violet-400/50 rounded-full animate-bounce [animation-delay:0.2s]" />
-                  <div className="size-1.5 bg-violet-400/50 rounded-full animate-bounce [animation-delay:0.4s]" />
-                </div>
-              </div>
-            </div>
           )}
           <div ref={scrollRef} />
         </div>

@@ -66,28 +66,32 @@ export function ThinkingBlock({
   }
 
   // Format the text label
-  let thoughtText = isStreaming ? "Thinking…" : "Thought process";
+  let thoughtText = isStreaming ? "thinking…" : "thought process";
   if (!isStreaming) {
     if (durationMs) {
-      thoughtText = `Thought for ${(durationMs / 1000).toFixed(1)} seconds`;
+      thoughtText = `thought for ${(durationMs / 1000).toFixed(1)} seconds`;
     } else if (activeDuration > 0) {
-      thoughtText = `Thought for ${(activeDuration / 1000).toFixed(1)} seconds`;
+      thoughtText = `thought for ${(activeDuration / 1000).toFixed(1)} seconds`;
     }
   }
 
   return (
-    <div className="mb-4">
+    <div className="mb-6">
       <button
         type="button"
         onClick={() => setIsExpanded((prev) => !prev)}
-        className="flex items-center gap-2 py-1 text-left transition-colors focus-visible:outline-none group"
+        className="flex items-center gap-2.5 py-1 text-left transition-colors focus-visible:outline-none group select-none"
       >
-        <span className="text-text-muted group-hover:text-text-secondary transition-colors">
-          {isExpanded ? <ChevronDown className="size-4" /> : <ChevronRight className="size-4" />}
+        <span className="text-[#a1a1aa] group-hover:text-[#d4d4d8] transition-colors">
+          {isExpanded ? (
+            <ChevronDown className="size-3.5 stroke-[2.5px]" />
+          ) : (
+            <ChevronRight className="size-3.5 stroke-[2.5px]" />
+          )}
         </span>
         <span
           className={cn(
-            "text-sm font-medium text-text-muted group-hover:text-text-secondary transition-colors selection:bg-transparent",
+            "text-[13px] font-medium text-[#a1a1aa] group-hover:text-[#d4d4d8] transition-colors lowercase",
             isStreaming && "animate-pulse",
           )}
         >
@@ -97,19 +101,20 @@ export function ThinkingBlock({
 
       {/* Expanded full thinking — animated height */}
       <div
-        className="overflow-hidden transition-all duration-300 ease-in-out"
+        className="overflow-hidden transition-all duration-500 cubic-bezier(0.4, 0, 0.2, 1)"
         style={{
-          maxHeight: isExpanded ? `${Math.min(contentHeight + 16, 500)}px` : "0px",
+          maxHeight: isExpanded ? `${Math.min(contentHeight + 32, 600)}px` : "0px",
           opacity: isExpanded ? 1 : 0,
         }}
       >
-        <div
-          ref={contentRef}
-          className="pl-6 pr-2 pb-2 mt-2 max-h-[480px] overflow-y-auto custom-scrollbar"
-        >
-          <p className="text-[13px] text-text-muted/80 whitespace-pre-wrap leading-relaxed break-words">
+        <div ref={contentRef} className="pl-6 pr-2 py-3 border-l-2 border-[#27272a] ml-1.5 mt-1">
+          {/* Subtle internal header like in the screenshot */}
+          <div className="text-[11px] font-bold tracking-wider text-[#a1a1aa]/40 uppercase mb-3 select-none">
+            reasoning chain
+          </div>
+          <div className="text-[14px] text-[#d4d4d8]/80 whitespace-pre-wrap font-sans leading-relaxed break-words">
             {content}
-          </p>
+          </div>
         </div>
       </div>
     </div>
