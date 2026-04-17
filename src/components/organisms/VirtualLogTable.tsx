@@ -138,6 +138,21 @@ export function VirtualLogTable({
     };
   }, [handleSelection]);
 
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (selectionInfo && parentRef.current && !parentRef.current.contains(e.target as Node)) {
+        const isTooltipClick = (e.target as Element).closest('[role="toolbar"]');
+        if (!isTooltipClick) {
+          setSelectionInfo(null);
+          globalThis.getSelection()?.removeAllRanges();
+        }
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [selectionInfo]);
+
   const handleAddFilter = (operator: "contains" | "not_contains") => {
     if (!selectionInfo) {
       return;

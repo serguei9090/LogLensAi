@@ -53,6 +53,8 @@
 - [x] **AI-FE-004**: "Agent" Toolbar Integration (Orchestrate Hub hooks)
 - [x] **NOTE-FE-001**: Refactor Note View into a smaller floating card/bottom panel
 - [x] **UX-001**: Sidebar Collapse Functionality (Mini workspace icons + Tooltips)
+- [x] **UX-002**: Source Tab Aliasing (Pencil icon renaming + Persistence)
+
 
 ---
 
@@ -93,6 +95,18 @@
 - [x] **FIX-CLEAN-001**: Technical Debt Remediation (React Keys, Hooks, A11y)
   - **Files**: `src/components/atoms/MarkdownContent.tsx`, `src/components/organisms/CustomParserModal.tsx`, etc.
   - **Detail**: `docs/TODOC/FIX-CLEAN-001.md`
+- [x] **FIX-LINT-001**: Biome Zero-Tolerance UI Compliance (Orchestrator and TimeShiftModal)
+  - **Files**: `src/components/organisms/OrchestratorHub.tsx`, `src/components/organisms/TimeShiftModal.tsx`
+  - **Detail**: `docs/TODOC/FIX-LINT-001.md`
+- [x] **FIX-LINT-002**: TimeShiftModal Biome Compliance (Nested JSX, Empty Catch Blocks)
+  - **Files**: `src/components/organisms/TimeShiftModal.tsx`
+  - **Detail**: `docs/TODOC/FIX-LINT-002.md`
+- [x] **FIX-CORE-002**: Temporal Offset Model Sync (Fixed 422 Dict/List Mismatch)
+  - **Files**: `sidecar/src/api.py`
+  - **Detail**: `docs/TODOC/FIX-CORE-002.md`
+- [x] **FIX-CORE-003**: SQL Aliasing Regression (Fixed l.l.field Binder Error)
+  - **Files**: `sidecar/src/api.py`
+  - **Detail**: `docs/TODOC/FIX-CORE-003.md`
 
 ---
 
@@ -140,6 +154,16 @@
   - **Detail**: `docs/TODOC/FEAT_AI_TOOLS_002.md`
 
 ---
+
+## 🔵 Sprint 06 — Logical Alignment (Planning)
+
+### P1 — Time Normalization
+- [x] **TIME-001**: Backend Implementation — Support `time_shift_seconds` in `FusionSourceConfig` and `get_fused_logs`
+- [x] **TIME-002**: Frontend UI — `TimeShiftModal.tsx` for Relative and Sample-based alignment
+- [x] **TIME-003**: Orchestrator Integration — Wire clock icon to `TimeShiftModal` in `OrchestratorHub`
+
+---
+
 
 ## ⚪ Backlog (Future Sprints)
 

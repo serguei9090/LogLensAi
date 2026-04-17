@@ -56,15 +56,23 @@ export function AIHistorySearchModal({ open, onOpenChange }: AIHistorySearchModa
           ) : (
             <div className="p-2 space-y-1">
               {filteredSessions.map((session) => (
-                <div
+                <button
+                  type="button"
                   key={session.session_id}
+                  tabIndex={0}
                   className={cn(
-                    "group flex items-center justify-between p-3 rounded-xl transition-all cursor-pointer border border-transparent",
+                    "group flex items-center justify-between p-3 rounded-xl transition-all cursor-pointer border border-transparent outline-none focus-visible:bg-white/5",
                     currentSessionId === session.session_id
                       ? "bg-emerald-500/10 border-emerald-500/20"
                       : "hover:bg-zinc-800/40 hover:border-zinc-700/50",
                   )}
                   onClick={() => handleSelect(session.session_id)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      handleSelect(session.session_id);
+                    }
+                  }}
                 >
                   <div className="flex flex-col gap-1 min-w-0 pr-4">
                     <span
@@ -104,7 +112,7 @@ export function AIHistorySearchModal({ open, onOpenChange }: AIHistorySearchModa
                   >
                     <Trash2 className="size-3.5" />
                   </Button>
-                </div>
+                </button>
               ))}
             </div>
           )}

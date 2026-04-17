@@ -88,6 +88,7 @@ class Database:
                 source_id    TEXT,
                 enabled      BOOLEAN DEFAULT TRUE,
                 tz_offset    INTEGER DEFAULT 0,
+                time_shift_seconds INTEGER DEFAULT 0,
                 custom_format TEXT,
                 parser_config TEXT,
                 PRIMARY KEY (workspace_id, fusion_id, source_id)
@@ -121,12 +122,20 @@ class Database:
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 PRIMARY KEY (workspace_id, issue_signature)
             );
+
+            CREATE TABLE IF NOT EXISTS temporal_offsets (
+                workspace_id TEXT,
+                source_id    TEXT,
+                offset_seconds INTEGER DEFAULT 0,
+                PRIMARY KEY (workspace_id, source_id)
+            );
         """)
 
     def _run_migrations(self, cursor):
         """Handle schema evolution for existing databases."""
         self._migrate_ai_tables(cursor)
         self._migrate_fusion_pk(cursor)
+        self._migrate_fusion_time_shift(cursor)
         self._migrate_log_columns(cursor)
 
     def _migrate_ai_tables(self, cursor):
@@ -202,6 +211,16 @@ class Database:
                 cursor.execute("DROP TABLE fusion_configs_backup")
         except Exception as e:
             print(f"[DB] Error migrating fusion_configs: {e}")
+
+    def _migrate_fusion_time_shift(self, cursor):
+        """Add time_shift_seconds column to fusion_configs."""
+        try:
+            cursor.execute("SELECT time_shift_seconds FROM fusion_configs LIMIT 1")
+        except Exception:
+            print("[DB] Adding time_shift_seconds to fusion_configs...")
+            cursor.execute(
+                "ALTER TABLE fusion_configs ADD COLUMN time_shift_seconds INTEGER DEFAULT 0"
+            )
 
     def _migrate_log_columns(self, cursor):
         """Add missing source_id and defaults to logs table."""

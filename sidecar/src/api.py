@@ -4,7 +4,7 @@ import os
 import sys
 import threading
 import time
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any
 
 import aiohttp_cors
@@ -136,6 +136,20 @@ class FusionSourceConfig(BaseModel):
     tz_offset: int = 0
     custom_format: str | None = None
     parser_config: str | None = None
+
+
+class TemporalOffsetEntry(BaseModel):
+    source_id: str
+    offset_seconds: int
+
+
+class UpdateTemporalOffsetsRequest(BaseModel):
+    workspace_id: str
+    offsets: dict[str, int]
+
+
+class GetTemporalOffsetsRequest(BaseModel):
+    workspace_id: str
 
 
 class UpdateFusionConfigRequest(BaseModel):
@@ -409,15 +423,17 @@ class App:
         start_time: str | None = None,
         end_time: str | None = None,
     ) -> dict:
-        """Unified internal log fetcher supporting source-filtering for Fusion mode."""
+        """Unified internal log fetcher with temporal offset calibration.
+        Adjusts timestamps on-the-fly using workspace-defined offsets.
+        """
         cursor = self.db.get_cursor()
 
+        # Build base WHERE clause
         where_clauses = ["workspace_id = ?"]
         params: list[Any] = [workspace_id]
 
-        # If source_ids is provided (Fusion mode), restrict to those sources
         if source_ids is not None:
-            if not source_ids:  # None provided = show nothing
+            if not source_ids:
                 return {"total": 0, "logs": [], "offset": offset, "limit": limit}
             placeholders = ",".join(["?"] * len(source_ids))
             where_clauses.append(f"source_id IN ({placeholders})")
@@ -434,14 +450,11 @@ class App:
             params.extend([f"%{query}%", f"%{query}%"])
 
         if start_time:
-            # Normalize ISO from frontend (T separator) to DB format (space separator)
-            norm_start = start_time.replace("T", " ").split(".")[0].replace("Z", "")
             where_clauses.append("timestamp >= ?")
-            params.append(norm_start)
+            params.append(start_time)
         if end_time:
-            norm_end = end_time.replace("T", " ").split(".")[0].replace("Z", "")
             where_clauses.append("timestamp <= ?")
-            params.append(norm_end)
+            params.append(end_time)
 
         where_sql = " AND ".join(where_clauses)
         total_logs_subquery = "(SELECT count(*) FROM logs WHERE workspace_id = ?)"
@@ -497,7 +510,36 @@ class App:
         columns = [desc[0] for desc in cursor.description]
         logs = [dict(zip(columns, row, strict=False)) for row in cursor.fetchall()]
 
+        self._apply_temporal_offsets(workspace_id, logs)
+
         return {"total": total, "logs": logs, "offset": offset, "limit": limit}
+
+    def _apply_temporal_offsets(self, workspace_id: str, logs: list[dict]):
+        """Apply global temporal offsets to a list of logs."""
+        cursor = self.db.get_cursor()
+        cursor.execute(
+            "SELECT source_id, offset_seconds FROM temporal_offsets WHERE workspace_id = ?",
+            (workspace_id,),
+        )
+        rows = cursor.fetchall()
+        if not rows:
+            return
+
+        offsets = {row[0]: row[1] for row in rows}
+
+        for log in logs:
+            source_id = log.get("source_id")
+            shift_sec = offsets.get(source_id, 0)
+            if shift_sec != 0 and log.get("timestamp"):
+                try:
+                    ts_str = log["timestamp"]
+                    if "T" in ts_str:
+                        ts_str = ts_str.replace("T", " ")
+                    dt = datetime.strptime(ts_str[:19], "%Y-%m-%d %H:%M:%S")
+                    dt = dt + timedelta(seconds=shift_sec)
+                    log["timestamp"] = dt.strftime("%Y-%m-%d %H:%M:%S")
+                except Exception:
+                    pass
 
     def method_get_logs(self, **kwargs) -> dict:
         """Fetch logs normally for a workspace/source."""
@@ -1164,17 +1206,39 @@ class App:
         ]
 
     def _sync_ai_sessions_to_json(self):
-        """Helper to keep session_names.json in sync with DB for Gemini CLI parity."""
-        try:
-            cursor = self.db.get_cursor()
-            cursor.execute("SELECT session_id, name FROM ai_sessions")
-            sessions = {row[0]: row[1] for row in cursor.fetchall()}
+        """No-op for DuckDB implementation, handled by DB persistence."""
+        pass
 
-            os.makedirs("gemini_sessions", exist_ok=True)
-            with open("gemini_sessions/session_names.json", "w", encoding="utf-8") as f:
-                json.dump(sessions, f, indent=2)
-        except Exception:
-            pass  # Non-critical
+    def method_update_temporal_offsets(self, **kwargs) -> dict:
+        """Update time offsets for specific log sources."""
+        params = UpdateTemporalOffsetsRequest(**kwargs)
+        cursor = self.db.get_cursor()
+
+        for source_id, offset_seconds in params.offsets.items():
+            cursor.execute(
+                """
+                INSERT INTO temporal_offsets (workspace_id, source_id, offset_seconds)
+                VALUES (?, ?, ?)
+                ON CONFLICT (workspace_id, source_id) DO UPDATE SET
+                    offset_seconds = excluded.offset_seconds
+            """,
+                (params.workspace_id, source_id, offset_seconds),
+            )
+
+        self.db.commit()
+        return {"status": "ok"}
+
+    def method_get_temporal_offsets(self, **kwargs) -> dict:
+        """Retrieve all time offsets for a workspace."""
+        params = GetTemporalOffsetsRequest(**kwargs)
+        cursor = self.db.get_cursor()
+
+        cursor.execute(
+            "SELECT source_id, offset_seconds FROM temporal_offsets WHERE workspace_id = ?",
+            (params.workspace_id,),
+        )
+        rows = cursor.fetchall()
+        return {"offsets": {row[0]: row[1] for row in rows}}
 
     def method_get_settings(self) -> dict:
         cursor = self.db.get_cursor()

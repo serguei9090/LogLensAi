@@ -1,39 +1,17 @@
+import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { callSidecar } from "@/lib/hooks/useSidecarBridge";
 import { cn } from "@/lib/utils";
 import { useInvestigationStore } from "@/store/investigationStore";
 import type { LogSource } from "@/store/workspaceStore";
-import {
-  Check,
-  ChevronDown,
-  Clock,
-  Cpu,
-  Edit2,
-  Plus,
-  Save,
-  Settings2,
-  Sparkles,
-  X,
-  Zap,
-} from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { Check, Clock, Cpu, Plus, Save, Settings2, Sparkles, X, Zap } from "lucide-react";
+import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { toast } from "sonner";
 import { CustomParserModal } from "./CustomParserModal";
+import { TimeShiftModal } from "./TimeShiftModal";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
-
-interface TimezoneOption {
-  value: number;
-  label: string;
-}
-
-const TIMEZONE_OPTIONS: TimezoneOption[] = Array.from({ length: 27 }, (_, i) => {
-  const offset = i - 12;
-  const sign = offset >= 0 ? "+" : "−";
-  const abs = Math.abs(offset);
-  return { value: offset, label: `UTC ${sign}${abs.toString().padStart(2, "0")}:00` };
-});
 
 interface FusionSourceConfig {
   source_id: string;
@@ -44,123 +22,13 @@ interface FusionSourceConfig {
 }
 
 interface OrchestratorHubProps {
-  /** Hub open state */
   isOpen: boolean;
   onClose: () => void;
   workspaceId: string;
   availableSources: LogSource[];
-  /** Source being edited (null = create new) */
   editingFusionId?: string | null;
   editingFusionName?: string | null;
-  /** Called when a fusion is successfully saved */
   onFusionSaved: (fusionId: string, fusionName: string, configs: FusionSourceConfig[]) => void;
-}
-
-// ─── TimezoneSelect (portal-based to escape scroll clipping) ─────────────────
-
-function TimezoneSelect({
-  value,
-  onChange,
-}: { readonly value: number; readonly onChange: (v: number) => void }) {
-  const [open, setOpen] = useState(false);
-  const [panelStyle, setPanelStyle] = useState<React.CSSProperties>({});
-  const triggerRef = useRef<HTMLButtonElement>(null);
-  const listRef = useRef<HTMLDivElement>(null);
-  const selected = TIMEZONE_OPTIONS.find((o) => o.value === value) ?? TIMEZONE_OPTIONS[12];
-
-  const updatePosition = () => {
-    if (!triggerRef.current) {
-      return;
-    }
-    const rect = triggerRef.current.getBoundingClientRect();
-    setPanelStyle({
-      position: "fixed",
-      top: rect.bottom + 4,
-      left: rect.left,
-      width: Math.max(rect.width, 148),
-      zIndex: 9999,
-    });
-  };
-
-  useEffect(() => {
-    if (!open) {
-      return;
-    }
-    const handler = (e: MouseEvent) => {
-      if (
-        !triggerRef.current?.contains(e.target as Node) &&
-        !listRef.current?.contains(e.target as Node)
-      ) {
-        setOpen(false);
-      }
-    };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, [open]);
-
-  useEffect(() => {
-    if (open && listRef.current) {
-      listRef.current.querySelector("[data-selected='true']")?.scrollIntoView({ block: "center" });
-    }
-  }, [open]);
-
-  return (
-    <>
-      <button
-        ref={triggerRef}
-        type="button"
-        onClick={() => {
-          updatePosition();
-          setOpen((o) => !o);
-        }}
-        className={cn(
-          "flex items-center gap-2 h-8 px-3 rounded-md text-[11px] font-mono font-semibold transition-all",
-          "bg-[#0D0F0E] border text-white",
-          open
-            ? "border-violet-500 ring-1 ring-violet-500/40 text-violet-400"
-            : "border-white/10 hover:border-violet-400/40 hover:text-violet-300",
-        )}
-      >
-        <Clock className="size-3 opacity-60" />
-        <span>{selected.label}</span>
-        <ChevronDown
-          className={cn(
-            "size-3 opacity-60 transition-transform duration-200",
-            open && "rotate-180",
-          )}
-        />
-      </button>
-      {open &&
-        createPortal(
-          <div
-            ref={listRef}
-            style={panelStyle}
-            className="bg-[#111613] border border-white/10 rounded-xl shadow-2xl max-h-52 overflow-y-auto animate-in fade-in slide-in-from-top-2 duration-150"
-          >
-            {TIMEZONE_OPTIONS.map((opt) => (
-              <button
-                key={opt.value}
-                type="button"
-                data-selected={opt.value === value ? "true" : "false"}
-                onClick={() => {
-                  onChange(opt.value);
-                  setOpen(false);
-                }}
-                className={cn(
-                  "w-full text-left px-3 py-2 text-[11px] font-mono transition-colors",
-                  opt.value === value
-                    ? "bg-violet-500/20 text-violet-400 font-bold"
-                    : "text-white/70 hover:bg-white/5 hover:text-white",
-                )}
-              >
-                {opt.label}
-              </button>
-            ))}
-          </div>,
-          document.body,
-        )}
-    </>
-  );
 }
 
 // ─── Strategy Card ────────────────────────────────────────────────────────────
@@ -180,14 +48,16 @@ function StrategyCard({
     <button
       type="button"
       onClick={onClick}
-      className="w-full flex items-start gap-4 p-4 rounded-xl bg-white/5 border border-white/10 hover:bg-violet-500/10 hover:border-violet-500/30 transition-all text-left group"
+      className="w-full flex items-center gap-3 p-3 rounded-lg border border-white/5 bg-white/[0.02] hover:bg-white/[0.04] transition-all text-left group"
     >
-      <div className="p-2.5 rounded-xl bg-violet-500/10 text-violet-400 border border-violet-500/20 group-hover:bg-violet-500/20 transition-colors shrink-0">
+      <div className="size-8 rounded-md bg-white/5 border border-white/10 text-white/50 flex items-center justify-center group-hover:text-white transition-all shrink-0">
         {icon}
       </div>
-      <div>
-        <p className="text-sm font-bold text-text-primary">{name}</p>
-        <p className="text-[11px] text-text-muted mt-0.5 leading-relaxed">{description}</p>
+      <div className="space-y-0.5 flex-1 min-w-0">
+        <p className="text-[13px] font-medium text-white/90 group-hover:text-white transition-colors truncate">
+          {name}
+        </p>
+        <p className="text-[11px] text-white/40 leading-relaxed truncate">{description}</p>
       </div>
     </button>
   );
@@ -195,15 +65,6 @@ function StrategyCard({
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 
-/**
- * OrchestratorHub is a slide-in right-side drawer that serves as the entry point
- * for creating and editing orchestration sessions (Fusion, and future strategy types).
- *
- * Flow:
- *   1. Strategy picker → user selects "Fusion"
- *   2. Inline form → name + source config
- *   3. Deploy → creates a fusion source tab in the workspace
- */
 export function OrchestratorHub({
   isOpen,
   onClose,
@@ -213,29 +74,35 @@ export function OrchestratorHub({
   editingFusionName,
   onFusionSaved,
 }: OrchestratorHubProps) {
-  // "picker" = strategy selection, "fusion-form" = fusion configuration, "ai-context-form" = edit global context
-  const [view, setView] = useState<"picker" | "fusion-form" | "ai-context-form">("picker");
   const showDistribution = useInvestigationStore((s) => s.showDistribution);
   const setShowDistribution = useInvestigationStore((s) => s.setShowDistribution);
   const showAnomalies = useInvestigationStore((s) => s.showAnomalies);
   const setShowAnomalies = useInvestigationStore((s) => s.setShowAnomalies);
   const workspaceGlobalContext = useInvestigationStore((s) => s.workspaceGlobalContext);
   const setWorkspaceGlobalContext = useInvestigationStore((s) => s.setWorkspaceGlobalContext);
+
+  const [view, setView] = useState<
+    "picker" | "fusion-form" | "ai-context-form" | "time-alignment-form"
+  >("picker");
   const [fusionName, setFusionName] = useState("");
   const [configs, setConfigs] = useState<FusionSourceConfig[]>([]);
+  const [temporalOffsets, setTemporalOffsets] = useState<Record<string, number>>({});
   const [isSaving, setIsSaving] = useState(false);
   const [activeParserSource, setActiveParserSource] = useState<string | null>(null);
+  const [activeTimeShiftSource, setActiveTimeShiftSource] = useState<string | null>(null);
   const [isLoadingConfig, setIsLoadingConfig] = useState(false);
   const [tempContext, setTempContext] = useState("");
 
-  // Reset or pre-fill when opening
+  // Initialize
   useEffect(() => {
     if (!isOpen) {
+      setView("picker");
+      setActiveParserSource(null);
+      setActiveTimeShiftSource(null);
       return;
     }
 
     if (editingFusionId) {
-      // Pre-fill for editing
       setFusionName(editingFusionName ?? "");
       setView("fusion-form");
       setIsLoadingConfig(true);
@@ -243,81 +110,75 @@ export function OrchestratorHub({
         method: "get_fusion_config",
         params: { workspace_id: workspaceId, fusion_id: editingFusionId },
       })
-        .then((res) => {
-          const merged = availableSources.map((src) => {
-            const existing = res.sources.find((s) => s.source_id === src.path);
-            return (
-              existing ?? {
-                source_id: src.path,
-                enabled: false,
-                tz_offset: 0,
-                custom_format: null,
-                parser_config: null,
-              }
-            );
-          });
-          setConfigs(merged);
-        })
-        .catch(() => {
-          toast.error("Failed to load fusion config for editing.");
-        })
+        .then((res) => setConfigs(res.sources))
         .finally(() => setIsLoadingConfig(false));
     } else {
-      // New fusion
-      setView("picker");
       setFusionName("");
-      const defaults = availableSources.map((src) => ({
-        source_id: src.path,
-        enabled: true,
-        tz_offset: 0,
-        custom_format: null,
-        parser_config: null,
-      }));
-      setConfigs(defaults);
+      setView("picker");
+      setConfigs(
+        availableSources.map((s) => ({
+          source_id: s.path,
+          enabled: false,
+          tz_offset: 0,
+          custom_format: null,
+          parser_config: null,
+        })),
+      );
     }
+
+    callSidecar<{ offsets: Record<string, number> }>({
+      method: "get_temporal_offsets",
+      params: { workspace_id: workspaceId },
+    }).then((res) => setTemporalOffsets(res.offsets || {}));
   }, [isOpen, editingFusionId, editingFusionName, workspaceId, availableSources]);
 
-  const toggleSource = (sourceId: string) =>
+  const toggleSource = (sourceId: string) => {
     setConfigs((prev) =>
       prev.map((c) => (c.source_id === sourceId ? { ...c, enabled: !c.enabled } : c)),
     );
-
-  const updateOffset = (sourceId: string, offset: number) =>
-    setConfigs((prev) =>
-      prev.map((c) => (c.source_id === sourceId ? { ...c, tz_offset: offset } : c)),
-    );
-
-  const handleParserSaved = (sourceId: string, configJson: string) => {
-    setConfigs((prev) =>
-      prev.map((c) => (c.source_id === sourceId ? { ...c, parser_config: configJson } : c)),
-    );
-    toast.success("Extraction pattern updated.");
   };
 
-  const handleDeploy = async () => {
-    if (!fusionName.trim()) {
-      toast.warning("Please give your fusion a name.");
-      return;
+  const handleParserSaved = (sourceId: string, cfg: string | null) => {
+    setConfigs((prev) =>
+      prev.map((c) => (c.source_id === sourceId ? { ...c, parser_config: cfg } : c)),
+    );
+    setActiveParserSource(null);
+  };
+
+  const saveTemporalOffsets = async () => {
+    setIsSaving(true);
+    try {
+      await callSidecar({
+        method: "update_temporal_offsets",
+        params: { workspace_id: workspaceId, offsets: temporalOffsets },
+      });
+      toast.success("Temporal offsets calibrated.");
+      setView("picker");
+    } catch (e) {
+      toast.error("Failed to calibrate temporal offsets.");
+    } finally {
+      setIsSaving(false);
     }
+  };
+
+  const deployFusion = async () => {
     const enabledCount = configs.filter((c) => c.enabled).length;
     if (enabledCount < 2) {
-      toast.warning("Enable at least 2 log sources to fuse.");
+      toast.warning("Enable at least 2 log streams for fusion.");
       return;
     }
 
     setIsSaving(true);
     try {
-      // Generate a stable fusion ID from the name
       const fusionId = editingFusionId ?? `fusion_${Date.now()}`;
       await callSidecar({
         method: "update_fusion_config",
         params: { workspace_id: workspaceId, fusion_id: fusionId, sources: configs },
       });
-      toast.success(`Fusion "${fusionName}" deployed.`);
-      onFusionSaved(fusionId, fusionName.trim(), configs);
+      toast.success(`Fusion "${fusionName}" established.`);
+      onFusionSaved(fusionId, fusionName.trim() || "Log Fusion", configs);
       onClose();
     } catch (error) {
-      console.error("Deploy failed", error);
       toast.error("Failed to deploy fusion.");
     } finally {
       setIsSaving(false);
@@ -330,103 +191,116 @@ export function OrchestratorHub({
 
   return createPortal(
     <>
-      {/* Backdrop: only closes when clicking OUTSIDE the drawer.
-          The drawer uses onPointerDown+stopPropagation so events inside
-          the drawer never reach this backdrop handler. */}
+      {/* Backdrop */}
       <div
-        className="fixed inset-0 z-[150] bg-black/40 backdrop-blur-sm animate-in fade-in duration-200"
+        className="fixed inset-0 z-[150] bg-black/40 backdrop-blur-sm animate-in fade-in duration-300"
         onPointerDown={onClose}
       />
 
-      {/* Drawer: stopPropagation ensures pointer events stay inside the drawer
-          and never bubble up to the backdrop div above. */}
+      {/* Drawer */}
       <div
-        className="fixed top-0 right-0 bottom-0 z-[160] w-[420px] flex flex-col bg-[#0D1110] border-l border-border/60 shadow-2xl animate-in slide-in-from-right duration-300"
+        className="fixed top-0 right-0 bottom-0 z-[160] w-[380px] flex flex-col bg-[#111] border-l border-white/10 shadow-2xl animate-in slide-in-from-right duration-300 ease-out"
         onPointerDown={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between p-5 border-b border-border/40 bg-white/5 shrink-0">
+        <div className="flex items-center justify-between p-5 border-b border-white/5 bg-white/[0.02] shrink-0">
           <div className="flex items-center gap-3">
-            <div className="p-2 rounded-xl bg-violet-500/10 text-violet-400 border border-violet-500/20">
+            <div className="p-2.5 rounded-md bg-white/5 text-white/70 border border-white/5">
               <Cpu className="size-5" />
             </div>
             <div>
-              <h2 className="text-base font-bold text-text-primary tracking-tight">Orchestrator</h2>
-              <p className="text-[10px] text-text-muted uppercase tracking-widest font-medium">
-                {view === "picker"
-                  ? "Choose a Strategy"
-                  : view === "ai-context-form"
-                    ? "Global Context"
-                    : editingFusionId
-                      ? "Edit Fusion"
-                      : "New Fusion"}
+              <h2 className="text-[15px] font-semibold text-white/90 tracking-tight">
+                Orchestrator
+              </h2>
+              <p className="text-[10px] text-white/40 uppercase tracking-widest mt-0.5">
+                {
+                  {
+                    picker: "Command Center",
+                    "ai-context-form": "Cognitive State",
+                    "time-alignment-form": "Temporal Target",
+                    "fusion-form": "Neural Link",
+                  }[view]
+                }
               </p>
             </div>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="p-2 hover:bg-white/10 rounded-full transition-colors text-text-muted hover:text-text-primary"
+            className="p-2 hover:bg-white/10 rounded-md transition-all text-white/40 hover:text-white"
           >
-            <X className="size-5" />
+            <X className="size-4" />
           </button>
         </div>
 
         {/* Body */}
-        <div className="flex-1 overflow-y-auto custom-scrollbar">
+        <div className="flex-1 overflow-y-auto custom-scrollbar p-6 space-y-8">
           {view === "picker" && (
-            <div className="p-5 space-y-4">
+            <div className="space-y-8 animate-in fade-in slide-in-from-right-2 duration-300">
               <div className="space-y-3">
-                <p className="text-[11px] text-text-muted uppercase tracking-widest font-bold">
-                  Visual Layers
+                <p className="text-[11px] text-white/40 font-medium px-0.5 uppercase tracking-widest">
+                  Visualizers
                 </p>
-                <div className="flex items-center justify-between p-3 rounded-xl border border-white/5 bg-black/20">
-                  <div>
-                    <span className="block text-sm font-semibold text-text-primary">
-                      Log Distribution
-                    </span>
-                    <span className="block text-[11px] text-text-muted mt-0.5">
-                      Timeline histogram of log volume
-                    </span>
-                  </div>
-                  <Switch
-                    checked={showDistribution}
-                    onCheckedChange={setShowDistribution}
-                    className="data-[checked]:bg-violet-500"
-                  />
-                </div>
-
-                <div className="flex items-center justify-between p-3 rounded-xl border border-white/5 bg-black/20 mt-2">
-                  <div>
-                    <span className="block text-sm font-semibold text-text-primary">
-                      Anomaly Engine
-                    </span>
-                    <span className="block text-[11px] text-text-muted mt-0.5">
-                      Highlight statistical outliers in logs
-                    </span>
-                  </div>
-                  <Switch
-                    checked={showAnomalies}
-                    onCheckedChange={setShowAnomalies}
-                    className="data-[checked]:bg-orange-500"
-                  />
+                <div className="grid gap-2">
+                  {[
+                    {
+                      label: "Log Distribution",
+                      desc: "Timeline density matching",
+                      checked: showDistribution,
+                      set: setShowDistribution,
+                      icon: <Sparkles className="size-4 text-white/50" />,
+                    },
+                    {
+                      label: "Anomaly Radar",
+                      desc: "Detect statistical violations",
+                      checked: showAnomalies,
+                      set: setShowAnomalies,
+                      icon: <Sparkles className="size-4 text-white/50" />,
+                    },
+                  ].map((layer) => (
+                    <div
+                      key={layer.label}
+                      className="flex items-center justify-between p-3 rounded-lg border border-white/5 bg-white/[0.02] hover:bg-white/[0.04] transition-all group"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="size-8 rounded-md bg-white/5 border border-white/10 flex items-center justify-center group-hover:text-white transition-all">
+                          {layer.icon}
+                        </div>
+                        <div className="space-y-0.5">
+                          <span className="block text-[13px] font-medium text-white/90 group-hover:text-white transition-colors">
+                            {layer.label}
+                          </span>
+                          <span className="block text-[11px] text-white/40">{layer.desc}</span>
+                        </div>
+                      </div>
+                      <Switch checked={layer.checked} onCheckedChange={layer.set} />
+                    </div>
+                  ))}
                 </div>
               </div>
 
-              <div className="w-full h-px bg-border/40 my-2" />
-
               <div className="space-y-3">
-                <p className="text-[11px] text-text-muted uppercase tracking-widest font-bold">
-                  AI Layer
+                <p className="text-[11px] text-white/40 font-medium px-0.5 uppercase tracking-widest">
+                  Intelligence
                 </p>
-                <div className="flex items-center justify-between p-3 rounded-xl border border-white/5 bg-black/20">
-                  <div>
-                    <span className="block text-sm font-semibold text-text-primary">
-                      Workspace Global Context
-                    </span>
-                    <span className="block text-[11px] text-text-muted mt-0.5">
-                      Enable AI context ingestion across the entire workspace
-                    </span>
+                <div className="flex items-center justify-between p-3 rounded-lg border border-white/5 bg-white/[0.02] hover:bg-white/[0.04] transition-all group">
+                  <div className="flex items-center gap-3">
+                    <div className="size-8 rounded-md bg-white/5 border border-white/10 flex items-center justify-center group-hover:bg-white/10 transition-all">
+                      <Sparkles
+                        className={cn(
+                          "size-4",
+                          workspaceGlobalContext ? "text-white/80" : "text-white/40",
+                        )}
+                      />
+                    </div>
+                    <div className="space-y-0.5">
+                      <span className="block text-[13px] font-medium text-white/90 group-hover:text-white transition-colors">
+                        Knowledge Base
+                      </span>
+                      <span className="block text-[11px] text-white/40 max-w-[140px] truncate">
+                        {workspaceGlobalContext ? "Context active" : "Inject structure"}
+                      </span>
+                    </div>
                   </div>
                   <button
                     type="button"
@@ -434,257 +308,281 @@ export function OrchestratorHub({
                       setTempContext(workspaceGlobalContext ?? "");
                       setView("ai-context-form");
                     }}
-                    className={cn(
-                      "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors border",
-                      workspaceGlobalContext
-                        ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30"
-                        : "bg-white/5 text-text-muted border-white/10 hover:text-white",
-                    )}
+                    className="px-3 py-1.5 rounded-md text-[11px] font-medium transition-all bg-white/5 text-white/60 hover:text-white hover:bg-white/10"
                   >
-                    <Edit2 className="size-3" />
-                    {workspaceGlobalContext ? "Edit Context" : "Add Context"}
+                    {workspaceGlobalContext ? "Edit" : "Set"}
                   </button>
                 </div>
               </div>
 
-              <div className="w-full h-px bg-border/40 my-2" />
-
-              <p className="text-[11px] text-text-muted uppercase tracking-widest font-bold">
-                Available Strategies
-              </p>
-              <StrategyCard
-                icon={<Zap className="size-5" />}
-                name="Fusion"
-                description="Interleave and synchronize logs from multiple sources into a single unified timeline."
-                onClick={() => setView("fusion-form")}
-              />
-              {/* Placeholder for future strategies */}
-              <div className="p-4 rounded-xl border border-dashed border-white/10 text-center text-[11px] text-text-muted/40 italic">
-                More strategies coming soon...
+              <div className="space-y-3">
+                <p className="text-[11px] text-white/40 font-medium px-0.5 uppercase tracking-widest">
+                  Operations
+                </p>
+                <div className="grid gap-2">
+                  <StrategyCard
+                    icon={<Zap className="size-4 text-white/50" />}
+                    name="Log Fusion"
+                    description="Combine different log streams together."
+                    onClick={() => setView("fusion-form")}
+                  />
+                  <StrategyCard
+                    icon={<Clock className="size-4 text-white/50" />}
+                    name="Temporal Sync"
+                    description="Align clocks across multiple files."
+                    onClick={() => setView("time-alignment-form")}
+                  />
+                </div>
               </div>
             </div>
           )}
 
           {view === "fusion-form" && (
-            <div className="p-5 space-y-6">
-              {/* Back button (only on new) */}
-              {!editingFusionId && (
-                <button
-                  type="button"
-                  onClick={() => setView("picker")}
-                  className="flex items-center gap-1.5 text-[11px] text-text-muted hover:text-text-secondary transition-colors"
-                >
-                  ← Back to strategies
-                </button>
-              )}
+            <div className="space-y-6 animate-in fade-in slide-in-from-right-2 duration-300 outline-none">
+              <button
+                type="button"
+                onClick={() => setView("picker")}
+                className="text-[11px] text-white/50 hover:text-white transition-all flex items-center gap-1.5"
+              >
+                ← Back
+              </button>
 
-              {/* Fusion Name */}
-              <div className="space-y-2">
-                <label
-                  htmlFor="fusion-name"
-                  className="text-[10px] font-bold text-text-muted uppercase tracking-widest flex items-center gap-2"
-                >
-                  <Zap className="size-3 text-violet-400" /> Fusion Name
-                </label>
-                <input
-                  id="fusion-name"
-                  type="text"
-                  value={fusionName}
-                  onChange={(e) => setFusionName(e.target.value)}
-                  placeholder="e.g. Production Stack"
-                  className="w-full h-10 bg-black/60 border border-border/40 rounded-xl px-4 text-sm text-text-primary outline-none focus:ring-2 focus:ring-violet-500/40 focus:border-violet-500/60 transition-all placeholder:text-text-muted/40"
-                />
-              </div>
+              <div className="space-y-5">
+                <div className="space-y-1.5">
+                  <label
+                    htmlFor="fusion-name-input"
+                    className="text-[11px] font-medium text-white/40 px-0.5 uppercase tracking-wider"
+                  >
+                    Name
+                  </label>
+                  <input
+                    id="fusion-name-input"
+                    type="text"
+                    value={fusionName}
+                    onChange={(e) => setFusionName(e.target.value)}
+                    placeholder="e.g. Cluster Primary 01"
+                    className="w-full h-10 bg-white/5 border border-white/10 rounded-lg px-3 text-sm text-white outline-none focus:border-white/30 transition-all placeholder:text-white/20"
+                  />
+                </div>
 
-              {/* Source List */}
-              <div className="space-y-2">
-                <p className="text-[10px] font-bold text-text-muted uppercase tracking-widest">
-                  Log Sources
-                </p>
-                {isLoadingConfig ? (
-                  <div className="py-8 text-center text-text-muted/40 animate-pulse text-sm">
-                    Loading config...
-                  </div>
-                ) : configs.length === 0 ? (
-                  <div className="py-8 text-center text-text-muted/40 text-sm italic">
-                    No log sources in workspace yet.
-                  </div>
-                ) : (
-                  <div className="space-y-2">
-                    {configs.map((config) => {
-                      const sourceInfo = availableSources.find((s) => s.path === config.source_id);
-                      const label =
-                        sourceInfo?.name ?? config.source_id.split("/").pop() ?? config.source_id;
-                      const hasParser = !!config.parser_config;
-
-                      return (
-                        <div
-                          key={config.source_id}
-                          className={cn(
-                            "flex items-center gap-3 p-3 rounded-xl border transition-all",
-                            config.enabled
-                              ? "bg-violet-500/5 border-violet-500/20"
-                              : "bg-black/20 border-border/20 opacity-60",
-                          )}
-                        >
-                          {/* Toggle */}
-                          <button
-                            type="button"
-                            onClick={() => toggleSource(config.source_id)}
+                <div className="space-y-3">
+                  <p className="text-[11px] font-medium text-white/40 px-0.5 uppercase tracking-wider">
+                    Sources
+                  </p>
+                  {isLoadingConfig ? (
+                    <div className="py-10 flex flex-col items-center gap-3">
+                      <div className="size-5 rounded-full border-2 border-white/5 border-t-white/50 animate-spin" />
+                      <p className="text-[11px] text-white/40">Loading</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-2 max-h-[340px] overflow-y-auto pr-1 custom-scrollbar">
+                      {configs.map((config) => {
+                        const sourceInfo = availableSources.find(
+                          (s) => s.path === config.source_id,
+                        );
+                        const label =
+                          sourceInfo?.name ?? config.source_id.split("/").pop() ?? config.source_id;
+                        return (
+                          <div
+                            key={config.source_id}
                             className={cn(
-                              "size-5 rounded flex-shrink-0 flex items-center justify-center transition-colors",
+                              "group flex flex-row items-center gap-3 p-3 rounded-lg border transition-all",
                               config.enabled
-                                ? "bg-violet-500 text-white"
-                                : "bg-white/5 border border-white/10",
+                                ? "bg-white/[0.04] border-white/20"
+                                : "bg-white/[0.01] border-white/5 opacity-60 hover:opacity-100",
                             )}
                           >
-                            {config.enabled && <Check className="size-3.5 stroke-[3]" />}
-                          </button>
-
-                          {/* Label */}
-                          <div className="flex-1 min-w-0">
-                            <span className="block text-sm font-semibold text-text-secondary truncate">
-                              {label}
-                            </span>
-                            <span className="block text-[10px] text-text-muted truncate lowercase font-mono">
-                              {config.source_id}
-                            </span>
+                            <button
+                              type="button"
+                              onClick={() => toggleSource(config.source_id)}
+                              className={cn(
+                                "size-[18px] rounded border flex items-center justify-center transition-all",
+                                config.enabled
+                                  ? "bg-white border-white text-black"
+                                  : "bg-transparent border-white/20 text-transparent",
+                              )}
+                            >
+                              <Check className="size-3" />
+                            </button>
+                            <div className="flex-1 min-w-0">
+                              <p
+                                className={cn(
+                                  "text-[13px] font-medium truncate",
+                                  config.enabled ? "text-white/90" : "text-white/60",
+                                )}
+                              >
+                                {label}
+                              </p>
+                            </div>
+                            {config.enabled && (
+                              <button
+                                type="button"
+                                onClick={() => setActiveParserSource(config.source_id)}
+                                className={cn(
+                                  "p-1.5 rounded transition-all border",
+                                  config.parser_config
+                                    ? "bg-white/10 border-white/20 text-white"
+                                    : "bg-transparent border-transparent text-white/30 hover:bg-white/5 hover:text-white",
+                                )}
+                              >
+                                <Settings2 className="size-3.5" />
+                              </button>
+                            )}
                           </div>
-
-                          {/* Timezone */}
-                          <TimezoneSelect
-                            value={config.tz_offset}
-                            onChange={(tz) => updateOffset(config.source_id, tz)}
-                          />
-
-                          {/* Parser */}
-                          <button
-                            type="button"
-                            onClick={() => setActiveParserSource(config.source_id)}
-                            className={cn(
-                              "p-2 rounded-lg border transition-all flex-shrink-0 flex items-center justify-center relative",
-                              hasParser
-                                ? "bg-violet-500 text-white border-violet-500 shadow-[0_0_10px_rgba(139,92,246,0.3)]"
-                                : "bg-white/5 border-white/10 text-text-muted hover:text-text-primary hover:border-white/20",
-                            )}
-                            title="Configure Timestamp Parser"
-                          >
-                            <Settings2 className="size-4" />
-                            {hasParser && (
-                              <div className="absolute -top-1 -right-1 bg-white text-violet-600 p-0.5 rounded-full ring-2 ring-violet-500">
-                                <Sparkles className="size-2 fill-current" />
-                              </div>
-                            )}
-                          </button>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
               </div>
+            </div>
+          )}
 
-              {/* Sync info */}
-              <div className="p-3 rounded-xl bg-violet-500/5 border border-violet-500/10 text-[11px] text-text-muted leading-relaxed">
-                <span className="font-bold text-violet-400">Sync Strategy:</span> Interleaved
-                Timestamp Alignment. Use{" "}
-                <span className="text-text-secondary font-bold">Sync Drift</span> to offset logs
-                from different timezones.
+          {view === "time-alignment-form" && (
+            <div className="space-y-6 animate-in fade-in slide-in-from-right-2 duration-300">
+              <button
+                type="button"
+                onClick={() => setView("picker")}
+                className="text-[11px] text-white/50 hover:text-white transition-all flex items-center gap-1.5"
+              >
+                ← Back
+              </button>
+
+              <div className="space-y-4">
+                <p className="text-xs text-white/50 font-medium">
+                  Adjust time offsets out-of-sync lines.
+                </p>
+
+                <div className="space-y-2 max-h-[440px] overflow-y-auto pr-1 custom-scrollbar">
+                  {availableSources.map((source) => {
+                    const offset = temporalOffsets[source.path] ?? 0;
+                    return (
+                      <div
+                        key={source.path}
+                        className="group flex flex-row items-center justify-between p-3 rounded-lg bg-white/[0.02] border border-white/5 hover:bg-white/[0.04] transition-all"
+                      >
+                        <div className="min-w-0 pr-3">
+                          <p className="text-[13px] font-medium text-white/90 truncate">
+                            {source.name}
+                          </p>
+                          <div className="flex items-center gap-1.5 mt-0.5">
+                            <Clock className="size-3 text-white/30" />
+                            <p className="text-[11px] font-mono text-white/50">
+                              {offset === 0 ? "0s" : `${offset > 0 ? "+" : ""}${offset}s`}
+                            </p>
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setActiveTimeShiftSource(source.path)}
+                          className="px-3 py-1.5 rounded-md bg-white/5 border border-white/10 text-[11px] font-medium text-white/60 hover:text-white hover:bg-white/10 transition-all"
+                        >
+                          Sync
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             </div>
           )}
 
           {view === "ai-context-form" && (
-            <div className="p-5 space-y-6 flex flex-col h-full">
+            <div className="space-y-6 animate-in fade-in slide-in-from-right-2 duration-300 flex flex-col h-full">
               <button
                 type="button"
                 onClick={() => setView("picker")}
-                className="flex items-center gap-1.5 text-[11px] text-text-muted hover:text-text-secondary transition-colors"
+                className="text-[11px] text-white/50 hover:text-white transition-all flex items-center gap-1.5"
               >
-                ← Back to settings
+                ← Back
               </button>
 
-              <div className="space-y-3 flex-1 flex flex-col">
-                <div>
-                  <p className="text-sm font-bold text-text-primary">Workspace Global Context</p>
-                  <p className="text-xs text-text-muted mt-1 leading-relaxed">
-                    Provide instructions, service specifics, or architectural details about this
-                    workspace. This context will constantly guide the AI investigator.
-                  </p>
-                </div>
+              <div className="flex-1 flex flex-col space-y-3">
+                <p className="text-[11px] text-white/50 font-medium">
+                  Add architecture constraints for AI to know.
+                </p>
                 <textarea
                   value={tempContext}
                   onChange={(e) => setTempContext(e.target.value)}
-                  className="flex-1 w-full bg-black/60 border border-border/40 rounded-xl p-4 text-sm text-text-primary outline-none focus:ring-2 focus:ring-emerald-500/40 focus:border-emerald-500/60 transition-all placeholder:text-text-muted/40 resize-none font-mono min-h-[200px]"
-                  placeholder="e.g. This workspace logs the Redis anomalies for the user Auth service. We are mostly looking for memory leak patterns..."
+                  placeholder="Define schemas or domains..."
+                  className="w-full min-h-[300px] bg-white/[0.02] border border-white/10 rounded-lg p-4 text-[13px] text-white/80 outline-none focus:border-white/30 transition-all placeholder:text-white/20 custom-scrollbar font-mono resize-none"
                 />
-              </div>
-              <div className="pt-2 flex justify-end gap-3 mt-auto shrink-0">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setWorkspaceGlobalContext(null);
-                    setView("picker");
-                  }}
-                  className="px-4 py-2 text-xs font-bold text-red-400 hover:bg-red-500/10 rounded-lg transition-colors border border-transparent"
-                >
-                  Clear & Disable
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setWorkspaceGlobalContext(tempContext.trim() || null);
-                    setView("picker");
-                  }}
-                  className="px-6 py-2 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-500 rounded-lg transition-colors shadow-lg active:scale-95"
-                >
-                  Save Context
-                </button>
               </div>
             </div>
           )}
         </div>
 
-        {/* Footer (only during fusion form) */}
-        {view === "fusion-form" && (
-          <div className="p-5 border-t border-border/40 bg-white/5 shrink-0 space-y-3">
-            <button
-              type="button"
-              onClick={handleDeploy}
-              disabled={
-                isSaving || !fusionName.trim() || configs.filter((c) => c.enabled).length < 2
-              }
-              className={cn(
-                "w-full flex items-center justify-center gap-2 h-11 rounded-xl font-bold text-sm transition-all shadow-lg active:scale-95",
-                "bg-violet-600 text-white hover:bg-violet-500 disabled:opacity-50 disabled:active:scale-100",
+        {/* Footer */}
+        {view !== "picker" && (
+          <div className="p-4 border-t border-white/5 bg-white/[0.01] shrink-0">
+            <div className="flex gap-2">
+              <Button
+                variant="ghost"
+                className="flex-1 h-9 text-xs font-medium text-white/60 hover:text-white hover:bg-white/5"
+                onClick={() => setView("picker")}
+              >
+                Cancel
+              </Button>
+              {view === "ai-context-form" && (
+                <Button
+                  className="flex-1 h-9 text-xs font-medium bg-white text-black hover:bg-white/90"
+                  onClick={() => {
+                    setWorkspaceGlobalContext(tempContext.trim() || null);
+                    toast.success("Cognition saved");
+                    setView("picker");
+                  }}
+                >
+                  Save
+                </Button>
               )}
-            >
-              {isSaving ? (
-                <div className="animate-spin size-4 border-2 border-white border-t-transparent rounded-full" />
-              ) : editingFusionId ? (
-                <>
-                  <Save className="size-4" /> Update Fusion
-                </>
-              ) : (
-                <>
-                  <Plus className="size-4" /> Deploy Fusion
-                </>
+              {view === "time-alignment-form" && (
+                <Button
+                  className="flex-1 h-9 text-xs font-medium bg-white text-black hover:bg-white/90"
+                  onClick={saveTemporalOffsets}
+                  disabled={isSaving}
+                >
+                  {isSaving ? "Syncing..." : "Apply"}
+                </Button>
               )}
-            </button>
+              {view === "fusion-form" && (
+                <Button
+                  className="flex-1 h-9 text-xs font-medium bg-white text-black hover:bg-white/90"
+                  onClick={deployFusion}
+                  disabled={isSaving}
+                >
+                  {isSaving ? "Saving..." : "Deploy"}
+                </Button>
+              )}
+            </div>
           </div>
         )}
       </div>
 
-      {/* Parser Modal */}
-      {activeParserSource && (
-        <CustomParserModal
-          workspaceId={workspaceId}
-          sourceId={activeParserSource}
+      <CustomParserModal
+        workspaceId={workspaceId}
+        sourceId={activeParserSource ?? ""}
+        isOpen={!!activeParserSource}
+        onClose={() => setActiveParserSource(null)}
+        initialConfig={configs.find((c) => c.source_id === activeParserSource)?.parser_config ?? ""}
+        onSaved={(config) => handleParserSaved(activeParserSource ?? "", config)}
+      />
+
+      {activeTimeShiftSource && (
+        <TimeShiftModal
           isOpen={true}
-          onClose={() => setActiveParserSource(null)}
-          initialConfig={
-            configs.find((c) => c.source_id === activeParserSource)?.parser_config ?? null
+          onClose={() => setActiveTimeShiftSource(null)}
+          sourceLabel={
+            availableSources.find((s) => s.path === activeTimeShiftSource)?.name ??
+            activeTimeShiftSource.split("/").pop() ??
+            "Log Source"
           }
-          onSaved={(cfg) => handleParserSaved(activeParserSource, cfg)}
+          initialShiftSeconds={temporalOffsets[activeTimeShiftSource] ?? 0}
+          onSaved={(secs) => {
+            setTemporalOffsets((prev) => ({
+              ...prev,
+              [activeTimeShiftSource]: secs,
+            }));
+          }}
         />
       )}
     </>,
