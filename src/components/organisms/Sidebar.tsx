@@ -132,7 +132,7 @@ export function Sidebar({
                   <div
                     className={cn(
                       "group w-full flex items-center px-1 py-1 text-[13px] rounded-md transition-all text-left outline-none overflow-hidden",
-                      activeWorkspaceId === ws.id
+                      activeWorkspaceId === ws.id && activeNav !== "settings"
                         ? "bg-[#22C55E10] border border-[#22C55E20]"
                         : "hover:bg-[#1E2520]",
                       sidebarCollapsed && "justify-center",
@@ -143,7 +143,7 @@ export function Sidebar({
                       onClick={() => onWorkspaceSelect(ws.id)}
                       className={cn(
                         "flex flex-1 items-center px-2 py-1.5 rounded transition-all text-left outline-none overflow-hidden border-none bg-transparent cursor-pointer",
-                        activeWorkspaceId === ws.id
+                        activeWorkspaceId === ws.id && activeNav !== "settings"
                           ? "text-[#22C55E] font-medium"
                           : "text-[#8FA898] group-hover:text-[#E8F5EC]",
                         sidebarCollapsed && "justify-center px-0",
@@ -152,7 +152,9 @@ export function Sidebar({
                       <Database
                         className={cn(
                           "h-4 w-4 shrink-0 transition-colors",
-                          activeWorkspaceId === ws.id ? "text-[#22C55E]" : "text-[#4D6057]",
+                          activeWorkspaceId === ws.id && activeNav !== "settings"
+                            ? "text-[#22C55E]"
+                            : "text-[#4D6057]",
                         )}
                       />
                       {!sidebarCollapsed && (
@@ -267,14 +269,6 @@ export function Sidebar({
 
         <div className="mt-auto border-t border-[#1D2420] bg-[#0a0c0b] px-2 py-4 space-y-1 overflow-hidden shrink-0">
           <TooltipProvider delay={0}>
-            <SidebarNavItem
-              icon={<Terminal className="h-4 w-4" />}
-              label="Investigation"
-              active={activeNav === "investigation"}
-              collapsed={sidebarCollapsed}
-              onClick={() => onNavSelect("investigation")}
-            />
-
             <SidebarNavItem
               icon={<LayoutDashboard className="h-4 w-4" />}
               label="Dashboard"
