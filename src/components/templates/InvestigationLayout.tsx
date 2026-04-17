@@ -23,6 +23,7 @@ interface InvestigationLayoutProps {
   readonly onSelectSource?: (sourceId: string | null) => void;
   readonly onRemoveSource?: (sourceId: string) => void;
   readonly onEditFusion?: (sourceId: string) => void;
+  readonly onRenameSource?: (workspaceId: string, sourceId: string, name: string) => void;
   readonly showDistribution?: boolean;
   readonly workspaceId?: string;
   readonly onDistributionClose?: () => void;
@@ -47,6 +48,7 @@ export function InvestigationLayout({
   onSelectSource,
   onRemoveSource,
   onEditFusion,
+  onRenameSource,
   showDistribution,
   workspaceId,
   onDistributionClose,
@@ -73,6 +75,8 @@ export function InvestigationLayout({
         onSelectSource={onSelectSource}
         onRemoveSource={onRemoveSource}
         onEditFusion={onEditFusion}
+        onRenameSource={onRenameSource}
+        activeWorkspaceId={workspaceId}
       />
       {showDistribution && workspaceId && (
         <LogDistributionWidget

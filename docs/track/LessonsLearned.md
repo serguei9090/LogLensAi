@@ -44,6 +44,9 @@ This document tracks identified bugs, root causes, and their permanent fixes to 
 | 2026-04-17 | Toolbar Visual Clutter | Separator between Filter and Highlight created unnecessary visual breaks; Bookmark button appeared detached from log manipulation tools | Moved separator after Bookmark to group Filter/Highlight/Bookmark as a single functional "Capture & Filter" block | @antigravity |
 | 2026-04-17 | Navigational Conflict in Settings | Workspaces remained highlighted in Sidebar when Settings were active; clicking a workspace while in Settings updated store but didn't switch view | Disabled workspace highlighting in Settings mode and implemented auto-switch back to Investigation view on workspace selection | @antigravity |
 | 2026-04-17 | Redundant Navigational Entry Point | Dedicated "Investigation" tab became redundant once workspaces were linked to the investigation view | Removed Investigation tab from sidebar footer; workspaces now serve as primary navigational entry points | @antigravity |
+| 2026-04-17 | Long Log Tab Names | Log file paths (especially SSH/Local) can be extremely long, causing UI overflow and poor readability in the tab bar | Implemented log source aliasing; users can now click a pencil icon to rename any tab. Custom names are persisted in DuckDB/WorkspaceStore. | @antigravity |
+| 2026-04-17 | Icon Collision in Tabs | Both "Orchestrate" configuration and "Rename" used the pencil icon, creating functional ambiguity | Reserved Pencil (✎) for naming; updated Fusion Orchestration edit icon to Gear (⚙️) for better semantic separation | @antigravity |
+
 
 
 

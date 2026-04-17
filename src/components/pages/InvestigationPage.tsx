@@ -72,7 +72,8 @@ export function InvestigationPage() {
     syncActiveSource,
   } = useInvestigationStore();
 
-  const { activeWorkspaceId, addSource, removeSource, setActiveSource } = useWorkspaceStore();
+  const { activeWorkspaceId, addSource, removeSource, setActiveSource, renameSource } =
+    useWorkspaceStore();
   const activeWorkspace = useWorkspaceStore(selectActiveWorkspace);
   const { setSidebarOpen, sendMessage, setSession } = useAiStore();
 
@@ -394,6 +395,7 @@ export function InvestigationPage() {
         onSelectSource={handleSelectSource}
         onRemoveSource={handleRemoveSource}
         onEditFusion={handleEditFusion}
+        onRenameSource={renameSource}
         showDistribution={showDistribution}
         onDistributionClose={() => setShowDistribution(!showDistribution)}
         workspaceId={activeWorkspaceId}

@@ -1,6 +1,7 @@
 import { cn } from "@/lib/utils";
 import type { LogSource } from "@/store/workspaceStore";
 import { Pencil, X } from "lucide-react";
+import { useState } from "react";
 
 interface WorkspaceTabsProps {
   /** All sources attached to the active workspace */
@@ -15,6 +16,9 @@ interface WorkspaceTabsProps {
   onRemoveSource?: (sourceId: string) => void;
   /** Called when user wants to edit a fusion-type tab */
   onEditFusion?: (sourceId: string) => void;
+  /** Called when user renames a source tab */
+  onRenameSource?: (workspaceId: string, sourceId: string, name: string) => void;
+  activeWorkspaceId: string;
 }
 
 /**
@@ -33,7 +37,23 @@ export function WorkspaceTabs({
   onSelectSource,
   onRemoveSource,
   onEditFusion,
+  onRenameSource,
+  activeWorkspaceId,
 }: Readonly<WorkspaceTabsProps>) {
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [newName, setNewName] = useState("");
+
+  const handleStartRename = (id: string, currentName: string) => {
+    setEditingId(id);
+    setNewName(currentName);
+  };
+
+  const handleConfirmRename = (id: string) => {
+    if (onRenameSource && newName.trim()) {
+      onRenameSource(activeWorkspaceId, id, newName.trim());
+    }
+    setEditingId(null);
+  };
   if (sources.length === 0) {
     return null;
   }
@@ -91,16 +111,54 @@ export function WorkspaceTabs({
                 </span>
               ) : null}
 
-              <span className="max-w-[140px] truncate">{label}</span>
+              {editingId === src.id ? (
+                <input
+                  // biome-ignore lint/a11y/noAutofocus: intentional for renaming
+                  autoFocus
+                  value={newName}
+                  onChange={(e) => setNewName(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      handleConfirmRename(src.id);
+                    }
+                    if (e.key === "Escape") {
+                      setEditingId(null);
+                    }
+                  }}
+                  onBlur={() => handleConfirmRename(src.id)}
+                  className="bg-primary/20 border border-primary/30 rounded px-1.5 py-0.5 text-[11px] font-semibold text-primary outline-none w-[140px]"
+                  onClick={(e) => e.stopPropagation()}
+                />
+              ) : (
+                <span className="max-w-[140px] truncate">{label}</span>
+              )}
             </button>
 
             {/* Action Group */}
             <div className="flex items-center gap-0.5 pr-1">
-              {/* Edit button for fusion tabs */}
+              {/* Rename button (for all tabs) */}
+              {onRenameSource && editingId !== src.id && (
+                <button
+                  type="button"
+                  aria-label={`Rename ${label}`}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleStartRename(src.id, label);
+                  }}
+                  className={cn(
+                    "opacity-0 group-hover:opacity-100 rounded-full p-0.5 transition-opacity hover:bg-white/10 focus:outline-none",
+                    isActive && "opacity-60 hover:opacity-100",
+                  )}
+                >
+                  <Pencil className="h-3 w-3" />
+                </button>
+              )}
+
+              {/* Edit button for fusion tabs (Config) */}
               {isFusion && onEditFusion && (
                 <button
                   type="button"
-                  aria-label={`Edit ${label}`}
+                  aria-label={`Configure Fusion ${label}`}
                   onClick={(e) => {
                     e.stopPropagation();
                     onEditFusion(src.id);
@@ -110,7 +168,7 @@ export function WorkspaceTabs({
                     isActive && "opacity-60 hover:opacity-100",
                   )}
                 >
-                  <Pencil className="h-3 w-3" />
+                  <span className="text-[10px] font-bold">⚙️</span>
                 </button>
               )}
 

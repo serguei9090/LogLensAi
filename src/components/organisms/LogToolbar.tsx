@@ -29,6 +29,8 @@ interface LogToolbarProps {
   readonly onSelectSource?: (sourceId: string | null) => void;
   readonly onRemoveSource?: (sourceId: string) => void;
   readonly onEditFusion?: (sourceId: string) => void;
+  readonly onRenameSource?: (workspaceId: string, sourceId: string, name: string) => void;
+  readonly activeWorkspaceId?: string;
 }
 
 export function LogToolbar({
@@ -48,6 +50,8 @@ export function LogToolbar({
   onSelectSource,
   onRemoveSource,
   onEditFusion,
+  onRenameSource,
+  activeWorkspaceId,
 }: LogToolbarProps) {
   const { timeRange, setTimeRange } = useInvestigationStore();
   const { isSidebarOpen, setSidebarOpen } = useAiStore();
@@ -85,6 +89,8 @@ export function LogToolbar({
         onSelectSource={onSelectSource ?? (() => {})}
         onRemoveSource={onRemoveSource}
         onEditFusion={onEditFusion}
+        onRenameSource={onRenameSource}
+        activeWorkspaceId={activeWorkspaceId ?? ""}
       />
 
       {/* Search */}

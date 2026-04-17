@@ -43,6 +43,8 @@ interface WorkspaceStore {
   removeSource: (workspaceId: string, sourceId: string) => void;
   /** Switch the active source tab inside a workspace */
   setActiveSource: (workspaceId: string, sourceId: string | null) => void;
+  /** Rename a source tab */
+  renameSource: (workspaceId: string, sourceId: string, name: string) => void;
 }
 
 // ─── Helper ────────────────────────────────────────────────────────────────────
@@ -136,6 +138,19 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
           workspaces: state.workspaces.map((w) =>
             w.id === workspaceId ? { ...w, activeSourceId: sourceId } : w,
           ),
+        })),
+
+      renameSource: (workspaceId, sourceId, name) =>
+        set((state) => ({
+          workspaces: state.workspaces.map((w) => {
+            if (w.id !== workspaceId) {
+              return w;
+            }
+            return {
+              ...w,
+              sources: w.sources.map((s) => (s.id === sourceId ? { ...s, name } : s)),
+            };
+          }),
         })),
     }),
     {
