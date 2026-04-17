@@ -18,6 +18,7 @@ import {
   RefreshCcw,
   Save,
   Terminal,
+  Trash2,
   X,
 } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -583,6 +584,86 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
                   The similarity threshold determines how 'close' two log lines must be to share a
                   template. Lower values (0.1–0.4) are better for high-variance logs.
                 </p>
+              </div>
+
+              <div className="space-y-4">
+                <SectionLabel>Variable Masking</SectionLabel>
+                <div className="space-y-2">
+                  <p className="text-[10px] text-text-muted px-1 -mt-2">
+                    Sanitize logs by replacing dynamic variables (IPs, IDs) with tokens before
+                    clustering.
+                  </p>
+                  {settings.drain_masks.map((mask, idx) => (
+                    <div
+                      key={`${mask.label}-${idx}`}
+                      className="flex items-center gap-3 bg-bg-surface/30 p-2 rounded-xl border border-border group animate-in slide-in-from-left-2 duration-200"
+                    >
+                      <div className="px-2">
+                        <Switch
+                          checked={mask.enabled}
+                          onCheckedChange={(val) => {
+                            const newMasks = [...settings.drain_masks];
+                            newMasks[idx].enabled = val;
+                            update("drain_masks", newMasks);
+                          }}
+                          className="scale-75"
+                        />
+                      </div>
+                      <div className="flex-1 grid grid-cols-12 gap-2">
+                        <div className="col-span-3">
+                          <input
+                            type="text"
+                            value={mask.label}
+                            onChange={(e) => {
+                              const newMasks = [...settings.drain_masks];
+                              newMasks[idx].label = e.target.value;
+                              update("drain_masks", newMasks);
+                            }}
+                            className="w-full bg-transparent border-none text-[11px] font-bold text-primary focus:ring-0 px-0 h-6 uppercase"
+                            placeholder="LABEL"
+                          />
+                        </div>
+                        <div className="col-span-9">
+                          <input
+                            type="text"
+                            value={mask.pattern}
+                            onChange={(e) => {
+                              const newMasks = [...settings.drain_masks];
+                              newMasks[idx].pattern = e.target.value;
+                              update("drain_masks", newMasks);
+                            }}
+                            className="w-full bg-transparent border-none text-[11px] text-text-primary font-mono focus:ring-0 px-0 h-6"
+                            placeholder="Regex Pattern"
+                          />
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const newMasks = settings.drain_masks.filter((_, i) => i !== idx);
+                          update("drain_masks", newMasks);
+                        }}
+                        className="opacity-0 group-hover:opacity-100 p-1.5 text-text-muted hover:text-red-400 transition-all cursor-pointer"
+                      >
+                        <Trash2 className="size-3.5" />
+                      </button>
+                    </div>
+                  ))}
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      update("drain_masks", [
+                        ...settings.drain_masks,
+                        { label: "NEW_MASK", pattern: "", enabled: true },
+                      ]);
+                    }}
+                    className="w-full flex items-center justify-center gap-2 py-3 border border-dashed border-border rounded-xl text-[10px] font-bold text-text-muted hover:border-primary hover:text-primary hover:bg-primary/5 transition-all uppercase tracking-tighter cursor-pointer"
+                  >
+                    <Plus className="size-3" />
+                    Add Custom Masking Instruction
+                  </button>
+                </div>
               </div>
 
               <div className="pt-6 border-t border-border/30 flex items-center justify-between">

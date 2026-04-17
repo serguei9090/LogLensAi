@@ -1315,6 +1315,12 @@ class App:
         max_children = int(settings.get("drain_max_children", "100"))
         max_clusters = int(settings.get("drain_max_clusters", "1000"))
 
+        masks_raw = settings.get("drain_masks", "[]")
+        try:
+            masking_instructions = json.loads(masks_raw)
+        except Exception:
+            masking_instructions = []
+
         if scope == "global" or not workspace_id:
             key = "__global__"
             path = "data/drain/global.state"
@@ -1328,6 +1334,7 @@ class App:
                 sim_th=sim_th,
                 max_children=max_children,
                 max_clusters=max_clusters,
+                masking_instructions=masking_instructions,
             )
         return self._parsers[key]
 
@@ -1575,7 +1582,7 @@ def run_stdio():
 
 def main():
     if "--dev" in sys.argv:
-        run_http(4001)
+        run_http(5000)
     else:
         run_stdio()
 

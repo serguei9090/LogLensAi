@@ -17,6 +17,7 @@ export interface AppSettings {
   ai_tool_search: boolean;
   ai_tool_memory: boolean;
   drain_template_scope: "global" | "workspace";
+  drain_masks: Array<{ pattern: string; label: string; enabled: boolean }>;
 }
 
 export const defaultSettings: AppSettings = {
@@ -36,6 +37,18 @@ export const defaultSettings: AppSettings = {
   ai_tool_search: true,
   ai_tool_memory: true,
   drain_template_scope: "global",
+  drain_masks: [
+    {
+      pattern: "((?<=[^A-Za-z0-9])|^)(\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3})(?=[^A-Za-z0-9]|$)",
+      label: "IP",
+      enabled: true,
+    },
+    {
+      pattern: "[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}",
+      label: "UUID",
+      enabled: true,
+    },
+  ],
 };
 
 interface SettingsStore {
@@ -69,6 +82,9 @@ export const useSettingsStore = create<SettingsStore>((set) => ({
             ai_tool_memory: remote.ai_tool_memory !== "false", // default true
             drain_template_scope:
               (remote.drain_template_scope as "global" | "workspace") || "global",
+            drain_masks: remote.drain_masks
+              ? JSON.parse(remote.drain_masks)
+              : defaultSettings.drain_masks,
           },
         });
       }
@@ -79,9 +95,18 @@ export const useSettingsStore = create<SettingsStore>((set) => ({
 
   updateSettings: async (newSettings) => {
     try {
+      const payload: Record<string, string | number | boolean> = {};
+      for (const [k, v] of Object.entries(newSettings)) {
+        if (k === "drain_masks") {
+          payload[k] = JSON.stringify(v);
+        } else {
+          payload[k] = v as string;
+        }
+      }
+
       await callSidecar({
         method: "update_settings",
-        params: { settings: newSettings },
+        params: { settings: payload },
       });
       set((state) => ({ settings: { ...state.settings, ...newSettings } }));
     } catch (err) {

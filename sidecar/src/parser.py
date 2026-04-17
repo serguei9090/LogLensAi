@@ -3,15 +3,40 @@ import threading
 
 from drain3 import TemplateMiner
 from drain3.file_persistence import FilePersistence
+from drain3.masking import MaskingInstruction
 from drain3.template_miner_config import TemplateMinerConfig
 
 
 class DrainParser:
-    def __init__(self, persistence_path=None, sim_th=0.4, max_children=100, max_clusters=1000):
+    def __init__(
+        self,
+        persistence_path=None,
+        sim_th=0.4,
+        max_children=100,
+        max_clusters=1000,
+        masking_instructions=None,
+    ):
         self.config = TemplateMinerConfig()
         self.config.drain_sim_th = sim_th
         self.config.drain_max_children = max_children
         self.config.drain_max_clusters = max_clusters
+
+        if masking_instructions:
+            for mi in masking_instructions:
+                if not mi.get("enabled", True):
+                    continue
+                pattern = mi.get("pattern")
+                label = mi.get("label")
+                if pattern and label:
+                    try:
+                        # Validate regex before adding
+                        import re
+
+                        re.compile(pattern)
+                        self.config.masking_instructions.append(MaskingInstruction(pattern, label))
+                    except re.error:
+                        # Log or handle invalid regex
+                        continue
 
         self.persistence = None
         if persistence_path:
