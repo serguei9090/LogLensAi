@@ -100,7 +100,6 @@ export function LogToolbar({
       {/* Filters & Highlights */}
       <div className="flex items-center gap-2">
         <FilterBuilder filters={activeFilters} onChange={onFilterChange} />
-        <div className="h-5 w-px bg-zinc-800" />
         <HighlightBuilder highlights={activeHighlights} onChange={onHighlightChange} />
 
         {/* Template Summary Button */}
@@ -116,6 +115,8 @@ export function LogToolbar({
         >
           <Bookmark className="size-4" />
         </button>
+
+        <div className="h-5 w-px bg-zinc-800 shrink-0 mx-1" />
 
         {/* AI Sidebar Toggle */}
         <button

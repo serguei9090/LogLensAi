@@ -41,4 +41,6 @@ This document tracks identified bugs, root causes, and their permanent fixes to 
 | 2026-04-16 | Undefined Icon Reference (Trash2) | Removed `Trash2` import during footer refactor while it was still active in the History menu. | Restored `Trash2` import in `AIInvestigationSidebar.tsx`. | @antigravity |
 | 2026-04-16 | AI Navigation & Search Modal | Implemented global AI trigger, history truncation (4 items), and a centralized search modal for investigation history. | Added `AIHistorySearchModal.tsx`, updated `LogToolbar.tsx` and `AIInvestigationSidebar.tsx`. | @antigravity |
 | 2026-04-17 | Redundant AI Sidebar History Menu | "Recent Investigations" list and "Investigation History" dropdown menu provided duplicate entry points with inconsistent UI patterns | Removed redundant Clock icon dropdown, added "Show more" button to the primary list, and migrated the search modal trigger | @antigravity |
+| 2026-04-17 | Toolbar Visual Clutter | Separator between Filter and Highlight created unnecessary visual breaks; Bookmark button appeared detached from log manipulation tools | Moved separator after Bookmark to group Filter/Highlight/Bookmark as a single functional "Capture & Filter" block | @antigravity |
+
 
