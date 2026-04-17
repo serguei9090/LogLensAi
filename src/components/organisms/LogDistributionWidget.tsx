@@ -41,7 +41,9 @@ export function LogDistributionWidget({
     let mounted = true;
 
     const fetchDistribution = async () => {
-      if (!workspaceId) return;
+      if (!workspaceId) {
+        return;
+      }
 
       setLoading(true);
       setError(null);

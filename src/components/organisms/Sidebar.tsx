@@ -56,7 +56,9 @@ export function Sidebar({
 
   const handleConfirmAdd = () => {
     const trimmed = newName.trim();
-    if (trimmed) onWorkspaceCreate(trimmed);
+    if (trimmed) {
+      onWorkspaceCreate(trimmed);
+    }
     setIsAdding(false);
     setNewName("");
   };
@@ -192,12 +194,15 @@ export function Sidebar({
                   finalItem = (
                     <div className="px-1 py-1 flex items-center gap-1">
                       <input
-                        autoFocus
                         value={renameValue}
                         onChange={(e) => setRenameValue(e.target.value)}
                         onKeyDown={(e) => {
-                          if (e.key === "Enter") handleConfirmRename(ws.id);
-                          if (e.key === "Escape") setRenamingId(null);
+                          if (e.key === "Enter") {
+                            handleConfirmRename(ws.id);
+                          }
+                          if (e.key === "Escape") {
+                            setRenamingId(null);
+                          }
                         }}
                         className="flex-1 bg-black/40 border border-[#22C55E30] rounded px-2 py-0.5 text-xs text-[#E8F5EC] outline-none"
                       />
@@ -240,8 +245,12 @@ export function Sidebar({
                   onChange={(e) => setNewName(e.target.value)}
                   placeholder="Workspace..."
                   onKeyDown={(e) => {
-                    if (e.key === "Enter") handleConfirmAdd();
-                    if (e.key === "Escape") handleCancelAdd();
+                    if (e.key === "Enter") {
+                      handleConfirmAdd();
+                    }
+                    if (e.key === "Escape") {
+                      handleCancelAdd();
+                    }
                   }}
                   className="w-full bg-black/40 border border-[#22C55E30] rounded px-2 py-1 text-xs text-[#E8F5EC] outline-none"
                 />

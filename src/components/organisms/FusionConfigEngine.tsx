@@ -60,7 +60,9 @@ function TimezoneSelect({
 
   // Compute panel position from trigger rect each time it opens
   const updatePosition = () => {
-    if (!triggerRef.current) return;
+    if (!triggerRef.current) {
+      return;
+    }
     const rect = triggerRef.current.getBoundingClientRect();
     setPanelStyle({
       position: "fixed",
@@ -78,7 +80,9 @@ function TimezoneSelect({
 
   // Close on outside click
   useEffect(() => {
-    if (!open) return;
+    if (!open) {
+      return;
+    }
     const handler = (e: MouseEvent) => {
       const target = e.target as Node;
       if (

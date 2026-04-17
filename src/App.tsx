@@ -19,14 +19,16 @@ export default function App() {
   const seededRef = useRef(false);
 
   useEffect(() => {
-    if (seededRef.current) return;
+    if (seededRef.current) {
+      return;
+    }
     if (workspaces.length === 0) {
       seededRef.current = true;
       addWorkspace({ id: "default-ws", name: "Default Workspace" });
     } else {
       seededRef.current = true;
     }
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [workspaces.length, addWorkspace]);
 
   return (
     <>

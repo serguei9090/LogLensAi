@@ -52,8 +52,8 @@ def test_get_fused_logs_with_timezone_shift(api):
     logs = res["logs"]
 
     # Identify logs in the result
-    london_log = next(l for l in logs if l["source_id"] == "src_london")
-    nyc_log = next(l for l in logs if l["source_id"] == "src_nyc")
+    london_log = next(log for log in logs if log["source_id"] == "src_london")
+    nyc_log = next(log for log in logs if log["source_id"] == "src_nyc")
 
     assert london_log["timestamp"] == "2024-01-01 10:00:00"
     assert nyc_log["timestamp"] == "2024-01-01 15:00:00"  # 10:00 + 5

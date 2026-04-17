@@ -7,6 +7,9 @@
     "enabled": true,
     "rules": {
       "recommended": true,
+      "suspicious": {
+        "noArrayIndexKey": "off"
+      },
       "style": {
         "useBlockStatements": "error",
         "useFragmentSyntax": "error"

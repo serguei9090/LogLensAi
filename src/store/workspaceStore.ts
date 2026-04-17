@@ -65,7 +65,9 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
       addWorkspace: (ws) =>
         set((state) => {
           // Guard: prevent adding duplicate IDs
-          if (state.workspaces.some((w) => w.id === ws.id)) return state;
+          if (state.workspaces.some((w) => w.id === ws.id)) {
+            return state;
+          }
           const newWs: Workspace = {
             ...ws,
             sources: [],
@@ -98,7 +100,9 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
         const newSource: LogSource = { id: uid(), ...sourceData };
         set((state) => ({
           workspaces: state.workspaces.map((w) => {
-            if (w.id !== workspaceId) return w;
+            if (w.id !== workspaceId) {
+              return w;
+            }
             return {
               ...w,
               sources: [...w.sources, newSource],
@@ -113,7 +117,9 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
       removeSource: (workspaceId, sourceId) =>
         set((state) => ({
           workspaces: state.workspaces.map((w) => {
-            if (w.id !== workspaceId) return w;
+            if (w.id !== workspaceId) {
+              return w;
+            }
             const remaining = w.sources.filter((s) => s.id !== sourceId);
             const wasActive = w.activeSourceId === sourceId;
             return {
@@ -147,6 +153,8 @@ export const selectActiveWorkspace = (state: WorkspaceStore) =>
 /** Returns the active LogSource inside the active workspace, or null for aggregate view */
 export const selectActiveSource = (state: WorkspaceStore): LogSource | null => {
   const ws = selectActiveWorkspace(state);
-  if (!ws || ws.activeSourceId === null) return null;
+  if (!ws || ws.activeSourceId === null) {
+    return null;
+  }
   return ws.sources.find((s) => s.id === ws.activeSourceId) ?? null;
 };

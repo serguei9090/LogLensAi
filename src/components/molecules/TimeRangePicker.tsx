@@ -43,7 +43,6 @@ interface TimeSegmentInputProps {
   readonly max: number;
   readonly onChange: (v: number) => void;
   readonly onNext?: () => void;
-  readonly onPrev?: () => void;
 }
 
 interface TimeInputRowProps {
@@ -140,7 +139,9 @@ function TimeSegmentInput({ value, max, onChange, onNext }: TimeSegmentInputProp
       const n = Number.parseInt(next, 10);
       if (!Number.isNaN(n)) {
         onChange(clamp(n));
-        if (next.length === 2 && onNext) setTimeout(onNext, 0);
+        if (next.length === 2 && onNext) {
+          setTimeout(onNext, 0);
+        }
       }
     }
   };
@@ -172,7 +173,9 @@ function TimeSegmentInput({ value, max, onChange, onNext }: TimeSegmentInputProp
         }}
         onBlur={(e) => {
           const n = Number.parseInt(e.target.value, 10);
-          if (!Number.isNaN(n)) onChange(clamp(n));
+          if (!Number.isNaN(n)) {
+            onChange(clamp(n));
+          }
           pendingRef.current = "";
         }}
         className={[
@@ -483,7 +486,9 @@ export function TimeRangePicker({ value, onChange, className }: TimeRangePickerP
   );
 
   const handleApply = useCallback(() => {
-    if (!range?.from) return;
+    if (!range?.from) {
+      return;
+    }
     const start = new Date(range.from);
     start.setHours(startH, startM, startS, 0);
     let endStr = "";
@@ -509,8 +514,12 @@ export function TimeRangePicker({ value, onChange, className }: TimeRangePickerP
   const handleToggleView = useCallback((side: "left" | "right") => {
     setActiveSide(side);
     setView((v) => {
-      if (v === "days") return "months";
-      if (v === "months") return "years";
+      if (v === "days") {
+        return "months";
+      }
+      if (v === "months") {
+        return "years";
+      }
       return "days";
     });
   }, []);
@@ -536,8 +545,12 @@ export function TimeRangePicker({ value, onChange, className }: TimeRangePickerP
   // ── Derived ───────────────────────────────────────────────────────────────
 
   const displayText = useMemo(() => {
-    if (value.label) return value.label;
-    if (!value.start) return "All Time";
+    if (value.label) {
+      return value.label;
+    }
+    if (!value.start) {
+      return "All Time";
+    }
     const s = format(new Date(value.start), "MMM d, yyyy HH:mm:ss");
     const e = value.end ? format(new Date(value.end), "MMM d, yyyy HH:mm:ss") : "now";
     return `${s} → ${e}`;

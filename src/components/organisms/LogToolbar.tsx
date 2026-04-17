@@ -102,9 +102,10 @@ export function LogToolbar({
 
         {/* Template Summary Button */}
         <button
+          type="button"
           onClick={() =>
-            toast.info("Template functionality coming soon.", {
-              description: "You will be able to save highlights and filters for later.",
+            toast.info("Template functionality coming soon", {
+              description: "Saving complex filter setups as templates is planned.",
             })
           }
           className="p-1.5 rounded-md hover:bg-white/5 text-text-muted hover:text-text-primary transition-colors ml-1"

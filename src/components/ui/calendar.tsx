@@ -106,10 +106,12 @@ function Calendar({
       }}
       components={{
         Chevron: ({ orientation, className: cls, ...rest }) => {
-          if (orientation === "left")
+          if (orientation === "left") {
             return <ChevronLeft className={cn("size-4", cls)} {...rest} />;
-          if (orientation === "right")
+          }
+          if (orientation === "right") {
             return <ChevronRight className={cn("size-4", cls)} {...rest} />;
+          }
           // Used inside the dropdown caption_label
           return <ChevronDown className={cn("size-3.5", cls)} {...rest} />;
         },

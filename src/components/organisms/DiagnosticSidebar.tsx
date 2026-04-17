@@ -43,9 +43,9 @@ export function DiagnosticSidebar({ open, onClose, data, loading }: DiagnosticSi
       <ScrollArea className="flex-1 p-5">
         {loading ? (
           <div className="space-y-4 animate-pulse">
-            <div className="h-4 bg-border rounded w-3/4"></div>
-            <div className="h-4 bg-border rounded w-1/2"></div>
-            <div className="h-4 bg-border rounded w-5/6"></div>
+            <div className="h-4 bg-border rounded w-3/4" />
+            <div className="h-4 bg-border rounded w-1/2" />
+            <div className="h-4 bg-border rounded w-5/6" />
           </div>
         ) : data ? (
           <div className="space-y-6">
@@ -78,7 +78,7 @@ export function DiagnosticSidebar({ open, onClose, data, loading }: DiagnosticSi
               <ul className="space-y-2">
                 {data.recommended_actions.map((action, i) => (
                   <li
-                    key={i}
+                    key={`action-${i}`}
                     className="flex gap-3 text-sm text-text-primary bg-bg-base p-3 rounded border border-border"
                   >
                     <span className="text-primary font-mono font-bold">{i + 1}.</span>

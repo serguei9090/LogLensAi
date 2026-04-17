@@ -30,7 +30,9 @@ export function HighlightBuilder({ highlights, onChange }: HighlightBuilderProps
   const [color, setColor] = useState(PRESET_COLORS[0].hex);
 
   const handleAdd = () => {
-    if (!term.trim()) return;
+    if (!term.trim()) {
+      return;
+    }
     onChange([...highlights, { id: crypto.randomUUID(), term: term.trim(), color }]);
     setTerm("");
   };

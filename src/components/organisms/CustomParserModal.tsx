@@ -5,12 +5,25 @@ import { Clock, Info, Search, Terminal, Trash2, Wand2, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
+interface ParserMapping {
+  start: number;
+  end: number;
+}
+
+interface ParserConfig {
+  regex: string;
+  mapping: {
+    timestamp?: ParserMapping;
+    level?: ParserMapping;
+  };
+}
+
 interface CustomParserModalProps {
   workspaceId: string;
   sourceId: string;
   isOpen: boolean;
   onClose: () => void;
-  onSaved: (parserConfig: any) => void;
+  onSaved: (parserConfig: string) => void;
   initialConfig?: string | null;
 }
 
@@ -41,15 +54,21 @@ export function CustomParserModal({
     rect: DOMRect;
   } | null>(null);
   const [mapping, setMapping] = useState<{
-    timestamp?: { start: number; end: number };
-    level?: { start: number; end: number };
+    timestamp?: ParserMapping;
+    level?: ParserMapping;
   }>({});
 
   const sampleContainerRef = useRef<HTMLDivElement>(null);
 
+  // Generate unique IDs for form elements
+  const textareaId = "parser-regex-textarea";
+  const previewId = "parser-preview-grid";
+
   // 1. Load samples and initial config
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isOpen) {
+      return;
+    }
 
     async function fetchData() {
       setIsLoading(true);
@@ -62,9 +81,11 @@ export function CustomParserModal({
 
         if (initialConfig) {
           try {
-            const config = JSON.parse(initialConfig);
+            const config = JSON.parse(initialConfig) as ParserConfig;
             setRegexPattern(config.regex || "");
-            if (config.mapping) setMapping(config.mapping);
+            if (config.mapping) {
+              setMapping(config.mapping);
+            }
           } catch (e) {
             console.warn("Malformed config", e);
           }
@@ -121,15 +142,16 @@ export function CustomParserModal({
 
   // 3. Update Regex from Mapping
   useEffect(() => {
-    if (!mapping.timestamp && !mapping.level) return;
+    if (!mapping.timestamp && !mapping.level) {
+      return;
+    }
 
     let pattern = "^";
-    const sorted = Object.entries(mapping)
-      .filter(([_, val]) => !!val)
-      .sort((a, b) => (a[1] as any).start - (b[1] as any).start);
+    const entries = Object.entries(mapping) as [string, ParserMapping][];
+    const sorted = entries.filter(([_, val]) => !!val).sort((a, b) => a[1].start - b[1].start);
 
     let lastIdx = 0;
-    for (const [key, range] of sorted as any) {
+    for (const [key, range] of sorted) {
       if (range.start > lastIdx) {
         pattern += `.{${range.start - lastIdx}}`;
       }
@@ -165,11 +187,11 @@ export function CustomParserModal({
   }, [regexPattern, samples]);
 
   const handleSave = () => {
-    const config = JSON.stringify({
+    const config: ParserConfig = {
       regex: regexPattern,
       mapping,
-    });
-    onSaved(config);
+    };
+    onSaved(JSON.stringify(config));
     onClose();
   };
 
@@ -177,17 +199,16 @@ export function CustomParserModal({
     const segments: { text: string; type?: "timestamp" | "level" }[] = [];
     let currentPos = 0;
 
-    const hls = Object.entries(mapping)
-      .filter(([_, val]) => !!val)
-      .sort((a, b) => (a[1] as any).start - (b[1] as any).start);
+    const entries = Object.entries(mapping) as [string, ParserMapping][];
+    const hls = entries.filter(([_, val]) => !!val).sort((a, b) => a[1].start - b[1].start);
 
-    for (const [type, range] of hls as any) {
+    for (const [type, range] of hls) {
       if (range.start > currentPos) {
         segments.push({ text: line.substring(currentPos, range.start) });
       }
       segments.push({
         text: line.substring(range.start, range.end),
-        type: type as any,
+        type: type as "timestamp" | "level",
       });
       currentPos = range.end;
     }
@@ -198,7 +219,7 @@ export function CustomParserModal({
 
     return segments.map((s, i) => (
       <span
-        key={i}
+        key={`${i}-${s.text.length}`}
         className={cn(
           s.type === "timestamp" &&
             "bg-primary/30 text-primary border-b-2 border-primary px-0.5 rounded-t-sm",
@@ -211,7 +232,9 @@ export function CustomParserModal({
     ));
   };
 
-  if (!isOpen) return null;
+  if (!isOpen) {
+    return null;
+  }
 
   return (
     <TooltipProvider delay={200}>
@@ -238,6 +261,7 @@ export function CustomParserModal({
               </div>
             </div>
             <button
+              type="button"
               onClick={onClose}
               className="p-2 hover:bg-white/10 rounded-full transition-colors text-text-muted hover:text-text-primary"
             >
@@ -252,7 +276,7 @@ export function CustomParserModal({
                   <Search className="size-3" /> Raw Source Samples
                 </span>
                 <Tooltip>
-                  <TooltipTrigger>
+                  <TooltipTrigger asChild>
                     <span className="text-[9px] text-primary bg-primary/10 px-2 py-0.5 rounded border border-primary/20 animate-pulse cursor-help">
                       Highlight text to define capture group
                     </span>
@@ -274,7 +298,7 @@ export function CustomParserModal({
                 {!isLoading && samples.length > 0 ? (
                   samples.map((line, idx) => (
                     <div
-                      key={idx}
+                      key={`sample-${idx}-${line.length}`}
                       data-sample-line="true"
                       className="group flex hover:bg-primary/5 transition-colors min-w-fit"
                     >
@@ -297,7 +321,10 @@ export function CustomParserModal({
             <div className="flex-1 flex flex-col min-w-[320px] bg-surface-base/40 backdrop-blur-xl">
               <div className="p-6 space-y-6">
                 <div className="space-y-3">
-                  <label className="text-[10px] font-bold text-text-muted uppercase tracking-widest flex items-center justify-between">
+                  <label
+                    htmlFor={textareaId}
+                    className="text-[10px] font-bold text-text-muted uppercase tracking-widest flex items-center justify-between"
+                  >
                     <div className="flex items-center gap-2">
                       <Wand2 className="size-3" /> Extraction Logic
                     </div>
@@ -309,15 +336,17 @@ export function CustomParserModal({
                   </label>
                   <div className="relative group">
                     <textarea
+                      id={textareaId}
                       value={regexPattern}
                       onChange={(e) => setRegexPattern(e.target.value)}
-                      placeholder="^(?P<timestamp>.*?) (?P<level>\w+).*"
+                      placeholder="^(?P<timestamp>.*?) (?P<level>\\w+).*"
                       className="w-full h-24 bg-black/60 border border-border/40 rounded-xl p-4 text-sm font-mono text-primary outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary/60 transition-all resize-none shadow-inner"
                     />
                     <div className="absolute top-2 right-2 flex flex-col gap-2">
                       {activeSelection && (
                         <div className="flex flex-col gap-1 p-1 bg-primary/10 border border-primary/20 rounded-lg animate-in slide-in-from-right-2">
                           <button
+                            type="button"
                             onClick={() => {
                               setMapping((prev) => ({
                                 ...prev,
@@ -334,6 +363,7 @@ export function CustomParserModal({
                             <Clock className="size-3" />
                           </button>
                           <button
+                            type="button"
                             onClick={() => {
                               setMapping((prev) => ({
                                 ...prev,
@@ -349,7 +379,7 @@ export function CustomParserModal({
                         </div>
                       )}
                       <Tooltip>
-                        <TooltipTrigger>
+                        <TooltipTrigger asChild>
                           <div className="p-1 hover:bg-white/5 rounded-md cursor-help text-text-muted hover:text-primary transition-colors">
                             <Info className="size-4" />
                           </div>
@@ -375,13 +405,22 @@ export function CustomParserModal({
                 </div>
 
                 <div className="space-y-4">
-                  <label className="text-[10px] font-bold text-text-muted uppercase tracking-widest">
+                  <label
+                    htmlFor={previewId}
+                    className="text-[10px] font-bold text-text-muted uppercase tracking-widest"
+                  >
                     Extraction Preview
                   </label>
-                  <div className="bg-black/40 rounded-xl border border-white/5 divide-y divide-white/5 overflow-hidden text-wrap">
+                  <div
+                    id={previewId}
+                    className="bg-black/40 rounded-xl border border-white/5 divide-y divide-white/5 overflow-hidden text-wrap"
+                  >
                     {previewResults.length > 0 ? (
                       previewResults.slice(0, 2).map((res, i) => (
-                        <div key={i} className="p-3 flex items-center justify-between text-[11px]">
+                        <div
+                          key={`preview-${i}`}
+                          className="p-3 flex items-center justify-between text-[11px]"
+                        >
                           <span className="text-text-muted font-mono">
                             {res.timestamp || "---"}
                           </span>
@@ -431,6 +470,7 @@ export function CustomParserModal({
                 </div>
                 <div className="flex gap-3">
                   <button
+                    type="button"
                     onClick={() => {
                       setRegexPattern("");
                       setMapping({});
@@ -440,6 +480,7 @@ export function CustomParserModal({
                     <Trash2 className="size-5" />
                   </button>
                   <button
+                    type="button"
                     onClick={handleSave}
                     className="flex-1 bg-primary text-black h-11 rounded-xl font-bold text-sm hover:bg-primary-hover shadow-lg"
                   >
@@ -463,6 +504,7 @@ export function CustomParserModal({
           className="z-[999] flex items-center gap-1 p-1 bg-[#111613] border border-white/20 rounded-lg shadow-2xl animate-in zoom-in-95 duration-200"
         >
           <button
+            type="button"
             onClick={() => {
               setMapping((prev) => ({
                 ...prev,
@@ -477,6 +519,7 @@ export function CustomParserModal({
           </button>
           <div className="w-px h-4 bg-white/10 mx-1" />
           <button
+            type="button"
             onClick={() => {
               setMapping((prev) => ({
                 ...prev,

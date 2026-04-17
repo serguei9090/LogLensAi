@@ -3,6 +3,15 @@ from .base import AIChatMessage, AIProvider
 from .gemini_cli import GeminiCLIProvider
 from .ollama import OllamaProvider
 
+__all__ = [
+    "AIChatMessage",
+    "AIProvider",
+    "AIStudioProvider",
+    "GeminiCLIProvider",
+    "OllamaProvider",
+    "AIProviderFactory",
+]
+
 
 class AIProviderFactory:
     @staticmethod

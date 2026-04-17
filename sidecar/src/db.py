@@ -1,3 +1,4 @@
+import contextlib
 import os
 import threading
 from typing import Any
@@ -134,20 +135,16 @@ class Database:
         try:
             cursor.execute("SELECT name FROM ai_sessions LIMIT 1")
         except Exception:
-            try:
+            with contextlib.suppress(Exception):
                 cursor.execute("ALTER TABLE ai_sessions RENAME COLUMN title TO name")
-            except Exception:
-                pass
 
         try:
             cursor.execute("SELECT last_modified FROM ai_sessions LIMIT 1")
         except Exception:
-            try:
+            with contextlib.suppress(Exception):
                 cursor.execute(
                     "ALTER TABLE ai_sessions RENAME COLUMN last_updated TO last_modified"
                 )
-            except Exception:
-                pass
 
         # Add missing columns
         for table, col in [
@@ -213,10 +210,8 @@ class Database:
         except Exception:
             cursor.execute("ALTER TABLE logs ADD COLUMN source_id TEXT")
 
-        try:
+        with contextlib.suppress(Exception):
             cursor.execute("ALTER TABLE logs ALTER id SET DEFAULT nextval('log_id_seq')")
-        except Exception:
-            pass
 
     def _initialize_cluster_cache(self, cursor):
         """Warm up the clusters table from existing log data if empty."""

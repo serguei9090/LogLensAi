@@ -57,6 +57,12 @@
 
 ## 🔵 Bug Fixes (Active)
 
+- [x] **FIX-BE-001**: Missing 'os' Import in Ollama Provider (Regression from ENV stabilization)
+  - **Files**: `sidecar/src/ai/ollama.py`
+  - **Detail**: `docs/TODOC/FIX-BE-001.md`
+- [x] **FIX-CORE-001**: Restore AIChatMessage Export (Regression from lint cleanup)
+  - **Files**: `sidecar/src/ai/__init__.py`
+  - **Detail**: `docs/TODOC/FIX-CORE-001.md`
 - [x] **FIX-AI-001**: AI Persistence & Context Strategy (Commit transactions + Multi-turn history)
   - **Files**: `sidecar/src/api.py`, `sidecar/src/ai/ai_studio.py`
   - **Detail**: `docs/TODOC/FIX-AI-001.md`
@@ -68,6 +74,9 @@
 - [ ] **FIX-UX-004**: Context-Aware AI Hub (Highlight session logs + VS Code style history + Renaming)
   - **Files**: `src/components/organisms/AIInvestigationSidebar.tsx`, `src/components/organisms/VirtualLogTable.tsx`, `sidecar/src/api.py`, `src/store/aiStore.ts`
   - **Detail**: `docs/TODOC/FIX-UX-004.md`
+- [ ] **FIX-UX-006**: Chat Scroll & Context Persistence (Auto-Scroll to Last Answer)
+  - **Files**: `src/components/organisms/AIInvestigationSidebar.tsx`
+  - **Detail**: `docs/TODOC/FIX-UX-006.md`
 - [x] **FIX-UX-005**: Async LLM Provider Stability (Non-blocking CLI execution)
   - **Files**: `sidecar/src/ai/gemini_cli.py`
   - **Detail**: `docs/TODOC/FIX-UX-005.md`
@@ -77,6 +86,9 @@
 - [x] **FIX-LOG-001**: General Code Quality & Linting Overhaul (Biome/Ruff fixes)
   - **Files**: `src/components/pages/InvestigationPage.tsx`, `sidecar/src/ai.py`, `src/components/organisms/SettingsPanel.tsx`, etc.
   - **Detail**: `docs/TODOC/FIX_LOG_001.md`
+- [x] **FIX-CLEAN-001**: Technical Debt Remediation (React Keys, Hooks, A11y)
+  - **Files**: `src/components/atoms/MarkdownContent.tsx`, `src/components/organisms/CustomParserModal.tsx`, etc.
+  - **Detail**: `docs/TODOC/FIX-CLEAN-001.md`
 
 ---
 

@@ -8,11 +8,13 @@ import {
   ChevronDown,
   ChevronRight,
   Cpu,
+  FolderOpen,
   Layers,
   Palette,
   Plus,
   Save,
   Terminal,
+  X,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 

@@ -26,9 +26,16 @@ export function ThinkingBlock({
 }: Readonly<ThinkingBlockProps>) {
   const [isExpanded, setIsExpanded] = useState(false);
   const contentRef = useRef<HTMLDivElement>(null);
-  const [contentHeight, setContentHeight] = useState(0);
   const wasStreamingRef = useRef(isStreaming);
   const [activeDuration, setActiveDuration] = useState(0);
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  // Auto-scroll to bottom while streaming
+  useEffect(() => {
+    if (isStreaming && scrollRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    }
+  }, [isStreaming]); // content removed as dependency to avoid scroll jitters, isStreaming is the driver
 
   // Time counting for active streaming
   useEffect(() => {
@@ -41,13 +48,6 @@ export function ThinkingBlock({
     }
     return () => clearInterval(interval);
   }, [isStreaming]);
-
-  // biome-ignore lint/correctness/useExhaustiveDependencies: Re-measure height when content or expanded state changes
-  useEffect(() => {
-    if (contentRef.current) {
-      setContentHeight(contentRef.current.scrollHeight);
-    }
-  }, [content, isExpanded]);
 
   // Auto-retract when streaming finishes (was streaming -> no longer streaming)
   useEffect(() => {
@@ -99,16 +99,21 @@ export function ThinkingBlock({
         </span>
       </button>
 
-      {/* Expanded full thinking — animated height */}
+      {/* Expanded full thinking — animated height + scrollable */}
       <div
-        className="overflow-hidden transition-all duration-500 cubic-bezier(0.4, 0, 0.2, 1)"
+        ref={scrollRef}
+        className={cn(
+          "transition-all duration-500 cubic-bezier(0.4, 0, 0.2, 1) scrollbar-thin scrollbar-thumb-[#27272a] scrollbar-track-transparent",
+          isExpanded ? "overflow-y-auto" : "overflow-hidden",
+        )}
         style={{
-          maxHeight: isExpanded ? `${Math.min(contentHeight + 32, 600)}px` : "0px",
+          maxHeight: isExpanded ? "400px" : "0px",
           opacity: isExpanded ? 1 : 0,
+          display: isExpanded ? "block" : "none",
         }}
       >
         <div ref={contentRef} className="pl-6 pr-2 py-3 border-l-2 border-[#27272a] ml-1.5 mt-1">
-          {/* Subtle internal header like in the screenshot */}
+          {/* Subtle internal header */}
           <div className="text-[11px] font-bold tracking-wider text-[#a1a1aa]/40 uppercase mb-3 select-none">
             reasoning chain
           </div>

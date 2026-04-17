@@ -40,7 +40,9 @@ export function FilterBuilder({ filters, onChange }: FilterBuilderProps) {
   const [value, setValue] = useState("");
 
   const handleAdd = () => {
-    if (!value.trim()) return;
+    if (!value.trim()) {
+      return;
+    }
     onChange([...filters, { id: crypto.randomUUID(), field, operator, value: value.trim() }]);
     setValue("");
   };

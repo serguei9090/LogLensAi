@@ -51,9 +51,10 @@ if __name__ == "__main__":
     main()
 '''
 
+
 def title_case_skill_name(skill_name):
     """Convert hyphenated skill name to Title Case for display."""
-    return ' '.join(word.capitalize() for word in skill_name.split('-'))
+    return " ".join(word.capitalize() for word in skill_name.split("-"))
 
 
 def init_skill(skill_name, path):
@@ -68,16 +69,20 @@ def init_skill(skill_name, path):
 
     try:
         skill_dir.mkdir(parents=True, exist_ok=False)
-        (skill_dir / 'scripts').mkdir(exist_ok=True)
-        (skill_dir / 'references').mkdir(exist_ok=True)
-        (skill_dir / 'assets').mkdir(exist_ok=True)
+        (skill_dir / "scripts").mkdir(exist_ok=True)
+        (skill_dir / "references").mkdir(exist_ok=True)
+        (skill_dir / "assets").mkdir(exist_ok=True)
 
         # Create SKILL.md
         skill_title = title_case_skill_name(skill_name)
-        (skill_dir / 'SKILL.md').write_text(SKILL_TEMPLATE.format(skill_name=skill_name, skill_title=skill_title))
+        (skill_dir / "SKILL.md").write_text(
+            SKILL_TEMPLATE.format(skill_name=skill_name, skill_title=skill_title)
+        )
 
         # Create Example Script
-        (skill_dir / 'scripts' / 'helper.py').write_text(EXAMPLE_SCRIPT.format(skill_name=skill_name))
+        (skill_dir / "scripts" / "helper.py").write_text(
+            EXAMPLE_SCRIPT.format(skill_name=skill_name)
+        )
 
         print(f"✅ Skill '{skill_name}' initialized successfully at {skill_dir}")
         return skill_dir
@@ -87,7 +92,7 @@ def init_skill(skill_name, path):
 
 
 def main():
-    if len(sys.argv) < 4 or sys.argv[2] != '--path':
+    if len(sys.argv) < 4 or sys.argv[2] != "--path":
         print("Usage: init_skill.py <skill-name> --path <path>")
         sys.exit(1)
 

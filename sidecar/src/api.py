@@ -1,12 +1,15 @@
 import json
+import logging
 import os
 import sys
 import threading
 import time
+from datetime import datetime
 from typing import Any
 
 import aiohttp_cors
 from aiohttp import web
+from dotenv import load_dotenv
 from pydantic import BaseModel, ValidationError
 from src.ai import AIChatMessage, AIProviderFactory
 from src.db import Database
@@ -15,6 +18,42 @@ from src.metadata_extractor import extract_log_metadata
 from src.parser import DrainParser
 from src.ssh_loader import SSHLoader
 from src.tailer import FileTailer
+
+# --- Professional Logging Setup ---
+SIDE_CAR_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+PROJECT_ROOT = os.path.dirname(SIDE_CAR_DIR)
+LOG_FILE = os.path.join(SIDE_CAR_DIR, "sidecar.log")
+
+# Load environment variables from project root
+load_dotenv(os.path.join(PROJECT_ROOT, ".env"))
+
+# Determine log level
+LL_DEBUG = os.getenv("LOGLENS_DEBUG", "false").lower() == "true"
+LOG_LEVEL = logging.DEBUG if LL_DEBUG else logging.INFO
+
+# Create a custom logger and force it to be the root or attached to root
+root_logger = logging.getLogger()
+root_logger.setLevel(LOG_LEVEL)
+
+# Clear existing handlers to avoid duplicates/conflicts
+for handler in root_logger.handlers[:]:
+    root_logger.removeHandler(handler)
+
+# Create file handler with NO buffering (flush immediately)
+fh = logging.FileHandler(LOG_FILE, encoding="utf-8")
+fh.setLevel(LOG_LEVEL)
+formatter = logging.Formatter("%(asctime)s [%(levelname)s] %(name)s: %(message)s")
+fh.setFormatter(formatter)
+root_logger.addHandler(fh)
+
+# Also add stderr for Tauri console visibility
+sh = logging.StreamHandler(sys.stderr)
+sh.setFormatter(formatter)
+root_logger.addHandler(sh)
+
+logger = logging.getLogger("LogLensSidecar")
+logger.info("--- Sidecar Tracing Session Started --- (Level: %s)", logging.getLevelName(LOG_LEVEL))
+logger.info("Log path: %s", LOG_FILE)
 
 
 # RPC Base Models
@@ -159,6 +198,7 @@ class SendAiMessageRequest(BaseModel):
     model: str | None = None
     context_logs: list[int] | None = None  # List of log IDs to include as context
     provider_session_id: str | None = None  # Explicit taskId/threadId reuse
+    reasoning: bool | None = True  # Whether to enforce deep reasoning phase
 
 
 class GetAiSessionsRequest(BaseModel):
@@ -603,7 +643,7 @@ class App:
         result = self._get_logs_internal(**model_dump, source_ids=enabled_ids)
 
         # 3. Apply Multi-Source Timezone Normalization (PARS-004)
-        from datetime import datetime, timedelta
+        from datetime import timedelta
 
         normalized_logs = []
         for log in result["logs"]:
@@ -830,7 +870,7 @@ class App:
         batch_data = []
 
         # Map logs to dict if they are models
-        log_dicts = [l.model_dump() if hasattr(l, "model_dump") else l for l in logs]
+        log_dicts = [log.model_dump() if hasattr(log, "model_dump") else log for log in logs]
 
         for log in log_dicts:
             batch_data.append(self._ingest_single_log(cursor, log))
@@ -912,7 +952,6 @@ class App:
     ) -> tuple[str, str | None, list[AIChatMessage]]:
         cursor = self.db.get_cursor()
         import uuid
-        from datetime import datetime
 
         session_id = params.session_id
         if not session_id:
@@ -941,7 +980,7 @@ class App:
             )
             logs = cursor.fetchall()
             if logs:
-                log_context = "\n\nContextual Log Lines:\n" + "\n".join([l[0] for l in logs])
+                log_context = "\n\nContextual Log Lines:\n" + "\n".join([log[0] for log in logs])
 
         cursor.execute(
             "INSERT INTO ai_messages (session_id, role, content, context_logs, provider_session_id) VALUES (?, ?, ?, ?, ?)",
@@ -972,7 +1011,6 @@ class App:
     def _finalize_ai_session(
         self, session_id: str, response_content: str, provider_session_id: str | None
     ):
-        from datetime import datetime
 
         cursor = self.db.get_cursor()
 
@@ -1051,7 +1089,6 @@ class App:
 
     def method_rename_ai_session(self, session_id: str, name: str) -> dict:
         """Update an investigation session name."""
-        from datetime import datetime
 
         cursor = self.db.get_cursor()
         cursor.execute(
@@ -1172,7 +1209,14 @@ class App:
         # Re-initialize AI Provider if relevant settings changed
         if any(
             k in settings
-            for k in ["ai_provider", "ai_api_key", "ai_ollama_host", "ai_gemini_url", "ai_model"]
+            for k in [
+                "ai_provider",
+                "ai_api_key",
+                "ai_ollama_host",
+                "ai_gemini_url",
+                "ai_model",
+                "ai_system_prompt",
+            ]
         ):
             current_settings = self.method_get_settings()
             provider = current_settings.get("ai_provider", "ollama")
@@ -1253,7 +1297,12 @@ class App:
 
             full_text = []
             if hasattr(self.ai, "chat_stream"):
-                async for chunk in self.ai.chat_stream(session_id, history, params.model):
+                async for chunk in self.ai.chat_stream(
+                    messages=history,
+                    model=params.model,
+                    reasoning=params.reasoning,
+                    session_id=session_id,
+                ):
                     full_text.append(chunk)
                     # We pass 'provider_session_id' dynamically tracking in _task_cache later.
                     payload = {"chunk": chunk}

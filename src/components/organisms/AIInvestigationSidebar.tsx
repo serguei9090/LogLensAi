@@ -17,6 +17,8 @@ import { selectActiveWorkspace, useWorkspaceStore } from "@/store/workspaceStore
 import {
   Bot,
   Clock,
+  Lightbulb,
+  LightbulbOff,
   MessageSquare,
   Pencil,
   Plus,
@@ -33,8 +35,25 @@ import { TypingIndicator } from "../atoms/TypingIndicator";
  * Extracts <think>...</think> blocks from model responses.
  * Returns the thinking content and the clean response separately,
  * and handles unclosed tags during active streaming.
+ *
+ * Also defensively strips raw Gemma4 channel markers
+ * (`<|channel>thought`, `<|channel>text`, `<channel|>`) that may
+ * leak from corrupted DB history or incomplete backend parsing.
  */
-function parseThinking(content: string): {
+
+/** Raw channel markers emitted by Gemma4 models that should never appear in UI. */
+const CHANNEL_TAGS = ["<|channel>thought", "<|channel>text", "<channel|>", "<|think|>"] as const;
+
+/** Strip all known raw channel markers from a string. */
+function stripChannelTags(text: string): string {
+  let result = text;
+  for (const tag of CHANNEL_TAGS) {
+    result = result.replaceAll(tag, "");
+  }
+  return result;
+}
+
+export function parseThinking(content: string): {
   thinking: string | null;
   response: string;
   isStreamingThink: boolean;
@@ -43,53 +62,75 @@ function parseThinking(content: string): {
     return { thinking: null, response: "", isStreamingThink: false };
   }
 
-  // 1. Check for fully closed think block (Standard or Gemma 4 variant)
-  const standardClosed = content.match(/<think>([\s\S]*?)<\/think>/);
-  const gemmaClosed = content.match(/<\|channel>thought([\s\S]*?)<channel\|>/);
-  const closedMatch = standardClosed || gemmaClosed;
+  const startTags = ["<think>", "<|channel>thought"];
+  const endTags = ["</think>", "<|channel>text", "<channel|>"];
 
-  if (closedMatch) {
-    const rawResponse = content
-      .replace(/<think>[\s\S]*?<\/think>/g, "")
-      .replace(/<\|channel>thought[\s\S]*?<channel\|>/g, "")
-      .trim();
+  // 1. Find the FIRST start tag
+  let firstStartIdx = -1;
+  let startTagLength = 0;
+  for (const tag of startTags) {
+    const idx = content.indexOf(tag);
+    if (idx !== -1 && (firstStartIdx === -1 || idx < firstStartIdx)) {
+      firstStartIdx = idx;
+      startTagLength = tag.length;
+    }
+  }
+
+  // 2. Find the FIRST end tag that appears AFTER the start tag
+  let firstEndIdx = -1;
+  let endTagLength = 0;
+  for (const tag of endTags) {
+    const searchStart = firstStartIdx !== -1 ? firstStartIdx + startTagLength : 0;
+    const idx = content.indexOf(tag, searchStart);
+    if (idx !== -1 && (firstEndIdx === -1 || idx < firstEndIdx)) {
+      firstEndIdx = idx;
+      endTagLength = tag.length;
+    }
+  }
+
+  // 3. Phase: Terminal (Found transition)
+  if (firstEndIdx !== -1) {
+    let thinking = "";
+    if (firstStartIdx !== -1) {
+      thinking = content.substring(firstStartIdx + startTagLength, firstEndIdx);
+    } else {
+      thinking = content.substring(0, firstEndIdx);
+    }
+
+    let response = content.substring(firstEndIdx + endTagLength);
+
+    // Clean all tags from both thinking and response to prevent technical leakage
+    thinking = stripChannelTags(thinking);
+    response = stripChannelTags(response);
+
+    // Also strip any remaining structural tags
+    for (const tag of [...startTags, ...endTags]) {
+      response = response.replaceAll(tag, "");
+      thinking = thinking.replaceAll(tag, "");
+    }
+
     return {
-      thinking: closedMatch[1].trim(),
-      response: rawResponse,
+      thinking: thinking.trim() || null,
+      response: response.trim(),
       isStreamingThink: false,
     };
   }
 
-  // 2. Check for active unclosed think block (streaming)
-  const standardIndex = content.indexOf("<think>");
-  const gemmaIndex = content.indexOf("<|channel>thought");
-
-  if (standardIndex !== -1 || gemmaIndex !== -1) {
-    const isGemma = gemmaIndex !== -1 && (standardIndex === -1 || gemmaIndex < standardIndex);
-    const startIndex = isGemma ? gemmaIndex : standardIndex;
-    const offset = isGemma ? 17 : 7; // Length of "<|channel>thought" vs "<think>"
-
-    const thinkingPart = content.substring(startIndex + offset);
-    const responsePart = content.substring(0, startIndex).trim();
+  // 4. Phase: Active (Inside thinking)
+  if (firstStartIdx !== -1) {
+    let thinkingContent = content.substring(firstStartIdx + startTagLength);
+    // Strip channel markers from active thinking content
+    thinkingContent = stripChannelTags(thinkingContent);
 
     return {
-      thinking: thinkingPart,
-      response: responsePart,
+      thinking: thinkingContent,
+      response: content.substring(0, firstStartIdx).trim(),
       isStreamingThink: true,
     };
   }
 
-  // 3. Check for partial start tag at the very end (prevent rendering the tag)
-  const partialTagMatch = content.match(/(<t(h(i(n(k)?)?)?)?|<\|c(h(a(n(n(e(l)?)?)?)?)?)?)$/i);
-  if (partialTagMatch) {
-    return {
-      thinking: "",
-      response: content.substring(0, partialTagMatch.index).trim(),
-      isStreamingThink: true,
-    };
-  }
-
-  return { thinking: null, response: content, isStreamingThink: false };
+  // 5. No thinking tags found — strip any leaked channel markers from plain response
+  return { thinking: null, response: stripChannelTags(content), isStreamingThink: false };
 }
 
 export function AIInvestigationSidebar() {
@@ -118,6 +159,7 @@ export function AIInvestigationSidebar() {
   const [editedTitle, setEditedTitle] = useState("");
   const [pendingSessionName, setPendingSessionName] = useState("");
   const [showCommands, setShowCommands] = useState(false);
+  const [isReasoningEnabled, setIsReasoningEnabled] = useState(true);
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -162,12 +204,24 @@ export function AIInvestigationSidebar() {
     }
   }, [currentSession, pendingSessionName]);
 
+  // 1. Instant scroll to bottom on session change (Historical Context)
+  // biome-ignore lint/correctness/useExhaustiveDependencies: Must trigger on sessionId change, messages.length is used as safety guard.
   useEffect(() => {
-    if (scrollRef.current) {
+    if (messages.length > 0 && scrollRef.current) {
+      scrollRef.current.scrollIntoView({ behavior: "auto" });
+    }
+  }, [currentSessionId]);
+
+  // 2. Smooth scroll as new messages arrive or tokens stream in
+  // biome-ignore lint/correctness/useExhaustiveDependencies: Tracks token streaming for smooth viewport following.
+  useEffect(() => {
+    if (messages.length > 0 && scrollRef.current) {
+      // Only scroll if we are looking at the bottom or if it's a new message
       scrollRef.current.scrollIntoView({ behavior: "smooth" });
     }
-    // biome-ignore lint/correctness/useExhaustiveDependencies: Auto-scroll when messages update
-  }, [messages]);
+  }, [messages.length, messages[messages.length - 1]?.content]);
+
+  // Handle Send logic...
 
   const handleSend = async () => {
     if (!inputValue.trim() || !activeWorkspace?.id) {
@@ -183,6 +237,7 @@ export function AIInvestigationSidebar() {
       context_logs: selectedLogIds,
       model: settings.ai_model,
       session_name: currentSessionId ? undefined : pendingSessionName,
+      reasoning: isReasoningEnabled,
     });
 
     if (selectedLogIds.length > 0) {
@@ -437,6 +492,9 @@ export function AIInvestigationSidebar() {
               const showTypingIndicator =
                 isAssistantAndEmpty && isLoading && index === messages.length - 1;
 
+              // Only hold the 'streaming' pulse state if the global store is actually still loading
+              const isPulseActive = isStreamingThink && isLoading && index === messages.length - 1;
+
               return (
                 <div
                   key={m.id}
@@ -491,11 +549,8 @@ export function AIInvestigationSidebar() {
                         </div>
                       ) : (
                         <>
-                          {!isUser && (thinking !== null || isStreamingThink) && (
-                            <ThinkingBlock
-                              content={thinking ?? ""}
-                              isStreaming={isStreamingThink}
-                            />
+                          {!isUser && (thinking !== null || isPulseActive) && (
+                            <ThinkingBlock content={thinking ?? ""} isStreaming={isPulseActive} />
                           )}
                           <div
                             className={cn(
@@ -618,6 +673,23 @@ export function AIInvestigationSidebar() {
             LogLens Platform Agent 2.0
           </span>
           <div className="flex gap-2">
+            <IconButton
+              icon={
+                isReasoningEnabled ? (
+                  <Lightbulb className="size-3" />
+                ) : (
+                  <LightbulbOff className="size-3" />
+                )
+              }
+              label={isReasoningEnabled ? "Deep Reasoning On" : "Deep Reasoning Off"}
+              onClick={() => setIsReasoningEnabled(!isReasoningEnabled)}
+              className={cn(
+                "size-6 transition-all",
+                isReasoningEnabled
+                  ? "bg-amber-500/10 text-amber-500 hover:bg-amber-500/20"
+                  : "bg-transparent text-zinc-500 hover:bg-zinc-800/80 hover:text-zinc-400",
+              )}
+            />
             <IconButton
               icon={<Trash2 className="size-3" />}
               label="Clear Conversation"

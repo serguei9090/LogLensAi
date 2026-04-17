@@ -26,9 +26,10 @@ export function MarkdownContent({ content, className }: MarkdownContentProps) {
 
   return (
     <div className={cn("space-y-2 overflow-hidden", className)}>
-      {elements.map((el, i) => (
-        <Fragment key={`md-${i}`}>{el}</Fragment>
-      ))}
+      {elements.map((el, i) => {
+        const key = typeof el === "string" ? `${i}-${el.length}` : `md-${i}`;
+        return <Fragment key={key}>{el}</Fragment>;
+      })}
     </div>
   );
 }
@@ -182,7 +183,9 @@ function renderInline(text: string): React.ReactNode {
 
   for (const match of text.matchAll(regex)) {
     const before = text.slice(lastIndex, match.index);
-    if (before) parts.push(renderLineBreaks(before));
+    if (before) {
+      parts.push(renderLineBreaks(before));
+    }
 
     const token = match[0];
     if (token.startsWith("**")) {
@@ -206,7 +209,9 @@ function renderInline(text: string): React.ReactNode {
   }
 
   const remaining = text.slice(lastIndex);
-  if (remaining) parts.push(renderLineBreaks(remaining));
+  if (remaining) {
+    parts.push(renderLineBreaks(remaining));
+  }
 
   return parts.length === 1 ? parts[0] : <>{parts}</>;
 }
@@ -214,9 +219,11 @@ function renderInline(text: string): React.ReactNode {
 /** Converts \n to <br /> within inline text. */
 function renderLineBreaks(text: string): React.ReactNode {
   const lines = text.split("\n");
-  if (lines.length === 1) return text;
+  if (lines.length === 1) {
+    return text;
+  }
   return lines.map((line, i) => (
-    <Fragment key={`br-${i}`}>
+    <Fragment key={`br-${i}-${line.length}`}>
       {line}
       {i < lines.length - 1 && <br />}
     </Fragment>

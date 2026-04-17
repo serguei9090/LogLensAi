@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils";
 import { useAiStore } from "@/store/aiStore";
 import { useInvestigationStore } from "@/store/investigationStore";
 import { selectActiveWorkspace, useWorkspaceStore } from "@/store/workspaceStore";
-import { useVirtualizer } from "@tanstack/react-virtual";
+import { type VirtualItem, useVirtualizer } from "@tanstack/react-virtual";
 import {
   ArrowDown,
   ArrowUp,
@@ -75,7 +75,7 @@ export function VirtualLogTable({
     clearSelection,
     setSelectedLogIds,
   } = useInvestigationStore();
-  const { setSidebarOpen, setSession, logSessionMap, fetchMapping } = useAiStore();
+  const { logSessionMap, fetchMapping } = useAiStore();
   const activeWorkspace = useWorkspaceStore(selectActiveWorkspace);
 
   useEffect(() => {
@@ -84,7 +84,9 @@ export function VirtualLogTable({
     }
   }, [activeWorkspace?.id, fetchMapping]);
 
-  const addFilter = (f: any) => setFilters([...filters, f]);
+  const addFilter = (f: FilterEntry) => {
+    setFilters([...filters, f]);
+  };
 
   const handleSelection = useCallback(() => {
     const selection = globalThis.getSelection();
@@ -126,14 +128,20 @@ export function VirtualLogTable({
 
   useEffect(() => {
     const el = parentRef.current;
-    if (!el) return;
+    if (!el) {
+      return;
+    }
 
     el.addEventListener("mouseup", handleSelection);
-    return () => el.removeEventListener("mouseup", handleSelection);
+    return () => {
+      el.removeEventListener("mouseup", handleSelection);
+    };
   }, [handleSelection]);
 
   const handleAddFilter = (operator: "contains" | "not_contains") => {
-    if (!selectionInfo) return;
+    if (!selectionInfo) {
+      return;
+    }
     addFilter({
       id: crypto.randomUUID(),
       field: selectionInfo.field,
@@ -152,52 +160,6 @@ export function VirtualLogTable({
     overscan: 10,
     measureElement: (element) => element?.getBoundingClientRect().height,
   });
-
-  const getHighlightedElements = (text: string) => {
-    if (!highlights || highlights.length === 0 || !text) return <>{text}</>;
-
-    const terms: string[] = [];
-    highlights.forEach((h) => {
-      if (h.term) {
-        terms.push(h.term.replaceAll(/[-[\]{}()*+?.,\\^$|#\s]/g, String.raw`\$&`));
-      }
-    });
-
-    if (terms.length === 0) return <>{text}</>;
-
-    const regex = new RegExp(`(${terms.join("|")})`, "gi");
-    const parts = text.split(regex);
-
-    let currentPos = 0;
-    return (
-      <>
-        {parts.map((part) => {
-          const startPos = currentPos;
-          currentPos += part.length;
-
-          const match = highlights.find((h) => h.term?.toLowerCase() === part.toLowerCase());
-
-          if (match) {
-            return (
-              <mark
-                key={`${match.id}-${startPos}`}
-                className="px-0.5 rounded-sm font-bold transition-all transition-duration-300"
-                style={{
-                  backgroundColor: `${match.color}25`,
-                  color: match.color,
-                  border: `1px solid ${match.color}40`,
-                  boxShadow: `0 0 8px ${match.color}15`,
-                }}
-              >
-                {part}
-              </mark>
-            );
-          }
-          return <Fragment key={`text-${startPos}`}>{part}</Fragment>;
-        })}
-      </>
-    );
-  };
 
   const handleToggleView = (id: number) => {
     const row = logs.find((l) => l.id === id);
@@ -239,7 +201,9 @@ export function VirtualLogTable({
   };
 
   const renderSortIcon = (field: string) => {
-    if (sortBy !== field) return <ArrowUpDown className="h-3 w-3 opacity-20" />;
+    if (sortBy !== field) {
+      return <ArrowUpDown className="h-3 w-3 opacity-20" />;
+    }
     return sortOrder === "asc" ? (
       <ArrowUp className="h-3 w-3 text-primary animate-in zoom-in-50" />
     ) : (
@@ -248,7 +212,9 @@ export function VirtualLogTable({
   };
 
   const getAriaSort = (field: string): "ascending" | "descending" | "none" => {
-    if (sortBy !== field) return "none";
+    if (sortBy !== field) {
+      return "none";
+    }
     return sortOrder === "asc" ? "ascending" : "descending";
   };
 
@@ -347,162 +313,23 @@ export function VirtualLogTable({
               {rowVirtualizer.getVirtualItems().map((virtualRow) => {
                 const log = logs[virtualRow.index];
                 const isExpanded = expandedRow === log.id;
-
-                let rowStyle = "hover:bg-bg-hover";
-                if (log.level === "ERROR") {
-                  rowStyle = "bg-error/5 border-l-2 border-error hover:bg-error/10";
-                } else if (log.level === "WARN") {
-                  rowStyle = "bg-warning/5 border-l-2 border-warning hover:bg-warning/10";
-                } else if (log.level === "INFO") {
-                  rowStyle = "bg-info/3 hover:bg-info/8 text-info/90";
-                } else if (log.level === "DEBUG") {
-                  rowStyle = "bg-debug/2 hover:bg-debug/5 text-debug/80";
-                }
-
                 const isSelected = selectedLogIds.includes(log.id);
 
                 return (
-                  <tr
+                  <LogTableRow
                     key={virtualRow.key}
-                    ref={rowVirtualizer.measureElement}
-                    data-index={virtualRow.index}
-                    tabIndex={0}
-                    aria-expanded={isExpanded}
-                    aria-controls={isExpanded ? `row-details-${log.id}` : undefined}
-                    className={cn(
-                      "group cursor-pointer transition-all border-b border-border/40 outline-none focus-visible:bg-bg-hover focus-visible:ring-1 focus-visible:ring-primary/30 relative",
-                      rowStyle,
-                      isSelected && "bg-emerald-500/[0.04] !border-l-emerald-500",
-                      !isSelected && "border-l-transparent",
-                      isExpanded && "bg-bg-hover ring-1 ring-primary/20 z-10",
-                    )}
-                    style={{
-                      position: "absolute",
-                      top: 0,
-                      left: 0,
-                      width: "100%",
-                      transform: `translateY(${virtualRow.start}px)`,
-                      borderLeftWidth: "3px",
-                      borderLeftStyle: "solid",
-                    }}
-                    onClick={(e) => {
-                      handleSelectRow(log.id, e);
-                    }}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" || e.key === " ") {
-                        e.preventDefault();
-                        handleSelectRow(log.id, e);
-                      }
-                    }}
-                  >
-                    <td className="w-[60px] px-3 py-2 text-center text-text-muted/50 select-none group-hover:text-text-secondary align-top font-bold">
-                      {log.id}
-                    </td>
-                    <td className="w-[180px] px-3 py-2 text-text-secondary/70 align-top opacity-80">
-                      {log.timestamp}
-                    </td>
-                    <td className="w-[90px] px-3 py-2 align-top">
-                      <LogLevelBadge level={log.level} className="scale-75 origin-left" />
-                    </td>
-                    <td className="px-3 py-2 text-text-primary/90 overflow-hidden align-top whitespace-normal break-words leading-relaxed">
-                      {getHighlightedElements(log.message)}
-                    </td>
-                    <td className="w-[110px] px-3 py-2 text-center align-top border-x border-border/5">
-                      {log.cluster_id ? (
-                        <div
-                          className={cn(
-                            "flex flex-col items-center justify-center gap-0.5 group/cluster",
-                            log.cluster_id !== "unknown" &&
-                              "animate-in fade-in zoom-in-95 duration-500",
-                          )}
-                        >
-                          <button
-                            type="button"
-                            className={cn(
-                              "inline-flex items-center justify-center border h-5 px-1.5 rounded-md text-[9px] font-bold transition-colors outline-none focus-visible:ring-1 focus-visible:ring-primary",
-                              log.cluster_id === "unknown"
-                                ? "bg-zinc-800/50 border-zinc-700/30 text-zinc-500"
-                                : anomalousClusters?.has(log.cluster_id)
-                                  ? "bg-orange-500/20 border-orange-500/40 text-orange-400 hover:bg-orange-500/30"
-                                  : "bg-primary/10 border-primary/20 text-primary hover:bg-primary/20",
-                            )}
-                            title={log.cluster_template || "Click to analyze with AI"}
-                            onClick={(e) => {
-                              if (log.cluster_id && onAnalyzeCluster) {
-                                e.stopPropagation();
-                                onAnalyzeCluster(log.cluster_id);
-                              }
-                            }}
-                          >
-                            #{log.cluster_id}
-                          </button>
-                          {log.cluster_percent !== undefined && (
-                            <span className="text-[8px] text-text-muted/60 font-medium whitespace-nowrap">
-                              {Number(log.cluster_percent).toFixed(1)}%
-                            </span>
-                          )}
-                        </div>
-                      ) : (
-                        <span className="opacity-10">—</span>
-                      )}
-                    </td>
-                    <td className="w-[100px] px-3 py-2 text-center relative align-top">
-                      <div className="flex items-center justify-center gap-1">
-                        <IconButton
-                          icon={
-                            <StickyNote
-                              className={cn(
-                                "h-3.5 w-3.5",
-                                log.has_comment && "text-primary fill-primary/20",
-                              )}
-                            />
-                          }
-                          label={log.has_comment ? "View Note" : "Add Note"}
-                          onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
-                            e.stopPropagation();
-                            handleToggleView(log.id);
-                          }}
-                          className={cn(
-                            "transition-all h-7 w-7 rounded-lg text-text-muted hover:text-primary hover:bg-primary/10",
-                            !log.has_comment && "opacity-0 group-hover:opacity-100",
-                            log.has_comment && "opacity-100 text-primary bg-primary/20",
-                          )}
-                        />
-                        <IconButton
-                          icon={
-                            <Sparkles
-                              className={cn(
-                                "h-3.5 w-3.5 transition-all",
-                                logSessionMap[log.id] && "text-violet-400 fill-violet-400/20",
-                              )}
-                            />
-                          }
-                          label={
-                            logSessionMap[log.id] ? "View AI Investigation" : "Start AI Analysis"
-                          }
-                          onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
-                            e.stopPropagation();
-                            const existingSessionId = logSessionMap[log.id];
-
-                            if (existingSessionId) {
-                              setSession(existingSessionId);
-                            } else {
-                              setSession(null);
-                              clearSelection();
-                              setSelectedLogIds([log.id]);
-                            }
-                            setSidebarOpen(true);
-                          }}
-                          className={cn(
-                            "transition-all h-7 w-7 rounded-lg",
-                            logSessionMap[log.id]
-                              ? "opacity-100 bg-violet-500/10 border border-violet-500/20 text-violet-400"
-                              : "text-text-muted hover:text-violet-400 hover:bg-violet-500/10 opacity-0 group-hover:opacity-100",
-                          )}
-                        />
-                      </div>
-                    </td>
-                  </tr>
+                    log={log}
+                    content={getHighlightedElements(log.message, highlights)}
+                    virtualRow={virtualRow}
+                    isExpanded={isExpanded}
+                    isSelected={isSelected}
+                    measureElement={rowVirtualizer.measureElement}
+                    onSelect={handleSelectRow}
+                    onToggleView={handleToggleView}
+                    onAnalyzeCluster={onAnalyzeCluster}
+                    anomalousClusters={anomalousClusters}
+                    logSessionMap={logSessionMap}
+                  />
                 );
               })}
             </tbody>
@@ -568,7 +395,6 @@ export function VirtualLogTable({
               <div className="absolute -inset-1 bg-gradient-to-r from-primary/10 via-transparent to-primary/10 rounded-2xl blur-lg opacity-20 group-hover:opacity-40 transition-opacity duration-1000" />
               <textarea
                 id={`note-editor-${expandedRow}`}
-                autoFocus
                 className="relative w-full h-[180px] text-[13px] font-sans leading-relaxed text-text-primary bg-bg-base/60 p-6 rounded-2xl border border-white/10 focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all resize-none placeholder:text-text-muted/20 scrollbar-thin"
                 placeholder="Add investigation details, identified causes, or diagnostic insights for this log entry..."
                 value={commentText}
@@ -652,5 +478,248 @@ export function VirtualLogTable({
           document.body,
         )}
     </>
+  );
+}
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+function getRowLevelStyles(level: LogLevel): string {
+  switch (level) {
+    case "ERROR":
+      return "bg-error/5 border-l-2 border-error hover:bg-error/10";
+    case "WARN":
+      return "bg-warning/5 border-l-2 border-warning hover:bg-warning/10";
+    case "INFO":
+      return "bg-info/3 hover:bg-info/8 text-info/90";
+    case "DEBUG":
+      return "bg-debug/2 hover:bg-debug/5 text-debug/80";
+    default:
+      return "hover:bg-bg-hover";
+  }
+}
+
+function getClusterStyles(clusterId: string, anomalousClusters?: Set<string>): string {
+  if (clusterId === "unknown") {
+    return "bg-zinc-800/50 border-zinc-700/30 text-zinc-500";
+  }
+
+  if (anomalousClusters?.has(clusterId)) {
+    return "bg-orange-500/20 border-orange-500/40 text-orange-400 hover:bg-orange-500/30";
+  }
+
+  return "bg-primary/10 border-primary/20 text-primary hover:bg-primary/20";
+}
+
+function getHighlightedElements(text: string, highlights: HighlightEntry[]) {
+  if (!highlights || highlights.length === 0 || !text) {
+    return <>{text}</>;
+  }
+
+  const terms: string[] = [];
+  for (const h of highlights) {
+    if (h.term) {
+      terms.push(h.term.replaceAll(/[-[\]{}()*+?.,\\^$|#\s]/g, String.raw`\$&`));
+    }
+  }
+
+  if (terms.length === 0) {
+    return <>{text}</>;
+  }
+
+  const regex = new RegExp(`(${terms.join("|")})`, "gi");
+  const parts = text.split(regex);
+
+  let currentPos = 0;
+  return (
+    <>
+      {parts.map((part) => {
+        const startPos = currentPos;
+        currentPos += part.length;
+
+        const match = highlights.find((h) => h.term?.toLowerCase() === part.toLowerCase());
+
+        if (match) {
+          return (
+            <mark
+              key={`${match.id}-${startPos}`}
+              className="px-0.5 rounded-sm font-bold transition-all transition-duration-300"
+              style={{
+                backgroundColor: `${match.color}25`,
+                color: match.color,
+                border: `1px solid ${match.color}40`,
+                boxShadow: `0 0 8px ${match.color}15`,
+              }}
+            >
+              {part}
+            </mark>
+          );
+        }
+        return <Fragment key={`text-${startPos}`}>{part}</Fragment>;
+      })}
+    </>
+  );
+}
+
+// ─── Components ───────────────────────────────────────────────────────────────
+
+interface LogTableRowProps {
+  readonly log: LogEntry;
+  readonly content: React.ReactNode;
+  readonly virtualRow: VirtualItem;
+  readonly isExpanded: boolean;
+  readonly isSelected: boolean;
+  readonly measureElement: (el: HTMLElement | null) => void;
+  readonly onSelect: (id: number, e: React.MouseEvent | React.KeyboardEvent) => void;
+  readonly onToggleView: (id: number) => void;
+  readonly onAnalyzeCluster?: (clusterId: string) => void;
+  readonly anomalousClusters?: Set<string>;
+  readonly logSessionMap: Record<number, string>;
+}
+
+function LogTableRow({
+  log,
+  content,
+  virtualRow,
+  isExpanded,
+  isSelected,
+  measureElement,
+  onSelect,
+  onToggleView,
+  onAnalyzeCluster,
+  anomalousClusters,
+  logSessionMap,
+}: LogTableRowProps) {
+  const { setSidebarOpen, setSession } = useAiStore();
+  const { clearSelection, setSelectedLogIds } = useInvestigationStore();
+
+  return (
+    <tr
+      ref={measureElement}
+      data-index={virtualRow.index}
+      tabIndex={0}
+      aria-expanded={isExpanded}
+      aria-controls={isExpanded ? `row-details-${log.id}` : undefined}
+      className={cn(
+        "group cursor-pointer transition-all border-b border-border/40 outline-none focus-visible:bg-bg-hover focus-visible:ring-1 focus-visible:ring-primary/30 relative",
+        getRowLevelStyles(log.level),
+        isSelected && "bg-emerald-500/[0.04] !border-l-emerald-500",
+        !isSelected && "border-l-transparent",
+        isExpanded && "bg-bg-hover ring-1 ring-primary/20 z-10",
+      )}
+      style={{
+        position: "absolute",
+        top: 0,
+        left: 0,
+        width: "100%",
+        transform: `translateY(${virtualRow.start}px)`,
+        borderLeftWidth: "3px",
+        borderLeftStyle: "solid",
+      }}
+      onClick={(e) => onSelect(log.id, e)}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onSelect(log.id, e);
+        }
+      }}
+    >
+      <td className="w-[60px] px-3 py-2 text-center text-text-muted/50 select-none group-hover:text-text-secondary align-top font-bold">
+        {log.id}
+      </td>
+      <td className="w-[180px] px-3 py-2 text-text-secondary/70 align-top opacity-80">
+        {log.timestamp}
+      </td>
+      <td className="w-[90px] px-3 py-2 align-top">
+        <LogLevelBadge level={log.level} className="scale-75 origin-left" />
+      </td>
+      <td className="px-3 py-2 text-text-primary/90 overflow-hidden align-top whitespace-normal break-words leading-relaxed">
+        {content}
+      </td>
+      <td className="w-[110px] px-3 py-2 text-center align-top border-x border-border/5">
+        {log.cluster_id ? (
+          <div
+            className={cn(
+              "flex flex-col items-center justify-center gap-0.5 group/cluster",
+              log.cluster_id !== "unknown" && "animate-in fade-in zoom-in-95 duration-500",
+            )}
+          >
+            <button
+              type="button"
+              className={cn(
+                "inline-flex items-center justify-center border h-5 px-1.5 rounded-md text-[9px] font-bold transition-colors outline-none focus-visible:ring-1 focus-visible:ring-primary",
+                getClusterStyles(log.cluster_id, anomalousClusters),
+              )}
+              title={log.cluster_template || "Click to analyze with AI"}
+              onClick={(e) => {
+                if (log.cluster_id && onAnalyzeCluster) {
+                  e.stopPropagation();
+                  onAnalyzeCluster(log.cluster_id);
+                }
+              }}
+            >
+              #{log.cluster_id}
+            </button>
+            {log.cluster_percent !== undefined && (
+              <span className="text-[8px] text-text-muted/60 font-medium whitespace-nowrap">
+                {Number(log.cluster_percent).toFixed(1)}%
+              </span>
+            )}
+          </div>
+        ) : (
+          <span className="opacity-10">—</span>
+        )}
+      </td>
+      <td className="w-[100px] px-3 py-2 text-center relative align-top">
+        <div className="flex items-center justify-center gap-1">
+          <IconButton
+            icon={
+              <StickyNote
+                className={cn("h-3.5 w-3.5", log.has_comment && "text-primary fill-primary/20")}
+              />
+            }
+            label={log.has_comment ? "View Note" : "Add Note"}
+            onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
+              e.stopPropagation();
+              onToggleView(log.id);
+            }}
+            className={cn(
+              "transition-all h-7 w-7 rounded-lg text-text-muted hover:text-primary hover:bg-primary/10",
+              !log.has_comment && "opacity-0 group-hover:opacity-100",
+              log.has_comment && "opacity-100 text-primary bg-primary/20",
+            )}
+          />
+          <IconButton
+            icon={
+              <Sparkles
+                className={cn(
+                  "h-3.5 w-3.5 transition-all",
+                  logSessionMap[log.id] && "text-violet-400 fill-violet-400/20",
+                )}
+              />
+            }
+            label={logSessionMap[log.id] ? "View AI Investigation" : "Start AI Analysis"}
+            onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
+              e.stopPropagation();
+              const existingSessionId = logSessionMap[log.id];
+
+              if (existingSessionId) {
+                setSession(existingSessionId);
+              } else {
+                setSession(null);
+                clearSelection();
+                setSelectedLogIds([log.id]);
+              }
+              setSidebarOpen(true);
+            }}
+            className={cn(
+              "transition-all h-7 w-7 rounded-lg",
+              logSessionMap[log.id]
+                ? "opacity-100 bg-violet-500/10 border border-violet-500/20 text-violet-400"
+                : "text-text-muted hover:text-violet-400 hover:bg-violet-500/10 opacity-0 group-hover:opacity-100",
+            )}
+          />
+        </div>
+      </td>
+    </tr>
   );
 }

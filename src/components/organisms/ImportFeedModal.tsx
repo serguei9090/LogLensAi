@@ -8,7 +8,8 @@ import { toast } from "sonner"; // For environmental feedback
  * Detects whether the app is running inside a Tauri desktop shell.
  * When false, we're in web mode and must use browser-native file APIs.
  */
-const isTauri = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
+const isTauri =
+  typeof globalThis.window !== "undefined" && "__TAURI_INTERNALS__" in globalThis.window;
 
 interface ImportFeedModalProps {
   readonly open: boolean;
@@ -55,7 +56,9 @@ export function ImportFeedModal({
   const [sshTail, setSshTail] = useState(true);
   const [manualLogs, setManualLogs] = useState("");
 
-  if (!open) return null;
+  if (!open) {
+    return null;
+  }
 
   const handleBrowse = async () => {
     if (isTauri) {
@@ -298,7 +301,7 @@ export function ImportFeedModal({
                   <span className="text-text-muted/40 font-normal ml-1">— newline separated</span>
                 </label>
                 <div className="relative group">
-                  <div className="absolute -inset-0.5 bg-primary/20 rounded-2xl blur opacity-0 group-focus-within:opacity-100 transition duration-500"></div>
+                  <div className="absolute -inset-0.5 bg-primary/20 rounded-2xl blur opacity-0 group-focus-within:opacity-100 transition duration-500" />
                   <textarea
                     id="manual-logs"
                     placeholder={

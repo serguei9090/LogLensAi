@@ -1,11 +1,14 @@
 import asyncio
 import json
+import logging
 import os
 import sys
 
 import aiohttp
 
 from .base import AIChatMessage, AIProvider
+
+logger = logging.getLogger(__name__)
 
 
 class GeminiCLIProvider(AIProvider):
@@ -131,6 +134,7 @@ class GeminiCLIProvider(AIProvider):
                     }
                 },
             }
+            logger.debug("Gemini A2A Stream Request Payload: %s", json.dumps(payload, indent=2))
 
             # 4. Stream Handling
             async with session.post(f"{self.host}/", json=payload) as resp:
@@ -145,7 +149,12 @@ class GeminiCLIProvider(AIProvider):
             return AIChatMessage(role="assistant", content=content, provider_session_id=task_id)
 
     async def chat_stream(
-        self, session_id: str, messages: list[AIChatMessage], model: str | None = None
+        self,
+        messages: list[AIChatMessage],
+        model: str | None = None,
+        session_id: str | None = None,
+        reasoning: bool = True,
+        **kwargs,
     ):
         """Streaming version of hot mode chat that yields text chunks."""
         is_new_task = not self.force_cold and session_id not in self._task_cache
@@ -245,6 +254,7 @@ class GeminiCLIProvider(AIProvider):
                 block = block_bytes.decode("utf-8").strip()
                 if block.startswith("data: "):
                     data_str = block[6:].strip()
+                    logger.debug("Gemini A2A SSE Block: %s", data_str)
                     text = self._parse_json_chunk(data_str)
                     if text:
                         yield text
@@ -297,6 +307,7 @@ class GeminiCLIProvider(AIProvider):
         prompt = "\n\n".join(prompt_parts) + "\n\nAssistant: "
 
         try:
+            logger.debug("Gemini Cold Mode Execution: gemini -p [PROMPT] -m %s", target_model)
             process = await asyncio.create_subprocess_exec(
                 "gemini",
                 "-p",

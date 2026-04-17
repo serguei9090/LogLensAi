@@ -44,6 +44,7 @@ interface AiStore {
     context_logs?: number[];
     model?: string;
     session_name?: string;
+    reasoning?: boolean;
   }) => Promise<void>;
   clearError: () => void;
 }
@@ -174,7 +175,9 @@ export const useAiStore = create<AiStore>((set, get) => ({
         }),
       });
 
-      if (!response.body) throw new Error("No readable stream available");
+      if (!response.body) {
+        throw new Error("No readable stream available");
+      }
 
       const reader = response.body.getReader();
       const decoder = new TextDecoder("utf-8");

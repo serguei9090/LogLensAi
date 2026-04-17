@@ -364,6 +364,7 @@ export function OrchestratorHub({
             </div>
           </div>
           <button
+            type="button"
             onClick={onClose}
             className="p-2 hover:bg-white/10 rounded-full transition-colors text-text-muted hover:text-text-primary"
           >
@@ -469,6 +470,7 @@ export function OrchestratorHub({
               {/* Back button (only on new) */}
               {!editingFusionId && (
                 <button
+                  type="button"
                   onClick={() => setView("picker")}
                   className="flex items-center gap-1.5 text-[11px] text-text-muted hover:text-text-secondary transition-colors"
                 >
@@ -594,9 +596,9 @@ export function OrchestratorHub({
           {view === "ai-context-form" && (
             <div className="p-5 space-y-6 flex flex-col h-full">
               <button
+                type="button"
                 onClick={() => setView("picker")}
                 className="flex items-center gap-1.5 text-[11px] text-text-muted hover:text-text-secondary transition-colors"
-                type="button"
               >
                 ← Back to settings
               </button>

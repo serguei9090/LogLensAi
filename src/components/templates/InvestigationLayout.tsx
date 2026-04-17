@@ -52,6 +52,8 @@ export function InvestigationLayout({
   onDistributionClose,
   rightPanel,
 }: InvestigationLayoutProps) {
+  const activeSource = sources?.find((s) => s.id === activeSourceId);
+
   return (
     <div className="flex flex-col h-full w-full bg-[#0a0c0b] overflow-hidden">
       <LogToolbar
@@ -75,20 +77,8 @@ export function InvestigationLayout({
       {showDistribution && workspaceId && (
         <LogDistributionWidget
           workspaceId={workspaceId}
-          sourceIds={
-            activeSourceId &&
-            sources &&
-            sources.find((s) => s.id === activeSourceId)?.type !== "fusion"
-              ? [sources.find((s) => s.id === activeSourceId)!.path]
-              : null
-          }
-          fusionId={
-            activeSourceId &&
-            sources &&
-            sources.find((s) => s.id === activeSourceId)?.type === "fusion"
-              ? sources.find((s) => s.id === activeSourceId)!.path
-              : undefined
-          }
+          sourceIds={activeSource && activeSource.type !== "fusion" ? [activeSource.path] : null}
+          fusionId={activeSource && activeSource.type === "fusion" ? activeSource.path : undefined}
           isTailing={activeSourceId ? tailingSourceIds?.has(activeSourceId) : false}
           filters={activeFilters}
           onClose={onDistributionClose}

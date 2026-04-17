@@ -64,6 +64,7 @@ describe("investigationStore", () => {
     const mockLogs = [
       { id: 1, raw_text: "log 1", has_comment: false },
       { id: 2, raw_text: "log 2", has_comment: false },
+      // biome-ignore lint/suspicious/noExplicitAny: Mock data for testing
     ] as any;
 
     store.setLogs(mockLogs, 2);
