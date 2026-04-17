@@ -48,6 +48,7 @@
 - [x] **PARS-004**: Timezone offset normalization in sidecar (UTC conversion using `tz_offset`)
 - [x] **AI-FE-001**: `VirtualLogTable` row selection (checkboxes) & Batch Action Pill
 - [x] **AI-FE-002**: "Batch Send to AI" logic integrated with Investigation Hub
+- [x] **FEAT-AI-NAV-001**: AI Navigation & History Search (Global Trigger + Command Palette)
 - [x] **AI-FE-003**: `AIInvestigationSidebar` (Chat interface with session history)
 - [x] **AI-FE-004**: "Agent" Toolbar Integration (Orchestrate Hub hooks)
 - [x] **NOTE-FE-001**: Refactor Note View into a smaller floating card/bottom panel

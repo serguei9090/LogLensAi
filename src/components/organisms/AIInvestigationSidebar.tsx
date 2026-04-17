@@ -1,12 +1,8 @@
 import { MarkdownContent } from "@/components/atoms/MarkdownContent";
 import { ThinkingBlock } from "@/components/atoms/ThinkingBlock";
+import { AIHistorySearchModal } from "@/components/organisms/AIHistorySearchModal";
 import { Button } from "@/components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
@@ -24,7 +20,6 @@ import {
   Plus,
   Send,
   Sparkles,
-  Trash2,
   User,
   X,
 } from "lucide-react";
@@ -145,7 +140,6 @@ export function AIInvestigationSidebar() {
     setSession,
     fetchSessions,
     renameSession,
-    deleteSession,
     sendMessage,
     isLoading,
   } = useAiStore();
@@ -157,6 +151,7 @@ export function AIInvestigationSidebar() {
   const [inputValue, setInputValue] = useState("");
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [editedTitle, setEditedTitle] = useState("");
+  const [isSearchModalOpen, setIsSearchModalOpen] = useState(false);
   const [pendingSessionName, setPendingSessionName] = useState("");
   const [showCommands, setShowCommands] = useState(false);
   const [isReasoningEnabled, setIsReasoningEnabled] = useState(true);
@@ -363,61 +358,6 @@ export function AIInvestigationSidebar() {
             <Plus className="h-4 w-4" />
           </Button>
 
-          <DropdownMenu>
-            <DropdownMenuTrigger className="inline-flex items-center justify-center p-0 h-8 w-8 rounded-lg text-zinc-500 hover:text-white hover:bg-zinc-800/80 transition-colors">
-              <Clock className="h-3.5 w-3.5" />
-            </DropdownMenuTrigger>
-            <DropdownMenuContent
-              align="end"
-              className="w-[280px] bg-[#111312] border-zinc-800/80 p-1"
-            >
-              <ScrollArea className="h-[400px]">
-                <div className="p-2">
-                  <h3 className="text-[10px] uppercase tracking-widest text-zinc-500 font-bold mb-2 pl-2">
-                    Investigation History
-                  </h3>
-                  {sessions.length === 0 ? (
-                    <div className="p-4 text-center text-xs text-zinc-500 italic">
-                      No sessions yet
-                    </div>
-                  ) : (
-                    sessions.map((s) => (
-                      <div key={s.session_id} className="relative group">
-                        <DropdownMenuItem
-                          onClick={() => setSession(s.session_id)}
-                          className={cn(
-                            "flex flex-col items-start gap-1 p-3 focus:bg-zinc-800/60 transition-all mb-1 rounded-xl",
-                            currentSessionId === s.session_id &&
-                              "bg-emerald-500/5 border-l-2 border-emerald-500",
-                          )}
-                        >
-                          <span className="font-bold text-xs truncate w-full text-zinc-200">
-                            {s.name}
-                          </span>
-                          <span className="text-[10px] text-zinc-500">
-                            {new Date(s.last_modified).toLocaleString()}
-                          </span>
-                        </DropdownMenuItem>
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            if (activeWorkspace?.id) {
-                              deleteSession(s.session_id, activeWorkspace.id);
-                            }
-                          }}
-                          className="absolute top-3 right-2 opacity-0 group-hover:opacity-100 p-1.5 hover:bg-red-500/20 rounded-lg transition-all"
-                        >
-                          <Trash2 className="h-3 w-3 text-red-500" />
-                        </button>
-                      </div>
-                    ))
-                  )}
-                </div>
-              </ScrollArea>
-            </DropdownMenuContent>
-          </DropdownMenu>
-
           <Button
             variant="ghost"
             size="icon"
@@ -473,6 +413,16 @@ export function AIInvestigationSidebar() {
                       </button>
                     ))}
                   </div>
+
+                  {sessions.length > 4 && (
+                    <button
+                      type="button"
+                      onClick={() => setIsSearchModalOpen(true)}
+                      className="w-full mt-2 py-2 text-[10px] font-bold text-zinc-500 uppercase tracking-widest hover:text-emerald-400 hover:bg-emerald-400/5 rounded-lg transition-all"
+                    >
+                      Show {sessions.length - 4} more...
+                    </button>
+                  )}
                 </div>
               )}
             </div>
@@ -691,6 +641,7 @@ export function AIInvestigationSidebar() {
           </button>
         </div>
       </div>
+      <AIHistorySearchModal open={isSearchModalOpen} onOpenChange={setIsSearchModalOpen} />
     </div>
   );
 }

@@ -5,9 +5,11 @@ import { HighlightBuilder, type HighlightEntry } from "@/components/molecules/Hi
 import { SearchBar } from "@/components/molecules/SearchBar";
 import { TimeRangePicker } from "@/components/molecules/TimeRangePicker";
 import { WorkspaceTabs } from "@/components/molecules/WorkspaceTabs";
+import { cn } from "@/lib/utils";
+import { useAiStore } from "@/store/aiStore";
 import { useInvestigationStore } from "@/store/investigationStore";
 import type { LogSource } from "@/store/workspaceStore";
-import { Bookmark, Cpu, Upload } from "lucide-react";
+import { Bookmark, Cpu, Sparkles, Upload } from "lucide-react";
 import { toast } from "sonner";
 
 interface LogToolbarProps {
@@ -48,6 +50,7 @@ export function LogToolbar({
   onEditFusion,
 }: LogToolbarProps) {
   const { timeRange, setTimeRange } = useInvestigationStore();
+  const { isSidebarOpen, setSidebarOpen } = useAiStore();
 
   return (
     <div className="sticky top-0 z-10 flex flex-nowrap items-center gap-3 bg-[#0d0f0e]/95 backdrop-blur-sm border-b border-zinc-800/60 px-4 py-2.5 shadow-sm overflow-x-auto scrollbar-none">
@@ -112,6 +115,26 @@ export function LogToolbar({
           title="Save as Template"
         >
           <Bookmark className="size-4" />
+        </button>
+
+        {/* AI Sidebar Toggle */}
+        <button
+          type="button"
+          onClick={() => setSidebarOpen(!isSidebarOpen)}
+          className={cn(
+            "p-1.5 rounded-md transition-all ml-1 group shrink-0 border",
+            isSidebarOpen
+              ? "bg-violet-500/10 border-violet-500/20 text-violet-400 ring-1 ring-violet-500/30 shadow-[0_0_12px_rgba(139,92,246,0.1)]"
+              : "bg-zinc-900 border-zinc-700 text-zinc-400 hover:border-zinc-600 hover:text-zinc-300",
+          )}
+          title={isSidebarOpen ? "Close AI Assistant" : "Open AI Assistant"}
+        >
+          <Sparkles
+            className={cn(
+              "size-4 transition-transform",
+              isSidebarOpen ? "scale-110" : "group-hover:scale-110",
+            )}
+          />
         </button>
       </div>
 
