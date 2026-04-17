@@ -24,6 +24,7 @@ import {
   X,
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { A2UIRenderer } from "../atoms/A2UIRenderer";
 import { TypingIndicator } from "../atoms/TypingIndicator";
 
 /**
@@ -46,6 +47,13 @@ function stripChannelTags(text: string): string {
     result = result.replaceAll(tag, "");
   }
   return result;
+}
+
+const A2UI_REGEX = /\[\[A2UI\]\].*?(\[\[\/A2UI\]\]|$)/gs;
+
+/** Strip A2UI v0.9 tags from display text. */
+function stripA2UITags(text: string): string {
+  return text.replace(A2UI_REGEX, "").trim();
 }
 
 export function parseThinking(content: string): {
@@ -106,7 +114,7 @@ export function parseThinking(content: string): {
 
     return {
       thinking: thinking.trim() || null,
-      response: response.trim(),
+      response: stripA2UITags(response.trim()),
       isStreamingThink: false,
     };
   }
@@ -124,8 +132,12 @@ export function parseThinking(content: string): {
     };
   }
 
-  // 5. No thinking tags found — strip any leaked channel markers from plain response
-  return { thinking: null, response: stripChannelTags(content), isStreamingThink: false };
+  // 5. No thinking tags found — strip any leaked channel markers and A2UI tags from plain response
+  return {
+    thinking: null,
+    response: stripA2UITags(stripChannelTags(content)),
+    isStreamingThink: false,
+  };
 }
 
 export function AIInvestigationSidebar() {
@@ -157,6 +169,39 @@ export function AIInvestigationSidebar() {
   const [isReasoningEnabled, setIsReasoningEnabled] = useState(true);
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  const handleA2UIAction = useCallback((action: any) => {
+    if (!action || !action.type) return;
+
+    switch (action.type) {
+      case "filter": {
+        if (action.field && action.value) {
+          const newFilter = {
+            field: action.field,
+            value: action.value,
+            operator: action.operator || "equals",
+          };
+          useInvestigationStore.getState().setFilters([newFilter]);
+        }
+        break;
+      }
+      case "search": {
+        if (action.query) {
+          useInvestigationStore.getState().setSearchQuery(action.query);
+        }
+        break;
+      }
+      case "command": {
+        if (action.command) {
+          setInputValue(action.command);
+          textareaRef.current?.focus();
+        }
+        break;
+      }
+      default:
+        console.warn("Unhandled A2UI action:", action);
+    }
+  }, []);
 
   const AI_COMMANDS = [
     { cmd: "/search", label: "Search Memory", desc: "Search previously saved issues" },
@@ -511,7 +556,15 @@ export function AIInvestigationSidebar() {
                             {isUser ? (
                               <p className="whitespace-pre-wrap">{m.content}</p>
                             ) : (
-                              <MarkdownContent content={response} className="text-zinc-200" />
+                              <>
+                                <MarkdownContent content={response} className="text-zinc-200" />
+                                {m.a2ui_payload && (
+                                  <A2UIRenderer
+                                    payload={m.a2ui_payload}
+                                    onAction={handleA2UIAction}
+                                  />
+                                )}
+                              </>
                             )}
                           </div>
                         </>

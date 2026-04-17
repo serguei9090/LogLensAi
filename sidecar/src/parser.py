@@ -44,7 +44,7 @@ class DrainParser:
             os.makedirs(os.path.dirname(persistence_path), exist_ok=True)
             self.persistence = FilePersistence(persistence_path)
 
-        self.miner = TemplateMiner(persistence=self.persistence, config=self.config)
+        self.miner = TemplateMiner(persistence_handler=self.persistence, config=self.config)
         self.lock = threading.RLock()
 
     def parse(self, log_line: str) -> dict:

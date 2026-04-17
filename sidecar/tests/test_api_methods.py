@@ -98,16 +98,24 @@ def test_log_comment(api):
     assert updated["has_comment"] is True
 
 
-def test_analyze_cluster(api):
+@pytest.mark.asyncio
+async def test_analyze_cluster(api):
     api.method_ingest_logs(
         [IngestLogEntry(workspace_id="ws1", source_id="src1", raw_text="Connection failed")]
     )
     logs = api.method_get_logs(workspace_id="ws1")["logs"]
     cluster_id = logs[0]["cluster_id"]
 
-    res = api.method_analyze_cluster(cluster_id=cluster_id, workspace_id="ws1")
+    # Mock async method
+    import asyncio
+
+    future = asyncio.Future()
+    future.set_result({"summary": "test", "root_cause": "test", "recommended_actions": []})
+    api.ai.analyze_logs.return_value = future
+
+    res = await api.method_analyze_cluster(cluster_id=cluster_id, workspace_id="ws1")
     assert "summary" in res
-    api.ai.analyze.assert_called_once()
+    api.ai.analyze_logs.assert_called_once()
 
 
 def test_get_fusion_config_empty(api):

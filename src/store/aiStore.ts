@@ -6,6 +6,7 @@ export interface AiMessage {
   session_id: string;
   role: "user" | "assistant" | "system";
   content: string;
+  a2ui_payload?: any;
   context_logs?: number[];
   timestamp: string;
   provider_session_id?: string;
@@ -212,6 +213,15 @@ export const useAiStore = create<AiStore>((set, get) => ({
                 if (parsed.session_id && !currentSessionId) {
                   currentSessionId = parsed.session_id;
                   set({ currentSessionId });
+                }
+
+                if (parsed.a2ui_payload) {
+                  set((state) => {
+                    const messages = [...state.messages];
+                    const lastMsg = messages[messages.length - 1];
+                    lastMsg.a2ui_payload = parsed.a2ui_payload;
+                    return { messages };
+                  });
                 }
 
                 if (parsed.chunk) {

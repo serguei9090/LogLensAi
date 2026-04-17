@@ -110,6 +110,7 @@ class Database:
                 session_id   TEXT,
                 role         TEXT,
                 content      TEXT,
+                a2ui_payload TEXT,
                 context_logs TEXT,
                 timestamp    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 provider_session_id TEXT
@@ -159,6 +160,7 @@ class Database:
         for table, col in [
             ("ai_sessions", "provider_session_id"),
             ("ai_messages", "provider_session_id"),
+            ("ai_messages", "a2ui_payload"),
         ]:
             try:
                 cursor.execute(f"SELECT {col} FROM {table} LIMIT 1")

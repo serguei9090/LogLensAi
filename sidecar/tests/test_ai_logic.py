@@ -14,23 +14,18 @@ def test_is_reasoning_model(provider):
 
 
 @pytest.mark.asyncio
-async def test_reasoning_injection_enabled(provider, mocker):
+async def test_reasoning_injection_enabled(provider):
     [AIChatMessage(role="user", content="hello")]
 
-    # We test the logic inside chat_stream conceptually by checking how it processes messages
-    # In chat_stream, we look for reasoning=True
+    from unittest.mock import patch
 
-    # Mock the http session
-    mocker.patch("aiohttp.ClientSession.post")
+    with patch("aiohttp.ClientSession.post"):
+        # Test message processing logic (extracted from chat/chat_stream)
+        processed_content = "hello"
+        if True:  # reasoning enabled
+            processed_content = "<|think|>\nhello\n(Please think deeply before responding in your reasoning channel)"
 
-    # Test message processing logic (extracted from chat/chat_stream)
-    processed_content = "hello"
-    if True:  # reasoning enabled
-        processed_content = (
-            "<|think|>\nhello\n(Please think deeply before responding in your reasoning channel)"
-        )
-
-    assert "<|think|>" in processed_content
+        assert "<|think|>" in processed_content
 
 
 def test_reasoning_disabled_strips_system_tag(provider):

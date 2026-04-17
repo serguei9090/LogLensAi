@@ -2,7 +2,20 @@
 
 All notable changes to the LogLensAi project will be documented in this file.
 
-## [Unreleased] - 2026-04-16
+## [Unreleased] - 2026-04-17
+
+### Added
+- **A2UI v0.9 (Agent-to-User Interface) Integration**:
+    - Integrated `@a2ui/react` and `google-adk` to enable generative UI widgets within the AI Sidebar.
+    - Implemented `A2UIRenderer.tsx` with support for both JSON and token-efficient Markup formats.
+    - Added decorative UI tag stripping in `AIInvestigationSidebar.tsx` for a clean conversational experience.
+- **Port Resolution & Stability**:
+    - Centralized sidecar URL resolution in `useSidecarBridge.ts` to enforce port 5000 and prevent 4001 ghost routing.
+    - Implemented explicit debug logging for sidecar endpoint detection.
+
+### Fixed
+- **Module Shadowing Regression**: Deleted stale `ai.py` that was conflicting with the `src.ai` package and causing sidecar crashes (Code 255).
+- **Code Debt**: Consolidated redundant `get_drain_parser` definitions and cleaned up unused imports in the test suite.
 
 ### Added
 - **AI Copilot Skills & Memory**:

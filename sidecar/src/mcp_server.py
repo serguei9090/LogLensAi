@@ -67,12 +67,12 @@ def get_pattern_summary(workspace_id: str) -> list[dict]:
 
 
 @mcp_server.tool()
-def analyze_cluster(workspace_id: str, cluster_id: str) -> dict:
+async def analyze_cluster(workspace_id: str, cluster_id: str) -> dict:
     """Analyze a specific log cluster using AI to determine summary, root cause, and recommendations."""
     app = get_app()
     if not app:
         return {}
-    return app.method_analyze_cluster(cluster_id=cluster_id, workspace_id=workspace_id)
+    return await app.method_analyze_cluster(cluster_id=cluster_id, workspace_id=workspace_id)
 
 
 @mcp_server.tool()

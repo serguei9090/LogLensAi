@@ -26,7 +26,8 @@ function isTauriRuntime(): boolean {
  * The sidecar HTTP endpoint for web mode.
  * Configurable via VITE_SIDECAR_URL env variable, defaults to localhost:4001.
  */
-export const SIDECAR_BASE_URL = import.meta.env.VITE_SIDECAR_URL ?? "http://localhost:5000";
+export const SIDECAR_BASE_URL = import.meta.env.VITE_SIDECAR_URL || "http://localhost:5000";
+console.log("[LogLensAi] Sidecar URL resolved to:", SIDECAR_BASE_URL);
 export const SIDECAR_URL = `${SIDECAR_BASE_URL}/rpc`;
 
 /**

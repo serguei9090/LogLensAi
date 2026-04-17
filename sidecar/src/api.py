@@ -243,6 +243,9 @@ class App:
         self._start_time = time.time()
         self.dev_mode = False
 
+        # Initialize global Drain3 parser
+        self.parser = self.get_drain_parser()
+
         # Initialize AI Provider from settings
         settings = self.method_get_settings()
         provider = settings.get("ai_provider", "ollama")
@@ -968,7 +971,7 @@ class App:
             {"id": c.cluster_id, "template": c.get_template(), "size": c.size} for c in clusters
         ]
 
-    def method_analyze_cluster(self, cluster_id: str, workspace_id: str) -> dict:
+    async def method_analyze_cluster(self, cluster_id: str, workspace_id: str) -> dict:
         cursor = self.db.get_cursor()
 
         cursor.execute(
@@ -984,7 +987,7 @@ class App:
                 template = c.get_template()
                 break
 
-        return self.ai.analyze_logs(template, samples)
+        return await self.ai.analyze_logs(template, samples)
 
     async def method_list_ai_models(self) -> list[str]:
         """Fetch models available for the current AI provider."""
@@ -1052,14 +1055,24 @@ class App:
         return session_id, provider_session_id, history
 
     def _finalize_ai_session(
-        self, session_id: str, response_content: str, provider_session_id: str | None
+        self,
+        session_id: str,
+        response_content: str,
+        provider_session_id: str | None,
+        a2ui_payload: dict | None = None,
     ):
 
         cursor = self.db.get_cursor()
 
         cursor.execute(
-            "INSERT INTO ai_messages (session_id, role, content, provider_session_id) VALUES (?, ?, ?, ?)",
-            (session_id, "assistant", response_content, provider_session_id),
+            "INSERT INTO ai_messages (session_id, role, content, a2ui_payload, provider_session_id) VALUES (?, ?, ?, ?, ?)",
+            (
+                session_id,
+                "assistant",
+                response_content,
+                json.dumps(a2ui_payload) if a2ui_payload else None,
+                provider_session_id,
+            ),
         )
 
         updates = {"last_modified": datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
@@ -1088,9 +1101,19 @@ class App:
             provider_session_id=provider_session_id,
         )
 
-        # 5. Record Assistant Message
+        # 5. Extract A2UI if present (simple check for non-streaming mode)
+        a2ui_payload = None
+        if "[[A2UI]]" in response_msg.content:
+            try:
+                parts = response_msg.content.split("[[A2UI]]")
+                json_str = parts[1].split("[[/A2UI]]")[0]
+                a2ui_payload = json.loads(json_str)
+            except Exception:
+                pass
+
+        # 6. Record Assistant Message
         self._finalize_ai_session(
-            session_id, response_msg.content, response_msg.provider_session_id
+            session_id, response_msg.content, response_msg.provider_session_id, a2ui_payload
         )
 
         return {"session_id": session_id, "response": response_msg.content}
@@ -1116,7 +1139,7 @@ class App:
         """Fetch all messages for a specific session."""
         cursor = self.db.get_cursor()
         cursor.execute(
-            "SELECT id, role, content, context_logs, timestamp FROM ai_messages WHERE session_id = ? ORDER BY timestamp ASC",
+            "SELECT id, role, content, context_logs, timestamp, a2ui_payload FROM ai_messages WHERE session_id = ? ORDER BY timestamp ASC",
             (session_id,),
         )
         return [
@@ -1126,6 +1149,7 @@ class App:
                 "content": row[2],
                 "context_logs": json.loads(row[3]) if row[3] else [],
                 "timestamp": str(row[4]) if row[4] else None,
+                "a2ui_payload": json.loads(row[5]) if row[5] else None,
             }
             for row in cursor.fetchall()
         ]
@@ -1413,10 +1437,13 @@ class App:
         try:
             session_id, provider_session_id, history = self._prepare_ai_session(params)
 
-            # Send initial session ID to UI
             await response.write(f"data: {json.dumps({'session_id': session_id})}\n\n".encode())
 
             full_text = []
+            a2ui_buffer = ""
+            is_collecting_a2ui = False
+            extracted_a2ui = None
+
             if hasattr(self.ai, "chat_stream"):
                 async for chunk in self.ai.chat_stream(
                     messages=history,
@@ -1425,11 +1452,42 @@ class App:
                     session_id=session_id,
                 ):
                     full_text.append(chunk)
-                    # We pass 'provider_session_id' dynamically tracking in _task_cache later.
+
+                    # --- A2UI Streaming Logic ---
+                    # Check if we're entering an A2UI block
+                    if "[[A2UI]]" in chunk and not is_collecting_a2ui:
+                        is_collecting_a2ui = True
+                        parts = chunk.split("[[A2UI]]")
+                        a2ui_buffer = parts[1]
+                    elif is_collecting_a2ui:
+                        a2ui_buffer += chunk
+
+                    # Check if we're leaving an A2UI block
+                    if "[[/A2UI]]" in a2ui_buffer and is_collecting_a2ui:
+                        try:
+                            # 1. Fragment the raw content
+                            raw_content = a2ui_buffer.split("[[/A2UI]]")[0].strip()
+
+                            # 2. Strategy A: Attempt JSON parse (Legacy/Standard)
+                            try:
+                                extracted_a2ui = json.loads(raw_content)
+                            except ValueError:
+                                # Strategy B: It's likely Markup format (button label="...")
+                                # We pass it as a special object that the frontend A2UIRenderer will understand
+                                extracted_a2ui = {"type": "markup", "raw": raw_content}
+
+                            # 3. Stream to UI
+                            await response.write(
+                                f"data: {json.dumps({'a2ui_payload': extracted_a2ui})}\n\n".encode()
+                            )
+                        except Exception as e:
+                            logger.error("Failed to parse A2UI block: %s", e)
+                        is_collecting_a2ui = False
+
                     payload = {"chunk": chunk}
                     await response.write(f"data: {json.dumps(payload)}\n\n".encode())
             else:
-                # Fallback to cold full fetch if provider does not support stream
+                # Fallback to cold full fetch
                 resp_msg = await self.ai.chat(
                     history,
                     model=params.model,
@@ -1437,18 +1495,48 @@ class App:
                     provider_session_id=provider_session_id,
                 )
                 full_text.append(resp_msg.content)
-                await response.write(
-                    f"data: {json.dumps({'chunk': resp_msg.content})}\n\n".encode()
-                )
+
+                # Extract A2UI from full message
+                if "[[A2UI]]" in resp_msg.content:
+                    try:
+                        parts = resp_msg.content.split("[[A2UI]]")
+                        raw_content = parts[1].split("[[/A2UI]]")[0].strip()
+                        try:
+                            extracted_a2ui = json.loads(raw_content)
+                        except ValueError:
+                            extracted_a2ui = {"type": "markup", "raw": raw_content}
+                    except Exception:
+                        pass
+
+                payload = {"chunk": resp_msg.content}
+                if extracted_a2ui:
+                    payload["a2ui_payload"] = extracted_a2ui
+
+                await response.write(f"data: {json.dumps(payload)}\n\n".encode())
 
             final_text = "".join(full_text)
+            # If we didn't extract it during stream (e.g. malformed closing tag), try one last time on full text
+            if not extracted_a2ui and "[[A2UI]]" in final_text:
+                try:
+                    parts = final_text.split("[[A2UI]]")
+                    raw_content = parts[1].split("[[/A2UI]]")[0].strip()
+                    try:
+                        extracted_a2ui = json.loads(raw_content)
+                    except ValueError:
+                        extracted_a2ui = {"type": "markup", "raw": raw_content}
+                except Exception:
+                    pass
 
-            # Retrieve latest task id from _task_cache if using Gemini, else fall back
+            # ... existing session finalization ...
+            # Wait for backend transactions to commit by introducing a tiny delay in UI logic
+            # (Note: self._finalize_ai_session now accepts a2ui_payload)
             final_provider_session_id = provider_session_id
             if hasattr(self.ai, "_task_cache") and session_id in self.ai._task_cache:
                 final_provider_session_id = self.ai._task_cache.get(session_id)
 
-            self._finalize_ai_session(session_id, final_text, final_provider_session_id)
+            self._finalize_ai_session(
+                session_id, final_text, final_provider_session_id, extracted_a2ui
+            )
 
             await response.write(b"data: [DONE]\n\n")
             return response
