@@ -238,7 +238,7 @@ class SearchMemoryRequest(BaseModel):
 class App:
     def __init__(self, db_path="loglens.duckdb"):
         self.db = Database(db_path)
-        self.parser = DrainParser()
+        self._parsers = {}
         self.tailers = {}
         self._start_time = time.time()
         self.dev_mode = False
@@ -886,7 +886,8 @@ class App:
 
         # 2. Pattern Clustering (Drain3)
         try:
-            res = self.parser.parse(message)
+            parser = self.get_drain_parser(workspace_id)
+            res = parser.parse(message)
             cluster_id = str(res["cluster_id"])
             template = res["template"]
         except Exception:
@@ -1298,8 +1299,57 @@ class App:
                 host=host,
             )
 
+        # Reset Drain parsers if clustering settings changed
+        if any(k.startswith("drain_") for k in settings):
+            self._parsers = {}
+
         self.db.commit()
         return {"status": "success"}
+
+    def get_drain_parser(self, workspace_id: str = None) -> DrainParser:
+        """Get or create a Drain3 parser based on current scope settings."""
+        settings = self.method_get_settings()
+        scope = settings.get("drain_template_scope", "global")
+
+        sim_th = float(settings.get("drain_similarity_threshold", "0.4"))
+        max_children = int(settings.get("drain_max_children", "100"))
+        max_clusters = int(settings.get("drain_max_clusters", "1000"))
+
+        if scope == "global" or not workspace_id:
+            key = "__global__"
+            path = "data/drain/global.state"
+        else:
+            key = workspace_id
+            path = f"data/drain/workspace_{workspace_id}.state"
+
+        if key not in self._parsers:
+            self._parsers[key] = DrainParser(
+                persistence_path=path,
+                sim_th=sim_th,
+                max_children=max_children,
+                max_clusters=max_clusters,
+            )
+        return self._parsers[key]
+
+    def method_reset_drain_templates(self, workspace_id: str = None) -> dict:
+        """Deletes the persistence state for the given workspace or global scope."""
+        settings = self.method_get_settings()
+        scope = settings.get("drain_template_scope", "global")
+
+        if scope == "global" or not workspace_id:
+            path = "data/drain/global.state"
+            key = "__global__"
+        else:
+            path = f"data/drain/workspace_{workspace_id}.state"
+            key = workspace_id
+
+        if key in self._parsers:
+            del self._parsers[key]
+
+        if os.path.exists(path):
+            os.remove(path)
+
+        return {"status": "success", "scope": scope, "workspace_id": workspace_id}
 
     async def aiohttp_handler(self, request):
         try:

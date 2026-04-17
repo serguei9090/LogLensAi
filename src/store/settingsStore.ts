@@ -16,6 +16,7 @@ export interface AppSettings {
   mcp_server_enabled: boolean;
   ai_tool_search: boolean;
   ai_tool_memory: boolean;
+  drain_template_scope: "global" | "workspace";
 }
 
 export const defaultSettings: AppSettings = {
@@ -34,6 +35,7 @@ export const defaultSettings: AppSettings = {
   mcp_server_enabled: false,
   ai_tool_search: true,
   ai_tool_memory: true,
+  drain_template_scope: "global",
 };
 
 interface SettingsStore {
@@ -65,6 +67,8 @@ export const useSettingsStore = create<SettingsStore>((set) => ({
             mcp_server_enabled: remote.mcp_server_enabled === "true",
             ai_tool_search: remote.ai_tool_search !== "false", // default true
             ai_tool_memory: remote.ai_tool_memory !== "false", // default true
+            drain_template_scope:
+              (remote.drain_template_scope as "global" | "workspace") || "global",
           },
         });
       }

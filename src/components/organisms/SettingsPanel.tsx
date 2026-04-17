@@ -2,16 +2,20 @@ import { HelpTooltip } from "@/components/atoms/HelpTooltip";
 import { Switch } from "@/components/ui/switch";
 import { callSidecar } from "@/lib/hooks/useSidecarBridge";
 import { cn } from "@/lib/utils";
+import { useWorkspaceStore } from "@/store/workspaceStore";
 import {
   Bot,
+  Box,
   Check,
   ChevronDown,
   ChevronRight,
   Cpu,
   FolderOpen,
+  Globe,
   Layers,
   Palette,
   Plus,
+  RefreshCcw,
   Save,
   Terminal,
   X,
@@ -82,7 +86,6 @@ function SectionLabel({
     </label>
   );
 }
-
 export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSettings) => void }) {
   const [settings, setSettings] = useState<AppSettings>(defaultSettings);
   const [activeSection, setActiveSection] = useState<SectionId>("ai");
@@ -92,11 +95,26 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
     "llama3",
     "mistral",
   ]);
+
   const [isToolsExpanded, setIsToolsExpanded] = useState(false);
   const [isSkillModalOpen, setIsSkillModalOpen] = useState(false);
+  const { activeWorkspaceId } = useWorkspaceStore();
 
   const update = <K extends keyof AppSettings>(key: K, value: AppSettings[K]) =>
     setSettings((prev) => ({ ...prev, [key]: value }));
+
+  const handleResetTemplates = async () => {
+    try {
+      await callSidecar({
+        method: "reset_drain_templates",
+        params: { workspace_id: activeWorkspaceId },
+      });
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+    } catch (error) {
+      console.error("Failed to reset templates:", error);
+    }
+  };
 
   // Load settings on mount
   useEffect(() => {
@@ -465,6 +483,42 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
                 </p>
               </div>
 
+              <div className="space-y-4">
+                <SectionLabel>Template Isolation Scope</SectionLabel>
+                <div className="flex p-1 bg-bg-surface border border-border rounded-xl w-fit">
+                  {[
+                    { id: "global", label: "Global", icon: Globe, desc: "Shared cross-workspace" },
+                    {
+                      id: "workspace",
+                      label: "Workspace",
+                      icon: Box,
+                      desc: "Project-isolated",
+                    },
+                  ].map((scope) => (
+                    <button
+                      key={scope.id}
+                      type="button"
+                      onClick={() =>
+                        update("drain_template_scope", scope.id as "global" | "workspace")
+                      }
+                      className={cn(
+                        "flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all",
+                        settings.drain_template_scope === scope.id
+                          ? "bg-primary text-bg-base shadow-lg"
+                          : "text-text-muted hover:text-text-primary hover:bg-white/5",
+                      )}
+                    >
+                      <scope.icon className="size-3.5" />
+                      {scope.label}
+                    </button>
+                  ))}
+                </div>
+                <p className="text-[10px] text-text-muted px-1">
+                  Workspace scope ensures patterns found in one project don't pollute clustering
+                  logic in others.
+                </p>
+              </div>
+
               <div className="grid grid-cols-3 gap-8">
                 <div className="space-y-2">
                   <SectionLabel htmlFor="drain_sim">Similarity</SectionLabel>
@@ -529,6 +583,24 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
                   The similarity threshold determines how 'close' two log lines must be to share a
                   template. Lower values (0.1–0.4) are better for high-variance logs.
                 </p>
+              </div>
+
+              <div className="pt-6 border-t border-border/30 flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-bold text-text-primary">Clustering Memory</p>
+                  <p className="text-[10px] text-text-muted mt-0.5">
+                    Resetting templates will force the parser to re-learn patterns from scratch.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleResetTemplates}
+                  className="flex items-center gap-2 px-4 py-2 bg-red-500/10 text-red-400 hover:bg-red-500/20 rounded-xl text-xs font-bold transition-all border border-red-500/20"
+                >
+                  <RefreshCcw className="size-3.5" />
+                  Reset {settings.drain_template_scope === "global" ? "Global" : "Workspace"}{" "}
+                  Templates
+                </button>
               </div>
             </div>
           )}
