@@ -57,6 +57,9 @@
 
 ## 🔵 Bug Fixes (Active)
 
+- [x] **FIX-FE-003**: Restore Trash2 Icon in History (Regression from UI refactor)
+  - **Files**: `src/components/organisms/AIInvestigationSidebar.tsx`
+  - **Detail**: `docs/TODOC/FIX-FE-003.md`
 - [x] **FIX-BE-001**: Missing 'os' Import in Ollama Provider (Regression from ENV stabilization)
   - **Files**: `sidecar/src/ai/ollama.py`
   - **Detail**: `docs/TODOC/FIX-BE-001.md`

@@ -668,63 +668,29 @@ export function AIInvestigationSidebar() {
           </Button>
         </div>
 
-        <div className="flex justify-between items-center opacity-40 px-1">
-          <span className="text-[9px] text-zinc-500 font-medium tracking-tight uppercase">
-            LogLens Platform Agent 2.0
-          </span>
-          <div className="flex gap-2">
-            <IconButton
-              icon={
-                isReasoningEnabled ? (
-                  <Lightbulb className="size-3" />
-                ) : (
-                  <LightbulbOff className="size-3" />
-                )
-              }
-              label={isReasoningEnabled ? "Deep Reasoning On" : "Deep Reasoning Off"}
-              onClick={() => setIsReasoningEnabled(!isReasoningEnabled)}
-              className={cn(
-                "size-6 transition-all",
-                isReasoningEnabled
-                  ? "bg-amber-500/10 text-amber-500 hover:bg-amber-500/20"
-                  : "bg-transparent text-zinc-500 hover:bg-zinc-800/80 hover:text-zinc-400",
-              )}
-            />
-            <IconButton
-              icon={<Trash2 className="size-3" />}
-              label="Clear Conversation"
-              onClick={() => {}}
-              className="size-6 bg-transparent hover:bg-red-500/10 hover:text-red-400 transition-all"
-            />
-          </div>
+        <div className="flex items-center px-1">
+          <button
+            type="button"
+            onClick={() => setIsReasoningEnabled(!isReasoningEnabled)}
+            className={cn(
+              "flex items-center gap-2 px-3 py-1.5 rounded-xl transition-all border",
+              isReasoningEnabled
+                ? "bg-amber-500/10 border-amber-500/20 text-amber-300 hover:bg-amber-500/20 shadow-[0_0_15px_-5px_rgba(245,158,11,0.4)]"
+                : "bg-transparent border-zinc-800/60 text-zinc-500 hover:bg-zinc-800/80",
+            )}
+            title={isReasoningEnabled ? "Deep Reasoning Active" : "Deep Reasoning Disabled"}
+          >
+            {isReasoningEnabled ? (
+              <Lightbulb className="size-3.5 text-amber-400 animate-pulse-slow" />
+            ) : (
+              <LightbulbOff className="size-3.5" />
+            )}
+            <span className="text-[10px] font-bold uppercase tracking-widest whitespace-nowrap">
+              Think
+            </span>
+          </button>
         </div>
       </div>
     </div>
-  );
-}
-
-function IconButton({
-  icon,
-  label,
-  onClick,
-  className,
-}: {
-  readonly icon: React.ReactNode;
-  readonly label: string;
-  readonly onClick: () => void;
-  readonly className?: string;
-}) {
-  return (
-    <button
-      type="button"
-      className={cn(
-        "inline-flex items-center justify-center rounded-lg hover:bg-zinc-800/80 transition-colors h-8 w-8",
-        className,
-      )}
-      onClick={onClick}
-      title={label}
-    >
-      {icon}
-    </button>
   );
 }

@@ -24,3 +24,5 @@ All notable changes to this project will be documented in this file.
 - **Context Hygiene**: Standardized history management to strip internal thought blocks before multi-turn inference.
 - **NameError Regression**: Restored missing os import in Ollama provider.
 - **UI Focus**: Fixed 'dead view' issue where long sessions loaded at the top instead of the last answer.
+- **UI Refactor**: Enhanced 'Think' toggle with text and brighter aesthetic; removed redundant footer tags and trash button.
+- **UX Regression Fix**: Restored missing Trash2 icon in History dropdown.
