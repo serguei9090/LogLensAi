@@ -13,7 +13,6 @@ import { selectActiveWorkspace, useWorkspaceStore } from "@/store/workspaceStore
 import {
   Bot,
   Clock,
-  Layers,
   Lightbulb,
   LightbulbOff,
   MessageSquare,
@@ -141,11 +140,7 @@ export function parseThinking(content: string): {
   };
 }
 
-export interface AIInvestigationSidebarProps {
-  onEngineSettingsOpen?: () => void;
-}
-
-export function AIInvestigationSidebar({ onEngineSettingsOpen }: AIInvestigationSidebarProps) {
+export function AIInvestigationSidebar() {
   const {
     isSidebarOpen,
     setSidebarOpen,
@@ -409,16 +404,6 @@ export function AIInvestigationSidebar({ onEngineSettingsOpen }: AIInvestigation
           </div>
         </div>
         <div className="flex items-center gap-1 shrink-0">
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-8 w-8 text-zinc-500 hover:text-emerald-400 hover:bg-emerald-500/10"
-            onClick={onEngineSettingsOpen}
-            title="Workspace Engine Settings (Drain3)"
-          >
-            <Layers className="h-4 w-4" />
-          </Button>
-
           <Button
             variant="ghost"
             size="icon"

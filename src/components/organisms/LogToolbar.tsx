@@ -9,7 +9,7 @@ import { cn } from "@/lib/utils";
 import { useAiStore } from "@/store/aiStore";
 import { useInvestigationStore } from "@/store/investigationStore";
 import type { LogSource } from "@/store/workspaceStore";
-import { Bookmark, Cpu, Layers, Sparkles, Upload } from "lucide-react";
+import { Bookmark, Cpu, Sparkles, Upload } from "lucide-react";
 import { toast } from "sonner";
 
 interface LogToolbarProps {
