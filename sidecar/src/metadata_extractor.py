@@ -2,7 +2,7 @@ import datetime
 import json
 import re
 
-from src.db import Database
+from db import Database
 
 
 def extract_log_metadata(workspace_id: str, source_id: str, raw_line: str) -> dict:

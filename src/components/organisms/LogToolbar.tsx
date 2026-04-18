@@ -9,7 +9,7 @@ import { cn } from "@/lib/utils";
 import { useAiStore } from "@/store/aiStore";
 import { useInvestigationStore } from "@/store/investigationStore";
 import type { LogSource } from "@/store/workspaceStore";
-import { Bookmark, Cpu, Sparkles, Upload } from "lucide-react";
+import { Bookmark, Cpu, Layers, Sparkles, Upload } from "lucide-react";
 import { toast } from "sonner";
 
 interface LogToolbarProps {
@@ -31,6 +31,7 @@ interface LogToolbarProps {
   readonly onEditFusion?: (sourceId: string) => void;
   readonly onRenameSource?: (workspaceId: string, sourceId: string, name: string) => void;
   readonly activeWorkspaceId?: string;
+  readonly onEngineSettingsOpen?: () => void;
 }
 
 export function LogToolbar({
@@ -52,6 +53,7 @@ export function LogToolbar({
   onEditFusion,
   onRenameSource,
   activeWorkspaceId,
+  onEngineSettingsOpen,
 }: LogToolbarProps) {
   const { timeRange, setTimeRange } = useInvestigationStore();
   const { isSidebarOpen, setSidebarOpen } = useAiStore();

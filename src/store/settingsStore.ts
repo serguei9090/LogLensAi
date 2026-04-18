@@ -53,18 +53,18 @@ export const defaultSettings: AppSettings = {
 
 interface SettingsStore {
   settings: AppSettings;
-  fetchSettings: () => Promise<void>;
-  updateSettings: (newSettings: Partial<AppSettings>) => Promise<void>;
+  fetchSettings: (workspaceId?: string) => Promise<void>;
+  updateSettings: (newSettings: Partial<AppSettings>, workspaceId?: string) => Promise<void>;
 }
 
 export const useSettingsStore = create<SettingsStore>((set) => ({
   settings: defaultSettings,
 
-  fetchSettings: async () => {
+  fetchSettings: async (workspaceId?: string) => {
     try {
       const remote = await callSidecar<Record<string, string>>({
         method: "get_settings",
-        params: {},
+        params: { workspace_id: workspaceId },
       });
 
       if (remote) {
@@ -93,21 +93,22 @@ export const useSettingsStore = create<SettingsStore>((set) => ({
     }
   },
 
-  updateSettings: async (newSettings) => {
+  updateSettings: async (newSettings, workspaceId?: string) => {
     try {
       const payload: Record<string, string | number | boolean> = {};
       for (const [k, v] of Object.entries(newSettings)) {
         if (k === "drain_masks") {
           payload[k] = JSON.stringify(v);
         } else {
-          payload[k] = v as string;
+          payload[k] = v as string | number | boolean;
         }
       }
 
       await callSidecar({
         method: "update_settings",
-        params: { settings: payload },
+        params: { settings: payload, workspace_id: workspaceId },
       });
+      // Optionally re-fetch to ensure sync, or just update local state
       set((state) => ({ settings: { ...state.settings, ...newSettings } }));
     } catch (err) {
       console.error("Failed to update settings:", err);

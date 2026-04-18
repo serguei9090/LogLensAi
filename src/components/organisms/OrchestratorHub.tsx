@@ -4,7 +4,7 @@ import { callSidecar } from "@/lib/hooks/useSidecarBridge";
 import { cn } from "@/lib/utils";
 import { useInvestigationStore } from "@/store/investigationStore";
 import type { LogSource } from "@/store/workspaceStore";
-import { Check, Clock, Cpu, Plus, Save, Settings2, Sparkles, X, Zap } from "lucide-react";
+import { Check, Clock, Cpu, Layers, Plus, Save, Settings2, Sparkles, X, Zap } from "lucide-react";
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { toast } from "sonner";
@@ -29,6 +29,7 @@ interface OrchestratorHubProps {
   editingFusionId?: string | null;
   editingFusionName?: string | null;
   onFusionSaved: (fusionId: string, fusionName: string, configs: FusionSourceConfig[]) => void;
+  onEngineSettingsOpen?: () => void;
 }
 
 // ─── Strategy Card ────────────────────────────────────────────────────────────
@@ -73,6 +74,7 @@ export function OrchestratorHub({
   editingFusionId,
   editingFusionName,
   onFusionSaved,
+  onEngineSettingsOpen,
 }: OrchestratorHubProps) {
   const showDistribution = useInvestigationStore((s) => s.showDistribution);
   const setShowDistribution = useInvestigationStore((s) => s.setShowDistribution);
@@ -311,6 +313,37 @@ export function OrchestratorHub({
                     className="px-3 py-1.5 rounded-md text-[11px] font-medium transition-all bg-white/5 text-white/60 hover:text-white hover:bg-white/10"
                   >
                     {workspaceGlobalContext ? "Edit" : "Set"}
+                  </button>
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                <p className="text-[11px] text-white/40 font-medium px-0.5 uppercase tracking-widest">
+                  Engine
+                </p>
+                <div className="flex items-center justify-between p-3 rounded-lg border border-white/5 bg-white/[0.02] hover:bg-white/[0.04] transition-all group">
+                  <div className="flex items-center gap-3">
+                    <div className="size-8 rounded-md bg-white/5 border border-white/10 flex items-center justify-center group-hover:bg-white/10 transition-all text-white/40 group-hover:text-white">
+                      <Layers className="size-4" />
+                    </div>
+                    <div className="space-y-0.5">
+                      <span className="block text-[13px] font-medium text-white/90 group-hover:text-white transition-colors">
+                        Core Parser
+                      </span>
+                      <span className="block text-[11px] text-white/40 truncate">
+                        Drain3 Configuration
+                      </span>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onClose();
+                      onEngineSettingsOpen?.();
+                    }}
+                    className="px-3 py-1.5 rounded-md text-[11px] font-medium transition-all bg-white/5 text-white/60 hover:text-white hover:bg-white/10"
+                  >
+                    Configure
                   </button>
                 </div>
               </div>

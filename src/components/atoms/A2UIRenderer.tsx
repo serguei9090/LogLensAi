@@ -9,16 +9,16 @@ interface A2UIComponent {
   text?: string;
   label?: string;
   children?: A2UIComponent[];
-  props?: Record<string, any>;
+  props?: Record<string, unknown>;
   action?: {
     type: string;
-    [key: string]: any;
+    [key: string]: unknown;
   };
 }
 
 interface A2UIRendererProps {
-  payload: any;
-  onAction?: (action: any) => void;
+  payload: unknown;
+  onAction?: (action: unknown) => void;
 }
 
 /**
@@ -34,7 +34,7 @@ function parseA2UIMarkup(raw: string): A2UIComponent | null {
     const actionMatch = trimmed.match(/action=\{([^}]+)\}/);
 
     if (labelMatch) {
-      let action: any = null;
+      let action: unknown = null;
       if (actionMatch) {
         try {
           // Wrapped in {} to make it valid JSON
@@ -71,12 +71,19 @@ function parseA2UIMarkup(raw: string): A2UIComponent | null {
  * Supports both standard JSON payloads and the compact Markup format.
  */
 export const A2UIRenderer: React.FC<A2UIRendererProps> = ({ payload, onAction }) => {
-  if (!payload || typeof payload !== "object") return null;
+  if (!payload || typeof payload !== "object") {
+    return null;
+  }
 
   // Handle the "markup" wrapper sent by the sidecar
-  let resolvedPayload = payload;
-  if (payload.type === "markup" && payload.raw) {
-    const parsed = parseA2UIMarkup(payload.raw);
+  let resolvedPayload = payload as Record<string, unknown>;
+  if (
+    typeof payload === "object" &&
+    payload !== null &&
+    (payload as Record<string, unknown>).type === "markup" &&
+    (payload as Record<string, unknown>).raw
+  ) {
+    const parsed = parseA2UIMarkup((payload as { raw: string }).raw);
     if (!parsed) {
       return (
         <div className="text-[10px] text-zinc-500 italic opacity-50 p-2 border border-zinc-800 rounded bg-zinc-900/30">
@@ -84,7 +91,7 @@ export const A2UIRenderer: React.FC<A2UIRendererProps> = ({ payload, onAction })
         </div>
       );
     }
-    resolvedPayload = parsed;
+    resolvedPayload = parsed as unknown as Record<string, unknown>;
   }
 
   const renderComponent = (comp: A2UIComponent, index: number): React.ReactNode => {

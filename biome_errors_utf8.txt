@@ -1,0 +1,270 @@
+﻿bun : ./src\components\atoms\A2UIRenderer.tsx:12:26 lint/suspicious/noExplicitAny ━━━━━━━━━━━━━━━━━━━━━━━━
+At line:1 char:1
++ bun x @biomejs/biome check ./src > biome_errors.txt 2>&1
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (./src\component...━━━━━━━━━━━━━━━:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+
+  × Unexpected any. Specify a different type.
+  
+    10 │   label?: string;
+    11 │   children?: A2UIComponent[];
+  > 12 │   props?: Record<string, any>;
+       │                          ^^^
+    13 │   action?: {
+    14 │     type: string;
+  
+  i any disables many type checking rules. Its use should be avoided.
+  
+
+./src\components\atoms\A2UIRenderer.tsx:15:20 lint/suspicious/noExplicitAny ━━━━━━━━━━━━━━━━━━━━━━━━
+
+  × Unexpected any. Specify a different type.
+  
+    13 │   action?: {
+    14 │     type: string;
+  > 15 │     [key: string]: any;
+       │                    ^^^
+    16 │   };
+    17 │ }
+  
+  i any disables many type checking rules. Its use should be avoided.
+  
+
+./src\components\atoms\A2UIRenderer.tsx:20:12 lint/suspicious/noExplicitAny ━━━━━━━━━━━━━━━━━━━━━━━━
+
+  × Unexpected any. Specify a different type.
+  
+    19 │ interface A2UIRendererProps {
+  > 20 │   payload: any;
+       │            ^^^
+    21 │   onAction?: (action: any) => void;
+    22 │ }
+  
+  i any disables many type checking rules. Its use should be avoided.
+  
+
+./src\components\atoms\A2UIRenderer.tsx:21:23 lint/suspicious/noExplicitAny ━━━━━━━━━━━━━━━━━━━━━━━━
+
+  × Unexpected any. Specify a different type.
+  
+    19 │ interface A2UIRendererProps {
+    20 │   payload: any;
+  > 21 │   onAction?: (action: any) => void;
+       │                       ^^^
+    22 │ }
+    23 │ 
+  
+  i any disables many type checking rules. Its use should be avoided.
+  
+
+./src\components\atoms\A2UIRenderer.tsx:37:19 lint/suspicious/noExplicitAny ━━━━━━━━━━━━━━━━━━━━━━━━
+
+  × Unexpected any. Specify a different type.
+  
+    36 │     if (labelMatch) {
+  > 37 │       let action: any = null;
+       │                   ^^^
+    38 │       if (actionMatch) {
+    39 │         try {
+  
+  i any disables many type checking rules. Its use should be avoided.
+  
+
+./src\components\atoms\A2UIRenderer.tsx:74:3 lint/style/useBlockStatements  FIXABLE  ━━━━━━━━━━━━━━━
+
+  × Block statements are preferred in this position.
+  
+    72 │  */
+    73 │ export const A2UIRenderer: React.FC<A2UIRendererProps> = ({ payload, onAction }) => {
+  > 74 │   if (!payload || typeof payload !== "object") return null;
+       │   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    75 │ 
+    76 │   // Handle the "markup" wrapper sent by the sidecar
+  
+  i Unsafe fix: Wrap the statement with a `JsBlockStatement`
+  
+    74 │ ··if·(!payload·||·typeof·payload·!==·"object")·{·return·null;·}
+       │                                                ++            ++
+
+./src\components\organisms\AIInvestigationSidebar.tsx:178:49 lint/suspicious/noExplicitAny ━━━━━━━━━━
+
+  × Unexpected any. Specify a different type.
+  
+    176 │   const textareaRef = useRef<HTMLTextAreaElement>(null);
+    177 │ 
+  > 178 │   const handleA2UIAction = useCallback((action: any) => {
+        │                                                 ^^^
+    179 │     if (!action || !action.type) return;
+    180 │ 
+  
+  i any disables many type checking rules. Its use should be avoided.
+  
+
+./src\components\organisms\AIInvestigationSidebar.tsx:179:5 lint/style/useBlockStatements  FIXABLE  ━━━━━━━━━━
+
+  × Block statements are preferred in this position.
+  
+    178 │   const handleA2UIAction = useCallback((action: any) => {
+  > 179 │     if (!action || !action.type) return;
+        │     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    180 │ 
+    181 │     switch (action.type) {
+  
+  i Unsafe fix: Wrap the statement with a `JsBlockStatement`
+  
+    179 │ ····if·(!action·||·!action.type)·{·return;·}
+        │                                  ++       ++
+
+./src\store\settingsStore.ts:103:29 lint/suspicious/noExplicitAny ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  × Unexpected any. Specify a different type.
+  
+    101 │           payload[k] = JSON.stringify(v);
+    102 │         } else {
+  > 103 │           payload[k] = v as any;
+        │                             ^^^
+    104 │         }
+    105 │       }
+  
+  i any disables many type checking rules. Its use should be avoided.
+  
+
+./src\components\organisms\WorkspaceEngineSettings.tsx:32:56 lint/suspicious/noExplicitAny ━━━━━━━━━━
+
+  × Unexpected any. Specify a different type.
+  
+    30 │   const { settings, fetchSettings, updateSettings } = useSettingsStore();
+    31 │   const [localSettings, setLocalSettings] = useState(settings);
+  > 32 │   const [globalSettings, setGlobalSettings] = useState<any>(null);
+       │                                                        ^^^
+    33 │   const [isSaving, setIsSaving] = useState(false);
+    34 │ 
+  
+  i any disables many type checking rules. Its use should be avoided.
+  
+
+./src\components\organisms\WorkspaceEngineSettings.tsx:40:70 lint/suspicious/noExplicitAny ━━━━━━━━━━
+
+  × Unexpected any. Specify a different type.
+  
+    38 │       setLocalSettings(settings);
+    39 │       // Fetch global settings for reference
+  > 40 │       callSidecar({ method: "get_settings", params: {} }).then((res: any) => {
+       │                                                                      ^^^
+    41 │         if (res) {
+    42 │           // Parse numeric values same as store
+  
+  i any disables many type checking rules. Its use should be avoided.
+  
+
+./src\components\organisms\WorkspaceEngineSettings.tsx:55:39 lint/suspicious/noExplicitAny ━━━━━━━━━━
+
+  × Unexpected any. Specify a different type.
+  
+    53 │   }, [isOpen, settings]);
+    54 │ 
+  > 55 │   const update = (key: string, value: any) => {
+Checked 73 files in 101ms. No fixes applied.
+Found 17 errors.
+       │                                       ^^^
+    56 │     setLocalSettings((prev) => ({ ...prev, [key]: value }));
+    57 │   };
+  
+  i any disables many type checking rules. Its use should be avoided.
+  
+
+./src\components\organisms\WorkspaceEngineSettings.tsx:116:15 lint/a11y/noLabelWithoutControl ━━━━━━━━━━
+
+  × A form label must be associated with an input.
+  
+    114 │           <div className="space-y-4">
+    115 │             <div className="flex items-center justify-between">
+  > 116 │               <label className="text-xs font-bold uppercase tracking-wider text-zinc-500 flex items-center 
+gap-2">
+        │               
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  > 117 │                 Similarity Sensitivity
+  > 118 │                 <Info className="size-3 opacity-50" />
+  > 119 │               </label>
+        │               ^^^^^^^^
+    120 │               <div className="flex items-center gap-2">
+    121 │                 <span className="text-xs font-mono text-emerald-400">
+  
+  i Consider adding a `for` or `htmlFor` attribute to the label element or moving the input element to inside the 
+label element.
+  
+
+./src\components\organisms\WorkspaceEngineSettings.tsx:152:17 lint/a11y/noLabelWithoutControl ━━━━━━━━━━
+
+  × A form label must be associated with an input.
+  
+    150 │             <div className="space-y-2">
+    151 │               <div className="flex items-center justify-between">
+  > 152 │                 <label className="text-[10px] font-bold uppercase text-zinc-500">
+        │                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  > 153 │                   Max Branches
+  > 154 │                 </label>
+        │                 ^^^^^^^^
+    155 │                 {globalSettings &&
+    156 │                   localSettings.drain_max_children === globalSettings.drain_max_children && (
+  
+  i Consider adding a `for` or `htmlFor` attribute to the label element or moving the input element to inside the 
+label element.
+  
+
+./src\components\organisms\WorkspaceEngineSettings.tsx:169:17 lint/a11y/noLabelWithoutControl ━━━━━━━━━━
+
+  × A form label must be associated with an input.
+  
+    167 │             <div className="space-y-2">
+    168 │               <div className="flex items-center justify-between">
+  > 169 │                 <label className="text-[10px] font-bold uppercase text-zinc-500">Cluster Cap</label>
+        │                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    170 │                 {globalSettings &&
+    171 │                   localSettings.drain_max_clusters === globalSettings.drain_max_clusters && (
+  
+  i Consider adding a `for` or `htmlFor` attribute to the label element or moving the input element to inside the 
+label element.
+  
+
+./src\components\organisms\WorkspaceEngineSettings.tsx:185:13 lint/a11y/noLabelWithoutControl ━━━━━━━━━━
+
+  × A form label must be associated with an input.
+  
+    184 │           <div className="space-y-3 pt-2">
+  > 185 │             <label className="text-xs font-bold uppercase tracking-wider text-zinc-500 flex items-center 
+gap-2">
+        │             
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  > 186 │               Variable Masking
+  > 187 │               <Layers className="size-3 opacity-50" />
+  > 188 │             </label>
+        │             ^^^^^^^^
+    189 │             <div className="space-y-2">
+    190 │               {localSettings.drain_masks.map((mask, idx) => {
+  
+  i Consider adding a `for` or `htmlFor` attribute to the label element or moving the input element to inside the 
+label element.
+  
+
+./src\components\organisms\WorkspaceEngineSettings.tsx format ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  × Formatter would have printed the following content:
+  
+    190 190 │                 {localSettings.drain_masks.map((mask, idx) => {
+    191 191 │                   const isGlobal = globalSettings?.drain_masks?.some(
+    192     │ - 
+··················(gm:·{·label:·string;·pattern:·string·})·=>·gm.label·===·mask.label·&&·gm.pattern·===·mask.pattern,
+        192 │ + ··················(gm:·{·label:·string;·pattern:·string·})·=>
+        193 │ + ····················gm.label·===·mask.label·&&·gm.pattern·===·mask.pattern,
+    193 194 │                   );
+    194 195 │                   return (
+  
+
+check ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  × Some errors were emitted while running checks.
+  
+

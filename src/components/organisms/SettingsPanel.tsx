@@ -478,45 +478,12 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
           {activeSection === "drain" && (
             <div className="space-y-8 animate-in fade-in slide-in-from-right-4 duration-300">
               <div className="border-b border-border pb-6">
-                <h2 className="text-2xl font-bold text-text-primary">Engine Core</h2>
+                <h2 className="text-2xl font-bold text-text-primary">
+                  Global Core Engine (Drain3)
+                </h2>
                 <p className="text-sm text-text-muted mt-2">
-                  Adjust the Drain3 streaming parser to perfectly match your log formats.
-                </p>
-              </div>
-
-              <div className="space-y-4">
-                <SectionLabel>Template Isolation Scope</SectionLabel>
-                <div className="flex p-1 bg-bg-surface border border-border rounded-xl w-fit">
-                  {[
-                    { id: "global", label: "Global", icon: Globe, desc: "Shared cross-workspace" },
-                    {
-                      id: "workspace",
-                      label: "Workspace",
-                      icon: Box,
-                      desc: "Project-isolated",
-                    },
-                  ].map((scope) => (
-                    <button
-                      key={scope.id}
-                      type="button"
-                      onClick={() =>
-                        update("drain_template_scope", scope.id as "global" | "workspace")
-                      }
-                      className={cn(
-                        "flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all",
-                        settings.drain_template_scope === scope.id
-                          ? "bg-primary text-bg-base shadow-lg"
-                          : "text-text-muted hover:text-text-primary hover:bg-white/5",
-                      )}
-                    >
-                      <scope.icon className="size-3.5" />
-                      {scope.label}
-                    </button>
-                  ))}
-                </div>
-                <p className="text-[10px] text-text-muted px-1">
-                  Workspace scope ensures patterns found in one project don't pollute clustering
-                  logic in others.
+                  System-wide defaults for pattern mining. These can be overridden in each
+                  workspace.
                 </p>
               </div>
 

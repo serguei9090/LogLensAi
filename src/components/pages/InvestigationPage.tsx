@@ -3,10 +3,12 @@ import { ImportFeedModal } from "@/components/organisms/ImportFeedModal";
 import { OrchestratorHub } from "@/components/organisms/OrchestratorHub";
 import { VirtualLogTable } from "@/components/organisms/VirtualLogTable";
 import type { LogEntry } from "@/components/organisms/VirtualLogTable";
+import { WorkspaceEngineSettings } from "@/components/organisms/WorkspaceEngineSettings";
 import { InvestigationLayout } from "@/components/templates/InvestigationLayout";
 import { callSidecar } from "@/lib/hooks/useSidecarBridge";
 import { useAiStore } from "@/store/aiStore";
 import { useInvestigationStore } from "@/store/investigationStore";
+import { useSettingsStore } from "@/store/settingsStore";
 import {
   type LogSource,
   selectActiveSource,
@@ -74,6 +76,7 @@ export function InvestigationPage() {
 
   const { activeWorkspaceId, addSource, removeSource, setActiveSource, renameSource } =
     useWorkspaceStore();
+  const { fetchSettings } = useSettingsStore();
   const activeWorkspace = useWorkspaceStore(selectActiveWorkspace);
   const { setSidebarOpen, sendMessage, setSession } = useAiStore();
 
@@ -82,6 +85,7 @@ export function InvestigationPage() {
 
   const [tailingSourceIds, setTailingSourceIds] = useState<Set<string>>(new Set());
   const [isImportOpen, setIsImportOpen] = useState(false);
+  const [isEngineSettingsOpen, setIsEngineSettingsOpen] = useState(false);
   const [isConnected, setIsConnected] = useState(true);
 
   // Orchestrator Hub state
@@ -96,6 +100,12 @@ export function InvestigationPage() {
   const nonFusionSources = useMemo(() => sources.filter((s) => s.type !== "fusion"), [sources]);
 
   // ── State Synchronization ──────────────────────────────────────────────────
+
+  useEffect(() => {
+    if (activeWorkspaceId) {
+      fetchSettings(activeWorkspaceId);
+    }
+  }, [activeWorkspaceId, fetchSettings]);
 
   useEffect(() => {
     syncActiveSource(activeSourceId);
@@ -399,7 +409,10 @@ export function InvestigationPage() {
         showDistribution={showDistribution}
         onDistributionClose={() => setShowDistribution(!showDistribution)}
         workspaceId={activeWorkspaceId}
-        rightPanel={<AIInvestigationSidebar />}
+        onEngineSettingsOpen={() => setIsEngineSettingsOpen(true)}
+        rightPanel={
+          <AIInvestigationSidebar onEngineSettingsOpen={() => setIsEngineSettingsOpen(true)} />
+        }
       >
         <VirtualLogTable
           logs={logs}
@@ -443,7 +456,13 @@ export function InvestigationPage() {
         availableSources={nonFusionSources}
         editingFusionId={editingFusionId}
         editingFusionName={editingFusionName}
+        onEngineSettingsOpen={() => setIsEngineSettingsOpen(true)}
         onFusionSaved={handleFusionSaved}
+      />
+      <WorkspaceEngineSettings
+        isOpen={isEngineSettingsOpen}
+        onClose={() => setIsEngineSettingsOpen(false)}
+        workspaceId={activeWorkspaceId}
       />
     </>
   );

@@ -1,6 +1,6 @@
 import paramiko
-from src.parser import DrainParser
-from src.tailer import FileTailer
+from parser import DrainParser
+from tailer import FileTailer
 
 
 class SSHLoader(FileTailer):

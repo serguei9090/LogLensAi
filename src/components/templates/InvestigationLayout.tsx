@@ -27,6 +27,7 @@ interface InvestigationLayoutProps {
   readonly showDistribution?: boolean;
   readonly workspaceId?: string;
   readonly onDistributionClose?: () => void;
+  readonly onEngineSettingsOpen?: () => void;
   readonly rightPanel?: ReactNode;
 }
 
@@ -52,6 +53,7 @@ export function InvestigationLayout({
   showDistribution,
   workspaceId,
   onDistributionClose,
+  onEngineSettingsOpen,
   rightPanel,
 }: InvestigationLayoutProps) {
   const activeSource = sources?.find((s) => s.id === activeSourceId);
@@ -77,6 +79,7 @@ export function InvestigationLayout({
         onEditFusion={onEditFusion}
         onRenameSource={onRenameSource}
         activeWorkspaceId={workspaceId}
+        onEngineSettingsOpen={onEngineSettingsOpen}
       />
       {showDistribution && workspaceId && (
         <LogDistributionWidget

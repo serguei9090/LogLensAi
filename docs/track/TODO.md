@@ -107,6 +107,12 @@
 - [x] **FIX-CORE-003**: SQL Aliasing Regression (Fixed l.l.field Binder Error)
   - **Files**: `sidecar/src/api.py`
   - **Detail**: `docs/TODOC/FIX-CORE-003.md`
+- [x] **FIX-UI-002**: Missing 'Layers' Import in LogToolbar (Regression from Engine Settings implementation)
+  - **Files**: `src/components/organisms/LogToolbar.tsx`
+  - **Detail**: `docs/TODOC/FIX-UI-002.md`
+- [ ] **FIX-D3-001**: Workspace Engine Settings Persistence & UI Polish (Force sync + Padding fix)
+  - **Files**: `src/components/organisms/WorkspaceEngineSettings.tsx`
+  - **Detail**: `docs/TODOC/FIX-D3-001.md`
 
 ---
 

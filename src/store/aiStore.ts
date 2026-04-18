@@ -6,7 +6,7 @@ export interface AiMessage {
   session_id: string;
   role: "user" | "assistant" | "system";
   content: string;
-  a2ui_payload?: any;
+  a2ui_payload?: Record<string, unknown>;
   context_logs?: number[];
   timestamp: string;
   provider_session_id?: string;

@@ -8,16 +8,16 @@ from datetime import datetime, timedelta
 from typing import Any
 
 import aiohttp_cors
+from ai import AIChatMessage, AIProviderFactory
 from aiohttp import web
+from db import Database
 from dotenv import load_dotenv
+from mcp_server import init_mcp, mcp_server
+from metadata_extractor import extract_log_metadata
+from parser import DrainParser
 from pydantic import BaseModel, ValidationError
-from src.ai import AIChatMessage, AIProviderFactory
-from src.db import Database
-from src.mcp_server import init_mcp, mcp_server
-from src.metadata_extractor import extract_log_metadata
-from src.parser import DrainParser
-from src.ssh_loader import SSHLoader
-from src.tailer import FileTailer
+from ssh_loader import SSHLoader
+from tailer import FileTailer
 
 # --- Professional Logging Setup ---
 SIDE_CAR_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -235,6 +235,15 @@ class SearchMemoryRequest(BaseModel):
     limit: int = 5
 
 
+class GetSettingsRequest(BaseModel):
+    workspace_id: str | None = None
+
+
+class UpdateSettingsRequest(BaseModel):
+    settings: dict
+    workspace_id: str | None = None
+
+
 class App:
     def __init__(self, db_path="loglens.duckdb"):
         self.db = Database(db_path)
@@ -326,8 +335,8 @@ class App:
                 "update_source_parser": UpdateSourceParserRequest,
                 "get_anomalies": GetAnomaliesRequest,
                 "analyze_cluster": None,
-                "get_settings": None,
-                "update_settings": None,
+                "get_settings": GetSettingsRequest,
+                "update_settings": UpdateSettingsRequest,
                 "list_ai_models": None,
                 "send_ai_message": SendAiMessageRequest,
                 "get_ai_sessions": GetAiSessionsRequest,
@@ -337,6 +346,7 @@ class App:
                 "get_ai_mapping": None,
                 "save_memory": SaveMemoryRequest,
                 "search_memory": SearchMemoryRequest,
+                "reset_workspace_settings": GetSettingsRequest,
             }
 
             handler = getattr(self, method_name)
@@ -1265,38 +1275,78 @@ class App:
         rows = cursor.fetchall()
         return {"offsets": {row[0]: row[1] for row in rows}}
 
-    def method_get_settings(self) -> dict:
+    def method_get_settings(self, workspace_id: str | None = None) -> dict:
         cursor = self.db.get_cursor()
+
+        # 1. Fetch Global Settings
         cursor.execute("SELECT key, value FROM settings")
-        return {row[0]: row[1] for row in cursor.fetchall()}
+        settings = {row[0]: row[1] for row in cursor.fetchall()}
 
-    def method_update_settings(self, settings: dict) -> dict:
+        # 2. If workspace_id provided, override with workspace-specific settings
+        if workspace_id:
+            cursor.execute(
+                "SELECT key, value FROM workspace_settings WHERE workspace_id = ?", (workspace_id,)
+            )
+            workspace_settings = {row[0]: row[1] for row in cursor.fetchall()}
+            settings.update(workspace_settings)
+
+        return settings
+
+    def method_reset_workspace_settings(self, workspace_id: str) -> dict:
+        """Delete all overrides for a specific workspace."""
+        if not workspace_id:
+            return {"status": "error", "message": "workspace_id required"}
+
+        cursor = self.db.get_cursor()
+        cursor.execute("DELETE FROM workspace_settings WHERE workspace_id = ?", (workspace_id,))
+
+        # Invalidate parser cache for this workspace
+        if workspace_id in self._parsers:
+            del self._parsers[workspace_id]
+
+        return {"status": "ok"}
+
+    def method_update_settings(self, settings: dict, workspace_id: str | None = None) -> dict:
         cursor = self.db.get_cursor()
 
-        if "ai_provider" in settings:
-            self.ai.provider = settings["ai_provider"]
-        if "ai_api_key" in settings:
-            self.ai.api_key = settings["ai_api_key"]
-        if "ai_system_prompt" in settings:
-            self.ai.system_prompt = settings["ai_system_prompt"]
+        # Update persistent settings (Global vs Workspace)
+        if workspace_id:
+            query = (
+                "INSERT INTO workspace_settings (workspace_id, key, value) VALUES (?, ?, ?) "
+                "ON CONFLICT (workspace_id, key) DO UPDATE SET value = excluded.value"
+            )
+            for k, v in settings.items():
+                cursor.execute(query, (workspace_id, k, str(v)))
+        else:
+            # Re-initialize AI Provider if relevant global settings changed
+            if any(
+                k in settings
+                for k in [
+                    "ai_provider",
+                    "ai_api_key",
+                    "ai_ollama_host",
+                    "ai_gemini_url",
+                    "ai_model",
+                    "ai_system_prompt",
+                ]
+            ):
+                # Update transient AI state immediately for global changes
+                if "ai_provider" in settings:
+                    self.ai.provider = settings["ai_provider"]
+                if "ai_api_key" in settings:
+                    self.ai.api_key = settings["ai_api_key"]
+                if "ai_system_prompt" in settings:
+                    self.ai.system_prompt = settings["ai_system_prompt"]
 
-        if "mcp_server_enabled" in settings:
-            enabled = str(settings["mcp_server_enabled"]).lower() == "true"
-            if enabled:
-                self._start_mcp_server()
-            else:
-                self._stop_mcp_server()
+            query = (
+                "INSERT INTO settings (key, value) VALUES (?, ?) "
+                "ON CONFLICT (key) DO UPDATE SET value = excluded.value"
+            )
+            for k, v in settings.items():
+                cursor.execute(query, (k, str(v)))
 
-        # Update persistent settings
-        query = (
-            "INSERT INTO settings (key, value) VALUES (?, ?) "
-            "ON CONFLICT (key) DO UPDATE SET value = excluded.value"
-        )
-        for k, v in settings.items():
-            cursor.execute(query, (k, str(v)))
-
-        # Re-initialize AI Provider if relevant settings changed
-        if any(
+        # Re-initialize AI Provider if relevant settings changed (Global-only for now)
+        if not workspace_id and any(
             k in settings
             for k in [
                 "ai_provider",
@@ -1319,20 +1369,23 @@ class App:
                 provider,
                 api_key=current_settings.get("ai_api_key", ""),
                 system_prompt=current_settings.get("ai_system_prompt", ""),
-                model=current_settings.get("ai_model", "gemma4:e2b"),  # Pass the new model setting
+                model=current_settings.get("ai_model", "gemma4:e2b"),
                 host=host,
             )
 
-        # Reset Drain parsers if clustering settings changed
+        # Reset specific Drain parser if clustering settings changed
         if any(k.startswith("drain_") for k in settings):
-            self._parsers = {}
+            if workspace_id and workspace_id in self._parsers:
+                del self._parsers[workspace_id]
+            else:
+                self._parsers = {}
 
         self.db.commit()
         return {"status": "success"}
 
     def get_drain_parser(self, workspace_id: str = None) -> DrainParser:
         """Get or create a Drain3 parser based on current scope settings."""
-        settings = self.method_get_settings()
+        settings = self.method_get_settings(workspace_id)
         scope = settings.get("drain_template_scope", "global")
 
         sim_th = float(settings.get("drain_similarity_threshold", "0.4"))
@@ -1387,7 +1440,9 @@ class App:
             body = await request.json()
             req = JSONRPCRequest(**body)
             res = await self.dispatch(req)
-            return web.json_response(res.model_dump())
+            resp_data = res.model_dump()
+            logger.debug("RPC Response [%s]: %s", req.method, json.dumps(resp_data)[:100])
+            return web.json_response(resp_data)
         except ValidationError:
             return web.json_response(
                 {

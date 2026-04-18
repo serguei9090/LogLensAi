@@ -13,6 +13,7 @@ import { selectActiveWorkspace, useWorkspaceStore } from "@/store/workspaceStore
 import {
   Bot,
   Clock,
+  Layers,
   Lightbulb,
   LightbulbOff,
   MessageSquare,
@@ -140,7 +141,11 @@ export function parseThinking(content: string): {
   };
 }
 
-export function AIInvestigationSidebar() {
+export interface AIInvestigationSidebarProps {
+  onEngineSettingsOpen?: () => void;
+}
+
+export function AIInvestigationSidebar({ onEngineSettingsOpen }: AIInvestigationSidebarProps) {
   const {
     isSidebarOpen,
     setSidebarOpen,
@@ -170,36 +175,47 @@ export function AIInvestigationSidebar() {
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  const handleA2UIAction = useCallback((action: any) => {
-    if (!action || !action.type) return;
+  const handleA2UIAction = useCallback((action: unknown) => {
+    if (!action || typeof action !== "object" || !("type" in action)) {
+      return;
+    }
 
-    switch (action.type) {
+    const a = action as {
+      type: string;
+      field?: string;
+      value?: unknown;
+      operator?: string;
+      query?: string;
+      command?: string;
+    };
+
+    switch (a.type) {
       case "filter": {
-        if (action.field && action.value) {
+        if (a.field && a.value) {
           const newFilter = {
-            field: action.field,
-            value: action.value,
-            operator: action.operator || "equals",
+            field: a.field,
+            value: a.value as string | number,
+            operator: a.operator || "equals",
           };
           useInvestigationStore.getState().setFilters([newFilter]);
         }
         break;
       }
       case "search": {
-        if (action.query) {
-          useInvestigationStore.getState().setSearchQuery(action.query);
+        if (a.query) {
+          useInvestigationStore.getState().setSearchQuery(a.query);
         }
         break;
       }
       case "command": {
-        if (action.command) {
-          setInputValue(action.command);
+        if (a.command) {
+          setInputValue(a.command);
           textareaRef.current?.focus();
         }
         break;
       }
       default:
-        console.warn("Unhandled A2UI action:", action);
+        console.warn("Unhandled A2UI action:", a);
     }
   }, []);
 
@@ -393,6 +409,16 @@ export function AIInvestigationSidebar() {
           </div>
         </div>
         <div className="flex items-center gap-1 shrink-0">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 text-zinc-500 hover:text-emerald-400 hover:bg-emerald-500/10"
+            onClick={onEngineSettingsOpen}
+            title="Workspace Engine Settings (Drain3)"
+          >
+            <Layers className="h-4 w-4" />
+          </Button>
+
           <Button
             variant="ghost"
             size="icon"

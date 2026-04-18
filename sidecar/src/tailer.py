@@ -2,9 +2,9 @@ import os
 import threading
 import time
 
-from src.db import Database
-from src.metadata_extractor import extract_log_metadata
-from src.parser import DrainParser
+from db import Database
+from metadata_extractor import extract_log_metadata
+from parser import DrainParser
 
 
 class FileTailer:

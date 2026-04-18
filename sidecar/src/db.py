@@ -130,6 +130,13 @@ class Database:
                 offset_seconds INTEGER DEFAULT 0,
                 PRIMARY KEY (workspace_id, source_id)
             );
+
+            CREATE TABLE IF NOT EXISTS workspace_settings (
+                workspace_id TEXT,
+                key          TEXT,
+                value        TEXT,
+                PRIMARY KEY (workspace_id, key)
+            );
         """)
 
     def _run_migrations(self, cursor):

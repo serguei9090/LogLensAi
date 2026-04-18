@@ -1,4 +1,3 @@
-
 function parseThinking(content) {
   if (!content) return { thinking: null, response: "", isStreamingThink: false };
 
@@ -36,10 +35,10 @@ function parseThinking(content) {
     } else {
       thinking = content.substring(0, firstEndIdx);
     }
-    
+
     // Everything AFTER the end tag is the response
     let response = content.substring(firstEndIdx + endTagLength);
-    
+
     // Strip other potential tags from response
     for (const tag of [...startTags, ...endTags]) {
       response = response.replaceAll(tag, "");
@@ -48,7 +47,7 @@ function parseThinking(content) {
     return {
       thinking: thinking.trim() || null,
       response: response.trim(),
-      isStreamingThink: false
+      isStreamingThink: false,
     };
   }
 
@@ -57,7 +56,7 @@ function parseThinking(content) {
     return {
       thinking: content.substring(firstStartIdx + startTagLength),
       response: content.substring(0, firstStartIdx).trim(),
-      isStreamingThink: true
+      isStreamingThink: true,
     };
   }
 
