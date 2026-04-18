@@ -31,7 +31,6 @@ interface LogToolbarProps {
   readonly onEditFusion?: (sourceId: string) => void;
   readonly onRenameSource?: (workspaceId: string, sourceId: string, name: string) => void;
   readonly activeWorkspaceId?: string;
-  readonly onEngineSettingsOpen?: () => void;
 }
 
 export function LogToolbar({
@@ -53,7 +52,6 @@ export function LogToolbar({
   onEditFusion,
   onRenameSource,
   activeWorkspaceId,
-  onEngineSettingsOpen,
 }: LogToolbarProps) {
   const { timeRange, setTimeRange } = useInvestigationStore();
   const { isSidebarOpen, setSidebarOpen } = useAiStore();

@@ -9,6 +9,7 @@ All notable changes to the LogLensAi project will be documented in this file.
 - **Sidecar Startup Stability**: Fixed a `ModuleNotFoundError` by correctly bootstrapping `sys.path` in `sidecar/main.py` to include the `src` directory, ensuring internal imports resolve correctly when run from the root.
 - **UI/UX Padding**: Standardized `DialogFooter` padding in settings modals to ensure consistent and professional spacing for action buttons.
 - **Redundant UI Pruning**: Removed redundant "Workspace Engine Settings" entry points from the AI Sidebar and LogToolbar, centralizing all engine-level overrides within the Orchestrator Hub.
+- **Global Stability & Type Safety**: Hardened types for A2UI components, ensured all `FilterEntry` objects have mandatory unique IDs, optimized regex performance, and completed a project-wide Biome quality audit.
 
 ## [Unreleased] - 2026-04-17
 

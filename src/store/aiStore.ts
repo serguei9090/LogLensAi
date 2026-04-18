@@ -218,8 +218,10 @@ export const useAiStore = create<AiStore>((set, get) => ({
                 if (parsed.a2ui_payload) {
                   set((state) => {
                     const messages = [...state.messages];
-                    const lastMsg = messages[messages.length - 1];
-                    lastMsg.a2ui_payload = parsed.a2ui_payload;
+                    const lastMsg = messages.at(-1);
+                    if (lastMsg) {
+                      lastMsg.a2ui_payload = parsed.a2ui_payload;
+                    }
                     return { messages };
                   });
                 }
@@ -227,12 +229,17 @@ export const useAiStore = create<AiStore>((set, get) => ({
                 if (parsed.chunk) {
                   set((state) => {
                     const messages = [...state.messages];
-                    const lastMsg = messages[messages.length - 1];
-                    lastMsg.content += parsed.chunk;
+                    const lastMsg = messages.at(-1);
+                    if (lastMsg) {
+                      lastMsg.content += parsed.chunk;
+                    }
                     // Update temp session id if resolving dynamically
-                    if (currentSessionId && lastMsg.session_id === "temp") {
+                    if (currentSessionId && lastMsg && lastMsg.session_id === "temp") {
                       lastMsg.session_id = currentSessionId;
-                      messages[messages.length - 2].session_id = currentSessionId;
+                      const prevMsg = messages.at(-2);
+                      if (prevMsg) {
+                        prevMsg.session_id = currentSessionId;
+                      }
                     }
                     return { messages };
                   });

@@ -12,7 +12,7 @@ import { callSidecar } from "@/lib/hooks/useSidecarBridge";
 import { cn } from "@/lib/utils";
 import { useSettingsStore } from "@/store/settingsStore";
 import { useWorkspaceStore } from "@/store/workspaceStore";
-import { Cpu, Globe, Info, Layers, Plus, RefreshCcw, Save, Trash2 } from "lucide-react";
+import { Cpu, Info, Layers, Plus, RefreshCcw, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
@@ -49,17 +49,18 @@ export function WorkspaceEngineSettings({
   // 3. Fetch global settings once for reference
   useEffect(() => {
     if (isOpen) {
-      callSidecar({ method: "get_settings", params: {} }).then((res: Record<string, unknown>) => {
-        if (res) {
+      callSidecar({ method: "get_settings", params: {} }).then((res) => {
+        const settings = res as Record<string, unknown>;
+        if (settings) {
           // Parse numeric values same as store
           setGlobalSettings({
-            ...res,
+            ...settings,
             drain_similarity_threshold: Number.parseFloat(
-              (res.drain_similarity_threshold as string) || "0.5",
+              (settings.drain_similarity_threshold as string) || "0.5",
             ),
-            drain_max_children: Number.parseInt((res.drain_max_children as string) || "100"),
-            drain_max_clusters: Number.parseInt((res.drain_max_clusters as string) || "1000"),
-            drain_masks: res.drain_masks ? JSON.parse(res.drain_masks as string) : [],
+            drain_max_children: Number.parseInt((settings.drain_max_children as string) || "100"),
+            drain_max_clusters: Number.parseInt((settings.drain_max_clusters as string) || "1000"),
+            drain_masks: settings.drain_masks ? JSON.parse(settings.drain_masks as string) : [],
           });
         }
       });
@@ -216,7 +217,9 @@ export function WorkspaceEngineSettings({
             </h3>
             <div className="space-y-2">
               {localSettings.drain_masks.map((mask, idx) => {
-                const isGlobal = globalSettings?.drain_masks?.some(
+                const isGlobal = (
+                  globalSettings?.drain_masks as { label: string; pattern: string }[]
+                )?.some(
                   (gm: { label: string; pattern: string }) =>
                     gm.label === mask.label && gm.pattern === mask.pattern,
                 );

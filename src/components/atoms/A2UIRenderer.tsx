@@ -1,7 +1,5 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { cn } from "@/lib/utils";
-import { ActionIcon } from "lucide-react"; // Fallback icon
 import type React from "react";
 
 interface A2UIComponent {
@@ -30,11 +28,11 @@ function parseA2UIMarkup(raw: string): A2UIComponent | null {
 
   // Handle Button Tag: button label="Text" action={...}
   if (trimmed.startsWith("button")) {
-    const labelMatch = trimmed.match(/label=["']([^"']+)["']/);
-    const actionMatch = trimmed.match(/action=\{([^}]+)\}/);
+    const labelMatch = /label=["']([^"']+)["']/.exec(trimmed);
+    const actionMatch = /action=\{([^}]+)\}/.exec(trimmed);
 
     if (labelMatch) {
-      let action: unknown = null;
+      let action: { type: string; [key: string]: unknown } | undefined;
       if (actionMatch) {
         try {
           // Wrapped in {} to make it valid JSON
@@ -54,7 +52,7 @@ function parseA2UIMarkup(raw: string): A2UIComponent | null {
 
   // Handle Text Tag: text value="..."
   if (trimmed.startsWith("text")) {
-    const textMatch = trimmed.match(/value=["']([^"']+)["']/);
+    const textMatch = /value=["']([^"']+)["']/.exec(trimmed);
     if (textMatch) {
       return {
         type: "text",
@@ -91,7 +89,9 @@ export const A2UIRenderer: React.FC<A2UIRendererProps> = ({ payload, onAction })
         </div>
       );
     }
-    resolvedPayload = parsed as unknown as Record<string, unknown>;
+    resolvedPayload = parsed as unknown as A2UIComponent;
+  } else {
+    resolvedPayload = payload as A2UIComponent;
   }
 
   const renderComponent = (comp: A2UIComponent, index: number): React.ReactNode => {
@@ -162,5 +162,9 @@ export const A2UIRenderer: React.FC<A2UIRendererProps> = ({ payload, onAction })
     }
   };
 
-  return <div className="a2ui-renderer w-full mt-2">{renderComponent(resolvedPayload, 0)}</div>;
+  return (
+    <div className="a2ui-renderer w-full mt-2">
+      {renderComponent(resolvedPayload as A2UIComponent, 0)}
+    </div>
+  );
 };

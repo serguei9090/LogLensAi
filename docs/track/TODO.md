@@ -113,6 +113,8 @@
 - [ ] **FIX-D3-001**: Workspace Engine Settings Persistence & UI Polish (Force sync + Padding fix)
   - **Files**: `src/components/organisms/WorkspaceEngineSettings.tsx`
   - **Detail**: `docs/TODOC/FIX-D3-001.md`
+- [x] **STABILITY-001**: [FIX-STABILITY-001](i:/01-Master_Code/Apps/LogLensAi/docs/TODOC/FIX-STABILITY-001.md) - Global IDE Resolution (DONE)
+  - **Files**: `src/components/atoms/A2UIRenderer.tsx`, `src/components/organisms/AIInvestigationSidebar.tsx`, `src/components/organisms/WorkspaceEngineSettings.tsx`
 
 ---
 

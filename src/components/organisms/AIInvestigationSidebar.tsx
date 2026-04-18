@@ -53,7 +53,7 @@ const A2UI_REGEX = /\[\[A2UI\]\].*?(\[\[\/A2UI\]\]|$)/gs;
 
 /** Strip A2UI v0.9 tags from display text. */
 function stripA2UITags(text: string): string {
-  return text.replace(A2UI_REGEX, "").trim();
+  return text.replaceAll(A2UI_REGEX, "").trim();
 }
 
 export function parseThinking(content: string): {
@@ -188,6 +188,7 @@ export function AIInvestigationSidebar() {
       case "filter": {
         if (a.field && a.value) {
           const newFilter = {
+            id: Date.now().toString(),
             field: a.field,
             value: a.value as string | number,
             operator: a.operator || "equals",
@@ -270,7 +271,7 @@ export function AIInvestigationSidebar() {
       // Only scroll if we are looking at the bottom or if it's a new message
       scrollRef.current.scrollIntoView({ behavior: "smooth" });
     }
-  }, [messages.length, messages[messages.length - 1]?.content]);
+  }, [messages.length, messages.at(-1)?.content]);
 
   // Handle Send logic...
 
