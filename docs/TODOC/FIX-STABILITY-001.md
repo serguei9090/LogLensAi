@@ -19,6 +19,7 @@ Major issues:
 - `src/components/organisms/WorkspaceEngineSettings.tsx`
 - `src/components/organisms/LogToolbar.tsx` (onEngineSettingsOpen unused)
 - `src/store/aiStore.ts` (.at conversion)
+- `sidecar/main.py` (Restored proxy to src/api.py)
 
 ## Impact Analysis
 - **Stability**: High (Fixes type errors).

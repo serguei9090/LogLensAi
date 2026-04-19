@@ -2,6 +2,13 @@
 
 All notable changes to the LogLensAi project will be documented in this file.
 
+## [Phase 4] - Core Stability & Sidecar Restoration (2026-04-19)
+
+### Fixed
+- **Sidecar Lifecycle Restoration**: Restored `sidecar/main.py` entry point which was previously empty, preventing the backend from starting in development mode.
+- **Connection Reliability**: Resolved "Failed to fetch" errors by ensuring the sidecar binds to port 5000 and correctly resolves the `src` package.
+- **Stability Audit**: Completed the final verification for `FIX-STABILITY-001`, resolving type safety regressions and ensuring full JSON-RPC parity between React and Python.
+
 ## [Unreleased] - 2026-04-18
 
 ### Fixed
