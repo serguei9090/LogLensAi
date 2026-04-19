@@ -1,10 +1,10 @@
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from src.ai.ai_studio import AIStudioProvider
-from src.ai.base import AIChatMessage
-from src.ai.gemini_cli import GeminiCLIProvider
-from src.ai.ollama import OllamaProvider
+from ai.ai_studio import AIStudioProvider
+from ai.base import AIChatMessage
+from ai.gemini_cli import GeminiCLIProvider
+from ai.ollama import OllamaProvider
 
 
 @pytest.mark.asyncio
@@ -41,6 +41,11 @@ async def test_gemini_cli_hot_mode_resume():
             for item in self.items:
                 yield item
 
+        async def read(self, n=4096):
+            if not self.items:
+                return b""
+            return self.items.pop(0)
+
     with patch("aiohttp.ClientSession") as mock_session_cls:
         mock_session = MagicMock()
         mock_session.__aenter__ = AsyncMock(return_value=mock_session)
@@ -57,7 +62,7 @@ async def test_gemini_cli_hot_mode_resume():
         mock_post_resp = AsyncMock()
         mock_post_resp.status = 200
         mock_post_resp.content = AsyncMockStream(
-            [b'data: {"message": {"parts": [{"kind": "text", "text": "Hot response"}]}}\n\n']
+            [b'data: {"result": {"status": {"message": {"role": "agent", "parts": [{"kind": "text", "text": "Hot response"}]}}}}\n\n']
         )
         mock_post_ctx = MagicMock()
         mock_post_ctx.__aenter__ = AsyncMock(return_value=mock_post_resp)

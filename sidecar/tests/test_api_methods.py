@@ -1,7 +1,7 @@
 from unittest.mock import MagicMock
 
 import pytest
-from src.api import App, IngestLogEntry
+from api import App, IngestLogEntry
 
 
 @pytest.fixture
@@ -16,9 +16,8 @@ def api():
         "recommended_actions": [],
     }
     yield app
-    from src.db import Database
-
-    Database.reset()
+    from db import LogDatabase
+    LogDatabase.reset()
 
 
 def test_get_settings_initial(api):
@@ -124,7 +123,7 @@ def test_get_fusion_config_empty(api):
 
 
 def test_update_fusion_config(api):
-    from src.api import FusionSourceConfig
+    from api import FusionSourceConfig
 
     sources = [FusionSourceConfig(source_id="src1", enabled=True, tz_offset=0)]
     api.method_update_fusion_config(workspace_id="ws1", sources=sources)

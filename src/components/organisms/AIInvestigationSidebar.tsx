@@ -37,6 +37,8 @@ import { TypingIndicator } from "../atoms/TypingIndicator";
  * leak from corrupted DB history or incomplete backend parsing.
  */
 
+import { type FilterEntry } from "../molecules/FilterBuilder";
+
 /** Raw channel markers emitted by Gemma4 models that should never appear in UI. */
 const CHANNEL_TAGS = ["<|channel>thought", "<|channel>text", "<channel|>", "<|think|>"] as const;
 
@@ -179,7 +181,7 @@ export function AIInvestigationSidebar() {
       type: string;
       field?: string;
       value?: unknown;
-      operator?: string;
+      operator?: FilterEntry["operator"];
       query?: string;
       command?: string;
     };
@@ -187,10 +189,10 @@ export function AIInvestigationSidebar() {
     switch (a.type) {
       case "filter": {
         if (a.field && a.value) {
-          const newFilter = {
+          const newFilter: FilterEntry = {
             id: Date.now().toString(),
             field: a.field,
-            value: a.value as string | number,
+            value: a.value as string,
             operator: a.operator || "equals",
           };
           useInvestigationStore.getState().setFilters([newFilter]);

@@ -6,7 +6,7 @@ import { useState } from "react";
 
 export interface FilterEntry {
   id: string;
-  field: "level" | "source_id" | "cluster_id" | "raw_text" | "message";
+  field: "level" | "source_id" | "cluster_id" | "raw_text" | "message" | string;
   operator: "equals" | "not_equals" | "contains" | "not_contains" | "starts_with" | "regex";
   value: string;
 }

@@ -86,14 +86,14 @@ export function CustomParserModal({
             if (config.mapping) {
               setMapping(config.mapping);
             }
-          } catch (e) {
-            console.warn("Malformed config", e);
+          } catch (error: unknown) {
+            console.warn("Malformed config", error);
           }
         } else {
           setRegexPattern("");
           setMapping({});
         }
-      } catch (error) {
+      } catch (error: unknown) {
         console.error("Failed to load parser data", error);
         toast.error("Could not fetch log samples for parsing.");
       } finally {
@@ -147,8 +147,9 @@ export function CustomParserModal({
     }
 
     let pattern = "^";
-    const entries = Object.entries(mapping) as [string, ParserMapping][];
-    const sorted = entries.filter(([_, val]) => !!val).sort((a, b) => a[1].start - b[1].start);
+    const sorted = Object.entries(mapping)
+      .filter((entry): entry is [string, ParserMapping] => entry[1] !== undefined)
+      .sort((a, b) => a[1].start - b[1].start);
 
     let lastIdx = 0;
     for (const [key, range] of sorted) {
@@ -170,18 +171,42 @@ export function CustomParserModal({
     }
 
     try {
-      const jsRegexStr = regexPattern.replaceAll(/\?P<(\w+)>/g, "").replaceAll(/\\/g, "\\\\");
+      // Convert Python-style named groups (?P<name>...) to JS-style capture groups (...) 
+      // because we want to extract them by index for the preview.
+      // JS also supports (?<name>...) in modern browsers, but index-based is more compatible for this bridge.
+      let jsRegexStr = regexPattern;
+      const groupNames: string[] = [];
+      const namedGroupRegex = /\(\?P<(\w+)>(.*?)\)/g;
+      
+      let m: RegExpExecArray | null;
+      // biome-ignore lint/suspicious/noAssignInExpressions: standard regex iteration
+      while ((m = namedGroupRegex.exec(regexPattern)) !== null) {
+        groupNames.push(m[1]);
+      }
+      
+      jsRegexStr = regexPattern.replace(/\(\?P<\w+>(.*?)\)/g, "($1)");
+
       const jsRegex = new RegExp(jsRegexStr);
 
       const previews = samples.map((line) => {
         const match = line.match(jsRegex);
+        if (!match) return { timestamp: "No match", level: "---" };
+
+        const result: { timestamp?: string; level?: string } = {};
+        
+        // Map groups by index
+        groupNames.forEach((name, i) => {
+          if (name === "timestamp") result.timestamp = match[i + 1];
+          if (name === "level") result.level = match[i + 1];
+        });
+
         return {
-          timestamp: match ? match[0].substring(0, 20) : "No match",
-          level: "INFO",
+          timestamp: result.timestamp || match[0].substring(0, 20),
+          level: result.level || "INFO",
         };
       });
       setPreviewResults(previews);
-    } catch (e) {
+    } catch (_error: unknown) {
       setPreviewResults([]);
     }
   }, [regexPattern, samples]);
@@ -199,8 +224,9 @@ export function CustomParserModal({
     const segments: { text: string; type?: "timestamp" | "level" }[] = [];
     let currentPos = 0;
 
-    const entries = Object.entries(mapping) as [string, ParserMapping][];
-    const hls = entries.filter(([_, val]) => !!val).sort((a, b) => a[1].start - b[1].start);
+    const hls = Object.entries(mapping)
+      .filter((entry): entry is [string, ParserMapping] => entry[1] !== undefined)
+      .sort((a, b) => a[1].start - b[1].start);
 
     for (const [type, range] of hls) {
       if (range.start > currentPos) {
@@ -276,7 +302,7 @@ export function CustomParserModal({
                   <Search className="size-3" /> Raw Source Samples
                 </span>
                 <Tooltip>
-                  <TooltipTrigger asChild>
+                  <TooltipTrigger>
                     <span className="text-[9px] text-primary bg-primary/10 px-2 py-0.5 rounded border border-primary/20 animate-pulse cursor-help">
                       Highlight text to define capture group
                     </span>
@@ -379,7 +405,7 @@ export function CustomParserModal({
                         </div>
                       )}
                       <Tooltip>
-                        <TooltipTrigger asChild>
+                        <TooltipTrigger>
                           <div className="p-1 hover:bg-white/5 rounded-md cursor-help text-text-muted hover:text-primary transition-colors">
                             <Info className="size-4" />
                           </div>

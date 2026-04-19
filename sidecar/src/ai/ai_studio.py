@@ -91,6 +91,50 @@ class AIStudioProvider(AIProvider):
         except Exception as e:
             return AIChatMessage(role="assistant", content=f"AI Studio Error: {str(e)}")
 
+    async def chat_stream(
+        self,
+        messages: list[AIChatMessage],
+        model: str | None = None,
+        session_id: str | None = None,
+        provider_session_id: str | None = None,
+        reasoning: bool = True,
+        **kwargs,
+    ):
+        """Streaming version using ADK Runner."""
+        if not self.api_key:
+            yield "Error: No API Key configured for AI Studio."
+            return
+
+        os.environ["GOOGLE_API_KEY"] = self.api_key
+        agent = LlmAgent(
+            name="ai_studio_agent",
+            model=model,
+            instruction="Expert log analyst. Provide concise and accurate assistance.",
+        )
+
+        session_service = InMemorySessionService()
+        user_id = "default_user"
+        adk_session_id = session_id or "temp_session"
+
+        # Auto-Heal: Reconstruct history
+        for msg in messages[:-1]:
+            role = "user" if msg.role == "user" else "model"
+            content = types.Content(role=role, parts=[types.Part(text=msg.content)])
+            await session_service.add_message(user_id, adk_session_id, content)
+
+        runner = Runner(agent=agent, app_name="LogLensAi", session_service=session_service)
+        last_msg = messages[-1]
+        content = types.Content(role="user", parts=[types.Part(text=last_msg.content)])
+
+        try:
+            async for event in runner.run_async(
+                user_id=user_id, session_id=adk_session_id, new_message=content
+            ):
+                if event.content and event.content.parts:
+                    yield event.content.parts[0].text
+        except Exception as e:
+            yield f"AI Studio Stream Error: {str(e)}"
+
     async def analyze_logs(self, template: str, samples: list[str]) -> dict:
         """Specific one-off analysis for log clusters."""
         # For simple analysis, we use the direct client to avoid session overhead

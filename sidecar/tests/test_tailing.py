@@ -1,8 +1,8 @@
 from unittest.mock import patch
 
 import pytest
-from src.api import App
-from src.db import Database
+from api import App
+from db import Database
 
 
 @pytest.fixture
@@ -22,7 +22,7 @@ def test_method_get_health(api_app):
     assert isinstance(health["active_tailers"], int)
 
 
-@patch("src.api.FileTailer")
+@patch("api.FileTailer")
 def test_method_start_stop_tail(mock_tailer_class, api_app, tmp_path):
     """Test start and stop flow for local file tailing."""
     log_file = tmp_path / "test.log"
@@ -53,7 +53,7 @@ def test_method_start_stop_tail(mock_tailer_class, api_app, tmp_path):
     mock_instance.stop.assert_called_once()
 
 
-@patch("src.api.SSHLoader")
+@patch("api.SSHLoader")
 def test_method_start_ssh_tail(mock_ssh_class, api_app):
     """Test SSH tailer initialization logic."""
     mock_instance = mock_ssh_class.return_value

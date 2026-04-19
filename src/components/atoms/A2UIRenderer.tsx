@@ -74,14 +74,11 @@ export const A2UIRenderer: React.FC<A2UIRendererProps> = ({ payload, onAction })
   }
 
   // Handle the "markup" wrapper sent by the sidecar
-  let resolvedPayload = payload as Record<string, unknown>;
-  if (
-    typeof payload === "object" &&
-    payload !== null &&
-    (payload as Record<string, unknown>).type === "markup" &&
-    (payload as Record<string, unknown>).raw
-  ) {
-    const parsed = parseA2UIMarkup((payload as { raw: string }).raw);
+  let resolvedPayload: A2UIComponent | null = null;
+  const rawPayload = payload as Record<string, unknown>;
+
+  if (rawPayload.type === "markup" && typeof rawPayload.raw === "string") {
+    const parsed = parseA2UIMarkup(rawPayload.raw);
     if (!parsed) {
       return (
         <div className="text-[10px] text-zinc-500 italic opacity-50 p-2 border border-zinc-800 rounded bg-zinc-900/30">
@@ -89,7 +86,7 @@ export const A2UIRenderer: React.FC<A2UIRendererProps> = ({ payload, onAction })
         </div>
       );
     }
-    resolvedPayload = parsed as unknown as A2UIComponent;
+    resolvedPayload = parsed;
   } else {
     resolvedPayload = payload as A2UIComponent;
   }
@@ -164,7 +161,7 @@ export const A2UIRenderer: React.FC<A2UIRendererProps> = ({ payload, onAction })
 
   return (
     <div className="a2ui-renderer w-full mt-2">
-      {renderComponent(resolvedPayload as A2UIComponent, 0)}
+      {resolvedPayload && renderComponent(resolvedPayload, 0)}
     </div>
   );
 };

@@ -1,5 +1,5 @@
 import { cn } from "@/lib/utils";
-import { Fragment } from "react";
+import { Fragment, type ReactNode } from "react";
 
 interface MarkdownContentProps {
   /** The raw text content to render with lightweight markdown support. */
@@ -35,8 +35,8 @@ export function MarkdownContent({ content, className }: MarkdownContentProps) {
 }
 
 /** Parses markdown text into React elements. */
-function parseMarkdown(text: string): React.ReactNode[] {
-  const elements: React.ReactNode[] = [];
+function parseMarkdown(text: string): ReactNode[] {
+  const elements: ReactNode[] = [];
   const lines = text.split("\n");
   let i = 0;
 
@@ -174,9 +174,9 @@ function parseParagraph(lines: string[], startIndex: number, elIndex: number) {
 }
 
 /** Renders inline markdown: **bold**, `code`, and line breaks. */
-function renderInline(text: string): React.ReactNode {
+function renderInline(text: string): ReactNode {
   // Split by inline patterns in order: bold, code, text
-  const parts: React.ReactNode[] = [];
+  const parts: ReactNode[] = [];
   // Combined regex for bold (**text**) and inline code (`text`)
   const regex = /(\*\*[^*]+\*\*|`[^`]+`)/g;
   let lastIndex = 0;
@@ -217,7 +217,7 @@ function renderInline(text: string): React.ReactNode {
 }
 
 /** Converts \n to <br /> within inline text. */
-function renderLineBreaks(text: string): React.ReactNode {
+function renderLineBreaks(text: string): ReactNode {
   const lines = text.split("\n");
   if (lines.length === 1) {
     return text;

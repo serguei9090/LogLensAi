@@ -17,6 +17,7 @@
     "lint:fix": "biome check --write .",
     "format": "biome format --write .",
     "typecheck": "tsc --noEmit",
+    "type-sync": "uv run scripts/generate_schema.py && bun x json2ts api_schema.json src/lib/types/generated.ts",
     "test": "vitest run",
     "test:watch": "vitest"
   },
@@ -74,6 +75,7 @@
     "autoprefixer": "^10.4.21",
     "concurrently": "^9.1.2",
     "jsdom": "^26.0.0",
+    "json-schema-to-typescript": "^15.0.4",
     "postcss": "^8.5.1",
     "tailwindcss": "^4.0.0",
     "tscanner": "^0.1.3",

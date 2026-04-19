@@ -72,7 +72,7 @@
 - [x] **FIX-AI-001**: AI Persistence & Context Strategy (Commit transactions + Multi-turn history)
   - **Files**: `sidecar/src/api.py`, `sidecar/src/ai/ai_studio.py`
   - **Detail**: `docs/TODOC/FIX-AI-001.md`
-- [ ] **FIX-AI-002**: Standardized AI History & Universal Auto-Healing (Context Injection)
+- [x] **FIX-AI-002**: Standardized AI History & Universal Auto-Healing (Context Injection)
   - **Files**: `sidecar/src/api.py`, `sidecar/src/ai/gemini_cli.py`, `sidecar/src/ai/ai_studio.py`
   - **Detail**: `docs/TODOC/FIX-AI-002.md`
 - [ ] **FIX-FE-001**: Sidebar Button Nesting & Sync (Fix component recursion + Initial fetch)
@@ -118,29 +118,40 @@
 
 ---
 
-## 🔵 Sprint 03 — Orchestrator Completion (Active)
+## 🔵 Sprint 03 — Orchestrator Completion (Done)
 
 ### P1 — Frontend Completion
 
-- [ ] **ORK-FE-001**: `workspaceStore.ts` — Add `updateSource` action for renaming fusion tabs after edit
-  - **Files**: `src/store/workspaceStore.ts`
-  - Currently fusion name update after edit does nothing
-- [ ] **ORK-FE-002**: `InvestigationPage.tsx` — Wire `handleFusionSaved` to call `updateSource` when editing
-  - **Files**: `src/components/pages/InvestigationPage.tsx`
-- [ ] **ORK-FE-003**: `OrchestratorHub.tsx` — Add validation: disabled state on "Deploy Fusion" if < 2 sources
-  - **Files**: `src/components/organisms/OrchestratorHub.tsx`
+- [x] **ORK-FE-001**: `workspaceStore.ts` — Add `updateSource` action for renaming fusion tabs after edit
+- [x] **ORK-FE-002**: `InvestigationPage.tsx` — Wire `handleFusionSaved` to call `updateSource` when editing
+- [x] **ORK-FE-003**: `OrchestratorHub.tsx` — Add validation: disabled state on "Deploy Fusion" if < 2 sources
 
 ---
 
-## 🔵 Sprint 04 — Dynamic Parsing Engine (Active)
+## 🔵 Sprint 04 — Dynamic Parsing Engine (Done)
 
 ### P0 — Parsing Integration
 
-- [ ] **PARS-002**: Sidecar — Dynamic regex application from `parser_config` JSON
-  - **Files**: `sidecar/src/parser.py`, `sidecar/src/api.py`
-- [ ] **PARS-003**: Sidecar — Integrate regex parser into `FileTailer` live-tail flow
-  - **Files**: `sidecar/src/tailer.py`, `sidecar/src/parser.py`
+- [x] **PARS-002**: Sidecar — Dynamic regex application from `parser_config` JSON
+- [x] **PARS-003**: Sidecar — Integrate regex parser into `FileTailer` live-tail flow
 - [x] **PARS-004**: Timezone offset normalization in sidecar (UTC conversion using `tz_offset`)
+
+---
+
+## 🔵 Phase 4 — Integration & Infrastructure (Active)
+
+### P0 — IPC & Performance
+
+- [x] **ipc_001**: Establish Tauri JSON-RPC Bridge (stdin/stdout process management)
+- [x] **ipc_002**: Type-Sync Auto-Generator (Pydantic to TypeScript pipeline)
+- [ ] **ui_004**: Native File Picker & Search Molecules
+ 
+## 🔵 Sprint 07 — Advanced UX & Intelligence (Active)
+
+### P0 — UI Facets & Metadata
+- [x] **metadata_faceting_001**: Advanced Metadata Faceting (The "IP Sidebar")
+  - **Detail**: `docs/TODOC/metadata_faceting_001.md`
+  - **Status**: Implemented backend extraction, DuckDB JSON storage, and FacetSidebar UI.
 
 ---
 

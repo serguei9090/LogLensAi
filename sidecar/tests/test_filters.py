@@ -1,12 +1,12 @@
 import pytest
-from src.api import App
+from api import App
 
 
 @pytest.fixture
 def api():
     app = App(db_path=":memory:")
     yield app
-    from src.db import Database
+    from db import Database
 
     Database.reset()
 

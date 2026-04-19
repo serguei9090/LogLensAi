@@ -2,8 +2,8 @@ import os
 import tempfile
 
 import pytest
-from src.api import App, JSONRPCRequest
-from src.db import Database
+from api import App, JSONRPCRequest
+from db import Database
 
 
 @pytest.fixture

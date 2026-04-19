@@ -5,13 +5,11 @@ import { cn } from "@/lib/utils";
 import { useWorkspaceStore } from "@/store/workspaceStore";
 import {
   Bot,
-  Box,
   Check,
   ChevronDown,
   ChevronRight,
   Cpu,
   FolderOpen,
-  Globe,
   Layers,
   Palette,
   Plus,

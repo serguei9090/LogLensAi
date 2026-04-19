@@ -2,8 +2,8 @@ import uuid
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
-from src.ai.base import AIChatMessage
-from src.api import App
+from ai.base import AIChatMessage
+from api import App
 
 
 @pytest.fixture
@@ -15,7 +15,7 @@ def api():
     # Mock the chat response specifically
     app.ai.chat = AsyncMock()
     yield app
-    from src.db import Database
+    from db import Database
 
     Database.reset()
 

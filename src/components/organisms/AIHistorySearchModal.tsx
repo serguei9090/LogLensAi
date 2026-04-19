@@ -3,7 +3,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
-import { type AiSession, useAiStore } from "@/store/aiStore";
+import { useAiStore } from "@/store/aiStore";
 import { useWorkspaceStore } from "@/store/workspaceStore";
 import { Calendar, Search, Trash2 } from "lucide-react";
 import { useState } from "react";

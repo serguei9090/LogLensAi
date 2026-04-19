@@ -4,7 +4,7 @@ import { callSidecar } from "@/lib/hooks/useSidecarBridge";
 import { cn } from "@/lib/utils";
 import { useInvestigationStore } from "@/store/investigationStore";
 import type { LogSource } from "@/store/workspaceStore";
-import { Check, Clock, Cpu, Layers, Plus, Save, Settings2, Sparkles, X, Zap } from "lucide-react";
+import { Check, Clock, Cpu, Layers, Settings2, Sparkles, X, Zap } from "lucide-react";
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { toast } from "sonner";
@@ -66,6 +66,13 @@ function StrategyCard({
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 
+interface DiscoveryTemplate {
+  id: number;
+  name: string;
+  config: string;
+  created_at: string;
+}
+
 export function OrchestratorHub({
   isOpen,
   onClose,
@@ -94,6 +101,7 @@ export function OrchestratorHub({
   const [activeTimeShiftSource, setActiveTimeShiftSource] = useState<string | null>(null);
   const [isLoadingConfig, setIsLoadingConfig] = useState(false);
   const [tempContext, setTempContext] = useState("");
+  const [templates, setTemplates] = useState<DiscoveryTemplate[]>([]);
 
   // Initialize
   useEffect(() => {
@@ -128,6 +136,12 @@ export function OrchestratorHub({
       );
     }
 
+    // Fetch Templates
+    callSidecar<DiscoveryTemplate[]>({
+      method: "get_templates",
+      params: { workspace_id: workspaceId },
+    }).then((res) => setTemplates(res || []));
+
     callSidecar<{ offsets: Record<string, number> }>({
       method: "get_temporal_offsets",
       params: { workspace_id: workspaceId },
@@ -138,6 +152,18 @@ export function OrchestratorHub({
     setConfigs((prev) =>
       prev.map((c) => (c.source_id === sourceId ? { ...c, enabled: !c.enabled } : c)),
     );
+  };
+
+  const applyTemplateToSource = (sourceId: string, templateId: string) => {
+    const template = templates.find((t) => t.id.toString() === templateId);
+    if (!template) return;
+
+    // Apply the template's config_json to the source's parser_config
+    // We treat discovery templates as source-specific parsers/filters
+    setConfigs((prev) =>
+      prev.map((c) => (c.source_id === sourceId ? { ...c, parser_config: template.config } : c)),
+    );
+    toast.success(`Applied "${template.name}" to source.`);
   };
 
   const handleParserSaved = (sourceId: string, cfg: string | null) => {
@@ -446,6 +472,24 @@ export function OrchestratorHub({
                               >
                                 {label}
                               </p>
+                              {config.enabled && templates.length > 0 && (
+                                <select
+                                  className="mt-1 w-full bg-transparent text-[10px] text-white/40 outline-none cursor-pointer hover:text-white/60 transition-colors"
+                                  onChange={(e) =>
+                                    applyTemplateToSource(config.source_id, e.target.value)
+                                  }
+                                  defaultValue=""
+                                >
+                                  <option value="" disabled className="bg-[#111]">
+                                    Apply Template...
+                                  </option>
+                                  {templates.map((t) => (
+                                    <option key={t.id} value={t.id} className="bg-[#111]">
+                                      {t.name}
+                                    </option>
+                                  ))}
+                                </select>
+                              )}
                             </div>
                             {config.enabled && (
                               <button
@@ -579,9 +623,9 @@ export function OrchestratorHub({
               )}
               {view === "fusion-form" && (
                 <Button
-                  className="flex-1 h-9 text-xs font-medium bg-white text-black hover:bg-white/90"
+                  className="flex-1 h-9 text-xs font-medium bg-white text-black hover:bg-white/90 disabled:opacity-30 disabled:cursor-not-allowed"
                   onClick={deployFusion}
-                  disabled={isSaving}
+                  disabled={isSaving || configs.filter((c) => c.enabled).length < 2}
                 >
                   {isSaving ? "Saving..." : "Deploy"}
                 </Button>

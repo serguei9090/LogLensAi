@@ -45,6 +45,8 @@ interface WorkspaceStore {
   setActiveSource: (workspaceId: string, sourceId: string | null) => void;
   /** Rename a source tab */
   renameSource: (workspaceId: string, sourceId: string, name: string) => void;
+  /** Update any field in a LogSource object */
+  updateSource: (workspaceId: string, sourceId: string, updates: Partial<LogSource>) => void;
 }
 
 // ─── Helper ────────────────────────────────────────────────────────────────────
@@ -140,7 +142,7 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
           ),
         })),
 
-      renameSource: (workspaceId, sourceId, name) =>
+      renameSource: (workspaceId: string, sourceId: string, name: string) =>
         set((state) => ({
           workspaces: state.workspaces.map((w) => {
             if (w.id !== workspaceId) {
@@ -152,7 +154,21 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
             };
           }),
         })),
-    }),
+
+      updateSource: (workspaceId, sourceId, updates) =>
+        set((state) => ({
+          workspaces: state.workspaces.map((w) => {
+            if (w.id !== workspaceId) {
+              return w;
+            }
+            return {
+              ...w,
+              sources: w.sources.map((s) => (s.id === sourceId ? { ...s, ...updates } : s)),
+            };
+          }),
+        })),
+      }),
+
     {
       name: "loglensai-workspaces-v3",
     },

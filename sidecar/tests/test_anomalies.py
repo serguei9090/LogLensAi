@@ -1,6 +1,6 @@
 import pytest
-from src.api import App
-from src.db import Database
+from api import App
+from db import Database
 
 
 @pytest.fixture

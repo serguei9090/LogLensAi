@@ -63,6 +63,7 @@ graph TD
 - **[Communication & Contract](communication.md)**: Full JSON-RPC 2.0 method specification and bridge patterns.
 - **[Testing & Quality](testing.md)**: Unit, integration, and E2E coverage tracking for the LogLens ecosystem.
 - **[Visual Diagrams Repository](diagrams.md)**: Detailed flowcharts and sequence diagrams for complex interactions.
+- **[Function & Component Index](function_index.md)**: Searchable list of all core backend functions and frontend components with one-line summaries.
 
 ## 🛡️ Mandate
 Every new feature, function, or structural file MUST update its corresponding documentation in this directory. Failing to do so is a direct violation of the `ArchitectureDocs.md` rule.

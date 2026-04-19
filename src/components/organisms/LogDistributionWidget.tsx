@@ -3,7 +3,7 @@ import { callSidecar } from "@/lib/hooks/useSidecarBridge";
 import { useInvestigationStore } from "@/store/investigationStore";
 import { X } from "lucide-react";
 import { useEffect, useState } from "react";
-import { Bar, BarChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { Bar, BarChart, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 
 interface Bucket {
   bucket: string;
@@ -11,6 +11,13 @@ interface Bucket {
   ERROR?: number;
   WARN?: number;
   [key: string]: string | number | undefined;
+}
+
+interface Anomaly {
+  cluster_id: string;
+  timestamp: string;
+  z_score: number;
+  current_rate: number;
 }
 
 interface LogDistributionWidgetProps {
@@ -34,6 +41,7 @@ export function LogDistributionWidget({
 }: LogDistributionWidgetProps) {
   const { timeRange } = useInvestigationStore();
   const [data, setData] = useState<Bucket[]>([]);
+  const [anomalies, setAnomalies] = useState<Anomaly[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -48,21 +56,29 @@ export function LogDistributionWidget({
       setLoading(true);
       setError(null);
       try {
-        const res = await callSidecar<{ buckets: Bucket[] }>({
-          method: "get_log_distribution",
-          params: {
-            workspace_id: workspaceId,
-            source_ids: sourceIds,
-            fusion_id: fusionId,
-            query: query,
-            filters: filters,
-            interval: "1h",
-            start_time: timeRange.start || undefined,
-            end_time: timeRange.end || undefined,
-          },
-        });
+        const [distRes, anomalyRes] = await Promise.all([
+          callSidecar<{ buckets: Bucket[] }>({
+            method: "get_log_distribution",
+            params: {
+              workspace_id: workspaceId,
+              source_ids: sourceIds,
+              fusion_id: fusionId,
+              query: query,
+              filters: filters,
+              interval: "1h",
+              start_time: timeRange.start || undefined,
+              end_time: timeRange.end || undefined,
+            },
+          }),
+          callSidecar<{ anomalies: Anomaly[] }>({
+            method: "get_anomalies",
+            params: { workspace_id: workspaceId },
+          }),
+        ]);
+
         if (mounted) {
-          setData(res.buckets || []);
+          setData(distRes.buckets || []);
+          setAnomalies(anomalyRes.anomalies || []);
         }
       } catch (err) {
         if (mounted) {
@@ -98,9 +114,13 @@ export function LogDistributionWidget({
       ? timeStr.split(" ")[1] || timeStr
       : date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 
+    // Match anomalies to this bucket
+    const hasAnomaly = anomalies.some((a) => a.timestamp.startsWith(timeStr));
+
     return {
       ...d,
       displayTime,
+      hasAnomaly,
       INFO: d.INFO || 0,
       ERROR: d.ERROR || 0,
       WARN: d.WARN || 0,
@@ -153,6 +173,12 @@ export function LogDistributionWidget({
         </div>
 
         <div className="flex items-center gap-4">
+          {anomalies.length > 0 && (
+            <div className="flex items-center gap-1.5 px-2 py-0.5 bg-red-500/10 rounded-full border border-red-500/20">
+              <div className="size-1.5 bg-red-500 rounded-full animate-ping" />
+              <span className="text-[10px] text-red-500 font-bold uppercase">Spike Detected</span>
+            </div>
+          )}
           {isTailing && (
             <div className="flex items-center gap-1.5 px-2 py-0.5 bg-primary/10 rounded-full border border-primary/20">
               <div className="size-1.5 bg-primary rounded-full animate-pulse" />
@@ -202,7 +228,16 @@ export function LogDistributionWidget({
             />
             <Bar dataKey="INFO" stackId="a" fill="#0ea5e9" radius={[0, 0, 4, 4]} />
             <Bar dataKey="WARN" stackId="a" fill="#eab308" />
-            <Bar dataKey="ERROR" stackId="a" fill="#ef4444" radius={[4, 4, 0, 0]} />
+            <Bar dataKey="ERROR" stackId="a" fill="#ef4444" radius={[4, 4, 0, 0]}>
+              {formattedData.map((entry, index) => (
+                <Cell
+                  key={`cell-${index}`}
+                  fill={entry.hasAnomaly ? "#ff4444" : "#ef4444"}
+                  stroke={entry.hasAnomaly ? "#ffffff" : "none"}
+                  strokeWidth={entry.hasAnomaly ? 2 : 0}
+                />
+              ))}
+            </Bar>
           </BarChart>
         </ResponsiveContainer>
       </div>

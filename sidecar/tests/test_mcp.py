@@ -1,6 +1,6 @@
 import pytest
-from src.api import App
-from src.db import Database
+from api import App
+from db import Database
 
 
 @pytest.fixture
@@ -20,7 +20,7 @@ def app():
 
 
 def test_mcp_tools(app):
-    from src.mcp_server import get_pattern_summary, ls_sources, query_logs
+    from mcp_server import get_pattern_summary, ls_sources, query_logs
 
     sources = ls_sources("ws1")
     assert "src1" in sources

@@ -30,7 +30,7 @@ describe("LogDistributionWidget", () => {
     );
 
     // Check loading state first
-    expect(getByText("Loading distribution...")).toBeDefined();
+    expect(getByText("Synchronizing timeline data...")).toBeDefined();
 
     // Wait for the container to render after loading
     await waitFor(() => {

@@ -39,14 +39,18 @@ export function ThinkingBlock({
 
   // Time counting for active streaming
   useEffect(() => {
-    let interval: NodeJS.Timeout;
+    let interval: ReturnType<typeof setInterval> | undefined;
     if (isStreaming) {
       setIsExpanded(true); // Auto-expand when streaming starts
       interval = setInterval(() => {
         setActiveDuration((prev) => prev + 100);
       }, 100);
     }
-    return () => clearInterval(interval);
+    return () => {
+      if (interval) {
+        clearInterval(interval);
+      }
+    };
   }, [isStreaming]);
 
   // Auto-retract when streaming finishes (was streaming -> no longer streaming)

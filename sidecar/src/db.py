@@ -1,12 +1,15 @@
 import contextlib
 import os
 import threading
-from typing import Any
+from typing import Any, List, Tuple, Dict, Optional
+from datetime import datetime, timedelta
+import json
 
 import duckdb
+from query_parser import parse_llql
 
 
-class Database:
+class LogDatabase:
     _instance = None
     _lock = threading.Lock()
 
@@ -27,8 +30,6 @@ class Database:
             self.conn = duckdb.connect(db_path)
         except Exception as e:
             # BUG-001 / STAB-003 Resolution: Robust WAL Recovery
-            # If the database was crashed abruptly, replaying the WAL may fail.
-            # In dev/local mode, we attempt to recover by flushing the WAL.
             if db_path != ":memory:":
                 wal_path = f"{db_path}.wal"
                 if os.path.exists(wal_path):
@@ -66,7 +67,8 @@ class Database:
                 cluster_id   TEXT,
                 raw_text     TEXT,
                 has_comment  BOOLEAN DEFAULT FALSE,
-                comment      TEXT
+                comment      TEXT,
+                facets       JSON
             );
 
             CREATE TABLE IF NOT EXISTS settings (
@@ -137,6 +139,31 @@ class Database:
                 value        TEXT,
                 PRIMARY KEY (workspace_id, key)
             );
+
+            CREATE TABLE IF NOT EXISTS settings_templates (
+                id           INTEGER PRIMARY KEY DEFAULT nextval('log_id_seq'),
+                workspace_id TEXT,
+                name         TEXT,
+                config_json  TEXT,
+                created_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+
+            CREATE TABLE IF NOT EXISTS anomalies (
+                workspace_id TEXT,
+                cluster_id   TEXT,
+                timestamp    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                z_score      FLOAT,
+                current_rate FLOAT,
+                mean_rate    FLOAT,
+                PRIMARY KEY (workspace_id, cluster_id, timestamp)
+            );
+
+            -- Performance Indexes
+            CREATE INDEX IF NOT EXISTS idx_logs_workspace_id ON logs (workspace_id);
+            CREATE INDEX IF NOT EXISTS idx_logs_source_id ON logs (source_id);
+            CREATE INDEX IF NOT EXISTS idx_logs_timestamp ON logs (timestamp);
+            CREATE INDEX IF NOT EXISTS idx_logs_cluster_id ON logs (cluster_id);
+            CREATE INDEX IF NOT EXISTS idx_ai_messages_session_id ON ai_messages (session_id);
         """)
 
     def _run_migrations(self, cursor):
@@ -145,10 +172,19 @@ class Database:
         self._migrate_fusion_pk(cursor)
         self._migrate_fusion_time_shift(cursor)
         self._migrate_log_columns(cursor)
+        self._migrate_log_facets(cursor)
+        self._migrate_indexes(cursor)
+
+    def _migrate_indexes(self, cursor):
+        """Ensure all performance indexes exist on legacy databases."""
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_logs_workspace_id ON logs (workspace_id);")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_logs_source_id ON logs (source_id);")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_logs_timestamp ON logs (timestamp);")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_logs_cluster_id ON logs (cluster_id);")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_ai_messages_session_id ON ai_messages (session_id);")
 
     def _migrate_ai_tables(self, cursor):
         """Ensure AI session/message tables have latest columns."""
-        # Fix column names if using old temporary names
         try:
             cursor.execute("SELECT name FROM ai_sessions LIMIT 1")
         except Exception:
@@ -163,7 +199,6 @@ class Database:
                     "ALTER TABLE ai_sessions RENAME COLUMN last_updated TO last_modified"
                 )
 
-        # Add missing columns
         for table, col in [
             ("ai_sessions", "provider_session_id"),
             ("ai_messages", "provider_session_id"),
@@ -174,7 +209,6 @@ class Database:
             except Exception:
                 cursor.execute(f"ALTER TABLE {table} ADD COLUMN {col} TEXT")
 
-        # Add ai_memory table if it doesn't exist
         try:
             cursor.execute("SELECT workspace_id FROM ai_memory LIMIT 1")
         except Exception:
@@ -189,7 +223,6 @@ class Database:
             """)
 
     def _migrate_fusion_pk(self, cursor):
-        """Migrate fusion_configs to new composite PK including fusion_id."""
         try:
             cursor.execute(
                 "SELECT k.name FROM pragma_table_info('fusion_configs') k WHERE k.pk > 0"
@@ -202,7 +235,7 @@ class Database:
                     "CREATE TEMP TABLE fusion_configs_backup AS SELECT * FROM fusion_configs"
                 )
                 cursor.execute("DROP TABLE fusion_configs")
-                self._setup_schema(cursor)  # Re-creates with new PK structure
+                self._setup_schema(cursor)
 
                 cursor.execute("PRAGMA table_info('fusion_configs_backup')")
                 backup_cols = [row[1] for row in cursor.fetchall()]
@@ -222,7 +255,6 @@ class Database:
             print(f"[DB] Error migrating fusion_configs: {e}")
 
     def _migrate_fusion_time_shift(self, cursor):
-        """Add time_shift_seconds column to fusion_configs."""
         try:
             cursor.execute("SELECT time_shift_seconds FROM fusion_configs LIMIT 1")
         except Exception:
@@ -232,7 +264,6 @@ class Database:
             )
 
     def _migrate_log_columns(self, cursor):
-        """Add missing source_id and defaults to logs table."""
         try:
             cursor.execute("SELECT source_id FROM logs LIMIT 1")
         except Exception:
@@ -241,8 +272,14 @@ class Database:
         with contextlib.suppress(Exception):
             cursor.execute("ALTER TABLE logs ALTER id SET DEFAULT nextval('log_id_seq')")
 
+    def _migrate_log_facets(self, cursor):
+        try:
+            cursor.execute("SELECT facets FROM logs LIMIT 1")
+        except Exception:
+            print("[DB] Adding facets column to logs table...")
+            cursor.execute("ALTER TABLE logs ADD COLUMN facets JSON")
+
     def _initialize_cluster_cache(self, cursor):
-        """Warm up the clusters table from existing log data if empty."""
         try:
             cursor.execute("SELECT count(*) FROM clusters")
             if cursor.fetchone()[0] == 0:
@@ -256,11 +293,9 @@ class Database:
             print(f"[DB] Cluster cache initialization failure: {e}")
 
     def get_cursor(self):
-        # BUG-001 Fix: Use thread-local cursor for DuckDB thread safety
         return self.conn.cursor()
 
     def commit(self):
-        """Thread-safe commit for DuckDB write operations."""
         self.conn.commit()
 
     @classmethod
@@ -270,3 +305,157 @@ class Database:
                 if hasattr(cls._instance, "conn"):
                     cls._instance.conn.close()
                 cls._instance = None
+
+    def _parse_filters(self, filters: list) -> tuple[list[str], list[Any]]:
+        where_clauses = []
+        params = []
+        allowed_fields = ["level", "source_id", "cluster_id", "raw_text", "has_comment"]
+
+        for f in filters:
+            if hasattr(f, "model_dump"):
+                f = f.model_dump()
+            
+            field = f.get("field")
+            value = f.get("value")
+            op = f.get("operator", "equals")
+
+            if field.startswith("facets."):
+                facet_key = field.split(".", 1)[1]
+                field = f"json_extract_string(l.facets, '$.{facet_key}')"
+            elif field not in allowed_fields or value is None:
+                continue
+            else:
+                field = f"l.{field}"
+
+            if op == "contains":
+                where_clauses.append(f"{field} ILIKE ?")
+                params.append(f"%{value}%")
+            elif op == "not_contains":
+                where_clauses.append(f"{field} NOT ILIKE ?")
+                params.append(f"%{value}%")
+            elif op == "equals":
+                if "source_id" in field:
+                    where_clauses.append(f"{field} ILIKE ?")
+                else:
+                    where_clauses.append(f"{field} = ?")
+                params.append(value)
+            elif op == "not_equals":
+                where_clauses.append(f"{field} != ?")
+                params.append(value)
+            elif op == "starts_with":
+                where_clauses.append(f"{field} ILIKE ?")
+                params.append(f"{value}%")
+            elif op == "regex":
+                where_clauses.append(f"regexp_matches({field}, ?)")
+                params.append(value)
+
+        return where_clauses, params
+
+    def _apply_temporal_offsets(self, workspace_id: str, logs: list[dict]):
+        cursor = self.get_cursor()
+        cursor.execute(
+            "SELECT source_id, offset_seconds FROM temporal_offsets WHERE workspace_id = ?",
+            (workspace_id,),
+        )
+        rows = cursor.fetchall()
+        if not rows:
+            return
+
+        offsets = {row[0]: row[1] for row in rows}
+
+        for log in logs:
+            source_id = log.get("source_id")
+            shift_sec = offsets.get(source_id, 0)
+            if shift_sec != 0 and log.get("timestamp"):
+                try:
+                    ts_str = log["timestamp"]
+                    if "T" in ts_str:
+                        ts_str = ts_str.replace("T", " ")
+                    dt = datetime.strptime(ts_str[:19], "%Y-%m-%d %H:%M:%S")
+                    dt = dt + timedelta(seconds=shift_sec)
+                    log["timestamp"] = dt.strftime("%Y-%m-%d %H:%M:%S")
+                except Exception:
+                    pass
+
+    def query_logs(self, workspace_id: str, query: str = None, filters: list = None,
+                   limit: int = 100, offset: int = 0, sort_by: str = "id",
+                   sort_order: str = "DESC", source_ids: list = None,
+                   start_time: str = None, end_time: str = None) -> dict:
+        cursor = self.get_cursor()
+
+        where_clauses = ["l.workspace_id = ?"]
+        params = [workspace_id]
+
+        if source_ids is not None:
+            if not source_ids:
+                return {"total": 0, "logs": [], "offset": offset, "limit": limit}
+            placeholders = ",".join(["?"] * len(source_ids))
+            where_clauses.append(f"l.source_id IN ({placeholders})")
+            params.extend(source_ids)
+
+        if filters:
+            f_clauses, f_params = self._parse_filters(filters)
+            where_clauses.extend(f_clauses)
+            params.extend(f_params)
+
+        if query:
+            llql_sql, llql_params = parse_llql(query)
+            if llql_sql:
+                where_clauses.append(f"({llql_sql})")
+                params.extend(llql_params)
+
+        if start_time:
+            norm_start = start_time.replace("T", " ").split(".")[0].replace("Z", "")
+            where_clauses.append("l.timestamp >= ?")
+            params.append(norm_start)
+        if end_time:
+            norm_end = end_time.replace("T", " ").split(".")[0].replace("Z", "")
+            where_clauses.append("l.timestamp <= ?")
+            params.append(norm_end)
+
+        where_sql = " AND ".join(where_clauses)
+        total_logs_subquery = "(SELECT count(*) FROM logs WHERE workspace_id = ?)"
+
+        base_query = f"""
+            SELECT l.*, c.count as _cluster_count, c.template as cluster_template,
+                CAST(c.count AS FLOAT) * 100.0 / {total_logs_subquery} as cluster_percent
+            FROM logs l
+            LEFT JOIN clusters c ON l.workspace_id = c.workspace_id AND l.cluster_id = c.cluster_id
+            WHERE {where_sql}
+        """
+
+        count_query = f"SELECT COUNT(*) FROM logs l WHERE {where_sql}"
+        cursor.execute(count_query, params)
+        total = cursor.fetchone()[0]
+
+        allowed_sort = ["id", "timestamp", "level", "source_id", "cluster_id", "has_comment", "cluster_percent"]
+        final_sort_by = sort_by if sort_by in allowed_sort else "id"
+        if final_sort_by == "cluster_id":
+            final_sort_by = "cluster_percent"
+
+        final_sort_order = "ASC" if sort_order and sort_order.upper() == "ASC" else "DESC"
+        data_query = base_query + f" ORDER BY {final_sort_by} {final_sort_order}, l.id {final_sort_order} LIMIT ? OFFSET ?"
+        
+        # params[0] is workspace_id for the subquery in SELECT, then params for WHERE clause
+        cursor.execute(data_query, [workspace_id] + params + [limit, offset])
+
+        columns = [desc[0] for desc in cursor.description]
+        logs = []
+        for row in cursor.fetchall():
+            log_dict = dict(zip(columns, row, strict=False))
+            if "facets" in log_dict and isinstance(log_dict["facets"], str):
+                try:
+                    log_dict["facets"] = json.loads(log_dict["facets"])
+                except Exception:
+                    log_dict["facets"] = {}
+            elif "facets" in log_dict and log_dict["facets"] is None:
+                log_dict["facets"] = {}
+            logs.append(log_dict)
+
+        self._apply_temporal_offsets(workspace_id, logs)
+
+        return {"total": total, "logs": logs, "offset": offset, "limit": limit}
+
+
+# Alias for backward compatibility
+Database = LogDatabase

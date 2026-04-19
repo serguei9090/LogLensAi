@@ -14,6 +14,7 @@ export interface SourceState {
   sortOrder: "asc" | "desc";
   timeRange: { start: string; end: string; label?: string };
   selectedLogIds: number[];
+  availableFacets: Record<string, { value: string; count: number }[]>;
 }
 
 export interface InvestigationStore extends SourceState {
@@ -46,6 +47,7 @@ export interface InvestigationStore extends SourceState {
   setSelectedLogIds: (ids: number[]) => void;
   toggleLogSelection: (id: number) => void;
   clearSelection: () => void;
+  setAvailableFacets: (facets: Record<string, { value: string; count: number }[]>) => void;
 }
 
 const DEFAULT_SOURCE_STATE: SourceState = {
@@ -59,6 +61,7 @@ const DEFAULT_SOURCE_STATE: SourceState = {
   sortOrder: "desc",
   timeRange: { start: "", end: "" },
   selectedLogIds: [],
+  availableFacets: {},
 };
 
 export const useInvestigationStore = create<InvestigationStore>((set, get) => ({
@@ -89,6 +92,7 @@ export const useInvestigationStore = create<InvestigationStore>((set, get) => ({
       sortOrder: get().sortOrder,
       timeRange: get().timeRange,
       selectedLogIds: get().selectedLogIds,
+      availableFacets: get().availableFacets,
     };
 
     // 2. Update the sourceStates map
@@ -129,4 +133,5 @@ export const useInvestigationStore = create<InvestigationStore>((set, get) => ({
         : [...state.selectedLogIds, id],
     })),
   clearSelection: () => set({ selectedLogIds: [] }),
+  setAvailableFacets: (availableFacets) => set({ availableFacets }),
 }));

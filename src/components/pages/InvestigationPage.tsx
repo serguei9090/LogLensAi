@@ -1,4 +1,5 @@
 import { AIInvestigationSidebar } from "@/components/organisms/AIInvestigationSidebar";
+import { FacetSidebar } from "@/components/organisms/FacetSidebar";
 import { ImportFeedModal } from "@/components/organisms/ImportFeedModal";
 import { OrchestratorHub } from "@/components/organisms/OrchestratorHub";
 import { VirtualLogTable } from "@/components/organisms/VirtualLogTable";
@@ -11,7 +12,6 @@ import { useInvestigationStore } from "@/store/investigationStore";
 import { useSettingsStore } from "@/store/settingsStore";
 import {
   type LogSource,
-  selectActiveSource,
   selectActiveWorkspace,
   useWorkspaceStore,
 } from "@/store/workspaceStore";
@@ -72,10 +72,17 @@ export function InvestigationPage() {
     showAnomalies,
     timeRange,
     syncActiveSource,
+    setAvailableFacets,
   } = useInvestigationStore();
 
-  const { activeWorkspaceId, addSource, removeSource, setActiveSource, renameSource } =
-    useWorkspaceStore();
+  const {
+    activeWorkspaceId,
+    addSource,
+    removeSource,
+    setActiveSource,
+    renameSource,
+    updateSource,
+  } = useWorkspaceStore();
   const { fetchSettings } = useSettingsStore();
   const activeWorkspace = useWorkspaceStore(selectActiveWorkspace);
   const { setSidebarOpen, sendMessage, setSession } = useAiStore();
@@ -156,9 +163,17 @@ export function InvestigationPage() {
           },
         });
         setLogs(result.logs ?? [], result.total ?? 0);
+
+        // Fetch Facets
+        const facetRes = await callSidecar<Record<string, { value: string; count: number }[]>>({
+          method: "get_metadata_facets",
+          params: { workspace_id: activeWorkspaceId },
+        });
+        setAvailableFacets(facetRes);
+
         setIsConnected(true);
       } catch (e) {
-        console.error("Fetch logs failed", e);
+        console.error("Fetch logs/facets failed", e);
         setIsConnected(false);
       }
     };
@@ -357,6 +372,8 @@ export function InvestigationPage() {
         path: fusionId,
       });
       setActiveSource(activeWorkspaceId, newSrc.id);
+    } else {
+      updateSource(activeWorkspaceId, existingSrc.id, { name: fusionName });
     }
   };
 
@@ -409,9 +426,9 @@ export function InvestigationPage() {
         showDistribution={showDistribution}
         onDistributionClose={() => setShowDistribution(!showDistribution)}
         workspaceId={activeWorkspaceId}
-        onEngineSettingsOpen={() => setIsEngineSettingsOpen(true)}
+        leftPanel={<FacetSidebar />}
         rightPanel={
-          <AIInvestigationSidebar onEngineSettingsOpen={() => setIsEngineSettingsOpen(true)} />
+          <AIInvestigationSidebar />
         }
       >
         <VirtualLogTable

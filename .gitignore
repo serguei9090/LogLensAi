@@ -1,6 +1,7 @@
 # Artifacts
 !README.md
 !CHANGELOG.md
+api_schema.json
 
 # Node / JS
 node_modules/

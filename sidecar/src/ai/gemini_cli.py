@@ -153,27 +153,26 @@ class GeminiCLIProvider(AIProvider):
         messages: list[AIChatMessage],
         model: str | None = None,
         session_id: str | None = None,
+        provider_session_id: str | None = None,
         reasoning: bool = True,
         **kwargs,
     ):
         """Streaming version of hot mode chat that yields text chunks."""
-        is_new_task = not self.force_cold and session_id not in self._task_cache
-        task_id = self._task_cache.get(session_id) if not self.force_cold else None
+        if not session_id:
+            # Fallback to cold mode (no stream support for now in cold mode)
+            res = await self._chat_cold(messages, model)
+            yield res.content
+            return
 
-        prompt = self._prepare_hot_prompt(messages, is_new_task)
+        async with aiohttp.ClientSession(timeout=self.timeout) as session:
+            # 1. Task Management
+            task_id = await self._get_or_create_task(session, session_id, provider_session_id, model)
+            is_new_task = (task_id != provider_session_id) if provider_session_id else False
 
-        import aiohttp
+            # 2. Context Restoration
+            prompt = self._prepare_hot_prompt(messages, is_new_task)
 
-        async with aiohttp.ClientSession() as session:
-            if is_new_task:
-                payload = {"name": f"LogLensAi Session {session_id}", "description": ""}
-                async with session.post(f"{self.host}/tasks", json=payload) as resp:
-                    if resp.status == 200:
-                        data = await resp.json()
-                        task_id = data.get("id")
-                    else:
-                        raise RuntimeError("Failed to create A2A Task")
-
+            # 3. Payload Parity
             message_id = os.urandom(8).hex()
             payload = {
                 "jsonrpc": "2.0",
@@ -188,6 +187,7 @@ class GeminiCLIProvider(AIProvider):
                 },
             }
 
+            # 4. Stream Handling
             async with session.post(f"{self.host}/", json=payload) as resp:
                 if resp.status != 200:
                     err_text = await resp.text()
@@ -197,6 +197,7 @@ class GeminiCLIProvider(AIProvider):
                 async for chunk in self._parse_sse_stream_gen(resp.content):
                     yield chunk
 
+            # Update cache
             self._task_cache[session_id] = task_id
 
     def _prepare_hot_prompt(self, messages: list[AIChatMessage], is_new_task: bool) -> str:

@@ -1,0 +1,205 @@
+import re
+
+class ParseError(Exception):
+    pass
+
+class Node:
+    def to_sql(self):
+        raise NotImplementedError()
+
+class FieldNode(Node):
+    def __init__(self, field, operator, value):
+        self.field = field
+        self.operator = operator
+        self.value = value
+
+    def to_sql(self):
+        field_mapping = {
+            'level': 'l.level',
+            'source': 'l.source_id',
+            'cluster': 'l.cluster_id',
+            'content': 'l.message',
+            'message': 'l.message',
+            'raw': 'l.raw_text',
+        }
+        
+        db_field = field_mapping.get(self.field)
+        
+        if db_field:
+            if self.operator in (':', ':='):
+                return f"{db_field} = ?", [self.value]
+            elif self.operator == ':!=':
+                return f"{db_field} != ?", [self.value]
+            elif self.operator == ':~':
+                return f"{db_field} ILIKE ?", [f"%{self.value}%"]
+        else:
+            # Fallback to facets
+            if self.operator in (':', ':='):
+                return f"json_extract_string(l.facets, '$.{self.field}') = ?", [self.value]
+            elif self.operator == ':!=':
+                return f"json_extract_string(l.facets, '$.{self.field}') != ?", [self.value]
+            elif self.operator == ':~':
+                return f"json_extract_string(l.facets, '$.{self.field}') ILIKE ?", [f"%{self.value}%"]
+        
+        return f"{self.field} = ?", [self.value]
+
+class SearchNode(Node):
+    def __init__(self, term):
+        self.term = term
+
+    def to_sql(self):
+        return "(l.message ILIKE ? OR l.raw_text ILIKE ?)", [f"%{self.term}%", f"%{self.term}%"]
+
+class AndNode(Node):
+    def __init__(self, left, right):
+        self.left = left
+        self.right = right
+
+    def to_sql(self):
+        l_sql, l_params = self.left.to_sql()
+        r_sql, r_params = self.right.to_sql()
+        return f"({l_sql} AND {r_sql})", l_params + r_params
+
+class OrNode(Node):
+    def __init__(self, left, right):
+        self.left = left
+        self.right = right
+
+    def to_sql(self):
+        l_sql, l_params = self.left.to_sql()
+        r_sql, r_params = self.right.to_sql()
+        return f"({l_sql} OR {r_sql})", l_params + r_params
+
+class NotNode(Node):
+    def __init__(self, operand):
+        self.operand = operand
+
+    def to_sql(self):
+        sql, params = self.operand.to_sql()
+        return f"(NOT {sql})", params
+
+class LLQLParser:
+    def __init__(self, query):
+        self.tokens = self._tokenize(query)
+        self.pos = 0
+
+    def _tokenize(self, query):
+        token_spec = [
+            ('FIELD',    r'[a-zA-Z_][a-zA-Z0-9_]*:(?:=|!=|~)?(?:"[^"]*"|[^()\s]+)'),
+            ('SEARCH',   r'search\s+"[^"]*"|search\s+[^()\s]+'),
+            ('STRING',   r'"[^"]*"'),
+            ('AND',      r'\bAND\b'),
+            ('OR',       r'\bOR\b'),
+            ('NOT',      r'\bNOT\b|-'),
+            ('LPAREN',   r'\('),
+            ('RPAREN',   r'\)'),
+            ('WORD',     r'[^()\s]+'),
+            ('WS',       r'\s+'),
+        ]
+        tok_regex = '|'.join('(?P<%s>%s)' % pair for pair in token_spec)
+        tokens = []
+        for mo in re.finditer(tok_regex, query):
+            kind = mo.lastgroup
+            val = mo.group()
+            if kind == 'WS':
+                continue
+            tokens.append((kind, val))
+        return tokens
+
+    def peek(self):
+        if self.pos < len(self.tokens):
+            return self.tokens[self.pos]
+        return None
+
+    def consume(self):
+        tok = self.peek()
+        if tok:
+            self.pos += 1
+        return tok
+
+    def parse(self):
+        if not self.tokens:
+            return None
+        node = self.parse_or_expr()
+        if self.pos < len(self.tokens):
+            raise ParseError(f"Unexpected token {self.peek()} at end of query")
+        return node
+
+    def parse_or_expr(self):
+        node = self.parse_and_expr()
+        while self.peek() and self.peek()[0] == 'OR':
+            self.consume()
+            right = self.parse_and_expr()
+            node = OrNode(node, right)
+        return node
+
+    def parse_and_expr(self):
+        node = self.parse_not_expr()
+        while self.peek() and self.peek()[0] not in ('OR', 'RPAREN'):
+            if self.peek()[0] == 'AND':
+                self.consume()
+            elif self.peek()[0] not in ('LPAREN', 'FIELD', 'SEARCH', 'STRING', 'WORD', 'NOT'):
+                break
+            
+            right = self.parse_not_expr()
+            node = AndNode(node, right)
+        return node
+
+    def parse_not_expr(self):
+        tok = self.peek()
+        if tok and tok[0] == 'NOT':
+            self.consume()
+            return NotNode(self.parse_primary())
+        return self.parse_primary()
+
+    def parse_primary(self):
+        tok = self.peek()
+        if not tok:
+            raise ParseError("Unexpected end of query")
+        
+        kind, val = tok
+        if kind == 'LPAREN':
+            self.consume()
+            node = self.parse_or_expr()
+            if not self.peek() or self.peek()[0] != 'RPAREN':
+                raise ParseError("Expected ')'")
+            self.consume()
+            return node
+        elif kind == 'FIELD':
+            self.consume()
+            # Match longest operators first
+            m = re.match(r'^([a-zA-Z_][a-zA-Z0-9_]*)(:!=|:=|:~|:)(.*)$', val)
+            if m:
+                field, op, val_str = m.groups()
+                if val_str.startswith('"') and val_str.endswith('"'):
+                    val_str = val_str[1:-1]
+                return FieldNode(field, op, val_str)
+            raise ParseError(f"Invalid field format: {val}")
+        elif kind == 'SEARCH':
+            self.consume()
+            val_str = val[6:].strip()
+            if val_str.startswith('"') and val_str.endswith('"'):
+                val_str = val_str[1:-1]
+            return SearchNode(val_str)
+        elif kind == 'STRING':
+            self.consume()
+            return SearchNode(val[1:-1])
+        elif kind == 'WORD':
+            self.consume()
+            return SearchNode(val)
+        else:
+            raise ParseError(f"Unexpected token: {val}")
+
+def parse_llql(query: str):
+    if not query or not query.strip():
+        return "", []
+    
+    try:
+        parser = LLQLParser(query)
+        ast = parser.parse()
+        if ast:
+            return ast.to_sql()
+        return "", []
+    except Exception as e:
+        print(f"[LLQL] Parsing error: {e}, falling back to text search")
+        return "(l.message ILIKE ? OR l.raw_text ILIKE ?)", [f"%{query}%", f"%{query}%"]

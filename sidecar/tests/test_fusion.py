@@ -1,5 +1,5 @@
 import pytest
-from src.api import App, FusionSourceConfig, IngestLogEntry
+from api import App, FusionSourceConfig, IngestLogEntry
 
 
 @pytest.fixture
@@ -7,7 +7,7 @@ def api():
     # Use memory DB for isolation
     app = App(db_path=":memory:")
     yield app
-    from src.db import Database
+    from db import Database
 
     Database.reset()
 

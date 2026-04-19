@@ -9,15 +9,19 @@ from typing import Any
 
 import aiohttp_cors
 from ai import AIChatMessage, AIProviderFactory
+from ai.context_manager import ContextManager
 from aiohttp import web
-from db import Database
+from anomalies import AnomalyDetector
+from db import LogDatabase
 from dotenv import load_dotenv
+from ingestion import IngestionServer
 from mcp_server import init_mcp, mcp_server
 from metadata_extractor import extract_log_metadata
 from parser import DrainParser
 from pydantic import BaseModel, ValidationError
 from ssh_loader import SSHLoader
 from tailer import FileTailer
+from models import *
 
 # --- Professional Logging Setup ---
 SIDE_CAR_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -56,197 +60,9 @@ logger.info("--- Sidecar Tracing Session Started --- (Level: %s)", logging.getLe
 logger.info("Log path: %s", LOG_FILE)
 
 
-# RPC Base Models
-class JSONRPCRequest(BaseModel):
-    jsonrpc: str = "2.0"
-    id: Any | None = None
-    method: str
-    params: dict = {}
-
-
-class JSONRPCResponse(BaseModel):
-    jsonrpc: str = "2.0"
-    id: Any | None = None
-    result: Any | None = None
-    error: dict | None = None
-
-
-# --- Specific Request/Response Models ---
-class LogFilter(BaseModel):
-    field: str
-    value: str
-    operator: str = "contains"
-
-
-class GetLogsRequest(BaseModel):
-    workspace_id: str
-    offset: int = 0
-    limit: int = 100
-    filters: list[LogFilter] | None = None
-    query: str | None = None
-    sort_by: str = "id"
-    sort_order: str = "DESC"
-    start_time: str | None = None
-    end_time: str | None = None
-
-
-class StartTailRequest(BaseModel):
-    filepath: str
-    workspace_id: str
-
-
-class StartSSHTailRequest(BaseModel):
-    host: str
-    port: int = 22
-    username: str
-    password: str | None = None
-    filepath: str
-    workspace_id: str
-
-
-class IngestLogEntry(BaseModel):
-    workspace_id: str
-    source_id: str = "manual"
-    raw_text: str
-    timestamp: str | None = None
-    level: str = "INFO"
-    message: str | None = None
-
-
-class IngestLogsRequest(BaseModel):
-    logs: list[IngestLogEntry]
-
-
-class UpdateCommentRequest(BaseModel):
-    log_id: int
-    comment: str
-
-
-class GetWorkspaceSourcesRequest(BaseModel):
-    workspace_id: str
-
-
-class ReadFileRequest(BaseModel):
-    filepath: str
-
-
-class FusionSourceConfig(BaseModel):
-    source_id: str
-    enabled: bool = True
-    tz_offset: int = 0
-    custom_format: str | None = None
-    parser_config: str | None = None
-
-
-class TemporalOffsetEntry(BaseModel):
-    source_id: str
-    offset_seconds: int
-
-
-class UpdateTemporalOffsetsRequest(BaseModel):
-    workspace_id: str
-    offsets: dict[str, int]
-
-
-class GetTemporalOffsetsRequest(BaseModel):
-    workspace_id: str
-
-
-class UpdateFusionConfigRequest(BaseModel):
-    workspace_id: str
-    fusion_id: str = "default"
-    sources: list[FusionSourceConfig]
-
-
-class GetFusionConfigRequest(BaseModel):
-    workspace_id: str
-    fusion_id: str = "default"
-
-
-class GetSampleLinesRequest(BaseModel):
-    workspace_id: str
-    source_id: str
-    limit: int = 10
-
-
-class UpdateSourceParserRequest(BaseModel):
-    workspace_id: str
-    source_id: str
-    parser_config: str
-
-
-class GetFusedLogsRequest(BaseModel):
-    workspace_id: str
-    fusion_id: str = "default"
-    offset: int = 0
-    limit: int = 100
-    filters: list[LogFilter] | None = None
-    query: str | None = None
-    sort_by: str = "id"
-    sort_order: str = "DESC"
-    start_time: str | None = None
-    end_time: str | None = None
-
-
-class GetAnomaliesRequest(BaseModel):
-    workspace_id: str
-    time_range: str | None = None
-
-
-class GetLogDistributionRequest(BaseModel):
-    workspace_id: str
-    fusion_id: str | None = None
-    source_ids: list[str] | None = None
-    filters: list[LogFilter] | None = None
-    query: str | None = None
-    start_time: str | None = None
-    end_time: str | None = None
-
-
-# AI Models
-class SendAiMessageRequest(BaseModel):
-    workspace_id: str
-    session_id: str | None = None  # UUID if existing, None to create
-    session_name: str | None = None  # Optional name if creating
-    message: str
-    model: str | None = None
-    context_logs: list[int] | None = None  # List of log IDs to include as context
-    provider_session_id: str | None = None  # Explicit taskId/threadId reuse
-    reasoning: bool | None = True  # Whether to enforce deep reasoning phase
-
-
-class GetAiSessionsRequest(BaseModel):
-    workspace_id: str
-
-
-class GetAiMessagesRequest(BaseModel):
-    session_id: str
-
-
-class SaveMemoryRequest(BaseModel):
-    workspace_id: str
-    issue_signature: str
-    resolution: str
-
-
-class SearchMemoryRequest(BaseModel):
-    workspace_id: str
-    query: str
-    limit: int = 5
-
-
-class GetSettingsRequest(BaseModel):
-    workspace_id: str | None = None
-
-
-class UpdateSettingsRequest(BaseModel):
-    settings: dict
-    workspace_id: str | None = None
-
-
 class App:
     def __init__(self, db_path="loglens.duckdb"):
-        self.db = Database(db_path)
+        self.db = LogDatabase(db_path)
         self._parsers = {}
         self.tailers = {}
         self._start_time = time.time()
@@ -271,6 +87,16 @@ class App:
             model=settings.get("ai_model", "gemma4:e2b"),
             host=host,
         )
+
+        # Initialize Ingestion Ports (Syslog/HTTP)
+        syslog_port = int(settings.get("ingestion_syslog_port", "514"))
+        http_port = int(settings.get("ingestion_http_port", "5002"))
+        self.ingestion_server = IngestionServer(self, syslog_port=syslog_port, http_port=http_port)
+        self.ingestion_server.start()
+
+        # Initialize Anomaly Detection
+        self.anomaly_detector = AnomalyDetector(self.db)
+        self.anomaly_detector.start()
 
         init_mcp(self)
         self._mcp_thread = None
@@ -334,6 +160,7 @@ class App:
                 "get_sample_lines": GetSampleLinesRequest,
                 "update_source_parser": UpdateSourceParserRequest,
                 "get_anomalies": GetAnomaliesRequest,
+                "get_metadata_facets": GetMetadataFacetsRequest,
                 "analyze_cluster": None,
                 "get_settings": GetSettingsRequest,
                 "update_settings": UpdateSettingsRequest,
@@ -396,7 +223,11 @@ class App:
             value = f.get("value")
             op = f.get("operator", "equals")
 
-            if field not in allowed_fields or value is None:
+            if field.startswith("facets."):
+                facet_key = field.split(".", 1)[1]
+                # Use json_extract_string for JSON type column
+                field = f"json_extract_string(facets, '$.{facet_key}')"
+            elif field not in allowed_fields or value is None:
                 continue
 
             if op == "contains":
@@ -442,14 +273,14 @@ class App:
         cursor = self.db.get_cursor()
 
         # Build base WHERE clause
-        where_clauses = ["workspace_id = ?"]
+        where_clauses = ["l.workspace_id = ?"]
         params: list[Any] = [workspace_id]
 
         if source_ids is not None:
             if not source_ids:
                 return {"total": 0, "logs": [], "offset": offset, "limit": limit}
             placeholders = ",".join(["?"] * len(source_ids))
-            where_clauses.append(f"source_id IN ({placeholders})")
+            where_clauses.append(f"l.source_id IN ({placeholders})")
             params.extend(source_ids)
 
         if filters:
@@ -459,45 +290,36 @@ class App:
             params.extend(f_params)
 
         if query:
-            where_clauses.append("(message ILIKE ? OR raw_text ILIKE ?)")
-            params.extend([f"%{query}%", f"%{query}%"])
+            from query_parser import parse_llql
+            llql_sql, llql_params = parse_llql(query)
+            where_clauses.append(f"({llql_sql})")
+            params.extend(llql_params)
 
         if start_time:
-            where_clauses.append("timestamp >= ?")
+            where_clauses.append("l.timestamp >= ?")
             params.append(start_time)
         if end_time:
-            where_clauses.append("timestamp <= ?")
+            where_clauses.append("l.timestamp <= ?")
             params.append(end_time)
 
         where_sql = " AND ".join(where_clauses)
         total_logs_subquery = "(SELECT count(*) FROM logs WHERE workspace_id = ?)"
 
-        # Apply table alias 'l' for safety in complex joins
-        aliased = (
-            where_sql.replace("workspace_id", "l.workspace_id")
-            .replace("source_id", "l.source_id")
-            .replace("message", "l.message")
-            .replace("level", "l.level")
-            .replace("cluster_id", "l.cluster_id")
-            .replace("raw_text", "l.raw_text")
-            .replace("has_comment", "l.has_comment")
-            .replace("timestamp", "l.timestamp")
-        )
-
         base_query = f"""
-            SELECT 
-                l.*, 
-                c.count as _cluster_count, 
+            SELECT
+                l.*,
+                c.count as _cluster_count,
                 c.template as cluster_template,
                 CAST(c.count AS FLOAT) * 100.0 / {total_logs_subquery} as cluster_percent
             FROM logs l
             LEFT JOIN clusters c ON l.workspace_id = c.workspace_id AND l.cluster_id = c.cluster_id
-            WHERE {aliased}
+            WHERE {where_sql}
         """
 
         params_for_data = [workspace_id] + params
-        count_query = f"SELECT COUNT(*) FROM logs l WHERE {aliased}"
+        count_query = f"SELECT COUNT(*) FROM logs l WHERE {where_sql}"
         cursor.execute(count_query, params)
+
         total = cursor.fetchone()[0]
 
         allowed_sort = [
@@ -521,7 +343,18 @@ class App:
         cursor.execute(data_query, params_for_data + [limit, offset])
 
         columns = [desc[0] for desc in cursor.description]
-        logs = [dict(zip(columns, row, strict=False)) for row in cursor.fetchall()]
+        logs = []
+        for row in cursor.fetchall():
+            log_dict = dict(zip(columns, row, strict=False))
+            # Handle JSON parsing for facets column
+            if "facets" in log_dict and isinstance(log_dict["facets"], str):
+                try:
+                    log_dict["facets"] = json.loads(log_dict["facets"])
+                except Exception:
+                    log_dict["facets"] = {}
+            elif "facets" in log_dict and log_dict["facets"] is None:
+                log_dict["facets"] = {}
+            logs.append(log_dict)
 
         self._apply_temporal_offsets(workspace_id, logs)
 
@@ -594,8 +427,11 @@ class App:
             sql_params.extend(f_params)
 
         if params.query:
-            where_clauses.append("(message ILIKE ? OR raw_text ILIKE ?)")
-            sql_params.extend([f"%{params.query}%", f"%{params.query}%"])
+            from query_parser import parse_llql
+            llql_sql, llql_params = parse_llql(params.query)
+            if llql_sql:
+                where_clauses.append(f"({llql_sql})")
+                sql_params.extend(llql_params)
 
         if params.start_time:
             norm_start = params.start_time.replace("T", " ").split(".")[0].replace("Z", "")
@@ -609,11 +445,15 @@ class App:
 
         where_sql = " AND ".join(where_clauses)
 
-        # Aggregate by minute bucket
-        # SQLite / DuckDB timestamp as string, substring(1,16) gives "YYYY-MM-DD HH:MM"
+        # Aggregate by time bucket
+        # Default to minute-level bucketing, but support hour-level for larger ranges
+        bucket_length = 16  # YYYY-MM-DD HH:MM
+        if hasattr(params, "interval") and params.interval == "1h":
+            bucket_length = 13  # YYYY-MM-DD HH
+
         query = f"""
             SELECT
-                substring(timestamp, 1, 16) as time_bucket,
+                substring(timestamp, 1, {bucket_length}) as time_bucket,
                 level,
                 COUNT(*) as count
             FROM logs
@@ -628,6 +468,8 @@ class App:
         buckets_map = {}
         for row in rows:
             time_bucket = row[0]
+            if bucket_length == 13:
+                time_bucket += ":00"  # Normalize to HH:00 for frontend parsing
             level = row[1]
             count = row[2]
 
@@ -638,44 +480,22 @@ class App:
 
         return {"buckets": list(buckets_map.values())}
 
-    def method_get_anomalies(self, **kwargs) -> dict:
-        """Analyze statistical outliers and novel clusters over a basic time sliding window."""
-        params = GetAnomaliesRequest(**kwargs)
+    def method_get_anomalies(self, workspace_id: str, time_range: str | None = None) -> dict:
+        """Fetch recently detected cluster anomalies from the database."""
         cursor = self.db.get_cursor()
-
-        # Simple baseline: detect "new" clusters in the last minute that rarely appeared before
-        query = """
-            WITH cluster_stats AS (
-                SELECT 
-                    cluster_id, 
-                    count(*) as total_occurrences,
-                    min(timestamp) as first_seen,
-                    max(timestamp) as last_seen
-                FROM logs
-                WHERE workspace_id = ?
-                GROUP BY cluster_id
-            )
-            SELECT l.cluster_id, l.timestamp, cs.total_occurrences
-            FROM logs l
-            JOIN cluster_stats cs ON l.cluster_id = cs.cluster_id
-            WHERE l.workspace_id = ? 
-            AND cs.total_occurrences <= 5 
-            ORDER BY l.timestamp DESC LIMIT 100
-        """
-        cursor.execute(query, [params.workspace_id, params.workspace_id])
-        rows = cursor.fetchall()
-
-        anomalies = []
-        for row in rows:
-            anomalies.append(
-                {
-                    "cluster_id": row[0],
-                    "timestamp": row[1],
-                    "type": "novelty" if row[2] <= 1 else "rare",
-                    "score": 0.95,  # Mocked Z-Score baseline
-                }
-            )
-
+        query = "SELECT cluster_id, timestamp, z_score, current_rate FROM anomalies WHERE workspace_id = ?"
+        params = [workspace_id]
+        
+        if time_range:
+            query += " AND timestamp >= ?"
+            params.append(time_range)
+        
+        query += " ORDER BY timestamp DESC LIMIT 50"
+        cursor.execute(query, params)
+        
+        columns = [desc[0] for desc in cursor.description]
+        anomalies = [dict(zip(columns, row)) for row in cursor.fetchall()]
+        
         return {"anomalies": anomalies}
 
     def method_get_fused_logs(self, **kwargs) -> dict:
@@ -895,7 +715,8 @@ class App:
         # Override metadata with provided values if they explicitly exist (important for manual ingest)
         timestamp = log.get("timestamp") or metadata["timestamp"]
         level = log.get("level") or metadata["level"]
-        message = log.get("message") or raw_text
+        raw_message = metadata["message"]
+        message = log.get("message") or raw_message
 
         # 2. Pattern Clustering (Drain3)
         try:
@@ -905,7 +726,7 @@ class App:
             template = res["template"]
         except Exception:
             cluster_id = "unknown"
-            template = "unknown"
+            template = message
 
         # 3. Persistence (Sync Stats table)
         cursor.execute(
@@ -918,7 +739,10 @@ class App:
             (workspace_id, cluster_id, template),
         )
 
-        return [workspace_id, source_id, raw_text, timestamp, level, message, cluster_id]
+        facets = log.get("facets") or metadata.get("facets", {})
+        facets_json = json.dumps(facets) if facets else None
+
+        return [workspace_id, source_id, raw_text, timestamp, level, message, cluster_id, facets_json]
 
     def method_ingest_logs(self, logs: list[IngestLogEntry]) -> dict:
         """High-speed batch ingestion of log entries with pattern clustering"""
@@ -933,12 +757,38 @@ class App:
 
         if batch_data:
             cursor.executemany(
-                "INSERT INTO logs (workspace_id, source_id, raw_text, timestamp, level, message, cluster_id) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                "INSERT INTO logs (workspace_id, source_id, raw_text, timestamp, level, message, cluster_id, facets) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
                 batch_data,
             )
             self.db.commit()
 
         return {"status": "ok", "count": len(batch_data)}
+
+    def method_get_metadata_facets(self, workspace_id: str) -> dict:
+        """Return the top unique metadata facets across all logs in a workspace."""
+        cursor = self.db.get_cursor()
+
+        # Define priority facets to extract
+        keys = ["ip", "uuid", "user_id", "host", "thread", "logger", "status", "method"]
+        results = {}
+
+        for key in keys:
+            # Efficiently query top 10 unique values for each facet key if they exist
+            # Note: Using json_extract_string for better compatibility with column type JSON
+            query = f"""
+                SELECT json_extract_string(facets, '$.{key}') as val, count(*) as count
+                FROM logs
+                WHERE workspace_id = ? AND json_extract_string(facets, '$.{key}') IS NOT NULL
+                GROUP BY val
+                ORDER BY count DESC
+                LIMIT 10
+            """
+            cursor.execute(query, (workspace_id,))
+            rows = cursor.fetchall()
+            if rows:
+                results[key] = [{"value": r[0], "count": r[1]} for r in rows]
+
+        return results
 
     def method_update_log_comment(self, log_id: int, comment: str) -> dict:
         """Update annotation for a specific log entry. If empty, the note is removed."""
@@ -1032,11 +882,15 @@ class App:
         if params.context_logs:
             placeholders = ",".join(["?"] * len(params.context_logs))
             cursor.execute(
-                f"SELECT raw_text FROM logs WHERE id IN ({placeholders})", params.context_logs
+                f"SELECT timestamp, level, message, raw_text, cluster_id FROM logs WHERE id IN ({placeholders})", 
+                params.context_logs
             )
-            logs = cursor.fetchall()
+            columns = [desc[0] for desc in cursor.description]
+            logs = [dict(zip(columns, row)) for row in cursor.fetchall()]
+            
             if logs:
-                log_context = "\n\nContextual Log Lines:\n" + "\n".join([log[0] for log in logs])
+                summary = ContextManager.prepare_log_context(logs)
+                log_context = f"\n\nContextual Log Summary:\n{summary}"
 
         cursor.execute(
             "INSERT INTO ai_messages (session_id, role, content, context_logs, provider_session_id) VALUES (?, ?, ?, ?, ?)",
@@ -1208,6 +1062,35 @@ class App:
             except Exception:
                 continue
         return mapping
+
+    def method_save_template(self, workspace_id: str, name: str, config_json: str) -> dict:
+        """Persist a discovery template (filters + highlights)."""
+        cursor = self.db.get_cursor()
+        cursor.execute(
+            "INSERT INTO settings_templates (workspace_id, name, config_json) VALUES (?, ?, ?)",
+            (workspace_id, name, config_json),
+        )
+        self.db.commit()
+        return {"status": "ok"}
+
+    def method_get_templates(self, workspace_id: str) -> list:
+        """Fetch all discovery templates for a workspace."""
+        cursor = self.db.get_cursor()
+        cursor.execute(
+            "SELECT id, name, config_json, created_at FROM settings_templates WHERE workspace_id = ? ORDER BY created_at DESC",
+            (workspace_id,),
+        )
+        return [
+            {"id": row[0], "name": row[1], "config": row[2], "created_at": str(row[3])}
+            for row in cursor.fetchall()
+        ]
+
+    def method_delete_template(self, id: int) -> dict:
+        """Remove a discovery template."""
+        cursor = self.db.get_cursor()
+        cursor.execute("DELETE FROM settings_templates WHERE id = ?", (id,))
+        self.db.commit()
+        return {"status": "ok"}
 
     def method_save_memory(self, workspace_id: str, issue_signature: str, resolution: str) -> dict:
         """Save a learned resolution to the workspace memory."""
@@ -1505,6 +1388,7 @@ class App:
                     model=params.model,
                     reasoning=params.reasoning,
                     session_id=session_id,
+                    provider_session_id=provider_session_id,
                 ):
                     full_text.append(chunk)
 
@@ -1631,11 +1515,11 @@ class App:
 
 
 def on_cleanup(_app):
-    Database.reset()
+    LogDatabase.reset()
 
 
-def run_http(port=5000):
-    app = App()
+def run_http(port=5000, db_path="loglens.duckdb"):
+    app = App(db_path=db_path)
     app.dev_mode = True
     server = web.Application()
 
@@ -1663,8 +1547,8 @@ def run_http(port=5000):
     web.run_app(server, host="127.0.0.1", port=port)
 
 
-async def run_stdio_async():
-    app = App()
+async def run_stdio_async(db_path="loglens.duckdb"):
+    app = App(db_path=db_path)
     app.dev_mode = False
 
     try:
@@ -1714,21 +1598,10 @@ async def run_stdio_async():
     except EOFError:
         pass
     finally:
-        Database.reset()
+        LogDatabase.reset()
 
 
-def run_stdio():
+def run_stdio(db_path="loglens.duckdb"):
     import asyncio
 
-    asyncio.run(run_stdio_async())
-
-
-def main():
-    if "--dev" in sys.argv:
-        run_http(5000)
-    else:
-        run_stdio()
-
-
-if __name__ == "__main__":
-    main()
+    asyncio.run(run_stdio_async(db_path=db_path))

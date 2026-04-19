@@ -8,9 +8,12 @@ import { WorkspaceTabs } from "@/components/molecules/WorkspaceTabs";
 import { cn } from "@/lib/utils";
 import { useAiStore } from "@/store/aiStore";
 import { useInvestigationStore } from "@/store/investigationStore";
+import { useUIStore } from "@/store/uiStore";
 import type { LogSource } from "@/store/workspaceStore";
-import { Bookmark, Cpu, Sparkles, Upload } from "lucide-react";
+import { Bookmark, Cpu, PanelLeftClose, PanelLeftOpen, Sparkles, Upload } from "lucide-react";
+import { useState } from "react";
 import { toast } from "sonner";
+import { SaveTemplateModal } from "./SaveTemplateModal";
 
 interface LogToolbarProps {
   readonly onSearch: (q: string) => void;
@@ -55,9 +58,38 @@ export function LogToolbar({
 }: LogToolbarProps) {
   const { timeRange, setTimeRange } = useInvestigationStore();
   const { isSidebarOpen, setSidebarOpen } = useAiStore();
+  const { facetSidebarCollapsed, toggleFacetSidebar } = useUIStore();
+  const [isSaveTemplateModalOpen, setIsSaveTemplateModalOpen] = useState(false);
 
   return (
     <div className="sticky top-0 z-10 flex flex-nowrap items-center gap-3 bg-[#0d0f0e]/95 backdrop-blur-sm border-b border-zinc-800/60 px-4 py-2.5 shadow-sm overflow-x-auto scrollbar-none">
+      {/* ... previous buttons ... */}
+      <SaveTemplateModal
+        isOpen={isSaveTemplateModalOpen}
+        onClose={() => setIsSaveTemplateModalOpen(false)}
+        workspaceId={activeWorkspaceId ?? ""}
+        filters={activeFilters}
+        highlights={activeHighlights}
+      />
+      {/* Facet Toggle */}
+      <button
+        type="button"
+        onClick={toggleFacetSidebar}
+        className={cn(
+          "p-1.5 rounded-md transition-all shrink-0 border",
+          !facetSidebarCollapsed
+            ? "bg-zinc-800 border-zinc-700 text-zinc-300 hover:text-white"
+            : "bg-emerald-500/10 border-emerald-500/20 text-emerald-400 hover:text-emerald-300 shadow-[0_0_12px_rgba(52,211,153,0.1)]",
+        )}
+        title={facetSidebarCollapsed ? "Show Facets" : "Hide Facets"}
+      >
+        {facetSidebarCollapsed ? (
+          <PanelLeftOpen className="size-4" />
+        ) : (
+          <PanelLeftClose className="size-4" />
+        )}
+      </button>
+
       {/* Import button */}
       <button
         type="button"
@@ -111,11 +143,7 @@ export function LogToolbar({
         {/* Template Summary Button */}
         <button
           type="button"
-          onClick={() =>
-            toast.info("Template functionality coming soon", {
-              description: "Saving complex filter setups as templates is planned.",
-            })
-          }
+          onClick={() => setIsSaveTemplateModalOpen(true)}
           className="p-1.5 rounded-md hover:bg-white/5 text-text-muted hover:text-text-primary transition-colors ml-1"
           title="Save as Template"
         >

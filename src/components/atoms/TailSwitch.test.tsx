@@ -7,10 +7,10 @@ test("renders TailSwitch and responds to clicks", () => {
   render(<TailSwitch checked={false} onCheckedChange={handleChange} />);
 
   const label = screen.getByText("Live Tail");
-  expect(label).toBeInTheDocument();
+  expect(label).toBeDefined();
 
   const switchRole = screen.getByRole("switch");
-  expect(switchRole).not.toBeChecked();
+  expect(switchRole.getAttribute("aria-checked")).toBe("false");
 
   fireEvent.click(switchRole);
   expect(handleChange).toHaveBeenCalledWith(true);

@@ -18,6 +18,7 @@ dependencies = [
     # MCP Server
     "mcp>=1.26.0",
     "google-adk>=2.0.0a2",
+    "datamodel-code-generator>=0.56.1",
 ]
 
 [project.optional-dependencies]

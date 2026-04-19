@@ -1,6 +1,6 @@
 import pytest
-from src.ai.base import AIChatMessage
-from src.ai.ollama import OllamaProvider
+from ai.base import AIChatMessage
+from ai.ollama import OllamaProvider
 
 
 @pytest.fixture

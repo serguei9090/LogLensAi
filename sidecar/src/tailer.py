@@ -49,19 +49,21 @@ class FileTailer:
         if not line:
             return
 
-        # 1. Clustering (Pattern Mining)
+        # 1. Shared Metadata Extraction (Regex/Parser logic)
+        metadata = extract_log_metadata(self.workspace_id, self.filepath, line)
+        timestamp = metadata["timestamp"]
+        level = metadata["level"]
+        raw_message = metadata["message"]
+
+        # 2. Clustering (Pattern Mining)
         try:
-            res = self.parser.parse(line)
+            # Cluster on the extracted message (cleaner)
+            res = self.parser.parse(raw_message)
             cluster_id = str(res["cluster_id"])
             message = res["template"]
         except Exception:
             cluster_id = "unknown"
-            message = line
-
-        # 2. Shared Metadata Extraction (Regex/Parser logic)
-        metadata = extract_log_metadata(self.workspace_id, self.filepath, line)
-        timestamp = metadata["timestamp"]
-        level = metadata["level"]
+            message = raw_message
 
         # 3. Persistence
         cursor = self.db.get_cursor()

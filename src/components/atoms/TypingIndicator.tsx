@@ -1,4 +1,3 @@
-import { cn } from "@/lib/utils";
 
 /**
  * Professional pulsing dots to indicate AI is working.

@@ -1,5 +1,3 @@
-import { useAiStore } from "@/store/aiStore";
-import { useInvestigationStore } from "@/store/investigationStore";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { type LogEntry, VirtualLogTable } from "../VirtualLogTable";
@@ -34,15 +32,17 @@ globalThis.ResizeObserver = class {
 };
 
 // Mock stores
+const mockInvestigationStore = {
+  selectedLogIds: [],
+  filters: [],
+  setFilters: vi.fn(),
+  toggleLogSelection: vi.fn(),
+  clearSelection: vi.fn(),
+  setSelectedLogIds: vi.fn(),
+};
+
 vi.mock("@/store/investigationStore", () => ({
-  useInvestigationStore: vi.fn().mockReturnValue({
-    selectedLogIds: [],
-    filters: [],
-    setFilters: vi.fn(),
-    toggleLogSelection: vi.fn(),
-    clearSelection: vi.fn(),
-    setSelectedLogIds: vi.fn(),
-  }),
+  useInvestigationStore: vi.fn().mockImplementation(() => mockInvestigationStore),
 }));
 
 vi.mock("@/store/aiStore", () => ({
@@ -123,15 +123,13 @@ describe("VirtualLogTable", () => {
   });
 
   it("triggers row selection on click", () => {
-    const store = vi.mocked(useInvestigationStore)();
-
     render(<VirtualLogTable {...defaultProps} />);
     const row = screen.getByText("Test log 1").closest("tr");
     if (row) {
       fireEvent.click(row);
     }
 
-    expect(store.setSelectedLogIds).toHaveBeenCalledWith([1]);
+    expect(mockInvestigationStore.setSelectedLogIds).toHaveBeenCalledWith([1]);
   });
 
   it("toggles the note editor when clicking the note icon", () => {
