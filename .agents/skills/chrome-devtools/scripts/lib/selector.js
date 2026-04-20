@@ -152,9 +152,8 @@ export async function getElement(page, parsed) {
     // Convert JSHandle to ElementHandle
     const elementHandle = element.asElement();
     return elementHandle;
-  } else {
-    return await page.$(parsed.selector);
   }
+  return await page.$(parsed.selector);
 }
 
 /**
@@ -163,7 +162,7 @@ export async function getElement(page, parsed) {
  * @param {string} selector - Selector that failed
  * @returns {Error} Enhanced error with troubleshooting tips
  */
-export function enhanceError(error, selector) {
+export function enhanceError(error, _selector) {
   if (
     error.message.includes("waiting for selector") ||
     error.message.includes("waiting for XPath") ||

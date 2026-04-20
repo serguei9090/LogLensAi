@@ -1,5 +1,7 @@
 function parseThinking(content) {
-  if (!content) return { thinking: null, response: "", isStreamingThink: false };
+  if (!content) {
+    return { thinking: null, response: "", isStreamingThink: false };
+  }
 
   const startTags = ["<think>", "<|channel>thought"];
   const endTags = ["</think>", "<|channel>text", "<channel|>"];

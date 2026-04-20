@@ -148,6 +148,10 @@ class GetAnomaliesRequest(BaseModel):
     time_range: str | None = None
 
 
+class GetDashboardStatsRequest(BaseModel):
+    workspace_id: str | None = None
+
+
 class GetLogDistributionRequest(BaseModel):
     workspace_id: str
     fusion_id: str | None = None
@@ -160,6 +164,7 @@ class GetLogDistributionRequest(BaseModel):
 
 class GetMetadataFacetsRequest(BaseModel):
     workspace_id: str
+    source_ids: list[str] | None = None
 
 
 class ExportLogsRequest(BaseModel):

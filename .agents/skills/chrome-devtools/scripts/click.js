@@ -44,7 +44,7 @@ async function click() {
     // Wait for element based on selector type
     await waitForElement(page, parsed, {
       visible: true,
-      timeout: Number.parseInt(args.timeout || "5000"),
+      timeout: Number.parseInt(args.timeout || "5000", 10),
     });
 
     // Set up navigation promise BEFORE clicking (in case click triggers immediate navigation)
@@ -61,7 +61,7 @@ async function click() {
     // Wait for optional selector after click
     if (args["wait-for"]) {
       await page.waitForSelector(args["wait-for"], {
-        timeout: Number.parseInt(args.timeout || "5000"),
+        timeout: Number.parseInt(args.timeout || "5000", 10),
       });
     } else {
       // Wait for navigation to complete (or timeout if no navigation)

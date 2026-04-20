@@ -1,10 +1,10 @@
-import { callSidecar } from "@/lib/hooks/useSidecarBridge";
-import { cn } from "@/lib/utils";
-import type { LogSource } from "@/store/workspaceStore";
 import { Check, ChevronDown, Clock, Globe, Save, Settings2, Sparkles, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { toast } from "sonner";
+import { callSidecar } from "@/lib/hooks/useSidecarBridge";
+import { cn } from "@/lib/utils";
+import type { LogSource } from "@/store/workspaceStore";
 import { CustomParserModal } from "./CustomParserModal";
 
 /** UTC offset entry for the custom timezone picker. */

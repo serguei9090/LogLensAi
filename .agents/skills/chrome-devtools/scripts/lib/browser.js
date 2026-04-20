@@ -1,6 +1,6 @@
-import fs from "fs";
-import path from "path";
-import { fileURLToPath } from "url";
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import debug from "debug";
 /**
  * Shared browser utilities for Chrome DevTools scripts
@@ -19,7 +19,7 @@ let pageInstance = null;
  * Launch or connect to browser
  */
 export async function getBrowser(options = {}) {
-  if (browserInstance && browserInstance.isConnected()) {
+  if (browserInstance?.isConnected()) {
     log("Reusing existing browser instance");
     return browserInstance;
   }
@@ -102,7 +102,7 @@ export async function closeBrowser() {
 /**
  * Parse command line arguments
  */
-export function parseArgs(argv, options = {}) {
+export function parseArgs(argv, _options = {}) {
   const args = {};
 
   for (let i = 0; i < argv.length; i++) {

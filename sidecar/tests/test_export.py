@@ -1,9 +1,11 @@
-import os
-import json
 import csv
+import json
+import os
+
 import pytest
 from api import App
 from models import ExportLogsRequest
+
 
 @pytest.mark.asyncio
 async def test_export_logs_csv(tmp_path):
@@ -22,7 +24,7 @@ async def test_export_logs_csv(tmp_path):
     await app.method_export_logs(**req.model_dump())
     
     assert os.path.exists(export_path)
-    with open(export_path, "r", newline="") as f:
+    with open(export_path, newline="") as f:
         reader = csv.DictReader(f)
         rows = list(reader)
         assert len(rows) == 1
@@ -44,7 +46,7 @@ async def test_export_logs_json(tmp_path):
     await app.method_export_logs(**req.model_dump())
     
     assert os.path.exists(export_path)
-    with open(export_path, "r") as f:
+    with open(export_path) as f:
         data = json.load(f)
         assert len(data) == 1
         assert data[0]["message"] == "Hello World"

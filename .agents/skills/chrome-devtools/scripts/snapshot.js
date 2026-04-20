@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import fs from "fs/promises";
+import fs from "node:fs/promises";
 /**
  * Get DOM snapshot with selectors
  * Usage: node snapshot.js [--url https://example.com] [--output snapshot.json]
@@ -96,14 +96,7 @@ async function snapshot() {
         for (let i = 0; i < siblings.length; i++) {
           const sibling = siblings[i];
           if (sibling === element) {
-            return (
-              getXPath(element.parentNode) +
-              "/" +
-              element.tagName.toLowerCase() +
-              "[" +
-              (ix + 1) +
-              "]"
-            );
+            return `${getXPath(element.parentNode)}/${element.tagName.toLowerCase()}[${ix + 1}]`;
           }
           if (sibling.nodeType === 1 && sibling.tagName === element.tagName) {
             ix++;

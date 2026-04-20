@@ -1,9 +1,12 @@
+import { useEffect, useRef, useState } from "react";
+import DashboardPage from "@/components/pages/DashboardPage";
 import { InvestigationPage } from "@/components/pages/InvestigationPage";
 import { SettingsPage } from "@/components/pages/SettingsPage";
 import { AppLayout } from "@/components/templates/AppLayout";
 import { Toaster } from "@/components/ui/sonner";
 import { useWorkspaceStore } from "@/store/workspaceStore";
-import { useEffect, useRef, useState } from "react";
+
+export type NavTab = "investigation" | "settings" | "dashboard";
 
 export default function App() {
   const {
@@ -14,7 +17,7 @@ export default function App() {
     renameWorkspace,
     removeWorkspace,
   } = useWorkspaceStore();
-  const [activeNav, setActiveNav] = useState<"investigation" | "settings">("investigation");
+  const [activeNav, setActiveNav] = useState<NavTab>("investigation");
   // Guard against StrictMode double-fire adding two default workspaces
   const seededRef = useRef(false);
 
@@ -50,6 +53,7 @@ export default function App() {
         diagnosticData={null}
         diagnosticLoading={false}
       >
+        {activeNav === "dashboard" && <DashboardPage />}
         {activeNav === "investigation" && <InvestigationPage />}
         {activeNav === "settings" && <SettingsPage />}
       </AppLayout>

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
-import fs from "fs";
-import path from "path";
-import { fileURLToPath } from "url";
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 /**
  * Launch a persistent Chrome browser that can be reused across multiple commands
  * Saves the WebSocket endpoint to a file for other scripts to connect to

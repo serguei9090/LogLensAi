@@ -1,18 +1,3 @@
-import { HelpTooltip } from "@/components/atoms/HelpTooltip";
-import { FacetExtractionSettings } from "@/components/molecules/FacetExtractionSettings";
-import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Switch } from "@/components/ui/switch";
-import { callSidecar } from "@/lib/hooks/useSidecarBridge";
-import { cn } from "@/lib/utils";
-import { useWorkspaceStore } from "@/store/workspaceStore";
 import {
   Activity,
   Bot,
@@ -33,8 +18,22 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
-
+import { HelpTooltip } from "@/components/atoms/HelpTooltip";
+import { FacetExtractionSettings } from "@/components/molecules/FacetExtractionSettings";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Switch } from "@/components/ui/switch";
+import { callSidecar } from "@/lib/hooks/useSidecarBridge";
+import { cn } from "@/lib/utils";
 import { type AppSettings, defaultSettings, useSettingsStore } from "@/store/settingsStore";
+import { useWorkspaceStore } from "@/store/workspaceStore";
 
 type SectionId = "ai" | "drain" | "ingestion" | "general";
 
@@ -89,7 +88,10 @@ function SettingSelect({
 function SectionLabel({
   children,
   htmlFor,
-}: { readonly children: React.ReactNode; readonly htmlFor?: string }) {
+}: {
+  readonly children: React.ReactNode;
+  readonly htmlFor?: string;
+}) {
   return (
     <label
       htmlFor={htmlFor}
@@ -171,7 +173,7 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
       try {
         // Try standard JSON first
         return JSON.parse(raw);
-      } catch (e) {
+      } catch (_e) {
         // Fallback for Python repr strings (single quotes, True/False/None)
         try {
           const jsonified = raw
@@ -269,13 +271,7 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
       }, 1000);
       return () => clearTimeout(timer);
     }
-  }, [
-    fetchModels,
-    settings.ai_provider,
-    settings.ai_ollama_host,
-    settings.ai_openai_host,
-    settings.ai_api_key,
-  ]);
+  }, [fetchModels, settings.ai_provider]);
 
   // Removed handleSave in favor of auto-save via update()
 

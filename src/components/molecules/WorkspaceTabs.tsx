@@ -1,7 +1,7 @@
-import { cn } from "@/lib/utils";
-import type { LogSource } from "@/store/workspaceStore";
 import { Pencil, X } from "lucide-react";
 import { useState } from "react";
+import { cn } from "@/lib/utils";
+import type { LogSource } from "@/store/workspaceStore";
 
 interface WorkspaceTabsProps {
   /** All sources attached to the active workspace */
@@ -69,7 +69,7 @@ export function WorkspaceTabs({
         const isActive = activeSourceId === src.id;
         const isTailing = tailingSourceIds.has(src.id);
         const isFusion = src.type === "fusion";
-        const label = src.name || src.path.split(/[\\\/]/).pop() || src.path;
+        const label = src.name || src.path.split(/[\\/]/).pop() || src.path;
 
         return (
           <div

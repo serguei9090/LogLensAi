@@ -1,7 +1,7 @@
-import { HelpTooltip } from "@/components/atoms/HelpTooltip";
-import { cn } from "@/lib/utils";
 import { Plus, ToggleLeft, ToggleRight, Trash2 } from "lucide-react";
 import { useState } from "react";
+import { HelpTooltip } from "@/components/atoms/HelpTooltip";
+import { cn } from "@/lib/utils";
 
 export interface FacetExtractionRule {
   name: string;
@@ -169,7 +169,7 @@ export function FacetExtractionSettings({
                       type="number"
                       value={rule.group}
                       onChange={(e) =>
-                        updateRule(idx, { group: Number.parseInt(e.target.value) || 1 })
+                        updateRule(idx, { group: Number.parseInt(e.target.value, 10) || 1 })
                       }
                       className="w-full bg-transparent border-none focus:ring-0 text-sm text-text-primary text-center h-6"
                     />
@@ -224,7 +224,7 @@ export function FacetExtractionSettings({
                   type="number"
                   value={newRule.group}
                   onChange={(e) =>
-                    setNewRule({ ...newRule, group: Number.parseInt(e.target.value) || 1 })
+                    setNewRule({ ...newRule, group: Number.parseInt(e.target.value, 10) || 1 })
                   }
                   className="w-full bg-transparent border-none focus:ring-0 text-sm text-text-primary text-center h-6"
                 />

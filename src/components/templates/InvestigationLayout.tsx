@@ -1,9 +1,9 @@
+import type { ReactNode } from "react";
 import type { FilterEntry } from "@/components/molecules/FilterBuilder";
 import type { HighlightEntry } from "@/components/molecules/HighlightBuilder";
 import { LogDistributionWidget } from "@/components/organisms/LogDistributionWidget";
 import { LogToolbar } from "@/components/organisms/LogToolbar";
 import type { LogSource } from "@/store/workspaceStore";
-import type { ReactNode } from "react";
 
 interface InvestigationLayoutProps {
   readonly searchQuery: string;

@@ -1,3 +1,6 @@
+import { Cpu, Info, Layers, Plus, RefreshCcw, Trash2 } from "lucide-react";
+import { useEffect, useState } from "react";
+import { toast } from "sonner";
 import { FacetExtractionSettings } from "@/components/molecules/FacetExtractionSettings";
 import { Button } from "@/components/ui/button";
 import {
@@ -12,9 +15,6 @@ import { Switch } from "@/components/ui/switch";
 import { callSidecar } from "@/lib/hooks/useSidecarBridge";
 import { cn } from "@/lib/utils";
 import { useSettingsStore } from "@/store/settingsStore";
-import { Cpu, Info, Layers, Plus, RefreshCcw, Trash2 } from "lucide-react";
-import { useEffect, useState } from "react";
-import { toast } from "sonner";
 
 interface WorkspaceEngineSettingsProps {
   isOpen: boolean;
@@ -55,7 +55,7 @@ export function WorkspaceEngineSettings({
         }
         try {
           return JSON.parse(raw);
-        } catch (e) {
+        } catch (_e) {
           try {
             const jsonified = raw
               .replaceAll("'", '"')
@@ -70,21 +70,27 @@ export function WorkspaceEngineSettings({
       };
 
       callSidecar({ method: "get_settings", params: {} }).then((res) => {
-        const remoteSettings = res as Record<string, any>;
+        const remoteSettings = res as Record<string, unknown>;
         if (remoteSettings) {
           setGlobalSettings({
             ...remoteSettings,
             drain_similarity_threshold: Number.parseFloat(
-              remoteSettings.drain_similarity_threshold || "0.5",
+              (remoteSettings.drain_similarity_threshold as string) || "0.5",
             ),
-            drain_max_children: Number.parseInt(remoteSettings.drain_max_children || "100", 10),
-            drain_max_clusters: Number.parseInt(remoteSettings.drain_max_clusters || "1000", 10),
+            drain_max_children: Number.parseInt(
+              (remoteSettings.drain_max_children as string) || "100",
+              10,
+            ),
+            drain_max_clusters: Number.parseInt(
+              (remoteSettings.drain_max_clusters as string) || "1000",
+              10,
+            ),
             drain_masks: (() => {
-              const parsed = safeParse(remoteSettings.drain_masks);
+              const parsed = safeParse(remoteSettings.drain_masks as string);
               return Array.isArray(parsed) ? parsed : [];
             })(),
             facet_extractions: (() => {
-              const parsed = safeParse(remoteSettings.facet_extractions);
+              const parsed = safeParse(remoteSettings.facet_extractions as string);
               return Array.isArray(parsed) ? parsed : [];
             })(),
           });
@@ -111,7 +117,7 @@ export function WorkspaceEngineSettings({
       await updateSettings(overrides, workspaceId);
       toast.success("Workspace overrides saved successfully");
       onClose();
-    } catch (error) {
+    } catch (_error) {
       toast.error("Failed to save workspace overrides");
     } finally {
       setIsSaving(false);
@@ -127,7 +133,7 @@ export function WorkspaceEngineSettings({
       await fetchSettings(workspaceId);
       toast.success("Workspace overrides cleared. Using global settings.");
       onClose();
-    } catch (error) {
+    } catch (_error) {
       toast.error("Failed to reset workspace settings");
     }
   };
@@ -209,7 +215,7 @@ export function WorkspaceEngineSettings({
               <input
                 type="number"
                 value={localSettings.drain_max_children}
-                onChange={(e) => update("drain_max_children", Number.parseInt(e.target.value))}
+                onChange={(e) => update("drain_max_children", Number.parseInt(e.target.value, 10))}
                 id="drain-max-children"
                 className="w-full h-9 px-3 rounded-lg bg-zinc-900 border border-zinc-800 text-xs text-zinc-100 focus:outline-none focus:border-emerald-500/50 transition-all font-mono"
               />
@@ -230,7 +236,7 @@ export function WorkspaceEngineSettings({
               <input
                 type="number"
                 value={localSettings.drain_max_clusters}
-                onChange={(e) => update("drain_max_clusters", Number.parseInt(e.target.value))}
+                onChange={(e) => update("drain_max_clusters", Number.parseInt(e.target.value, 10))}
                 id="drain-max-clusters"
                 className="w-full h-9 px-3 rounded-lg bg-zinc-900 border border-zinc-800 text-xs text-zinc-100 focus:outline-none focus:border-emerald-500/50 transition-all font-mono"
               />

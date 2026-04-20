@@ -1,5 +1,4 @@
 #!/usr/bin/env node
-import fs from "fs/promises";
 /**
  * Measure performance metrics and record trace
  * Usage: node performance.js --url https://example.com [--trace trace.json] [--metrics]
@@ -73,7 +72,7 @@ async function measurePerformance() {
               vitals.LCP = lastEntry.renderTime || lastEntry.loadTime;
             }
           }).observe({ entryTypes: ["largest-contentful-paint"], buffered: true });
-        } catch (e) {}
+        } catch (_e) {}
 
         // CLS
         try {
@@ -84,7 +83,7 @@ async function measurePerformance() {
               }
             });
           }).observe({ entryTypes: ["layout-shift"], buffered: true });
-        } catch (e) {}
+        } catch (_e) {}
 
         // FCP
         try {
@@ -93,7 +92,7 @@ async function measurePerformance() {
           if (fcpEntry) {
             vitals.FCP = fcpEntry.startTime;
           }
-        } catch (e) {}
+        } catch (_e) {}
 
         // TTFB
         try {
@@ -101,7 +100,7 @@ async function measurePerformance() {
           if (navigationEntry) {
             vitals.TTFB = navigationEntry.responseStart - navigationEntry.requestStart;
           }
-        } catch (e) {}
+        } catch (_e) {}
 
         // Wait a bit for metrics to stabilize
         setTimeout(() => resolve(vitals), 1000);

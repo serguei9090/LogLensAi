@@ -1,7 +1,3 @@
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { cn } from "@/lib/utils";
-import { useUIStore } from "@/store/uiStore";
 import { motion } from "framer-motion";
 import {
   Check,
@@ -17,7 +13,11 @@ import {
   X,
 } from "lucide-react";
 import { useRef, useState } from "react";
-
+import type { NavTab } from "@/App";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { cn } from "@/lib/utils";
+import { useUIStore } from "@/store/uiStore";
 import type { Workspace } from "@/store/workspaceStore";
 
 interface SidebarProps {
@@ -27,8 +27,8 @@ interface SidebarProps {
   readonly onWorkspaceCreate: (name: string) => void;
   readonly onWorkspaceRename?: (id: string, name: string) => void;
   readonly onWorkspaceDelete?: (id: string) => void;
-  readonly activeNav: "investigation" | "settings";
-  readonly onNavSelect: (nav: "investigation" | "settings") => void;
+  readonly activeNav: NavTab;
+  readonly onNavSelect: (nav: NavTab) => void;
 }
 
 export function Sidebar({
@@ -272,10 +272,9 @@ export function Sidebar({
             <SidebarNavItem
               icon={<LayoutDashboard className="h-4 w-4" />}
               label="Dashboard"
-              active={false}
+              active={activeNav === "dashboard"}
               collapsed={sidebarCollapsed}
-              disabled
-              badge="SOON"
+              onClick={() => onNavSelect("dashboard")}
             />
 
             <SidebarNavItem

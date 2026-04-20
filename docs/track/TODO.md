@@ -195,7 +195,12 @@
 ---
 
 
-## ⚪ Backlog (Future Sprints)
+## 🔵 Sprint 08 — Final Verification (Done)
 
-- [ ] **DASH-001**: Dashboard page (placeholder nav item)
+- [x] **e2e_001**: Full-Stack E2E Integration Loop (Sidecar -> DuckDB -> UI Store)
+  - **Detail**: `docs/TODOC/e2e_001.md`
+## 🔵 Sprint 09 — Dashboard & Overview (Done)
+
+- [x] **DASH-001**: Dashboard page (placeholder nav item)
+  - **Detail**: `docs/TODOC/DASH-001.md`
 - [ ] **KEYBIND-001**: Keyboard shortcuts (⌘K command palette)

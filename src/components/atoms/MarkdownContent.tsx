@@ -1,5 +1,5 @@
-import { cn } from "@/lib/utils";
 import { Fragment, type ReactNode } from "react";
+import { cn } from "@/lib/utils";
 
 interface MarkdownContentProps {
   /** The raw text content to render with lightweight markdown support. */
@@ -213,7 +213,7 @@ function renderInline(text: string): ReactNode {
     parts.push(renderLineBreaks(remaining));
   }
 
-  return parts.length === 1 ? parts[0] : <>{parts}</>;
+  return parts.length === 1 ? parts[0] : parts;
 }
 
 /** Converts \n to <br /> within inline text. */

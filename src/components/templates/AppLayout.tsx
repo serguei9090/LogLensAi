@@ -1,7 +1,8 @@
+import type { ReactNode } from "react";
+import type { NavTab } from "@/App";
 import { type DiagnosticData, DiagnosticSidebar } from "@/components/organisms/DiagnosticSidebar";
 import { Sidebar } from "@/components/organisms/Sidebar";
 import type { Workspace } from "@/store/workspaceStore";
-import type { ReactNode } from "react";
 
 interface AppLayoutProps {
   readonly workspaces: readonly Workspace[];
@@ -10,8 +11,8 @@ interface AppLayoutProps {
   readonly onWorkspaceCreate: (name: string) => void;
   readonly onWorkspaceRename?: (id: string, name: string) => void;
   readonly onWorkspaceDelete?: (id: string) => void;
-  readonly activeNav: "investigation" | "settings";
-  readonly onNavSelect: (nav: "investigation" | "settings") => void;
+  readonly activeNav: NavTab;
+  readonly onNavSelect: (nav: NavTab) => void;
   readonly children: ReactNode;
   readonly diagnosticOpen: boolean;
   readonly onDiagnosticClose: () => void;
@@ -19,8 +20,8 @@ interface AppLayoutProps {
   readonly diagnosticLoading: boolean;
 }
 
-import { useUIStore } from "@/store/uiStore";
 import { useEffect } from "react";
+import { useUIStore } from "@/store/uiStore";
 
 export function AppLayout({
   workspaces,

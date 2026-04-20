@@ -49,13 +49,13 @@ async function fill() {
     // Wait for element based on selector type
     await waitForElement(page, parsed, {
       visible: true,
-      timeout: Number.parseInt(args.timeout || "5000"),
+      timeout: Number.parseInt(args.timeout || "5000", 10),
     });
 
     // Type into element
     await typeIntoElement(page, parsed, args.value, {
       clear: args.clear === "true",
-      delay: Number.parseInt(args.delay || "0"),
+      delay: Number.parseInt(args.delay || "0", 10),
     });
 
     outputJSON({

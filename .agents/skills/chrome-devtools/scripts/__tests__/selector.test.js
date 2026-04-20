@@ -134,7 +134,7 @@ describe("parseSelector", () => {
     });
 
     it("should block extremely long selectors (DoS prevention)", () => {
-      const longSelector = "//" + "a".repeat(1001);
+      const longSelector = `//${"a".repeat(1001)}`;
       assert.throws(() => parseSelector(longSelector), /XPath selector too long/i);
     });
   });

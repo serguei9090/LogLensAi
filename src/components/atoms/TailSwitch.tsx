@@ -1,5 +1,5 @@
-import { cn } from "@/lib/utils";
 import { Radio } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 interface TailSwitchProps {
   checked: boolean;

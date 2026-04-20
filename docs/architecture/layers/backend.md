@@ -41,6 +41,8 @@ Expert in high-performance log ingestion, statistical analysis, and DuckDB optim
   - Sends log samples from a cluster to the AI provider for explanatory analysis.
 - **`method_get_anomalies(workspace_id, time_range)`**
   - Identifies statistical outliers and novel log patterns in real-time.
+- **`method_export_logs(workspace_id, filepath, format, ...)`**
+  - Exports matching logs (CSV/JSON) to a local file via native save dialog coordination.
 - **`method_update_settings(settings: dict)`**
   - Persists AI provider keys and general app preferences to the `settings` table.
 
@@ -48,11 +50,11 @@ Expert in high-performance log ingestion, statistical analysis, and DuckDB optim
 
 ### Main Tables
 - **`logs`**: Central log repository. 
-  - `id` (INT), `timestamp` (TIMESTAMP), `level` (VARCHAR), `source_id` (VARCHAR), `raw_text` (TEXT), `message` (TEXT), `cluster_id` (VARCHAR), `comment` (TEXT), `has_comment` (BOOL), `workspace_id` (VARCHAR).
+  - `id` (INT), `timestamp` (TIMESTAMP), `level` (VARCHAR), `source_id` (VARCHAR), `raw_text` (TEXT), `message` (TEXT), `cluster_id` (VARCHAR), `comment` (TEXT), `has_comment` (BOOL), `workspace_id` (VARCHAR), `facets` (JSON).
 - **`clusters`**: Drain3 template registry.
   - `workspace_id` (VARCHAR), `cluster_id` (VARCHAR), `template` (TEXT), `count` (INT).
 - **`fusion_configs`**: Source orchestration settings.
-  - `workspace_id`, `fusion_id`, `source_id`, `enabled`, `tz_offset`.
+  - `workspace_id`, `fusion_id`, `source_id`, `enabled`, `tz_offset`, `time_shift_seconds`.
 - **`settings`**: Global persistent key-value store.
 
 ### 📐 Database ERD
@@ -73,6 +75,7 @@ erDiagram
     text message
     varchar cluster_id FK
     boolean has_comment
+    json facets
   }
   
   CLUSTERS {
@@ -84,5 +87,6 @@ erDiagram
 ```
 
 ## 🧠 Brain Evolution Log
+- **2026-04-20**: Implemented `EXPORT-001` (CSV/JSON log export) and `metadata_faceting_001` (JSON facet extraction).
 - **2026-03-29**: Integrated global temporal filtering across all `get_logs` and `get_log_distribution` methods.
 - **2026-03-29**: Added `has_comment` flag to optimize virtual table rendering and filtering.

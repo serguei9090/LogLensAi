@@ -96,7 +96,13 @@ DEFAULT_DB = "loglens.duckdb"
 
 
 class App:
-    def __init__(self, db_path=DEFAULT_DB):
+    def __init__(
+        self,
+        db_path=DEFAULT_DB,
+        start_ingestion=True,
+        start_anomalies=True,
+        start_mcp=True,
+    ):
         self.db = LogDatabase(db_path)
         self._parsers = {}
         self.tailers = {}
@@ -123,18 +129,20 @@ class App:
             syslog_enabled=syslog_enabled,
             http_enabled=http_enabled,
         )
-        self.ingestion_server.start()
+        if start_ingestion:
+            self.ingestion_server.start()
 
         # Initialize Anomaly Detection
         self.anomaly_detector = AnomalyDetector(self.db)
-        self.anomaly_detector.start()
+        if start_anomalies:
+            self.anomaly_detector.start()
 
         init_mcp(self)
         self._mcp_thread = None
         self._mcp_server_instance = None
 
         # Auto-start if enabled in settings
-        if settings.get("mcp_server_enabled", "false").lower() == "true":
+        if start_mcp and settings.get("mcp_server_enabled", "false").lower() == "true":
             self._start_mcp_server()
 
     def _init_ai_provider(self, settings: dict):
@@ -938,12 +946,13 @@ class App:
 
         return {"status": "ok", "count": len(batch_data)}
 
-    def method_get_metadata_facets(self, workspace_id: str) -> dict:
+    def method_get_metadata_facets(self, **kwargs) -> dict:
         """Return the top unique metadata facets across all logs in a workspace."""
+        params = GetMetadataFacetsRequest(**kwargs)
         cursor = self.db.get_cursor()
 
         # 1. Define priority/standard facets
-        keys = ["ip", "uuid", "user_id", "host", "thread", "logger", "status", "method"]
+        keys = ["ip", "uuid", "user_id", "host", "thread", "logger", "status", "method", "level"]
 
         # 2. Add custom facet names from settings
         # Fetch global rules
@@ -962,7 +971,7 @@ class App:
         # Fetch workspace rules
         cursor.execute(
             "SELECT value FROM workspace_settings WHERE workspace_id = ? AND key = 'facet_extractions'",
-            (workspace_id,),
+            (params.workspace_id,),
         )
         wr = cursor.fetchone()
         if wr and wr[0]:
@@ -980,15 +989,32 @@ class App:
         for key in keys:
             # Efficiently query top 10 unique values for each facet key if they exist
             # Note: Using json_extract_string with double-quoted keys for special char safety ($."key")
+            
+            if key == "level":
+                where_clauses = ["workspace_id = ?", "level IS NOT NULL"]
+                query_field = "level"
+            else:
+                where_clauses = ["workspace_id = ?", f"json_extract_string(facets, '$.\"{key}\"') IS NOT NULL"]
+                query_field = f"json_extract_string(facets, '$.\"{key}\"')"
+                
+            sql_params = [params.workspace_id]
+            
+            if params.source_ids:
+                placeholders = ",".join(["?"] * len(params.source_ids))
+                where_clauses.append(f"source_id IN ({placeholders})")
+                sql_params.extend(params.source_ids)
+                
+            where_sql = " AND ".join(where_clauses)
+            
             query = f"""
-                SELECT json_extract_string(facets, '$."{key}"') as val, count(*) as count
+                SELECT {query_field} as val, count(*) as count
                 FROM logs
-                WHERE workspace_id = ? AND json_extract_string(facets, '$."{key}"') IS NOT NULL
+                WHERE {where_sql}
                 GROUP BY val
                 ORDER BY count DESC
                 LIMIT 10
             """
-            cursor.execute(query, (workspace_id,))
+            cursor.execute(query, sql_params)
             rows = cursor.fetchall()
             if rows:
                 results[key] = [{"value": r[0], "count": r[1]} for r in rows]
@@ -1822,6 +1848,51 @@ class App:
             "database": {"logs": total_logs, "clusters": total_clusters},
             "active_tailers": len(active_tailers),
             "tailer_keys": active_tailers,
+        }
+
+    def method_get_dashboard_stats(self, workspace_id: str | None = None) -> dict:
+        """Fetch high-level metrics for the Dashboard view."""
+        cursor = self.db.get_cursor()
+        
+        # 1. Total Logs
+        if workspace_id:
+            cursor.execute("SELECT COUNT(*) FROM logs WHERE workspace_id = ?", (workspace_id,))
+        else:
+            cursor.execute("SELECT COUNT(*) FROM logs")
+        total_logs = cursor.fetchone()[0]
+
+        # 2. Level breakdown
+        if workspace_id:
+            cursor.execute("SELECT level, COUNT(*) FROM logs WHERE workspace_id = ? GROUP BY level", (workspace_id,))
+        else:
+            cursor.execute("SELECT level, COUNT(*) FROM logs GROUP BY level")
+        level_counts = {row[0]: row[1] for row in cursor.fetchall()}
+
+        # 3. Cluster count
+        if workspace_id:
+            cursor.execute("SELECT COUNT(*) FROM clusters WHERE workspace_id = ?", (workspace_id,))
+        else:
+            cursor.execute("SELECT COUNT(*) FROM clusters")
+        total_clusters = cursor.fetchone()[0]
+
+        # 4. Top Clusters (by frequency)
+        if workspace_id:
+            cursor.execute("SELECT template, count FROM clusters WHERE workspace_id = ? ORDER BY count DESC LIMIT 5", (workspace_id,))
+        else:
+            cursor.execute("SELECT template, SUM(count) as total FROM clusters GROUP BY template ORDER BY total DESC LIMIT 5")
+        top_clusters = [{"template": row[0], "count": row[1]} for row in cursor.fetchall()]
+
+        # 5. Workspace count
+        cursor.execute("SELECT COUNT(DISTINCT workspace_id) FROM logs")
+        workspace_count = cursor.fetchone()[0]
+
+        return {
+            "total_logs": total_logs,
+            "total_clusters": total_clusters,
+            "level_counts": level_counts,
+            "top_clusters": top_clusters,
+            "workspace_count": workspace_count,
+            "active_tailers": len([k for k, t in self.tailers.items() if t.running])
         }
 
 

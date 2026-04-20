@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import fs from "fs/promises";
+import fs from "node:fs/promises";
 /**
  * Monitor network requests
  * Usage: node network.js --url https://example.com [--types xhr,fetch] [--output requests.json]
@@ -63,7 +63,7 @@ async function monitorNetwork() {
             fromCache: response.fromCache(),
             timing: response.timing(),
           });
-        } catch (e) {
+        } catch (_e) {
           // Ignore errors for some response types
         }
       }

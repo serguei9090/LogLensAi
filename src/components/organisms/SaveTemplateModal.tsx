@@ -1,3 +1,6 @@
+import { Bookmark, Filter, Highlighter } from "lucide-react";
+import { useState } from "react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -9,9 +12,6 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { callSidecar } from "@/lib/hooks/useSidecarBridge";
-import { Bookmark, Filter, Highlighter } from "lucide-react";
-import { useState } from "react";
-import { toast } from "sonner";
 import type { FilterEntry } from "../molecules/FilterBuilder";
 import type { HighlightEntry } from "../molecules/HighlightBuilder";
 

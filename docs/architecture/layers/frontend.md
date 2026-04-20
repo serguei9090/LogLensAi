@@ -24,6 +24,7 @@ The central brain for log analysis. Manages search, filters, highlights, and tem
 |---|---|---|
 | `searchQuery` | `string` | Debounced text to find within `message` or `raw_text`. |
 | `filters` | `FilterEntry[]` | Structured SQL-style filters (equals, contains, regex). |
+| `facetFilters` | `Record<string, string[]>` | Dynamic categorical filters for extracted metadata (IPs, UUIDs). |
 | `highlights` | `HighlightEntry[]` | Visual-only term coloring rules (no backend filtering). |
 | `logs` | `LogEntry[]` | Current paginated buffer of logs to be displayed. |
 | `timeRange` | `{ start, end }` | ISO strings for global temporal filtering. |
@@ -40,6 +41,7 @@ Manages the list of active LogLens workspaces.
 ### `useSidecarBridge`
 - **Purpose**: Proxies React calls to the Python `stdin/stdout` bridge.
 - **Contract**: Ensures all `callSidecar` calls are wrapped in standard error handling and type-safe response parsing.
+- **Key Methods**: `get_logs`, `export_logs`, `get_settings`, `update_settings`, `ingest_logs`, `get_metadata_facets`.
 
 ### `useLogStream` (Future/TBD)
 - **Purpose**: Handles the reactive update loop for live tailing (polling or WebSocket/EventSource bridge).

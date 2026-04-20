@@ -1,7 +1,7 @@
 #!/usr/bin/env node
-import { execSync } from "child_process";
-import path from "path";
-import fs from "fs/promises";
+import { execSync } from "node:child_process";
+import fs from "node:fs/promises";
+import path from "node:path";
 /**
  * Take a screenshot
  * Usage: node screenshot.js --output screenshot.png [--url https://example.com] [--full-page true] [--selector .element] [--max-size 5] [--no-compress]
@@ -95,7 +95,7 @@ async function compressImageIfNeeded(filePath, maxSizeMB = 5) {
     console.error("Compression error:", error.message);
     // If compression fails, keep original file
     try {
-      const tempPath = filePath.replace(path.extname(filePath), ".temp" + path.extname(filePath));
+      const tempPath = filePath.replace(path.extname(filePath), `.temp${path.extname(filePath)}`);
       await fs.unlink(tempPath).catch(() => {});
     } catch {}
     return { compressed: false, originalSize, finalSize: originalSize };
@@ -131,7 +131,7 @@ async function screenshot() {
     };
 
     if (args.quality) {
-      screenshotOptions.quality = Number.parseInt(args.quality);
+      screenshotOptions.quality = Number.parseInt(args.quality, 10);
     }
 
     let buffer;
@@ -165,9 +165,7 @@ async function screenshot() {
         result.compressed = true;
         result.originalSize = compressionResult.originalSize;
         result.size = compressionResult.finalSize;
-        result.compressionRatio =
-          ((1 - compressionResult.finalSize / compressionResult.originalSize) * 100).toFixed(2) +
-          "%";
+        result.compressionRatio = `${((1 - compressionResult.finalSize / compressionResult.originalSize) * 100).toFixed(2)}%`;
       }
     }
 

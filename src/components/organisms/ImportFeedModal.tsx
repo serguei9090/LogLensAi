@@ -1,7 +1,3 @@
-import { TailSwitch } from "@/components/atoms/TailSwitch";
-import { cn } from "@/lib/utils";
-import { useSettingsStore } from "@/store/settingsStore";
-import { useWorkspaceStore } from "@/store/workspaceStore";
 import {
   Activity,
   Code,
@@ -16,6 +12,10 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner"; // For environmental feedback
+import { TailSwitch } from "@/components/atoms/TailSwitch";
+import { cn } from "@/lib/utils";
+import { useSettingsStore } from "@/store/settingsStore";
+import { useWorkspaceStore } from "@/store/workspaceStore";
 
 /**
  * Detects whether the app is running inside a Tauri desktop shell.

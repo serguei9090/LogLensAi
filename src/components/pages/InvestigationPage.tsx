@@ -1,9 +1,11 @@
+import { useEffect, useMemo, useState } from "react";
+import { toast } from "sonner";
 import { AIInvestigationSidebar } from "@/components/organisms/AIInvestigationSidebar";
 import { FacetSidebar } from "@/components/organisms/FacetSidebar";
 import { ImportFeedModal } from "@/components/organisms/ImportFeedModal";
 import { OrchestratorHub } from "@/components/organisms/OrchestratorHub";
-import { VirtualLogTable } from "@/components/organisms/VirtualLogTable";
 import type { LogEntry } from "@/components/organisms/VirtualLogTable";
+import { VirtualLogTable } from "@/components/organisms/VirtualLogTable";
 import { WorkspaceEngineSettings } from "@/components/organisms/WorkspaceEngineSettings";
 import { InvestigationLayout } from "@/components/templates/InvestigationLayout";
 import { callSidecar } from "@/lib/hooks/useSidecarBridge";
@@ -11,8 +13,6 @@ import { useAiStore } from "@/store/aiStore";
 import { useInvestigationStore } from "@/store/investigationStore";
 import { useSettingsStore } from "@/store/settingsStore";
 import { type LogSource, selectActiveWorkspace, useWorkspaceStore } from "@/store/workspaceStore";
-import { useEffect, useMemo, useState } from "react";
-import { toast } from "sonner";
 
 // ─── Local helpers ────────────────────────────────────────────────────────────
 

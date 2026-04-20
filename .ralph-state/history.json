@@ -11,6 +11,10 @@
     {
       "iteration": 2,
       "note": "Standardized model and host handling across all providers in backend."
+    },
+    {
+      "iteration": 3,
+      "note": "Task completed. Refactored frontend and backend for provider-aware AI settings."
     }
   ]
 }

@@ -1,3 +1,6 @@
+import { Clock, HelpCircle } from "lucide-react";
+import { useEffect, useState } from "react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -10,9 +13,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
-import { Clock, HelpCircle } from "lucide-react";
-import { useEffect, useState } from "react";
-import { toast } from "sonner";
 
 interface TimeShiftModalProps {
   readonly isOpen: boolean;
@@ -156,7 +156,9 @@ export function TimeShiftModal({
                       type="number"
                       min="0"
                       value={unit.value}
-                      onChange={(e) => unit.set(Math.max(0, Number.parseInt(e.target.value) || 0))}
+                      onChange={(e) =>
+                        unit.set(Math.max(0, Number.parseInt(e.target.value, 10) || 0))
+                      }
                       className="bg-white/5 border-white/10 text-center h-9 text-sm rounded-md focus:border-white/30 transition-all font-mono"
                     />
                   </div>

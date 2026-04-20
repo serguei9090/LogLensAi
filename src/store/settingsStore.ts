@@ -1,5 +1,5 @@
-import { callSidecar } from "@/lib/hooks/useSidecarBridge";
 import { create } from "zustand";
+import { callSidecar } from "@/lib/hooks/useSidecarBridge";
 
 export interface AppSettings {
   ai_provider: string;
@@ -85,7 +85,7 @@ export const useSettingsStore = create<SettingsStore>((set) => ({
         }
         try {
           return JSON.parse(raw);
-        } catch (e) {
+        } catch (_e) {
           try {
             const jsonified = raw
               .replace(/'/g, '"')

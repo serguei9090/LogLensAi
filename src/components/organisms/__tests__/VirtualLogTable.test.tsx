@@ -70,9 +70,7 @@ vi.mock("@/store/workspaceStore", () => ({
 vi.mock("react-dom", async () => {
   const actual = await vi.importActual("react-dom");
   return {
-    // biome-ignore lint/suspicious/noExplicitAny: Mocking react-dom module
     ...(actual as any),
-    // biome-ignore lint/suspicious/noExplicitAny: Mocking react-dom portal
     createPortal: (node: any) => node,
   };
 });

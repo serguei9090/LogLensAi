@@ -29,7 +29,7 @@ async function navigate() {
 
     const options = {
       waitUntil: args["wait-until"] || "networkidle2",
-      timeout: Number.parseInt(args.timeout || "30000"),
+      timeout: Number.parseInt(args.timeout || "30000", 10),
     };
 
     await page.goto(args.url, options);

@@ -1,7 +1,7 @@
-import { Input } from "@/components/ui/input";
-import { useDebounce } from "@/lib/hooks/useDebounce";
 import { Search, X } from "lucide-react";
 import { useEffect, useState } from "react";
+import { Input } from "@/components/ui/input";
+import { useDebounce } from "@/lib/hooks/useDebounce";
 
 interface SearchBarProps {
   value: string;

@@ -1,4 +1,5 @@
 import { GlobalRegistrator } from "@happy-dom/global-registrator";
+
 GlobalRegistrator.register();
 Object.defineProperty(globalThis, "document", { value: window.document, configurable: true });
 Object.defineProperty(globalThis, "window", { value: window, configurable: true });
