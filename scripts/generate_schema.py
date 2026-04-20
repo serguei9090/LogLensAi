@@ -1,22 +1,43 @@
 import json
-import sys
 import os
+import sys
 
 # Add sidecar/src to path
 sys.path.insert(0, os.path.join(os.getcwd(), "sidecar", "src"))
 
 from models import (
-    JSONRPCRequest, JSONRPCResponse, LogFilter, GetLogsRequest,
-    StartTailRequest, StartSSHTailRequest, IngestLogEntry, IngestLogsRequest,
-    UpdateCommentRequest, GetWorkspaceSourcesRequest, ReadFileRequest,
-    FusionSourceConfig, UpdateTemporalOffsetsRequest, GetTemporalOffsetsRequest,
-    UpdateFusionConfigRequest, GetFusionConfigRequest, GetSampleLinesRequest,
-    UpdateSourceParserRequest, GetFusedLogsRequest, GetAnomaliesRequest,
-    GetLogDistributionRequest, GetMetadataFacetsRequest, SendAiMessageRequest,
-    GetAiSessionsRequest, GetAiMessagesRequest, SaveMemoryRequest,
-    SearchMemoryRequest, GetSettingsRequest, UpdateSettingsRequest
+    FusionSourceConfig,
+    GetAiMessagesRequest,
+    GetAiSessionsRequest,
+    GetAnomaliesRequest,
+    GetFusedLogsRequest,
+    GetFusionConfigRequest,
+    GetLogDistributionRequest,
+    GetLogsRequest,
+    GetMetadataFacetsRequest,
+    GetSampleLinesRequest,
+    GetSettingsRequest,
+    GetTemporalOffsetsRequest,
+    GetWorkspaceSourcesRequest,
+    IngestLogEntry,
+    IngestLogsRequest,
+    JSONRPCRequest,
+    JSONRPCResponse,
+    LogFilter,
+    ReadFileRequest,
+    SaveMemoryRequest,
+    SearchMemoryRequest,
+    SendAiMessageRequest,
+    StartSSHTailRequest,
+    StartTailRequest,
+    UpdateCommentRequest,
+    UpdateFusionConfigRequest,
+    UpdateSettingsRequest,
+    UpdateSourceParserRequest,
+    UpdateTemporalOffsetsRequest,
 )
 from pydantic.json_schema import models_json_schema
+
 
 def generate_schema():
     models = [

@@ -1,4 +1,5 @@
 import duckdb
+
 conn = duckdb.connect('loglens.duckdb')
 try:
     res = conn.execute("SELECT value FROM settings WHERE key='facet_extractions'").fetchone()

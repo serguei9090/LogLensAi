@@ -1,9 +1,11 @@
-import sys
-import os
 import ipaddress
+import os
+import sys
+
 sys.path.append(os.path.join(os.getcwd(), 'sidecar/src'))
 
 from metadata_extractor import extract_log_metadata
+
 
 def test_ipv6_extraction():
     raw = "2024-03-21 15:30:45 INFO User connected from [2001:0db8:85a3:0000:0000:8a2e:0370:7334]"

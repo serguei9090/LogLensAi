@@ -1,0 +1,16 @@
+{
+  "iterations": [
+    {
+      "iteration": 1,
+      "note": "Refactored SettingsPanel.tsx for conditional rendering and added AI Studio support."
+    },
+    {
+      "iteration": 1,
+      "note": "Refactored SettingsPanel.tsx for conditional rendering and added AI Studio support."
+    },
+    {
+      "iteration": 2,
+      "note": "Standardized model and host handling across all providers in backend."
+    }
+  ]
+}

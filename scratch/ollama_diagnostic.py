@@ -1,6 +1,7 @@
 import asyncio
-import aiohttp
 import json
+
+import aiohttp
 
 
 async def diagnostic():
@@ -18,17 +19,16 @@ async def diagnostic():
     }
 
     print("--- OLLAMA RAW STREAM DIAGNOSTIC ---")
-    async with aiohttp.ClientSession() as session:
-        async with session.post(url, json=payload) as resp:
-            async for line in resp.content:
-                if line:
-                    chunk = json.loads(line.decode("utf-8"))
-                    if "message" in chunk:
-                        msg = chunk["message"]
-                        # Check for hidden fields Ollama might be using
-                        thinking = msg.get("thinking") or msg.get("thought")
-                        content = msg.get("content")
-                        print(f"Reasoning Field: {repr(thinking)} | Content Field: {repr(content)}")
+    async with aiohttp.ClientSession() as session, session.post(url, json=payload) as resp:
+        async for line in resp.content:
+            if line:
+                chunk = json.loads(line.decode("utf-8"))
+                if "message" in chunk:
+                    msg = chunk["message"]
+                    # Check for hidden fields Ollama might be using
+                    thinking = msg.get("thinking") or msg.get("thought")
+                    content = msg.get("content")
+                    print(f"Reasoning Field: {repr(thinking)} | Content Field: {repr(content)}")
 
 
 if __name__ == "__main__":

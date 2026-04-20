@@ -9,7 +9,6 @@ Usage:
 import sys
 from pathlib import Path
 
-
 SKILL_TEMPLATE = """---
 name: {skill_name}
 description: [TODO: Provide a high-signal trigger description. Include WHAT the skill does and WHEN to use it.]
