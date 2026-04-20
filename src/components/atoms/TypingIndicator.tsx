@@ -1,4 +1,3 @@
-
 /**
  * Professional pulsing dots to indicate AI is working.
  */

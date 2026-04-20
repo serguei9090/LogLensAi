@@ -62,7 +62,9 @@ async def test_gemini_cli_hot_mode_resume():
         mock_post_resp = AsyncMock()
         mock_post_resp.status = 200
         mock_post_resp.content = AsyncMockStream(
-            [b'data: {"result": {"status": {"message": {"role": "agent", "parts": [{"kind": "text", "text": "Hot response"}]}}}}\n\n']
+            [
+                b'data: {"result": {"status": {"message": {"role": "agent", "parts": [{"kind": "text", "text": "Hot response"}]}}}}\n\n'
+            ]
         )
         mock_post_ctx = MagicMock()
         mock_post_ctx.__aenter__ = AsyncMock(return_value=mock_post_resp)

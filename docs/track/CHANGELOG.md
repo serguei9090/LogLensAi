@@ -2,7 +2,19 @@
 
 All notable changes to the LogLensAi project will be documented in this file.
 
-## [Phase 4] - Core Stability & Sidecar Restoration (2026-04-19)
+## [Phase 4] - Ingestion Stabilization & Multi-Stream Routing (2026-04-19)
+
+### Added
+- **Multi-Stream Ingestion Routing**: Implemented path-based routing (`/ingest/{workspace_id}/{collection_name}`) for the HTTP API, allowing granular isolation of log streams within a single workspace.
+- **Workspace-Aware Ingestion UI**: Updated the `ImportFeedModal` to dynamically generate and display correctly formatted ingestion URLs based on the active workspace and chosen collection label.
+- **Dynamic Port Feedback**: Unified real-time port feedback across the UI (toasts and instructions) using standard settings store values.
+
+### Fixed
+- **Variable Masking Engine Hardening**: Resolved critical sidecar startup crashes and frontend `TypeError` mapping errors caused by malformed or double-encoded `drain_masks` settings.
+- **Defensive Multi-Stage Parsing**: Implemented robust JSON-RPC settings decoding in the sidecar and store-level sanitization in React to handle serialization edge cases.
+- **Quality Audit**: Performed a complete repository-wide lint and format pass (Biome + Ruff), resolving all remaining quality violations in the ingestion and settings components.
+
+## [Phase 4.1] - Core Stability & Sidecar Restoration (2026-04-19, Partial)
 
 ### Fixed
 - **Sidecar Lifecycle Restoration**: Restored `sidecar/main.py` entry point which was previously empty, preventing the backend from starting in development mode.

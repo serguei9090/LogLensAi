@@ -1,4 +1,5 @@
 from typing import Any
+
 from pydantic import BaseModel
 
 
@@ -192,3 +193,18 @@ class GetSettingsRequest(BaseModel):
 class UpdateSettingsRequest(BaseModel):
     settings: dict
     workspace_id: str | None = None
+
+
+class GetLogStreamsRequest(BaseModel):
+    workspace_id: str
+
+
+class CreateLogStreamRequest(BaseModel):
+    workspace_id: str
+    name: str
+    type: str  # 'syslog' or 'http'
+    port: int
+
+
+class DeleteLogStreamRequest(BaseModel):
+    id: int

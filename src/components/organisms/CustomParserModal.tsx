@@ -171,33 +171,39 @@ export function CustomParserModal({
     }
 
     try {
-      // Convert Python-style named groups (?P<name>...) to JS-style capture groups (...) 
+      // Convert Python-style named groups (?P<name>...) to JS-style capture groups (...)
       // because we want to extract them by index for the preview.
       // JS also supports (?<name>...) in modern browsers, but index-based is more compatible for this bridge.
       let jsRegexStr = regexPattern;
       const groupNames: string[] = [];
       const namedGroupRegex = /\(\?P<(\w+)>(.*?)\)/g;
-      
+
       let m: RegExpExecArray | null;
       // biome-ignore lint/suspicious/noAssignInExpressions: standard regex iteration
       while ((m = namedGroupRegex.exec(regexPattern)) !== null) {
         groupNames.push(m[1]);
       }
-      
+
       jsRegexStr = regexPattern.replace(/\(\?P<\w+>(.*?)\)/g, "($1)");
 
       const jsRegex = new RegExp(jsRegexStr);
 
       const previews = samples.map((line) => {
         const match = line.match(jsRegex);
-        if (!match) return { timestamp: "No match", level: "---" };
+        if (!match) {
+          return { timestamp: "No match", level: "---" };
+        }
 
         const result: { timestamp?: string; level?: string } = {};
-        
+
         // Map groups by index
         groupNames.forEach((name, i) => {
-          if (name === "timestamp") result.timestamp = match[i + 1];
-          if (name === "level") result.level = match[i + 1];
+          if (name === "timestamp") {
+            result.timestamp = match[i + 1];
+          }
+          if (name === "level") {
+            result.level = match[i + 1];
+          }
         });
 
         return {

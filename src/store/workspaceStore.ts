@@ -12,7 +12,7 @@ export interface LogSource {
   /** Transport type – determines which RPC methods are used for tailing.
    *  'fusion' sources are orchestrated virtual streams managed by OrchestratorHub.
    */
-  type: "local" | "ssh" | "manual" | "fusion";
+  type: "local" | "ssh" | "manual" | "fusion" | "live";
   /** Absolute file path, SSH connection string, or fusion ID for type='fusion' */
   path: string;
 }
@@ -167,7 +167,7 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
             };
           }),
         })),
-      }),
+    }),
 
     {
       name: "loglensai-workspaces-v3",

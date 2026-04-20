@@ -10,11 +10,7 @@ import { callSidecar } from "@/lib/hooks/useSidecarBridge";
 import { useAiStore } from "@/store/aiStore";
 import { useInvestigationStore } from "@/store/investigationStore";
 import { useSettingsStore } from "@/store/settingsStore";
-import {
-  type LogSource,
-  selectActiveWorkspace,
-  useWorkspaceStore,
-} from "@/store/workspaceStore";
+import { type LogSource, selectActiveWorkspace, useWorkspaceStore } from "@/store/workspaceStore";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
@@ -102,6 +98,7 @@ export function InvestigationPage() {
 
   // Anomalies state
   const [anomalousClusters, setAnomalousClusters] = useState<Set<string>>(new Set());
+  const { settings } = useSettingsStore();
 
   // Memoized non-fusion sources
   const nonFusionSources = useMemo(() => sources.filter((s) => s.type !== "fusion"), [sources]);
@@ -190,6 +187,7 @@ export function InvestigationPage() {
     sortBy,
     sortOrder,
     setLogs,
+    setAvailableFacets,
     showAnomalies,
     timeRange,
   ]);
@@ -306,6 +304,63 @@ export function InvestigationPage() {
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Manual ingestion failed.", {
         id: "ingest",
+      });
+    }
+  };
+
+  const handleImportLive = async (name: string, types: { syslog: boolean; http: boolean }) => {
+    const { settings } = useSettingsStore.getState();
+    try {
+      toast.loading(`Initializing live collection: ${name}...`, { id: "live-ingest" });
+
+      const promises = [];
+      if (types.syslog) {
+        promises.push(
+          callSidecar({
+            method: "create_log_stream",
+            params: {
+              workspace_id: activeWorkspaceId,
+              type: "syslog",
+              name: name,
+              port: settings.ingestion_syslog_port,
+            },
+          }),
+        );
+      }
+      if (types.http) {
+        promises.push(
+          callSidecar({
+            method: "create_log_stream",
+            params: {
+              workspace_id: activeWorkspaceId,
+              type: "http",
+              name: name,
+              port: settings.ingestion_http_port,
+            },
+          }),
+        );
+      }
+
+      await Promise.all(promises);
+
+      // Add as a formal source to the workspace so it gets a tab
+      const newSource = addSource(activeWorkspaceId, {
+        name: name,
+        type: "live",
+        path: name, // We'll filter by source_id matching this name
+      });
+
+      setActiveSource(activeWorkspaceId, newSource.id);
+
+      toast.success(`Live collection "${name}" active`, {
+        id: "live-ingest",
+        description: `Listening on ${types.syslog ? `UDP:${settings.ingestion_syslog_port} ` : ""}${
+          types.http ? `HTTP:${settings.ingestion_http_port}` : ""
+        }`,
+      });
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : "Failed to start live collection.", {
+        id: "live-ingest",
       });
     }
   };
@@ -427,9 +482,7 @@ export function InvestigationPage() {
         onDistributionClose={() => setShowDistribution(!showDistribution)}
         workspaceId={activeWorkspaceId}
         leftPanel={<FacetSidebar />}
-        rightPanel={
-          <AIInvestigationSidebar />
-        }
+        rightPanel={<AIInvestigationSidebar />}
       >
         <VirtualLogTable
           logs={logs}
@@ -464,6 +517,7 @@ export function InvestigationPage() {
         onImportLocal={handleImportLocal}
         onImportSSH={handleImportSSH}
         onIngestManual={handleIngestManual}
+        onImportLive={handleImportLive}
       />
 
       <OrchestratorHub

@@ -156,7 +156,9 @@ export function OrchestratorHub({
 
   const applyTemplateToSource = (sourceId: string, templateId: string) => {
     const template = templates.find((t) => t.id.toString() === templateId);
-    if (!template) return;
+    if (!template) {
+      return;
+    }
 
     // Apply the template's config_json to the source's parser_config
     // We treat discovery templates as source-specific parsers/filters

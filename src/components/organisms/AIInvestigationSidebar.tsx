@@ -37,7 +37,7 @@ import { TypingIndicator } from "../atoms/TypingIndicator";
  * leak from corrupted DB history or incomplete backend parsing.
  */
 
-import { type FilterEntry } from "../molecules/FilterBuilder";
+import type { FilterEntry } from "../molecules/FilterBuilder";
 
 /** Raw channel markers emitted by Gemma4 models that should never appear in UI. */
 const CHANNEL_TAGS = ["<|channel>thought", "<|channel>text", "<channel|>", "<|think|>"] as const;

@@ -166,7 +166,9 @@ class GeminiCLIProvider(AIProvider):
 
         async with aiohttp.ClientSession(timeout=self.timeout) as session:
             # 1. Task Management
-            task_id = await self._get_or_create_task(session, session_id, provider_session_id, model)
+            task_id = await self._get_or_create_task(
+                session, session_id, provider_session_id, model
+            )
             is_new_task = (task_id != provider_session_id) if provider_session_id else False
 
             # 2. Context Restoration

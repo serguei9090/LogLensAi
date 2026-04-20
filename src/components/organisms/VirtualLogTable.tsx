@@ -1,12 +1,12 @@
 import { IconButton } from "@/components/atoms/IconButton";
 import { type LogLevel, LogLevelBadge } from "@/components/atoms/LogLevelBadge";
+import type { FilterEntry } from "@/components/molecules/FilterBuilder";
 import type { HighlightEntry } from "@/components/molecules/HighlightBuilder";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useAiStore } from "@/store/aiStore";
 import { useInvestigationStore } from "@/store/investigationStore";
 import { selectActiveWorkspace, useWorkspaceStore } from "@/store/workspaceStore";
-import { type FilterEntry } from "@/components/molecules/FilterBuilder";
 import { type VirtualItem, useVirtualizer } from "@tanstack/react-virtual";
 import {
   ArrowDown,

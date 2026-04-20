@@ -144,6 +144,8 @@
 
 - [x] **ipc_001**: Establish Tauri JSON-RPC Bridge (stdin/stdout process management)
 - [x] **ipc_002**: Type-Sync Auto-Generator (Pydantic to TypeScript pipeline)
+- [x] **ingestion_001**: Configurable Ingestion Listeners (Enable/Disable/Ports)
+  - **Detail**: `docs/TODOC/ingestion_001.md`
 - [ ] **ui_004**: Native File Picker & Search Molecules
  
 ## 🔵 Sprint 07 — Advanced UX & Intelligence (Active)

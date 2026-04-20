@@ -83,7 +83,10 @@ export function SaveTemplateModal({
 
         <div className="grid gap-6 py-6">
           <div className="space-y-3">
-            <label htmlFor="template-name" className="text-[10px] font-bold text-text-muted uppercase tracking-widest">
+            <label
+              htmlFor="template-name"
+              className="text-[10px] font-bold text-text-muted uppercase tracking-widest"
+            >
               Template Name
             </label>
             <Input
@@ -100,7 +103,7 @@ export function SaveTemplateModal({
             <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-widest text-text-muted">
               <span>Configuration Summary</span>
             </div>
-            
+
             <div className="flex items-center gap-4">
               <div className="flex items-center gap-2">
                 <Filter className="size-3 text-primary/60" />

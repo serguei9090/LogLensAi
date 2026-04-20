@@ -1,9 +1,9 @@
 import contextlib
+import json
 import os
 import threading
-from typing import Any, List, Tuple, Dict, Optional
 from datetime import datetime, timedelta
-import json
+from typing import Any
 
 import duckdb
 from query_parser import parse_llql
@@ -107,6 +107,16 @@ class LogDatabase:
                 last_modified TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
 
+            CREATE TABLE IF NOT EXISTS log_streams (
+                id           INTEGER PRIMARY KEY DEFAULT nextval('log_id_seq'),
+                workspace_id TEXT,
+                name         TEXT,
+                type         TEXT,
+                port         INTEGER,
+                enabled      BOOLEAN DEFAULT TRUE,
+                created_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+
             CREATE TABLE IF NOT EXISTS ai_messages (
                 id           INTEGER PRIMARY KEY DEFAULT nextval('log_id_seq'),
                 session_id   TEXT,
@@ -181,7 +191,9 @@ class LogDatabase:
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_logs_source_id ON logs (source_id);")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_logs_timestamp ON logs (timestamp);")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_logs_cluster_id ON logs (cluster_id);")
-        cursor.execute("CREATE INDEX IF NOT EXISTS idx_ai_messages_session_id ON ai_messages (session_id);")
+        cursor.execute(
+            "CREATE INDEX IF NOT EXISTS idx_ai_messages_session_id ON ai_messages (session_id);"
+        )
 
     def _migrate_ai_tables(self, cursor):
         """Ensure AI session/message tables have latest columns."""
@@ -314,7 +326,7 @@ class LogDatabase:
         for f in filters:
             if hasattr(f, "model_dump"):
                 f = f.model_dump()
-            
+
             field = f.get("field")
             value = f.get("value")
             op = f.get("operator", "equals")
@@ -377,10 +389,19 @@ class LogDatabase:
                 except Exception:
                     pass
 
-    def query_logs(self, workspace_id: str, query: str = None, filters: list = None,
-                   limit: int = 100, offset: int = 0, sort_by: str = "id",
-                   sort_order: str = "DESC", source_ids: list = None,
-                   start_time: str = None, end_time: str = None) -> dict:
+    def query_logs(
+        self,
+        workspace_id: str,
+        query: str = None,
+        filters: list = None,
+        limit: int = 100,
+        offset: int = 0,
+        sort_by: str = "id",
+        sort_order: str = "DESC",
+        source_ids: list = None,
+        start_time: str = None,
+        end_time: str = None,
+    ) -> dict:
         cursor = self.get_cursor()
 
         where_clauses = ["l.workspace_id = ?"]
@@ -428,14 +449,25 @@ class LogDatabase:
         cursor.execute(count_query, params)
         total = cursor.fetchone()[0]
 
-        allowed_sort = ["id", "timestamp", "level", "source_id", "cluster_id", "has_comment", "cluster_percent"]
+        allowed_sort = [
+            "id",
+            "timestamp",
+            "level",
+            "source_id",
+            "cluster_id",
+            "has_comment",
+            "cluster_percent",
+        ]
         final_sort_by = sort_by if sort_by in allowed_sort else "id"
         if final_sort_by == "cluster_id":
             final_sort_by = "cluster_percent"
 
         final_sort_order = "ASC" if sort_order and sort_order.upper() == "ASC" else "DESC"
-        data_query = base_query + f" ORDER BY {final_sort_by} {final_sort_order}, l.id {final_sort_order} LIMIT ? OFFSET ?"
-        
+        data_query = (
+            base_query
+            + f" ORDER BY {final_sort_by} {final_sort_order}, l.id {final_sort_order} LIMIT ? OFFSET ?"
+        )
+
         # params[0] is workspace_id for the subquery in SELECT, then params for WHERE clause
         cursor.execute(data_query, [workspace_id] + params + [limit, offset])
 

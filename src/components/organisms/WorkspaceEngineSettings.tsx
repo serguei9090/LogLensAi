@@ -59,7 +59,19 @@ export function WorkspaceEngineSettings({
             ),
             drain_max_children: Number.parseInt((settings.drain_max_children as string) || "100"),
             drain_max_clusters: Number.parseInt((settings.drain_max_clusters as string) || "1000"),
-            drain_masks: settings.drain_masks ? JSON.parse(settings.drain_masks as string) : [],
+            drain_masks: (() => {
+              const raw = settings.drain_masks as string;
+              if (!raw) {
+                return [];
+              }
+              try {
+                const parsed = JSON.parse(raw);
+                const final = typeof parsed === "string" ? JSON.parse(parsed) : parsed;
+                return Array.isArray(final) ? final : [];
+              } catch {
+                return [];
+              }
+            })(),
           });
         }
       });
@@ -215,70 +227,72 @@ export function WorkspaceEngineSettings({
               <Layers className="size-3 opacity-50" />
             </h3>
             <div className="space-y-2">
-              {localSettings.drain_masks.map((mask, idx) => {
-                const isGlobal = (
-                  globalSettings?.drain_masks as { label: string; pattern: string }[]
-                )?.some(
-                  (gm: { label: string; pattern: string }) =>
-                    gm.label === mask.label && gm.pattern === mask.pattern,
-                );
-                return (
-                  <div
-                    key={idx}
-                    className="flex items-center gap-2 bg-zinc-900/50 p-2 rounded-lg border border-zinc-800/50 group"
-                  >
-                    <Switch
-                      checked={mask.enabled}
-                      onCheckedChange={(val) => {
-                        const m = [...localSettings.drain_masks];
-                        m[idx] = { ...m[idx], enabled: val };
-                        update("drain_masks", m);
-                      }}
-                      className="scale-75"
-                    />
-                    <div className="flex flex-col">
-                      <input
-                        value={mask.label}
-                        onChange={(e) => {
+              {(Array.isArray(localSettings.drain_masks) ? localSettings.drain_masks : []).map(
+                (mask, idx) => {
+                  const isGlobal = (
+                    globalSettings?.drain_masks as { label: string; pattern: string }[]
+                  )?.some(
+                    (gm: { label: string; pattern: string }) =>
+                      gm.label === mask.label && gm.pattern === mask.pattern,
+                  );
+                  return (
+                    <div
+                      key={idx}
+                      className="flex items-center gap-2 bg-zinc-900/50 p-2 rounded-lg border border-zinc-800/50 group"
+                    >
+                      <Switch
+                        checked={mask.enabled}
+                        onCheckedChange={(val) => {
                           const m = [...localSettings.drain_masks];
-                          m[idx] = { ...m[idx], label: e.target.value };
+                          m[idx] = { ...m[idx], enabled: val };
                           update("drain_masks", m);
                         }}
-                        placeholder="LABEL"
-                        className="bg-transparent border-none text-[10px] font-bold text-emerald-400 focus:ring-0 w-20 px-0 uppercase"
+                        className="scale-75"
                       />
-                      {isGlobal && (
-                        <span className="text-[7px] text-zinc-600 font-bold -mt-1 uppercase tracking-tighter">
-                          GLOBAL
-                        </span>
-                      )}
+                      <div className="flex flex-col">
+                        <input
+                          value={mask.label}
+                          onChange={(e) => {
+                            const m = [...localSettings.drain_masks];
+                            m[idx] = { ...m[idx], label: e.target.value };
+                            update("drain_masks", m);
+                          }}
+                          placeholder="LABEL"
+                          className="bg-transparent border-none text-[10px] font-bold text-emerald-400 focus:ring-0 w-20 px-0 uppercase"
+                        />
+                        {isGlobal && (
+                          <span className="text-[7px] text-zinc-600 font-bold -mt-1 uppercase tracking-tighter">
+                            GLOBAL
+                          </span>
+                        )}
+                      </div>
+                      <input
+                        value={mask.pattern}
+                        onChange={(e) => {
+                          const m = [...localSettings.drain_masks];
+                          m[idx] = { ...m[idx], pattern: e.target.value };
+                          update("drain_masks", m);
+                        }}
+                        placeholder="Regex Pattern"
+                        className="flex-1 bg-transparent border-none text-[10px] text-zinc-400 font-mono focus:ring-0 px-0"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const m = localSettings.drain_masks.filter((_, i) => i !== idx);
+                          update("drain_masks", m);
+                        }}
+                        className={cn(
+                          "p-1 text-zinc-500 hover:text-red-400 transition-all",
+                          isGlobal ? "opacity-0 group-hover:opacity-100" : "opacity-100",
+                        )}
+                      >
+                        <Trash2 className="size-3" />
+                      </button>
                     </div>
-                    <input
-                      value={mask.pattern}
-                      onChange={(e) => {
-                        const m = [...localSettings.drain_masks];
-                        m[idx] = { ...m[idx], pattern: e.target.value };
-                        update("drain_masks", m);
-                      }}
-                      placeholder="Regex Pattern"
-                      className="flex-1 bg-transparent border-none text-[10px] text-zinc-400 font-mono focus:ring-0 px-0"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const m = localSettings.drain_masks.filter((_, i) => i !== idx);
-                        update("drain_masks", m);
-                      }}
-                      className={cn(
-                        "p-1 text-zinc-500 hover:text-red-400 transition-all",
-                        isGlobal ? "opacity-0 group-hover:opacity-100" : "opacity-100",
-                      )}
-                    >
-                      <Trash2 className="size-3" />
-                    </button>
-                  </div>
-                );
-              })}
+                  );
+                },
+              )}
               <Button
                 variant="outline"
                 size="sm"

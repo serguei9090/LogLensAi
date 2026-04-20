@@ -17,6 +17,7 @@ def api():
     }
     yield app
     from db import LogDatabase
+
     LogDatabase.reset()
 
 

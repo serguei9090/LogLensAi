@@ -1,6 +1,19 @@
 import { TailSwitch } from "@/components/atoms/TailSwitch";
 import { cn } from "@/lib/utils";
-import { Code, Folder, FolderOpen, Info, Server, Terminal, Upload, X } from "lucide-react";
+import { useSettingsStore } from "@/store/settingsStore";
+import { useWorkspaceStore } from "@/store/workspaceStore";
+import {
+  Activity,
+  Code,
+  Folder,
+  FolderOpen,
+  Info,
+  Server,
+  Terminal,
+  Upload,
+  Wifi,
+  X,
+} from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner"; // For environmental feedback
 
@@ -8,8 +21,7 @@ import { toast } from "sonner"; // For environmental feedback
  * Detects whether the app is running inside a Tauri desktop shell.
  * When false, we're in web mode and must use browser-native file APIs.
  */
-const isTauri =
-  typeof globalThis.window !== "undefined" && "__TAURI_INTERNALS__" in globalThis.window;
+const isTauri = globalThis.window !== undefined && "__TAURI_INTERNALS__" in globalThis.window;
 
 interface ImportFeedModalProps {
   readonly open: boolean;
@@ -24,14 +36,16 @@ interface ImportFeedModalProps {
     tail: boolean,
   ) => void;
   readonly onIngestManual: (logs: string) => void;
+  readonly onImportLive: (name: string, types: { syslog: boolean; http: boolean }) => void;
 }
 
-type TabId = "local" | "ssh" | "manual";
+type TabId = "local" | "ssh" | "manual" | "live";
 
 const TABS: { id: TabId; icon: typeof FolderOpen; label: string }[] = [
   { id: "local", icon: FolderOpen, label: "Local File" },
   { id: "ssh", icon: Server, label: "SSH Remote" },
   { id: "manual", icon: Code, label: "Manual" },
+  { id: "live", icon: Activity, label: "Live Ingestion" },
 ];
 
 const inputCls =
@@ -43,6 +57,7 @@ export function ImportFeedModal({
   onImportLocal,
   onImportSSH,
   onIngestManual,
+  onImportLive,
 }: ImportFeedModalProps) {
   const [activeTab, setActiveTab] = useState<TabId>("local");
   const [localPath, setLocalPath] = useState("");
@@ -55,6 +70,13 @@ export function ImportFeedModal({
   const [sshPath, setSshPath] = useState("");
   const [sshTail, setSshTail] = useState(true);
   const [manualLogs, setManualLogs] = useState("");
+
+  const [liveName, setLiveName] = useState("");
+  const [liveSyslog, setLiveSyslog] = useState(true);
+  const [liveHttp, setLiveHttp] = useState(true);
+
+  const { activeWorkspaceId } = useWorkspaceStore();
+  const { settings } = useSettingsStore();
 
   if (!open) {
     return null;
@@ -326,6 +348,160 @@ export function ImportFeedModal({
                 >
                   <Upload className="h-5 w-5" />
                   Process Buffer
+                </button>
+              </div>
+            </div>
+          )}
+
+          {activeTab === "live" && (
+            <div className="space-y-6 animate-in slide-in-from-left-4 duration-500">
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <label htmlFor="live-name" className={labelCls}>
+                    Collection Label (Tab Name)
+                  </label>
+                  <input
+                    id="live-name"
+                    placeholder="e.g. Production Cluster"
+                    className={cn(inputCls, "h-12")}
+                    value={liveName}
+                    onChange={(e) => setLiveName(e.target.value)}
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <button
+                    type="button"
+                    onClick={() => setLiveSyslog(!liveSyslog)}
+                    className={cn(
+                      "p-5 rounded-2xl border transition-all text-left flex flex-col gap-2",
+                      liveSyslog
+                        ? "bg-primary/5 border-primary shadow-sm"
+                        : "bg-bg-surface border-border opacity-60 hover:opacity-100",
+                    )}
+                  >
+                    <div className="flex items-center justify-between w-full">
+                      <Wifi
+                        className={cn("h-5 w-5", liveSyslog ? "text-primary" : "text-text-muted")}
+                      />
+                      <div
+                        className={cn(
+                          "w-2 h-2 rounded-full transform transition-transform",
+                          liveSyslog
+                            ? "bg-primary scale-100 animate-pulse"
+                            : "bg-text-muted scale-75",
+                        )}
+                      />
+                    </div>
+                    <span
+                      className={cn(
+                        "text-xs font-bold",
+                        liveSyslog ? "text-primary" : "text-text-muted",
+                      )}
+                    >
+                      Syslog (UDP)
+                    </span>
+                    <span className="text-[10px] text-text-muted/60">
+                      Passive listening on port 514
+                    </span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setLiveHttp(!liveHttp)}
+                    className={cn(
+                      "p-5 rounded-2xl border transition-all text-left flex flex-col gap-2",
+                      liveHttp
+                        ? "bg-primary/5 border-primary shadow-sm"
+                        : "bg-bg-surface border-border opacity-60 hover:opacity-100",
+                    )}
+                  >
+                    <div className="flex items-center justify-between w-full">
+                      <Terminal
+                        className={cn("h-5 w-5", liveHttp ? "text-primary" : "text-text-muted")}
+                      />
+                      <div
+                        className={cn(
+                          "w-2 h-2 rounded-full transform transition-transform",
+                          liveHttp
+                            ? "bg-primary scale-100 animate-pulse"
+                            : "bg-text-muted scale-75",
+                        )}
+                      />
+                    </div>
+                    <span
+                      className={cn(
+                        "text-xs font-bold",
+                        liveHttp ? "text-primary" : "text-text-muted",
+                      )}
+                    >
+                      HTTP API
+                    </span>
+                    <span className="text-[10px] text-text-muted/60">
+                      POST endpoint on port 5002
+                    </span>
+                  </button>
+                </div>
+
+                <div className="flex items-start gap-3 border border-orange-500/20 bg-orange-500/5 rounded-2xl p-4">
+                  <Info className="h-5 w-5 shrink-0 mt-0.5 text-orange-500" />
+                  <div className="space-y-1">
+                    <p className="text-[10px] font-bold text-orange-500 uppercase tracking-tight">
+                      Configuration Note
+                    </p>
+                    <p className="text-[11px] text-text-muted leading-relaxed opacity-80">
+                      Ports are managed globally in **Settings**. All traffic matching the selected
+                      protocols will be routed to this workspace using the label above.
+                    </p>
+                  </div>
+                </div>
+
+                {(liveHttp || liveSyslog) && (
+                  <div className="bg-bg-dark/50 border border-border/50 rounded-2xl p-5 space-y-4">
+                    <p className="text-[10px] font-bold text-text-muted uppercase tracking-widest ml-1">
+                      Ready to Ingest
+                    </p>
+
+                    <div className="space-y-4">
+                      {liveHttp && (
+                        <div className="space-y-2">
+                          <span className="text-[10px] font-semibold text-text-muted/60 ml-1">
+                            HTTP ENDPOINT
+                          </span>
+                          <div className="bg-bg-surface/50 border border-border p-3 rounded-xl font-mono text-[10px] text-primary break-all">
+                            POST http://localhost:{settings.ingestion_http_port}/ingest/
+                            {activeWorkspaceId}/{liveName || "my-collection"}
+                          </div>
+                        </div>
+                      )}
+
+                      {liveSyslog && (
+                        <div className="space-y-2">
+                          <span className="text-[10px] font-semibold text-text-muted/60 ml-1">
+                            SYSLOG TARGET (UDP)
+                          </span>
+                          <div className="bg-bg-surface/50 border border-border p-3 rounded-xl font-mono text-[10px] text-primary">
+                            127.0.0.1:{settings.ingestion_syslog_port}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className="flex justify-end pt-2">
+                <button
+                  type="button"
+                  disabled={!liveName.trim() || (!liveSyslog && !liveHttp)}
+                  onClick={() => {
+                    onImportLive(liveName.trim(), { syslog: liveSyslog, http: liveHttp });
+                    onOpenChange(false);
+                  }}
+                  className="inline-flex items-center gap-3 px-8 py-3.5 rounded-2xl bg-primary hover:bg-primary-hover disabled:opacity-30 text-bg-base text-[13px] font-black transition-all shadow-xl shadow-primary/20 hover:-translate-y-0.5 active:translate-y-0"
+                >
+                  <Wifi className="h-5 w-5" />
+                  Start Collection
                 </button>
               </div>
             </div>

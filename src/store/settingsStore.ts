@@ -18,6 +18,10 @@ export interface AppSettings {
   ai_tool_memory: boolean;
   drain_template_scope: "global" | "workspace";
   drain_masks: Array<{ pattern: string; label: string; enabled: boolean }>;
+  ingestion_syslog_enabled: boolean;
+  ingestion_syslog_port: number;
+  ingestion_http_enabled: boolean;
+  ingestion_http_port: number;
 }
 
 export const defaultSettings: AppSettings = {
@@ -39,7 +43,7 @@ export const defaultSettings: AppSettings = {
   drain_template_scope: "global",
   drain_masks: [
     {
-      pattern: "((?<=[^A-Za-z0-9])|^)(\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3})(?=[^A-Za-z0-9]|$)",
+      pattern: String.raw`((?<=[^A-Za-z0-9])|^)(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})(?=[^A-Za-z0-9]|$)`,
       label: "IP",
       enabled: true,
     },
@@ -49,6 +53,10 @@ export const defaultSettings: AppSettings = {
       enabled: true,
     },
   ],
+  ingestion_syslog_enabled: true,
+  ingestion_syslog_port: 514,
+  ingestion_http_enabled: true,
+  ingestion_http_port: 5002,
 };
 
 interface SettingsStore {
@@ -82,9 +90,25 @@ export const useSettingsStore = create<SettingsStore>((set) => ({
             ai_tool_memory: remote.ai_tool_memory !== "false", // default true
             drain_template_scope:
               (remote.drain_template_scope as "global" | "workspace") || "global",
-            drain_masks: remote.drain_masks
-              ? JSON.parse(remote.drain_masks)
-              : defaultSettings.drain_masks,
+            drain_masks: (() => {
+              const raw = remote.drain_masks;
+              if (!raw) {
+                return defaultSettings.drain_masks;
+              }
+              try {
+                const parsed = JSON.parse(raw);
+                // Handle potential double-encoding
+                const final = typeof parsed === "string" ? JSON.parse(parsed) : parsed;
+                return Array.isArray(final) ? final : defaultSettings.drain_masks;
+              } catch (e) {
+                console.warn("Faulty drain_masks in settings:", e);
+                return defaultSettings.drain_masks;
+              }
+            })(),
+            ingestion_syslog_enabled: remote.ingestion_syslog_enabled !== "false",
+            ingestion_syslog_port: Number.parseInt(remote.ingestion_syslog_port || "514", 10),
+            ingestion_http_enabled: remote.ingestion_http_enabled !== "false",
+            ingestion_http_port: Number.parseInt(remote.ingestion_http_port || "5002", 10),
           },
         });
       }
@@ -94,24 +118,40 @@ export const useSettingsStore = create<SettingsStore>((set) => ({
   },
 
   updateSettings: async (newSettings, workspaceId?: string) => {
-    try {
-      const payload: Record<string, string | number | boolean> = {};
-      for (const [k, v] of Object.entries(newSettings)) {
-        if (k === "drain_masks") {
-          payload[k] = JSON.stringify(v);
-        } else {
-          payload[k] = v as string | number | boolean;
-        }
-      }
+    // 1. Update local state immediately for UI responsiveness
+    set((state) => ({ settings: { ...state.settings, ...newSettings } }));
 
-      await callSidecar({
-        method: "update_settings",
-        params: { settings: payload, workspace_id: workspaceId },
-      });
-      // Optionally re-fetch to ensure sync, or just update local state
-      set((state) => ({ settings: { ...state.settings, ...newSettings } }));
-    } catch (err) {
-      console.error("Failed to update settings:", err);
+    // 2. Debounced persistence to sidecar
+    // We use a module-level variable or a simple timeout to debounce the RPC call
+    if (saveTimeout) {
+      clearTimeout(saveTimeout);
     }
+
+    saveTimeout = setTimeout(async () => {
+      try {
+        const payload: Record<string, string | number | boolean> = {};
+        // The sidecar expects a dict of settings to update.
+        // To be safe and consistent with the existing API, we'll send the updated fields.
+        for (const [k, v] of Object.entries(newSettings)) {
+          if (k === "drain_masks") {
+            payload[k] = JSON.stringify(v);
+          } else {
+            payload[k] = v as string | number | boolean;
+          }
+        }
+
+        await callSidecar({
+          method: "update_settings",
+          params: { settings: payload, workspace_id: workspaceId },
+        });
+        console.log("Settings persisted to sidecar");
+      } catch (err) {
+        console.error("Failed to persist settings to sidecar:", err);
+      } finally {
+        saveTimeout = null;
+      }
+    }, 500);
   },
 }));
+
+let saveTimeout: ReturnType<typeof setTimeout> | null = null;

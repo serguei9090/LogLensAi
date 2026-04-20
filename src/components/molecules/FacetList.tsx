@@ -1,8 +1,8 @@
+import { cn } from "@/lib/utils";
 import { useInvestigationStore } from "@/store/investigationStore";
 import { AnimatePresence, motion } from "framer-motion";
 import { ChevronDown, ChevronRight, Database } from "lucide-react";
 import { useState } from "react";
-import { cn } from "@/lib/utils";
 import type { FilterEntry } from "./FilterBuilder";
 
 interface FacetListProps {
@@ -13,13 +13,16 @@ interface FacetListProps {
 export function FacetList({ onApplyFilter, className }: FacetListProps) {
   const { availableFacets, filters, setFilters } = useInvestigationStore();
   const [expandedKeys, setExpandedKeys] = useState<Set<string>>(
-    new Set(["ip", "uuid", "level", "email", "user_id"])
+    new Set(["ip", "uuid", "level", "email", "user_id"]),
   );
 
   const toggleKey = (key: string) => {
     const next = new Set(expandedKeys);
-    if (next.has(key)) next.delete(key);
-    else next.add(key);
+    if (next.has(key)) {
+      next.delete(key);
+    } else {
+      next.add(key);
+    }
     setExpandedKeys(next);
   };
 
@@ -31,7 +34,9 @@ export function FacetList({ onApplyFilter, className }: FacetListProps) {
 
     const field = key === "level" ? "level" : `facets.${key}`;
     // Check if filter already exists
-    if (filters.some((f: FilterEntry) => f.field === field && f.value === value)) return;
+    if (filters.some((f: FilterEntry) => f.field === field && f.value === value)) {
+      return;
+    }
 
     setFilters([...filters, { id: crypto.randomUUID(), field, value, operator: "equals" }]);
   };
@@ -40,9 +45,7 @@ export function FacetList({ onApplyFilter, className }: FacetListProps) {
     return (
       <div className={cn("px-6 py-10 text-center", className)}>
         <Database className="h-8 w-8 text-[#1D2420] mx-auto mb-3" />
-        <p className="text-[11px] text-[#4d6057]">
-          No metadata facets detected in current view.
-        </p>
+        <p className="text-[11px] text-[#4d6057]">No metadata facets detected in current view.</p>
       </div>
     );
   }
@@ -78,7 +81,7 @@ export function FacetList({ onApplyFilter, className }: FacetListProps) {
                   {values.map((v) => {
                     const field = key === "level" ? "level" : `facets.${key}`;
                     const isActive = filters.some(
-                      (f: FilterEntry) => f.field === field && f.value === v.value
+                      (f: FilterEntry) => f.field === field && f.value === v.value,
                     );
                     return (
                       <button
@@ -88,7 +91,7 @@ export function FacetList({ onApplyFilter, className }: FacetListProps) {
                           "w-full flex items-center justify-between group py-1 px-2 rounded text-[11px] transition-all",
                           isActive
                             ? "bg-[#22C55E15] text-[#22C55E]"
-                            : "text-[#8FA898] hover:bg-[#1E2520] hover:text-[#E8F5EC]"
+                            : "text-[#8FA898] hover:bg-[#1E2520] hover:text-[#E8F5EC]",
                         )}
                       >
                         <span className="truncate max-w-[140px] font-mono">{v.value}</span>

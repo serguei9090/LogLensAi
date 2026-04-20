@@ -4,6 +4,7 @@ import { callSidecar } from "@/lib/hooks/useSidecarBridge";
 import { cn } from "@/lib/utils";
 import { useWorkspaceStore } from "@/store/workspaceStore";
 import {
+  Activity,
   Bot,
   Check,
   ChevronDown,
@@ -11,10 +12,10 @@ import {
   Cpu,
   FolderOpen,
   Layers,
+  Network,
   Palette,
   Plus,
   RefreshCcw,
-  Save,
   Terminal,
   Trash2,
   X,
@@ -23,11 +24,12 @@ import { useEffect, useState } from "react";
 
 import { type AppSettings, defaultSettings } from "@/store/settingsStore";
 
-type SectionId = "ai" | "drain" | "general";
+type SectionId = "ai" | "drain" | "ingestion" | "general";
 
 const SECTIONS: { id: SectionId; icon: typeof Bot; label: string; desc: string }[] = [
   { id: "ai", icon: Bot, label: "AI Intelligence", desc: "Model & analyze logic" },
   { id: "drain", icon: Cpu, label: "Engine Core", desc: "Clustering parameters" },
+  { id: "ingestion", icon: Network, label: "Ingestion", desc: "Live stream listeners" },
   { id: "general", icon: Palette, label: "Interface", desc: "Display & accessibility" },
 ];
 
@@ -99,8 +101,16 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
   const [isSkillModalOpen, setIsSkillModalOpen] = useState(false);
   const { activeWorkspaceId } = useWorkspaceStore();
 
-  const update = <K extends keyof AppSettings>(key: K, value: AppSettings[K]) =>
-    setSettings((prev) => ({ ...prev, [key]: value }));
+  const update = <K extends keyof AppSettings>(key: K, value: AppSettings[K], immediate = true) => {
+    const newSettings = { ...settings, [key]: value };
+    setSettings(newSettings);
+
+    if (immediate) {
+      onSave(newSettings);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+    }
+  };
 
   const handleResetTemplates = async () => {
     try {
@@ -119,10 +129,10 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
   useEffect(() => {
     const loadSettings = async () => {
       try {
-        const remoteSettings = (await callSidecar({
+        const remoteSettings = await callSidecar<Record<string, string>>({
           method: "get_settings",
           params: {},
-        })) as Record<string, string>;
+        });
         if (remoteSettings) {
           setSettings((prev) => ({
             ...prev,
@@ -136,6 +146,13 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
             mcp_server_enabled: remoteSettings.mcp_server_enabled === "true",
             ai_tool_search: remoteSettings.ai_tool_search !== "false",
             ai_tool_memory: remoteSettings.ai_tool_memory !== "false",
+            ingestion_syslog_enabled: remoteSettings.ingestion_syslog_enabled !== "false",
+            ingestion_syslog_port: Number.parseInt(
+              remoteSettings.ingestion_syslog_port || "514",
+              10,
+            ),
+            ingestion_http_enabled: remoteSettings.ingestion_http_enabled !== "false",
+            ingestion_http_port: Number.parseInt(remoteSettings.ingestion_http_port || "5002", 10),
           }));
         }
       } catch (error) {
@@ -161,11 +178,7 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
     }
   }, [settings.ai_provider]);
 
-  const handleSave = () => {
-    onSave(settings);
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
-  };
+  // Removed handleSave in favor of auto-save via update()
 
   return (
     <div className="flex h-full bg-bg-base overflow-hidden">
@@ -208,28 +221,28 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
           ))}
         </nav>
 
-        <button
-          type="button"
-          onClick={handleSave}
-          className={cn(
-            "mt-6 flex items-center justify-center gap-2 px-6 py-3 rounded-2xl text-sm font-bold transition-all transform active:scale-95",
-            saved
-              ? "bg-zinc-800 text-primary border border-primary/30"
-              : "bg-primary hover:bg-primary-hover text-bg-base shadow-xl shadow-primary/20",
-          )}
-        >
-          {saved ? (
-            <>
-              <Check className="h-5 w-5 animate-in zoom-in duration-200" />
-              <span>Saved Successfully</span>
-            </>
-          ) : (
-            <>
-              <Save className="h-5 w-5" />
-              <span>Apply Changes</span>
-            </>
-          )}
-        </button>
+        <div className="mt-auto pt-6 flex flex-col gap-2">
+          <div
+            className={cn(
+              "flex items-center gap-2 px-4 py-2 rounded-xl text-[10px] font-bold uppercase tracking-wider transition-all duration-500",
+              saved
+                ? "text-primary bg-primary/5 border border-primary/20"
+                : "text-text-muted opacity-40",
+            )}
+          >
+            {saved ? (
+              <>
+                <Check className="h-3 w-3" />
+                <span>Changes Auto-Saved</span>
+              </>
+            ) : (
+              <>
+                <RefreshCcw className="h-3 w-3 animate-spin-slow" />
+                <span>Ready for Changes</span>
+              </>
+            )}
+          </div>
+        </div>
       </aside>
 
       {/* Main Content Area */}
@@ -272,7 +285,8 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
                     id="ai_api_key"
                     type="password"
                     value={settings.ai_api_key}
-                    onChange={(e) => update("ai_api_key", e.target.value)}
+                    onChange={(e) => update("ai_api_key", e.target.value, false)}
+                    onBlur={() => onSave(settings)}
                     placeholder="Encrypted: sk-••••••••••••••••"
                   />
                   <p className="text-[10px] text-text-muted/50 px-1">
@@ -307,7 +321,8 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
                       id="ai_gemini_url"
                       type="url"
                       value={settings.ai_gemini_url}
-                      onChange={(e) => update("ai_gemini_url", e.target.value)}
+                      onChange={(e) => update("ai_gemini_url", e.target.value, false)}
+                      onBlur={() => onSave(settings)}
                       placeholder="http://localhost:22436"
                     />
                     <p className="text-[10px] text-text-muted/50 px-1">Daemon port for Hot Mode.</p>
@@ -340,7 +355,8 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
                       id="ai_ollama_host"
                       type="url"
                       value={settings.ai_ollama_host}
-                      onChange={(e) => update("ai_ollama_host", e.target.value)}
+                      onChange={(e) => update("ai_ollama_host", e.target.value, false)}
+                      onBlur={() => onSave(settings)}
                       placeholder="http://localhost:11434"
                     />
                   </div>
@@ -368,7 +384,8 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
                 <textarea
                   id="ai_system_prompt"
                   value={settings.ai_system_prompt}
-                  onChange={(e) => update("ai_system_prompt", e.target.value)}
+                  onChange={(e) => update("ai_system_prompt", e.target.value, false)}
+                  onBlur={() => onSave(settings)}
                   rows={6}
                   className="w-full px-4 py-3 rounded-2xl text-xs font-mono bg-bg-surface border border-border text-text-primary placeholder:text-text-muted/30 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 resize-none transition-all"
                 />
@@ -496,8 +513,9 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
                     max="1"
                     value={settings.drain_similarity_threshold}
                     onChange={(e) =>
-                      update("drain_similarity_threshold", Number.parseFloat(e.target.value))
+                      update("drain_similarity_threshold", Number.parseFloat(e.target.value), false)
                     }
+                    onBlur={() => onSave(settings)}
                   />
                 </div>
                 <div className="space-y-2">
@@ -508,8 +526,9 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
                     min="1"
                     value={settings.drain_max_children}
                     onChange={(e) =>
-                      update("drain_max_children", Number.parseInt(e.target.value, 10))
+                      update("drain_max_children", Number.parseInt(e.target.value, 10), false)
                     }
+                    onBlur={() => onSave(settings)}
                   />
                 </div>
                 <div className="space-y-2">
@@ -520,8 +539,9 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
                     min="1"
                     value={settings.drain_max_clusters}
                     onChange={(e) =>
-                      update("drain_max_clusters", Number.parseInt(e.target.value, 10))
+                      update("drain_max_clusters", Number.parseInt(e.target.value, 10), false)
                     }
+                    onBlur={() => onSave(settings)}
                   />
                 </div>
               </div>
@@ -558,62 +578,64 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
                     Sanitize logs by replacing dynamic variables (IPs, IDs) with tokens before
                     clustering.
                   </p>
-                  {settings.drain_masks.map((mask, idx) => (
-                    <div
-                      key={`${mask.label}-${idx}`}
-                      className="flex items-center gap-3 bg-bg-surface/30 p-2 rounded-xl border border-border group animate-in slide-in-from-left-2 duration-200"
-                    >
-                      <div className="px-2">
-                        <Switch
-                          checked={mask.enabled}
-                          onCheckedChange={(val) => {
-                            const newMasks = [...settings.drain_masks];
-                            newMasks[idx].enabled = val;
+                  {(Array.isArray(settings.drain_masks) ? settings.drain_masks : []).map(
+                    (mask, idx) => (
+                      <div
+                        key={`${mask.label}-${idx}`}
+                        className="flex items-center gap-3 bg-bg-surface/30 p-2 rounded-xl border border-border group animate-in slide-in-from-left-2 duration-200"
+                      >
+                        <div className="px-2">
+                          <Switch
+                            checked={mask.enabled}
+                            onCheckedChange={(val) => {
+                              const newMasks = [...settings.drain_masks];
+                              newMasks[idx].enabled = val;
+                              update("drain_masks", newMasks);
+                            }}
+                            className="scale-75"
+                          />
+                        </div>
+                        <div className="flex-1 grid grid-cols-12 gap-2">
+                          <div className="col-span-3">
+                            <input
+                              type="text"
+                              value={mask.label}
+                              onChange={(e) => {
+                                const newMasks = [...settings.drain_masks];
+                                newMasks[idx].label = e.target.value;
+                                update("drain_masks", newMasks);
+                              }}
+                              className="w-full bg-transparent border-none text-[11px] font-bold text-primary focus:ring-0 px-0 h-6 uppercase"
+                              placeholder="LABEL"
+                            />
+                          </div>
+                          <div className="col-span-9">
+                            <input
+                              type="text"
+                              value={mask.pattern}
+                              onChange={(e) => {
+                                const newMasks = [...settings.drain_masks];
+                                newMasks[idx].pattern = e.target.value;
+                                update("drain_masks", newMasks);
+                              }}
+                              className="w-full bg-transparent border-none text-[11px] text-text-primary font-mono focus:ring-0 px-0 h-6"
+                              placeholder="Regex Pattern"
+                            />
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const newMasks = settings.drain_masks.filter((_, i) => i !== idx);
                             update("drain_masks", newMasks);
                           }}
-                          className="scale-75"
-                        />
+                          className="opacity-0 group-hover:opacity-100 p-1.5 text-text-muted hover:text-red-400 transition-all cursor-pointer"
+                        >
+                          <Trash2 className="size-3.5" />
+                        </button>
                       </div>
-                      <div className="flex-1 grid grid-cols-12 gap-2">
-                        <div className="col-span-3">
-                          <input
-                            type="text"
-                            value={mask.label}
-                            onChange={(e) => {
-                              const newMasks = [...settings.drain_masks];
-                              newMasks[idx].label = e.target.value;
-                              update("drain_masks", newMasks);
-                            }}
-                            className="w-full bg-transparent border-none text-[11px] font-bold text-primary focus:ring-0 px-0 h-6 uppercase"
-                            placeholder="LABEL"
-                          />
-                        </div>
-                        <div className="col-span-9">
-                          <input
-                            type="text"
-                            value={mask.pattern}
-                            onChange={(e) => {
-                              const newMasks = [...settings.drain_masks];
-                              newMasks[idx].pattern = e.target.value;
-                              update("drain_masks", newMasks);
-                            }}
-                            className="w-full bg-transparent border-none text-[11px] text-text-primary font-mono focus:ring-0 px-0 h-6"
-                            placeholder="Regex Pattern"
-                          />
-                        </div>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const newMasks = settings.drain_masks.filter((_, i) => i !== idx);
-                          update("drain_masks", newMasks);
-                        }}
-                        className="opacity-0 group-hover:opacity-100 p-1.5 text-text-muted hover:text-red-400 transition-all cursor-pointer"
-                      >
-                        <Trash2 className="size-3.5" />
-                      </button>
-                    </div>
-                  ))}
+                    ),
+                  )}
 
                   <button
                     type="button"
@@ -647,6 +669,108 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
                   Reset {settings.drain_template_scope === "global" ? "Global" : "Workspace"}{" "}
                   Templates
                 </button>
+              </div>
+            </div>
+          )}
+
+          {/* Ingestion Section */}
+          {activeSection === "ingestion" && (
+            <div className="space-y-8 animate-in fade-in slide-in-from-right-4 duration-300">
+              <div className="border-b border-border pb-6">
+                <h2 className="text-2xl font-bold text-text-primary">Network Ingestion</h2>
+                <p className="text-sm text-text-muted mt-2">
+                  Listen for live log streams from external servers via common protocols.
+                </p>
+              </div>
+
+              <div className="space-y-6">
+                <div className="flex items-center justify-between bg-bg-surface/50 border border-border rounded-2xl p-6 hover:bg-bg-surface transition-colors">
+                  <div className="flex items-center gap-4">
+                    <div className="bg-primary/20 p-2.5 rounded-xl">
+                      <Terminal className="h-5 w-5 text-primary" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-bold text-text-primary">Syslog UDP Listener</p>
+                      <p className="text-[10px] text-text-muted mt-0.5">
+                        Accept logs from Linux/Unix servers using standard syslog format.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-6">
+                    <div className="flex flex-col items-end">
+                      <SectionLabel htmlFor="syslog_port">UDP Port</SectionLabel>
+                      <input
+                        id="syslog_port"
+                        type="number"
+                        className="w-20 h-8 rounded-lg bg-bg-surface border border-border text-center text-xs text-text-primary focus:outline-none focus:border-primary transition-all"
+                        value={settings.ingestion_syslog_port}
+                        onChange={(e) =>
+                          update(
+                            "ingestion_syslog_port",
+                            Number.parseInt(e.target.value, 10),
+                            false,
+                          )
+                        }
+                        onBlur={() => onSave(settings)}
+                      />
+                    </div>
+                    <Switch
+                      checked={settings.ingestion_syslog_enabled}
+                      onCheckedChange={(checked) => update("ingestion_syslog_enabled", checked)}
+                    />
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between bg-bg-surface/50 border border-border rounded-2xl p-6 hover:bg-bg-surface transition-colors">
+                  <div className="flex items-center gap-4">
+                    <div className="bg-blue-500/10 p-2.5 rounded-xl">
+                      <Activity className="h-5 w-5 text-blue-400" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-bold text-text-primary">HTTP Ingestion API</p>
+                      <p className="text-[10px] text-text-muted mt-0.5">
+                        Ingest logs via POST requests to <code>/ingest</code> using JSON payloads.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-6">
+                    <div className="flex flex-col items-end">
+                      <SectionLabel htmlFor="http_port">TCP Port</SectionLabel>
+                      <input
+                        id="http_port"
+                        type="number"
+                        className="w-20 h-8 rounded-lg bg-bg-surface border border-border text-center text-xs text-text-primary focus:outline-none focus:border-primary transition-all"
+                        value={settings.ingestion_http_port}
+                        onChange={(e) =>
+                          update("ingestion_http_port", Number.parseInt(e.target.value, 10), false)
+                        }
+                        onBlur={() => onSave(settings)}
+                      />
+                    </div>
+                    <Switch
+                      checked={settings.ingestion_http_enabled}
+                      onCheckedChange={(checked) => update("ingestion_http_enabled", checked)}
+                    />
+                  </div>
+                </div>
+
+                <div className="p-4 bg-primary/5 rounded-2xl border border-primary/10">
+                  <p className="text-[11px] font-bold text-primary uppercase tracking-widest mb-2">
+                    Routing Instructions
+                  </p>
+                  <p className="text-[10px] text-text-secondary leading-relaxed">
+                    To route logs to a specific workspace and collection, use the path:{" "}
+                    <code className="bg-white/5 px-1.5 py-0.5 rounded text-text-primary">
+                      POST http://localhost:{settings.ingestion_http_port}
+                      /ingest/my-workspace/my-collection
+                    </code>
+                    <br />
+                    Or use query parameters:{" "}
+                    <code className="bg-white/5 px-1.5 py-0.5 rounded text-text-primary">
+                      /ingest?ws=my-workspace&source_id=my-collection
+                    </code>
+                  </p>
+                </div>
               </div>
             </div>
           )}
@@ -761,7 +885,7 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
                       </p>
                     </div>
                     {/* @ts-ignore */}
-                    <input type="file" webkitdirectory="true" directory="true" className="hidden" />
+                    <input type="file" webkitdirectory="true" className="hidden" />
                   </label>
                 </div>
               </div>

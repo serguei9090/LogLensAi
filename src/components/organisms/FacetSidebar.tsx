@@ -1,7 +1,7 @@
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { cn } from "@/lib/utils";
 import { useInvestigationStore } from "@/store/investigationStore";
 import { useUIStore } from "@/store/uiStore";
-import { cn } from "@/lib/utils";
 import { motion } from "framer-motion";
 import { FilterX, PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import { FacetList } from "../molecules/FacetList";
@@ -19,15 +19,15 @@ export function FacetSidebar() {
   return (
     <motion.div
       initial={false}
-      animate={{ 
+      animate={{
         width: facetSidebarCollapsed ? 0 : 256,
         opacity: facetSidebarCollapsed ? 0 : 1,
-        marginRight: facetSidebarCollapsed ? 0 : 0
+        marginRight: facetSidebarCollapsed ? 0 : 0,
       }}
       transition={{ type: "spring", stiffness: 400, damping: 40 }}
       className={cn(
         "border-r border-[#1D2420] bg-[#0d0f0e] flex flex-col h-full overflow-hidden select-none relative",
-        facetSidebarCollapsed ? "pointer-events-none" : ""
+        facetSidebarCollapsed ? "pointer-events-none" : "",
       )}
     >
       <div className="h-12 border-b border-[#1D2420] flex items-center justify-between px-4 shrink-0">

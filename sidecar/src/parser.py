@@ -21,8 +21,10 @@ class DrainParser:
         self.config.drain_max_children = max_children
         self.config.drain_max_clusters = max_clusters
 
-        if masking_instructions:
+        if masking_instructions and isinstance(masking_instructions, (list, tuple)):
             for mi in masking_instructions:
+                if not isinstance(mi, dict):
+                    continue
                 if not mi.get("enabled", True):
                     continue
                 pattern = mi.get("pattern")

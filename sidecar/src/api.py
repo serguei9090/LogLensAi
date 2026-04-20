@@ -17,11 +17,42 @@ from dotenv import load_dotenv
 from ingestion import IngestionServer
 from mcp_server import init_mcp, mcp_server
 from metadata_extractor import extract_log_metadata
+from models import (
+    CreateLogStreamRequest,
+    DeleteLogStreamRequest,
+    GetAiMessagesRequest,
+    GetAiSessionsRequest,
+    GetAnomaliesRequest,
+    GetFusedLogsRequest,
+    GetFusionConfigRequest,
+    GetLogDistributionRequest,
+    GetLogsRequest,
+    GetLogStreamsRequest,
+    GetMetadataFacetsRequest,
+    GetSampleLinesRequest,
+    GetSettingsRequest,
+    GetTemporalOffsetsRequest,
+    GetWorkspaceSourcesRequest,
+    IngestLogEntry,
+    IngestLogsRequest,
+    JSONRPCRequest,
+    JSONRPCResponse,
+    ReadFileRequest,
+    SaveMemoryRequest,
+    SearchMemoryRequest,
+    SendAiMessageRequest,
+    StartSSHTailRequest,
+    StartTailRequest,
+    UpdateCommentRequest,
+    UpdateFusionConfigRequest,
+    UpdateSettingsRequest,
+    UpdateSourceParserRequest,
+    UpdateTemporalOffsetsRequest,
+)
 from parser import DrainParser
-from pydantic import BaseModel, ValidationError
+from pydantic import ValidationError
 from ssh_loader import SSHLoader
 from tailer import FileTailer
-from models import *
 
 # --- Professional Logging Setup ---
 SIDE_CAR_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -59,9 +90,11 @@ logger = logging.getLogger("LogLensSidecar")
 logger.info("--- Sidecar Tracing Session Started --- (Level: %s)", logging.getLevelName(LOG_LEVEL))
 logger.info("Log path: %s", LOG_FILE)
 
+DEFAULT_DB = "loglens.duckdb"
+
 
 class App:
-    def __init__(self, db_path="loglens.duckdb"):
+    def __init__(self, db_path=DEFAULT_DB):
         self.db = LogDatabase(db_path)
         self._parsers = {}
         self.tailers = {}
@@ -91,7 +124,16 @@ class App:
         # Initialize Ingestion Ports (Syslog/HTTP)
         syslog_port = int(settings.get("ingestion_syslog_port", "514"))
         http_port = int(settings.get("ingestion_http_port", "5002"))
-        self.ingestion_server = IngestionServer(self, syslog_port=syslog_port, http_port=http_port)
+        syslog_enabled = settings.get("ingestion_syslog_enabled", "true").lower() == "true"
+        http_enabled = settings.get("ingestion_http_enabled", "true").lower() == "true"
+
+        self.ingestion_server = IngestionServer(
+            self,
+            syslog_port=syslog_port,
+            http_port=http_port,
+            syslog_enabled=syslog_enabled,
+            http_enabled=http_enabled,
+        )
         self.ingestion_server.start()
 
         # Initialize Anomaly Detection
@@ -136,6 +178,28 @@ class App:
                 self._mcp_thread.join(timeout=2)
                 self._mcp_thread = None
 
+    def stop(self):
+        """Gracefully shut down all background components."""
+        logger.info("Sidecar: Shutting down background workers...")
+
+        # 1. Ingestion Server
+        if hasattr(self, "ingestion_server"):
+            self.ingestion_server.stop()
+
+        # 2. Anomaly Detector
+        if hasattr(self, "anomaly_detector"):
+            self.anomaly_detector.stop()
+
+        # 3. Dedicated Tailers
+        for tailer in self.tailers.values():
+            tailer.stop()
+        self.tailers = {}
+
+        # 4. MCP Server
+        self._stop_mcp_server()
+
+        logger.info("Sidecar: Background workers stopped.")
+
     async def dispatch(self, req: JSONRPCRequest) -> JSONRPCResponse:
         try:
             method_name = f"method_{req.method}"
@@ -174,6 +238,9 @@ class App:
                 "save_memory": SaveMemoryRequest,
                 "search_memory": SearchMemoryRequest,
                 "reset_workspace_settings": GetSettingsRequest,
+                "get_log_streams": GetLogStreamsRequest,
+                "create_log_stream": CreateLogStreamRequest,
+                "delete_log_stream": DeleteLogStreamRequest,
             }
 
             handler = getattr(self, method_name)
@@ -291,6 +358,7 @@ class App:
 
         if query:
             from query_parser import parse_llql
+
             llql_sql, llql_params = parse_llql(query)
             where_clauses.append(f"({llql_sql})")
             params.extend(llql_params)
@@ -428,6 +496,7 @@ class App:
 
         if params.query:
             from query_parser import parse_llql
+
             llql_sql, llql_params = parse_llql(params.query)
             if llql_sql:
                 where_clauses.append(f"({llql_sql})")
@@ -485,17 +554,17 @@ class App:
         cursor = self.db.get_cursor()
         query = "SELECT cluster_id, timestamp, z_score, current_rate FROM anomalies WHERE workspace_id = ?"
         params = [workspace_id]
-        
+
         if time_range:
             query += " AND timestamp >= ?"
             params.append(time_range)
-        
+
         query += " ORDER BY timestamp DESC LIMIT 50"
         cursor.execute(query, params)
-        
+
         columns = [desc[0] for desc in cursor.description]
-        anomalies = [dict(zip(columns, row)) for row in cursor.fetchall()]
-        
+        anomalies = [dict(zip(columns, row, strict=False)) for row in cursor.fetchall()]
+
         return {"anomalies": anomalies}
 
     def method_get_fused_logs(self, **kwargs) -> dict:
@@ -742,7 +811,16 @@ class App:
         facets = log.get("facets") or metadata.get("facets", {})
         facets_json = json.dumps(facets) if facets else None
 
-        return [workspace_id, source_id, raw_text, timestamp, level, message, cluster_id, facets_json]
+        return [
+            workspace_id,
+            source_id,
+            raw_text,
+            timestamp,
+            level,
+            message,
+            cluster_id,
+            facets_json,
+        ]
 
     def method_ingest_logs(self, logs: list[IngestLogEntry]) -> dict:
         """High-speed batch ingestion of log entries with pattern clustering"""
@@ -882,12 +960,12 @@ class App:
         if params.context_logs:
             placeholders = ",".join(["?"] * len(params.context_logs))
             cursor.execute(
-                f"SELECT timestamp, level, message, raw_text, cluster_id FROM logs WHERE id IN ({placeholders})", 
-                params.context_logs
+                f"SELECT timestamp, level, message, raw_text, cluster_id FROM logs WHERE id IN ({placeholders})",
+                params.context_logs,
             )
             columns = [desc[0] for desc in cursor.description]
-            logs = [dict(zip(columns, row)) for row in cursor.fetchall()]
-            
+            logs = [dict(zip(columns, row, strict=False)) for row in cursor.fetchall()]
+
             if logs:
                 summary = ContextManager.prepare_log_context(logs)
                 log_context = f"\n\nContextual Log Summary:\n{summary}"
@@ -1263,6 +1341,23 @@ class App:
             else:
                 self._parsers = {}
 
+        # Reconfigure Ingestion Server if relevant settings changed
+        if not workspace_id and any(k.startswith("ingestion_") for k in settings):
+            current_settings = self.method_get_settings()
+            syslog_port = int(current_settings.get("ingestion_syslog_port", "514"))
+            http_port = int(current_settings.get("ingestion_http_port", "5002"))
+            syslog_enabled = (
+                current_settings.get("ingestion_syslog_enabled", "true").lower() == "true"
+            )
+            http_enabled = current_settings.get("ingestion_http_enabled", "true").lower() == "true"
+
+            self.ingestion_server.reconfigure(
+                syslog_enabled=syslog_enabled,
+                syslog_port=syslog_port,
+                http_enabled=http_enabled,
+                http_port=http_port,
+            )
+
         self.db.commit()
         return {"status": "success"}
 
@@ -1278,6 +1373,12 @@ class App:
         masks_raw = settings.get("drain_masks", "[]")
         try:
             masking_instructions = json.loads(masks_raw)
+            # Handle potential double-encoding (JSON string inside JSON string)
+            if isinstance(masking_instructions, str):
+                masking_instructions = json.loads(masking_instructions)
+            # Ensure it's a list for iteration safety
+            if not isinstance(masking_instructions, list):
+                masking_instructions = []
         except Exception:
             masking_instructions = []
 
@@ -1317,6 +1418,51 @@ class App:
             os.remove(path)
 
         return {"status": "success", "scope": scope, "workspace_id": workspace_id}
+
+    def method_get_log_streams(self, workspace_id: str) -> list:
+        """Fetch all configured log streams for a workspace."""
+        cursor = self.db.get_cursor()
+        cursor.execute(
+            "SELECT id, workspace_id, name, type, port, enabled FROM log_streams WHERE workspace_id = ?",
+            (workspace_id,),
+        )
+        return [
+            {
+                "id": row[0],
+                "workspace_id": row[1],
+                "name": row[2],
+                "type": row[3],
+                "port": row[4],
+                "enabled": bool(row[5]),
+            }
+            for row in cursor.fetchall()
+        ]
+
+    def method_create_log_stream(self, workspace_id: str, name: str, type: str, port: int) -> dict:
+        """Register a new log stream routing."""
+        cursor = self.db.get_cursor()
+        cursor.execute(
+            "INSERT INTO log_streams (workspace_id, name, type, port) VALUES (?, ?, ?, ?)",
+            (workspace_id, name, type, port),
+        )
+        self.db.commit()
+
+        # Trigger ingestion server refresh
+        if hasattr(self, "ingestion_server"):
+            self.ingestion_server.refresh_streams()
+
+        return {"status": "success"}
+
+    def method_delete_log_stream(self, id: int) -> dict:
+        """Remove a log stream routing."""
+        cursor = self.db.get_cursor()
+        cursor.execute("DELETE FROM log_streams WHERE id = ?", (id,))
+        self.db.commit()
+
+        if hasattr(self, "ingestion_server"):
+            self.ingestion_server.refresh_streams()
+
+        return {"status": "success"}
 
     async def aiohttp_handler(self, request):
         try:
@@ -1482,6 +1628,7 @@ class App:
         except Exception as e:
             import traceback
 
+            logger.error("AI Stream Error: %s", str(e))
             traceback.print_exc()
             await response.write(f"data: {json.dumps({'error': str(e)})}\n\n".encode())
             return response
@@ -1518,7 +1665,7 @@ def on_cleanup(_app):
     LogDatabase.reset()
 
 
-def run_http(port=5000, db_path="loglens.duckdb"):
+def run_http(port=5000, db_path=DEFAULT_DB):
     app = App(db_path=db_path)
     app.dev_mode = True
     server = web.Application()
@@ -1547,7 +1694,7 @@ def run_http(port=5000, db_path="loglens.duckdb"):
     web.run_app(server, host="127.0.0.1", port=port)
 
 
-async def run_stdio_async(db_path="loglens.duckdb"):
+async def run_stdio_async(db_path=DEFAULT_DB):
     app = App(db_path=db_path)
     app.dev_mode = False
 
@@ -1598,10 +1745,12 @@ async def run_stdio_async(db_path="loglens.duckdb"):
     except EOFError:
         pass
     finally:
+        app.stop()
         LogDatabase.reset()
+        logger.info("Sidecar: Cleanly exited.")
 
 
-def run_stdio(db_path="loglens.duckdb"):
+def run_stdio(db_path=DEFAULT_DB):
     import asyncio
 
     asyncio.run(run_stdio_async(db_path=db_path))
