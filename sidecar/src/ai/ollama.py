@@ -1,6 +1,5 @@
 import json
 import logging
-import os
 from enum import Enum, auto
 
 import aiohttp
@@ -22,6 +21,10 @@ ALT_CHANNEL_TEXT = "<|channel|>text"
 
 ALL_TEXT_MARKERS = (CHANNEL_TEXT_START, ALT_TEXT_START, ALT_CHANNEL_TEXT, CHANNEL_THOUGHT_END)
 ALL_THOUGHT_MARKERS = (CHANNEL_THOUGHT_START, ALT_THOUGHT_START)
+
+
+THINK_OPEN = "<think>"
+THINK_CLOSE = "</think>"
 
 
 class _StreamPhase(Enum):
@@ -92,7 +95,7 @@ class OllamaProvider(AIProvider):
         import re
 
         # 1. Remove entire <think>...</think> blocks if present (clean format)
-        text = re.sub(r"<think>[\s\S]*?</think>", "", text)
+        text = re.sub(rf"{THINK_OPEN}[\s\S]*?{THINK_CLOSE}", "", text)
 
         # 2. Remove raw channel markers (leaked format)
         all_tags = (
@@ -139,11 +142,11 @@ class OllamaProvider(AIProvider):
             response = raw[text_idx + len(text_marker) :]
             thinking = OllamaProvider._clean_channel_tags(thinking).strip()
             response = OllamaProvider._clean_channel_tags(response).strip()
-            return f"<think>{thinking}</think>{response}"
+            return f"{THINK_OPEN}{thinking}{THINK_CLOSE}{response}"
 
         thinking = raw[thought_idx + len(thought_marker) :]
         thinking = OllamaProvider._clean_channel_tags(thinking).strip()
-        return f"<think>{thinking}</think>"
+        return f"{THINK_OPEN}{thinking}{THINK_CLOSE}"
 
     async def chat(
         self,
@@ -195,7 +198,7 @@ class OllamaProvider(AIProvider):
                     clean_response = self._clean_channel_tags(raw_content).strip()
                     return AIChatMessage(
                         role="assistant",
-                        content=f"<think>{clean_thinking}</think>{clean_response}",
+                        content=f"{THINK_OPEN}{clean_thinking}{THINK_CLOSE}{clean_response}",
                     )
 
                 # Fallback to marker-based parsing for raw content
@@ -203,6 +206,140 @@ class OllamaProvider(AIProvider):
                 return AIChatMessage(role="assistant", content=clean_content)
         except Exception as e:
             return AIChatMessage(role="assistant", content=f"Ollama Connection Error: {str(e)}")
+
+    def _handle_text_phase(self, buffer: str, emitted_think: bool):
+        """Internal helper for text-to-thought transition detection."""
+        found_idx = -1
+        found_marker = ""
+        for m in ALL_THOUGHT_MARKERS:
+            idx = buffer.find(m)
+            if idx != -1 and (found_idx == -1 or idx < found_idx):
+                found_idx = idx
+                found_marker = m
+
+        if found_idx != -1:
+            before = buffer[:found_idx]
+            rem = buffer[found_idx + len(found_marker) :]
+            chunks = []
+            if before:
+                chunks.append(before)
+            if not emitted_think:
+                chunks.append(THINK_OPEN)
+                emitted_think = True
+            return chunks, _StreamPhase.THOUGHT, emitted_think, rem
+
+        if any(buffer.endswith(m[:i]) for m in ALL_THOUGHT_MARKERS for i in range(1, len(m))):
+            return [], _StreamPhase.TEXT, emitted_think, buffer
+
+        return [buffer], _StreamPhase.TEXT, emitted_think, ""
+
+    def _handle_thought_phase(self, buffer: str, emitted_think: bool):
+        """Internal helper for thought-to-text transition detection."""
+        found_idx = -1
+        found_marker = ""
+        for m in ALL_TEXT_MARKERS:
+            idx = buffer.find(m)
+            if idx != -1 and (found_idx == -1 or idx < found_idx):
+                found_idx = idx
+                found_marker = m
+
+        if found_idx != -1:
+            thinking_chunk = buffer[:found_idx]
+            rem = buffer[found_idx + len(found_marker) :]
+            chunks = []
+            if thinking_chunk:
+                chunks.append(thinking_chunk)
+            if emitted_think:
+                chunks.append(THINK_CLOSE)
+                emitted_think = False
+            return chunks, _StreamPhase.TEXT, emitted_think, rem
+
+        if any(buffer.endswith(m[:i]) for m in ALL_TEXT_MARKERS for i in range(1, len(m))):
+            return [], _StreamPhase.THOUGHT, emitted_think, buffer
+
+        return [buffer], _StreamPhase.THOUGHT, emitted_think, ""
+
+    def _handle_native_thought(self, native_thinking: str | None, state: dict):
+        """Processes native thinking tokens if present."""
+        chunks = []
+        if native_thinking:
+            if not state["emitted_think"]:
+                chunks.append(THINK_OPEN)
+                state["emitted_think"] = True
+            chunks.append(native_thinking)
+            state["phase"] = _StreamPhase.THOUGHT
+        return chunks
+
+    def _apply_token_transitions(self, token: str, native_thinking: bool, state: dict):
+        """Handles manual phase transitions based on token content."""
+        chunks = []
+        is_thought_to_text = (
+            state["phase"] == _StreamPhase.THOUGHT
+            and token.strip()
+            and not native_thinking
+            and not any(m in token for m in ALL_THOUGHT_MARKERS)
+        )
+        if is_thought_to_text:
+            if state["emitted_think"]:
+                chunks.append(THINK_CLOSE)
+                state["emitted_think"] = False
+            state["phase"] = _StreamPhase.TEXT
+        return chunks
+
+    def _process_stream_buffer(self, buffer: str, phase: _StreamPhase, emitted_think: bool):
+        """Processes the content buffer and yields (chunk, new_phase, new_emitted_think)."""
+        if phase == _StreamPhase.TEXT:
+            return self._handle_text_phase(buffer, emitted_think)
+        return self._handle_thought_phase(buffer, emitted_think)
+
+    def _process_stream_line(self, line: bytes, state: dict):
+        """Processes a single line from the Ollama chat stream."""
+        if not line:
+            return []
+
+        chunk_data = json.loads(line.decode("utf-8").strip())
+        msg = chunk_data.get("message", {})
+        native_thinking = msg.get("thinking") or msg.get("thought")
+
+        # 1. Handle Native Thinking
+        chunks = self._handle_native_thought(native_thinking, state)
+        if chunks:
+            return chunks
+
+        # 2. Handle Token/Done
+        token = msg.get("content", "")
+        if not token:
+            if chunk_data.get("done"):
+                state["done"] = True
+            return []
+
+        # 3. Transition logic
+        chunks.extend(self._apply_token_transitions(token, bool(native_thinking), state))
+
+        # 4. Buffer logic
+        state["buffer"] += token
+        while state["buffer"]:
+            sub_chunks, state["phase"], state["emitted_think"], state["buffer"] = (
+                self._process_stream_buffer(state["buffer"], state["phase"], state["emitted_think"])
+            )
+            chunks.extend(sub_chunks)
+            if not sub_chunks and state["buffer"]:
+                break
+
+        return chunks
+
+    def _format_messages(self, messages: list[AIChatMessage]) -> list[dict]:
+        """Prepares message list for Ollama payload."""
+        ollama_messages = []
+        if self.system_prompt:
+            ollama_messages.append({"role": "system", "content": self.system_prompt})
+
+        for msg in messages:
+            content = (
+                self._clean_channel_tags(msg.content) if msg.role == "assistant" else msg.content
+            )
+            ollama_messages.append({"role": msg.role, "content": content})
+        return ollama_messages
 
     async def chat_stream(
         self,
@@ -212,189 +349,42 @@ class OllamaProvider(AIProvider):
         session_id: str | None = None,
         **kwargs,
     ):
-        """Streams response using Ollama's /api/chat endpoint.
-
-        Uses a stateful parser to track <|channel>thought / <|channel>text
-        transitions and yield clean <think>...</think> + text chunks.
-        """
-        target_model = model or self.model
-        url = f"{self.host}/api/chat"
-
-        ollama_messages = []
-        if self.system_prompt:
-            ollama_messages.append({"role": "system", "content": self.system_prompt})
-
-        # Clean history: strip raw channel tags from previous assistant messages
-        for msg in messages:
-            content = msg.content
-            if msg.role == "assistant":
-                content = self._clean_channel_tags(content)
-            ollama_messages.append({"role": msg.role, "content": content})
-
+        """Streams response using Ollama's /api/chat endpoint."""
         payload = {
-            "model": target_model,
-            "messages": ollama_messages,
+            "model": model or self.model,
+            "messages": self._format_messages(messages),
             "stream": True,
-            "options": {
-                "temperature": 1.0,
-                "top_p": 0.95,
-                "top_k": 64,
-            },
+            "options": {"temperature": 1.0, "top_p": 0.95, "top_k": 64},
         }
-
-        logger.debug("Ollama Stream Request Payload: %s", json.dumps(payload, indent=2))
 
         try:
             async with (
                 aiohttp.ClientSession(timeout=self.timeout) as session,
-                session.post(url, json=payload) as resp,
+                session.post(f"{self.host}/api/chat", json=payload) as resp,
             ):
                 if resp.status != 200:
                     err_text = await resp.text()
-                    logger.error("Ollama Streaming Error (%d): %s", resp.status, err_text)
                     raise RuntimeError(f"Ollama stream error: {err_text}")
 
-                # Stateful parser state
-                phase = _StreamPhase.TEXT
-                content_buffer = ""
-                think_open_emitted = False
-
+                state = {
+                    "phase": _StreamPhase.TEXT,
+                    "buffer": "",
+                    "emitted_think": False,
+                    "done": False,
+                }
                 async for line in resp.content:
-                    if not line:
-                        continue
-                    try:
-                        line_str = line.decode("utf-8").strip()
-                        if not line_str:
-                            continue
+                    chunks = self._process_stream_line(line, state)
+                    for c in chunks:
+                        yield c
+                    if state["done"]:
+                        break
 
-                        chunk_data = json.loads(line_str)
-                        msg = chunk_data.get("message", {})
-
-                        # 1. Native Ollama Reasoning Field Detection
-                        # If the chunk contains a 'thinking' or 'thought' field, it's definitely reasoning.
-                        native_thinking = msg.get("thinking") or msg.get("thought")
-                        if native_thinking:
-                            if not think_open_emitted:
-                                yield "<think>"
-                                think_open_emitted = True
-                            yield native_thinking
-                            phase = _StreamPhase.THOUGHT
-                            continue
-
-                        token = msg.get("content", "")
-                        if not token:
-                            if chunk_data.get("done"):
-                                break
-                            continue
-
-                        # 2. Automated Phase Transition
-                        # If we have a non-empty 'content' token but were in THOUGHT phase,
-                        # and this chunk has NO native thinking field, we transition to TEXT.
-                        if (
-                            phase == _StreamPhase.THOUGHT
-                            and token.strip()
-                            and not native_thinking
-                            and not any(m in token for m in ALL_THOUGHT_MARKERS)
-                        ):
-                            if think_open_emitted:
-                                yield "</think>"
-                                think_open_emitted = False
-                            phase = _StreamPhase.TEXT
-
-                        # Granular token logging (Toggled via ENV)
-                        if os.getenv("LOGLENS_AI_DEBUG", "false").lower() == "true":
-                            logger.debug(
-                                "PHASE: %s | TOKEN: [%s]", phase.name, token.replace("\n", "\\n")
-                            )
-
-                        # 3. Accumulate into buffer for marker-based transition (Fallback)
-                        content_buffer += token
-
-                        # 4. Process buffer for channel markers
-                        while content_buffer:
-                            if phase == _StreamPhase.TEXT:
-                                # Look for any thought start marker
-                                found_idx = -1
-                                found_marker = ""
-                                for m in ALL_THOUGHT_MARKERS:
-                                    idx = content_buffer.find(m)
-                                    if idx != -1 and (found_idx == -1 or idx < found_idx):
-                                        found_idx = idx
-                                        found_marker = m
-
-                                if found_idx != -1:
-                                    # Yield any text before the marker
-                                    before = content_buffer[:found_idx]
-                                    if before:
-                                        yield before
-                                    # Transition to thought phase
-                                    phase = _StreamPhase.THOUGHT
-                                    if not think_open_emitted:
-                                        yield "<think>"
-                                        think_open_emitted = True
-                                    content_buffer = content_buffer[found_idx + len(found_marker) :]
-                                elif any(
-                                    content_buffer.endswith(m[:i])
-                                    for m in ALL_THOUGHT_MARKERS
-                                    for i in range(1, len(m))
-                                ):
-                                    # Buffer ends with a partial start marker - hold it
-                                    break
-                                else:
-                                    # No marker in sight - flush text
-                                    yield content_buffer
-                                    content_buffer = ""
-
-                            elif phase == _StreamPhase.THOUGHT:
-                                # Look for any text transition marker
-                                found_idx = -1
-                                found_marker = ""
-                                for m in ALL_TEXT_MARKERS:
-                                    idx = content_buffer.find(m)
-                                    if idx != -1 and (found_idx == -1 or idx < found_idx):
-                                        found_idx = idx
-                                        found_marker = m
-
-                                if found_idx != -1:
-                                    # Yield thinking content before transition
-                                    thinking_chunk = content_buffer[:found_idx]
-                                    if thinking_chunk:
-                                        yield thinking_chunk
-                                    content_buffer = content_buffer[found_idx + len(found_marker) :]
-
-                                    # Close thinking block and move to text
-                                    if think_open_emitted:
-                                        yield "</think>"
-                                        think_open_emitted = False
-                                    phase = _StreamPhase.TEXT
-                                elif any(
-                                    content_buffer.endswith(m[:i])
-                                    for m in ALL_TEXT_MARKERS
-                                    for i in range(1, len(m))
-                                ):
-                                    # Buffer ends with a partial end/transition marker - hold it
-                                    break
-                                else:
-                                    # Pure thinking content - flush it
-                                    yield content_buffer
-                                    content_buffer = ""
-
-                        if chunk_data.get("done"):
-                            logger.info("Ollama Stream finished successfully")
-                            break
-
-                    except json.JSONDecodeError:
-                        continue
-
-                # Final flush
-                if content_buffer:
-                    remaining = self._clean_channel_tags(content_buffer).strip()
-                    if remaining:
-                        yield remaining
-
-                if think_open_emitted:
-                    yield "</think>"
-                    think_open_emitted = False
+                if state["buffer"]:
+                    rem = self._clean_channel_tags(state["buffer"]).strip()
+                    if rem:
+                        yield rem
+                if state["emitted_think"]:
+                    yield THINK_CLOSE
 
         except Exception:
             logger.exception("Final exception in Ollama chat_stream")

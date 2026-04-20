@@ -17,9 +17,9 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
 interface WorkspaceEngineSettingsProps {
-  isOpen: boolean;
-  onClose: () => void;
-  workspaceId: string;
+  readonly isOpen: boolean;
+  readonly onClose: () => void;
+  readonly workspaceId: string;
 }
 
 export function WorkspaceEngineSettings({
@@ -55,7 +55,11 @@ export function WorkspaceEngineSettings({
         }
         try {
           return JSON.parse(raw);
-        } catch (_e) {
+        } catch (e) {
+          console.debug(
+            "Standard JSON parse failed for workspace settings, attempting legacy fix...",
+            e,
+          );
           try {
             const jsonified = raw
               .replaceAll("'", '"')
@@ -63,7 +67,8 @@ export function WorkspaceEngineSettings({
               .replaceAll("False", "false")
               .replaceAll("None", "null");
             return JSON.parse(jsonified);
-          } catch {
+          } catch (innerError) {
+            console.error("Deep JSON parsing failed for workspace settings", innerError);
             return null;
           }
         }
@@ -117,7 +122,8 @@ export function WorkspaceEngineSettings({
       await updateSettings(overrides, workspaceId);
       toast.success("Workspace overrides saved successfully");
       onClose();
-    } catch (_error) {
+    } catch (e) {
+      console.error("Failed to save workspace overrides", e);
       toast.error("Failed to save workspace overrides");
     } finally {
       setIsSaving(false);
@@ -133,7 +139,8 @@ export function WorkspaceEngineSettings({
       await fetchSettings(workspaceId);
       toast.success("Workspace overrides cleared. Using global settings.");
       onClose();
-    } catch (_error) {
+    } catch (e) {
+      console.error("Failed to reset workspace settings", e);
       toast.error("Failed to reset workspace settings");
     }
   };
@@ -172,13 +179,12 @@ export function WorkspaceEngineSettings({
                 <span className="text-xs font-mono text-emerald-400">
                   {(localSettings.drain_similarity_threshold * 100).toFixed(0)}%
                 </span>
-                {globalSettings &&
-                  localSettings.drain_similarity_threshold ===
-                    globalSettings.drain_similarity_threshold && (
-                    <span className="text-[9px] bg-zinc-800 text-zinc-500 px-1.5 py-0.5 rounded border border-zinc-700/50">
-                      GLOBAL
-                    </span>
-                  )}
+                {globalSettings?.drain_similarity_threshold ===
+                  localSettings.drain_similarity_threshold && (
+                  <span className="text-[9px] bg-zinc-800 text-zinc-500 px-1.5 py-0.5 rounded border border-zinc-700/50">
+                    GLOBAL
+                  </span>
+                )}
               </div>
             </div>
             <input
@@ -207,10 +213,9 @@ export function WorkspaceEngineSettings({
                 >
                   Max Branches
                 </label>
-                {globalSettings &&
-                  localSettings.drain_max_children === globalSettings.drain_max_children && (
-                    <span className="text-[8px] text-zinc-600 uppercase">Default</span>
-                  )}
+                {localSettings.drain_max_children === globalSettings?.drain_max_children && (
+                  <span className="text-[8px] text-zinc-600 uppercase">Default</span>
+                )}
               </div>
               <input
                 type="number"
@@ -228,10 +233,9 @@ export function WorkspaceEngineSettings({
                 >
                   Cluster Cap
                 </label>
-                {globalSettings &&
-                  localSettings.drain_max_clusters === globalSettings.drain_max_clusters && (
-                    <span className="text-[8px] text-zinc-600 uppercase">Default</span>
-                  )}
+                {localSettings.drain_max_clusters === globalSettings?.drain_max_clusters && (
+                  <span className="text-[8px] text-zinc-600 uppercase">Default</span>
+                )}
               </div>
               <input
                 type="number"
@@ -259,7 +263,7 @@ export function WorkspaceEngineSettings({
                   );
                   return (
                     <div
-                      key={idx}
+                      key={`mask-${mask.label}-${idx}`}
                       className="flex items-center gap-2 bg-zinc-900/50 p-2 rounded-lg border border-zinc-800/50 group"
                     >
                       <Switch

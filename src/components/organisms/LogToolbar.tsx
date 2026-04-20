@@ -114,8 +114,8 @@ export function LogToolbar({
         className={cn(
           "p-1.5 rounded-md transition-all shrink-0 border",
           !facetSidebarCollapsed
-            ? "bg-zinc-800 border-zinc-700 text-zinc-300 hover:text-white"
-            : "bg-emerald-500/10 border-emerald-500/20 text-emerald-400 hover:text-emerald-300 shadow-[0_0_12px_rgba(52,211,153,0.1)]",
+            ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-400 hover:text-emerald-300 shadow-[0_0_12px_rgba(52,211,153,0.1)]"
+            : "bg-zinc-800 border-zinc-700 text-zinc-300 hover:text-white",
         )}
         title={facetSidebarCollapsed ? "Show Facets" : "Hide Facets"}
       >

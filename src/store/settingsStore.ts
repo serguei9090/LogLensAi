@@ -85,15 +85,20 @@ export const useSettingsStore = create<SettingsStore>((set) => ({
         }
         try {
           return JSON.parse(raw);
-        } catch (_e) {
+        } catch (e) {
+          console.debug(
+            "Standard JSON parse failed in settings store, attempting legacy fix...",
+            e,
+          );
           try {
             const jsonified = raw
-              .replace(/'/g, '"')
-              .replace(/True/g, "true")
-              .replace(/False/g, "false")
-              .replace(/None/g, "null");
+              .replaceAll("'", '"')
+              .replaceAll("True", "true")
+              .replaceAll("False", "false")
+              .replaceAll("None", "null");
             return JSON.parse(jsonified);
-          } catch {
+          } catch (innerError) {
+            console.error("Deep JSON parsing failed in settings store", innerError);
             return null;
           }
         }
@@ -146,6 +151,7 @@ export const useSettingsStore = create<SettingsStore>((set) => ({
 
     saveTimeout = setTimeout(async () => {
       try {
+        console.log("Persisting settings to sidecar:", newSettings);
         const payload: Record<string, string | number | boolean> = {};
         // The sidecar expects a dict of settings to update.
         // To be safe and consistent with the existing API, we'll send the updated fields.

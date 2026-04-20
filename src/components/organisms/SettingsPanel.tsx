@@ -368,10 +368,15 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
                     value={settings.ai_provider}
                     onChange={(v) => {
                       let newModel = settings.ai_model;
-                      if (v === "ollama") newModel = "gemma4:e2b";
-                      else if (v === "gemini-cli") newModel = "flash";
-                      else if (v === "openai-compatible") newModel = "gpt-4o";
-                      else if (v === "ai-studio") newModel = "gemini-2.5-flash";
+                      if (v === "ollama") {
+                        newModel = "gemma4:e2b";
+                      } else if (v === "gemini-cli") {
+                        newModel = "flash";
+                      } else if (v === "openai-compatible") {
+                        newModel = "gpt-4o";
+                      } else if (v === "ai-studio") {
+                        newModel = "gemini-2.5-flash";
+                      }
 
                       const updated = { ...settings, ai_provider: v, ai_model: newModel };
                       setSettings(updated);

@@ -2,6 +2,16 @@
 
 All notable changes to the LogLensAi project will be documented in this file.
 
+## [Phase 4.2] - Core Hardening & Complexity Reduction (2026-04-20)
+
+### Refactored
+- **Ollama Stream Processor**: Modularized the monolithic `_process_stream_line` and `chat_stream` functions in `sidecar/src/ai/ollama.py` to reduce cognitive complexity below the 15-point threshold.
+- **Log Selection Refactor**: Moved the `onMouseUp` event listener in `CustomParserModal.tsx` to a hook-based `useEffect` assigned listener to satisfy JSX accessibility requirements.
+
+### Fixed
+- **JSON Parse Obsolescence**: Hardened exception handling in `WorkspaceEngineSettings.tsx` and `settingsStore.ts` by adding explicit debug logging to the standard parse attempt before falling back to legacy recovery.
+- **QA Compliance**: Resolved all outstanding Biome and Ruff regressions, including statement block formatting and `handleMouseUp` hook dependency optimization.
+
 ## [Phase 4] - Ingestion Stabilization & Multi-Stream Routing (2026-04-19)
 
 ### Added

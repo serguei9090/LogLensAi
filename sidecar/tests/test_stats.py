@@ -6,7 +6,7 @@ from api import App
 async def test_get_dashboard_stats(tmp_path):
     db_path = str(tmp_path / "test_stats.duckdb")
     app = App(db_path=db_path, start_ingestion=False, start_anomalies=False, start_mcp=False)
-    
+
     # 1. Seed some data
     cursor = app.db.get_cursor()
     cursor.execute("""
@@ -22,10 +22,10 @@ async def test_get_dashboard_stats(tmp_path):
         VALUES ('ws1', 'c1', 'Failure', 1), ('ws1', 'c2', 'Success', 1)
     """)
     app.db.commit()
-    
+
     # 2. Call method
     stats = app.method_get_dashboard_stats(workspace_id="ws1")
-    
+
     # 3. Assertions
     assert stats["total_logs"] == 2
     assert stats["total_clusters"] == 2

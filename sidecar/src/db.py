@@ -318,6 +318,24 @@ class LogDatabase:
                     cls._instance.conn.close()
                 cls._instance = None
 
+    def _get_filter_condition(self, field: str, op: str, value: Any) -> tuple[str, Any]:
+        """Maps operator to SQL condition and parameter."""
+        if op == "contains":
+            return f"{field} ILIKE ?", f"%{value}%"
+        if op == "not_contains":
+            return f"{field} NOT ILIKE ?", f"%{value}%"
+        if op == "equals":
+            if "source_id" in field:
+                return f"{field} ILIKE ?", value
+            return f"{field} = ?", value
+        if op == "not_equals":
+            return f"{field} != ?", value
+        if op == "starts_with":
+            return f"{field} ILIKE ?", f"{value}%"
+        if op == "regex":
+            return f"regexp_matches({field}, ?)", value
+        return "", None
+
     def _parse_filters(self, filters: list) -> tuple[list[str], list[Any]]:
         where_clauses = []
         params = []
@@ -339,27 +357,10 @@ class LogDatabase:
             else:
                 field = f"l.{field}"
 
-            if op == "contains":
-                where_clauses.append(f"{field} ILIKE ?")
-                params.append(f"%{value}%")
-            elif op == "not_contains":
-                where_clauses.append(f"{field} NOT ILIKE ?")
-                params.append(f"%{value}%")
-            elif op == "equals":
-                if "source_id" in field:
-                    where_clauses.append(f"{field} ILIKE ?")
-                else:
-                    where_clauses.append(f"{field} = ?")
-                params.append(value)
-            elif op == "not_equals":
-                where_clauses.append(f"{field} != ?")
-                params.append(value)
-            elif op == "starts_with":
-                where_clauses.append(f"{field} ILIKE ?")
-                params.append(f"{value}%")
-            elif op == "regex":
-                where_clauses.append(f"regexp_matches({field}, ?)")
-                params.append(value)
+            clause, param = self._get_filter_condition(field, op, value)
+            if clause:
+                where_clauses.append(clause)
+                params.append(param)
 
         return where_clauses, params
 
@@ -389,27 +390,20 @@ class LogDatabase:
                 except Exception:
                     pass
 
-    def query_logs(
+    def _build_where_clauses(
         self,
         workspace_id: str,
         query: str = None,
         filters: list = None,
-        limit: int = 100,
-        offset: int = 0,
-        sort_by: str = "id",
-        sort_order: str = "DESC",
         source_ids: list = None,
         start_time: str = None,
         end_time: str = None,
-    ) -> dict:
-        cursor = self.get_cursor()
-
+    ) -> tuple[list[str], list[Any]]:
+        """Constructs WHERE clauses and gathers parameters."""
         where_clauses = ["l.workspace_id = ?"]
         params = [workspace_id]
 
         if source_ids is not None:
-            if not source_ids:
-                return {"total": 0, "logs": [], "offset": offset, "limit": limit}
             placeholders = ",".join(["?"] * len(source_ids))
             where_clauses.append(f"l.source_id IN ({placeholders})")
             params.extend(source_ids)
@@ -433,6 +427,46 @@ class LogDatabase:
             norm_end = end_time.replace("T", " ").split(".")[0].replace("Z", "")
             where_clauses.append("l.timestamp <= ?")
             params.append(norm_end)
+
+        return where_clauses, params
+
+    def _process_log_results(self, cursor) -> list[dict]:
+        """Converts raw cursor rows to a list of dicts with JSON parsing."""
+        columns = [desc[0] for desc in cursor.description]
+        logs = []
+        for row in cursor.fetchall():
+            log_dict = dict(zip(columns, row, strict=False))
+            if "facets" in log_dict and isinstance(log_dict["facets"], str):
+                try:
+                    log_dict["facets"] = json.loads(log_dict["facets"])
+                except Exception:
+                    log_dict["facets"] = {}
+            elif "facets" in log_dict and log_dict["facets"] is None:
+                log_dict["facets"] = {}
+            logs.append(log_dict)
+        return logs
+
+    def query_logs(
+        self,
+        workspace_id: str,
+        query: str = None,
+        filters: list = None,
+        limit: int = 100,
+        offset: int = 0,
+        sort_by: str = "id",
+        sort_order: str = "DESC",
+        source_ids: list = None,
+        start_time: str = None,
+        end_time: str = None,
+    ) -> dict:
+        cursor = self.get_cursor()
+
+        if source_ids is not None and not source_ids:
+            return {"total": 0, "logs": [], "offset": offset, "limit": limit}
+
+        where_clauses, params = self._build_where_clauses(
+            workspace_id, query, filters, source_ids, start_time, end_time
+        )
 
         where_sql = " AND ".join(where_clauses)
         total_logs_subquery = "(SELECT count(*) FROM logs WHERE workspace_id = ?)"
@@ -468,21 +502,8 @@ class LogDatabase:
             + f" ORDER BY {final_sort_by} {final_sort_order}, l.id {final_sort_order} LIMIT ? OFFSET ?"
         )
 
-        # params[0] is workspace_id for the subquery in SELECT, then params for WHERE clause
         cursor.execute(data_query, [workspace_id] + params + [limit, offset])
-
-        columns = [desc[0] for desc in cursor.description]
-        logs = []
-        for row in cursor.fetchall():
-            log_dict = dict(zip(columns, row, strict=False))
-            if "facets" in log_dict and isinstance(log_dict["facets"], str):
-                try:
-                    log_dict["facets"] = json.loads(log_dict["facets"])
-                except Exception:
-                    log_dict["facets"] = {}
-            elif "facets" in log_dict and log_dict["facets"] is None:
-                log_dict["facets"] = {}
-            logs.append(log_dict)
+        logs = self._process_log_results(cursor)
 
         self._apply_temporal_offsets(workspace_id, logs)
 

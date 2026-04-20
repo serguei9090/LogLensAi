@@ -14,7 +14,7 @@ export const useUIStore = create<UIStore>()(
   persist(
     (set) => ({
       sidebarCollapsed: false,
-      facetSidebarCollapsed: false,
+      facetSidebarCollapsed: true,
       toggleSidebar: () => set((state) => ({ sidebarCollapsed: !state.sidebarCollapsed })),
       setSidebarCollapsed: (collapsed) => set({ sidebarCollapsed: collapsed }),
       toggleFacetSidebar: () =>

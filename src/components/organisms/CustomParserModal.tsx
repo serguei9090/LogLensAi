@@ -2,7 +2,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { callSidecar } from "@/lib/hooks/useSidecarBridge";
 import { cn } from "@/lib/utils";
 import { Clock, Info, Search, Terminal, Trash2, Wand2, X } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
 interface ParserMapping {
@@ -19,12 +19,12 @@ interface ParserConfig {
 }
 
 interface CustomParserModalProps {
-  workspaceId: string;
-  sourceId: string;
-  isOpen: boolean;
-  onClose: () => void;
-  onSaved: (parserConfig: string) => void;
-  initialConfig?: string | null;
+  readonly workspaceId: string;
+  readonly sourceId: string;
+  readonly isOpen: boolean;
+  readonly onClose: () => void;
+  readonly onSaved: (parserConfig: string) => void;
+  readonly initialConfig?: string | null;
 }
 
 /**
@@ -104,7 +104,7 @@ export function CustomParserModal({
   }, [isOpen, workspaceId, sourceId, initialConfig]);
 
   // 2. Handle Text Selection - Show Context Menu
-  const handleMouseUp = () => {
+  const handleMouseUp = useCallback(() => {
     const selection = globalThis.getSelection();
     if (!selection || selection.rangeCount === 0 || selection.toString().trim() === "") {
       setActiveSelection(null);
@@ -138,7 +138,19 @@ export function CustomParserModal({
     } else {
       setActiveSelection(null);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    const element = sampleContainerRef.current;
+    if (element) {
+      element.addEventListener("mouseup", handleMouseUp);
+    }
+    return () => {
+      if (element) {
+        element.removeEventListener("mouseup", handleMouseUp);
+      }
+    };
+  }, [handleMouseUp]);
 
   // 3. Update Regex from Mapping
   useEffect(() => {
@@ -184,12 +196,12 @@ export function CustomParserModal({
         groupNames.push(m[1]);
       }
 
-      jsRegexStr = regexPattern.replace(/\(\?P<\w+>(.*?)\)/g, "($1)");
+      jsRegexStr = regexPattern.replaceAll(/\(\?P<\w+>(.*?)\)/g, "($1)");
 
       const jsRegex = new RegExp(jsRegexStr);
 
       const previews = samples.map((line) => {
-        const match = line.match(jsRegex);
+        const match = jsRegex.exec(line);
         if (!match) {
           return { timestamp: "No match", level: "---" };
         }
@@ -213,6 +225,7 @@ export function CustomParserModal({
       });
       setPreviewResults(previews);
     } catch (_error: unknown) {
+      console.error("Regex preview generation failed", _error);
       setPreviewResults([]);
     }
   }, [regexPattern, samples]);
@@ -322,15 +335,15 @@ export function CustomParserModal({
                 </Tooltip>
               </div>
 
-              <div
+              <section
                 ref={sampleContainerRef}
-                onMouseUp={handleMouseUp}
+                aria-label="Log sample container"
                 className="flex-1 overflow-auto p-0 font-mono text-xs select-text custom-scrollbar bg-surface-base/20 divide-y divide-white/5"
               >
                 {!isLoading && samples.length > 0 ? (
                   samples.map((line, idx) => (
                     <div
-                      key={`sample-${idx}-${line.length}`}
+                      key={`sample-${sourceId}-${idx}`}
                       data-sample-line="true"
                       className="group flex hover:bg-primary/5 transition-colors min-w-fit"
                     >
@@ -347,7 +360,7 @@ export function CustomParserModal({
                     {isLoading ? "Sampling log stream..." : "No samples found."}
                   </div>
                 )}
-              </div>
+              </section>
             </div>
 
             <div className="flex-1 flex flex-col min-w-[320px] bg-surface-base/40 backdrop-blur-xl">
@@ -450,7 +463,7 @@ export function CustomParserModal({
                     {previewResults.length > 0 ? (
                       previewResults.slice(0, 2).map((res, i) => (
                         <div
-                          key={`preview-${i}`}
+                          key={`preview-${res.timestamp}-${i}`}
                           className="p-3 flex items-center justify-between text-[11px]"
                         >
                           <span className="text-text-muted font-mono">

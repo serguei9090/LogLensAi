@@ -22,7 +22,7 @@ export function FacetSidebar() {
       animate={{
         width: facetSidebarCollapsed ? 0 : 256,
         opacity: facetSidebarCollapsed ? 0 : 1,
-        marginRight: facetSidebarCollapsed ? 0 : 0,
+        marginRight: 0,
       }}
       transition={{ type: "spring", stiffness: 400, damping: 40 }}
       className={cn(

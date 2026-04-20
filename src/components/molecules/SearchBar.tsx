@@ -4,10 +4,10 @@ import { Search, X } from "lucide-react";
 import { forwardRef, useEffect, useState } from "react";
 
 interface SearchBarProps {
-  value: string;
-  onChange: (value: string) => void;
-  placeholder?: string;
-  className?: string;
+  readonly value: string;
+  readonly onChange: (value: string) => void;
+  readonly placeholder?: string;
+  readonly className?: string;
 }
 
 export const SearchBar = forwardRef<HTMLInputElement, SearchBarProps>(

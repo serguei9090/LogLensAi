@@ -61,7 +61,9 @@ def test_http_ingestion(app):
         "raw_text": "2023-10-01 12:05:00 [INFO] HTTP test message",
         "level": "INFO",
     }
-    response = requests.post(f"http://127.0.0.1:{app.test_http_port}/ingest/{workspace_id}", json=payload)
+    response = requests.post(
+        f"http://127.0.0.1:{app.test_http_port}/ingest/{workspace_id}", json=payload
+    )
     assert response.status_code == 200
 
     # Check DB

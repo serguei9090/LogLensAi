@@ -71,16 +71,24 @@ export function WorkspaceTabs({
         const isFusion = src.type === "fusion";
         const label = src.name || src.path.split(/[\\/]/).pop() || src.path;
 
+        let activeStyles = "border-transparent hover:bg-white/5";
+        if (isActive) {
+          activeStyles = isFusion
+            ? "bg-violet-500/15 border-violet-500/30"
+            : "bg-primary/15 border-primary/30";
+        }
+
+        let labelStyles = "text-text-muted hover:text-text-secondary";
+        if (isActive) {
+          labelStyles = isFusion ? "text-violet-400" : "text-primary";
+        }
+
         return (
           <div
             key={src.id}
             className={cn(
               "group inline-flex items-center gap-1 px-1 rounded-md transition-all whitespace-nowrap shrink-0 border",
-              isActive
-                ? isFusion
-                  ? "bg-violet-500/15 border-violet-500/30"
-                  : "bg-primary/15 border-primary/30"
-                : "border-transparent hover:bg-white/5",
+              activeStyles,
             )}
           >
             {/* Primary Tab Button */}
@@ -92,24 +100,22 @@ export function WorkspaceTabs({
               title={src.path}
               className={cn(
                 "flex items-center gap-1.5 px-2 py-1.5 rounded text-[11px] font-semibold transition-all outline-none",
-                isActive
-                  ? isFusion
-                    ? "text-violet-400"
-                    : "text-primary"
-                  : "text-text-muted hover:text-text-secondary",
+                labelStyles,
               )}
             >
               {/* Fusion icon or live-tail indicator */}
-              {isFusion ? (
+              {isFusion && (
                 <span className="text-violet-400/70 text-[9px] font-bold uppercase tracking-wider">
                   ⚡
                 </span>
-              ) : isTailing ? (
+              )}
+
+              {!isFusion && isTailing && (
                 <span aria-label="Live tailing" className="relative flex h-2 w-2 shrink-0">
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-60" />
                   <span className="relative inline-flex h-2 w-2 rounded-full bg-primary" />
                 </span>
-              ) : null}
+              )}
 
               {editingId === src.id ? (
                 <input

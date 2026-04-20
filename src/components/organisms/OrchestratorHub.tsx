@@ -22,14 +22,18 @@ interface FusionSourceConfig {
 }
 
 interface OrchestratorHubProps {
-  isOpen: boolean;
-  onClose: () => void;
-  workspaceId: string;
-  availableSources: LogSource[];
-  editingFusionId?: string | null;
-  editingFusionName?: string | null;
-  onFusionSaved: (fusionId: string, fusionName: string, configs: FusionSourceConfig[]) => void;
-  onEngineSettingsOpen?: () => void;
+  readonly isOpen: boolean;
+  readonly onClose: () => void;
+  readonly workspaceId: string;
+  readonly availableSources: LogSource[];
+  readonly editingFusionId?: string | null;
+  readonly editingFusionName?: string | null;
+  readonly onFusionSaved: (
+    fusionId: string,
+    fusionName: string,
+    configs: FusionSourceConfig[],
+  ) => void;
+  readonly onEngineSettingsOpen?: () => void;
 }
 
 // ─── Strategy Card ────────────────────────────────────────────────────────────
@@ -40,10 +44,10 @@ function StrategyCard({
   description,
   onClick,
 }: {
-  icon: React.ReactNode;
-  name: string;
-  description: string;
-  onClick: () => void;
+  readonly icon: React.ReactNode;
+  readonly name: string;
+  readonly description: string;
+  readonly onClick: () => void;
 }) {
   return (
     <button
@@ -184,7 +188,8 @@ export function OrchestratorHub({
       });
       toast.success("Temporal offsets calibrated.");
       setView("picker");
-    } catch (_e) {
+    } catch (e) {
+      console.error("Failed to calibrate temporal offsets", e);
       toast.error("Failed to calibrate temporal offsets.");
     } finally {
       setIsSaving(false);
@@ -208,7 +213,8 @@ export function OrchestratorHub({
       toast.success(`Fusion "${fusionName}" established.`);
       onFusionSaved(fusionId, fusionName.trim() || "Log Fusion", configs);
       onClose();
-    } catch (_error) {
+    } catch (e) {
+      console.error("Failed to deploy fusion", e);
       toast.error("Failed to deploy fusion.");
     } finally {
       setIsSaving(false);
@@ -547,7 +553,13 @@ export function OrchestratorHub({
                           <div className="flex items-center gap-1.5 mt-0.5">
                             <Clock className="size-3 text-white/30" />
                             <p className="text-[11px] font-mono text-white/50">
-                              {offset === 0 ? "0s" : `${offset > 0 ? "+" : ""}${offset}s`}
+                              {(() => {
+                                if (offset === 0) {
+                                  return "0s";
+                                }
+                                const sign = offset > 0 ? "+" : "";
+                                return `${sign}${offset}s`;
+                              })()}
                             </p>
                           </div>
                         </div>

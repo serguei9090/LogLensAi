@@ -1,3 +1,5 @@
+import sys
+
 from openai import AsyncOpenAI
 
 from .base import AIChatMessage, AIProvider
@@ -6,7 +8,13 @@ from .base import AIChatMessage, AIProvider
 class OpenAICompatibleProvider(AIProvider):
     """Provider for any OpenAI-compatible API (Azure, Anthropic via proxy, Groq, etc)."""
 
-    def __init__(self, api_key: str, system_prompt: str = "", host: str = "https://api.openai.com/v1", model: str | None = None):
+    def __init__(
+        self,
+        api_key: str,
+        system_prompt: str = "",
+        host: str = "https://api.openai.com/v1",
+        model: str | None = None,
+    ):
         super().__init__(api_key=api_key, system_prompt=system_prompt)
         self.host = host
         self.active_model = model or "gpt-4o"
@@ -17,25 +25,43 @@ class OpenAICompatibleProvider(AIProvider):
     async def list_models(self) -> list[str]:
         """Fetch available models from the provider (OpenAI or LM Studio)."""
         if not self._client:
-            return ["gpt-4o", "gpt-3.5-turbo"]
+            print("No API key or client initialized for list_models", file=sys.stderr)
+            return []
         try:
-            # Fetch directly to avoid dependency on OpenAI client internals if possible
-            # or use the client to get the raw response
-            res = await self._client.models.list()
-            
-            # OpenAI standard: m.id
-            # LM Studio: m.key
-            models = []
-            for m in res.data:
-                if hasattr(m, "id"):
-                    models.append(m.id)
-                elif hasattr(m, "key"):
-                    models.append(m.key)
-            
-            return models if models else ["gpt-4o", "gpt-3.5-turbo"]
+            print(f"Sending models list request to: {self.host}", file=sys.stderr)
+
+            # Use raw httpx/aiohttp or the underlying httpx client from openai
+            # to log the exact request if possible.
+            import httpx
+
+            async with httpx.AsyncClient() as client:
+                url = f"{self.host}/models"
+                print(f"Making direct HTTP GET to: {url}", file=sys.stderr)
+                headers = {}
+                if self.api_key:
+                    headers["Authorization"] = f"Bearer {self.api_key}"
+
+                response = await client.get(url, headers=headers)
+                print(f"Response Status: {response.status_code}", file=sys.stderr)
+                print(f"Response Body: {response.text[:200]}...", file=sys.stderr)
+
+                if response.status_code == 200:
+                    data = response.json()
+                    models = []
+                    # Handle both standard {"data": [{"id": ...}]} and LM Studio {"models": [{"key": ...}]}
+                    items = data.get("data") or data.get("models") or []
+                    for m in items:
+                        if "id" in m:
+                            models.append(m["id"])
+                        elif "key" in m:
+                            models.append(m["key"])
+
+                    return models
+
+            return []
         except Exception as e:
             print(f"Error fetching models from {self.host}: {e}", file=sys.stderr)
-            return ["gpt-4o", "gpt-3.5-turbo"]
+            return []
 
     async def chat(
         self,
@@ -55,8 +81,7 @@ class OpenAICompatibleProvider(AIProvider):
 
         try:
             res = await self._client.chat.completions.create(
-                model=model or self.active_model,
-                messages=chat_messages
+                model=model or self.active_model, messages=chat_messages
             )
             content = res.choices[0].message.content
             return AIChatMessage(role="assistant", content=content)
@@ -75,9 +100,7 @@ class OpenAICompatibleProvider(AIProvider):
 
         try:
             stream = await self._client.chat.completions.create(
-                model=model or self.active_model,
-                messages=chat_messages,
-                stream=True
+                model=model or self.active_model, messages=chat_messages, stream=True
             )
             async for chunk in stream:
                 if chunk.choices and chunk.choices[0].delta.content:
@@ -97,10 +120,11 @@ class OpenAICompatibleProvider(AIProvider):
 
         try:
             import json
+
             res = await self._client.chat.completions.create(
                 model=self.active_model,
                 messages=[{"role": "user", "content": prompt}],
-                response_format={"type": "json_object"}
+                response_format={"type": "json_object"},
             )
             return json.loads(res.choices[0].message.content)
         except Exception as e:

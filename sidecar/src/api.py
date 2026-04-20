@@ -484,13 +484,13 @@ class App:
         Export matching logs to a file (CSV or JSON).
         """
         params = ExportLogsRequest(**kwargs)
-        
+
         import csv
         import json
-        
+
         filepath = params.filepath
         file_format = params.format
-        
+
         # Determine which fetcher to use
         if params.fusion_id:
             # Re-use get_fused_logs logic but override limit
@@ -507,18 +507,18 @@ class App:
             kwargs_copy.pop("filepath", None)
             kwargs_copy.pop("format", None)
             result = self.method_get_logs(**kwargs_copy)
-            
+
         logs = result.get("logs", [])
-        
+
         if file_format == "csv":
             if not logs:
                 with open(filepath, "w", newline="", encoding="utf-8") as f:
                     f.write("")
                 return {"status": "ok", "count": 0}
-                
+
             # Filter out internal fields starting with _
             keys = [k for k in logs[0] if not k.startswith("_")]
-            
+
             with open(filepath, "w", newline="", encoding="utf-8") as f:
                 dict_writer = csv.DictWriter(f, fieldnames=keys, extrasaction="ignore")
                 dict_writer.writeheader()
@@ -527,7 +527,7 @@ class App:
             # For JSON, we can export everything
             with open(filepath, "w", encoding="utf-8") as f:
                 json.dump(logs, f, indent=2)
-                
+
         return {"status": "ok", "count": len(logs)}
 
     def method_get_log_distribution(self, **kwargs) -> dict:
@@ -989,23 +989,26 @@ class App:
         for key in keys:
             # Efficiently query top 10 unique values for each facet key if they exist
             # Note: Using json_extract_string with double-quoted keys for special char safety ($."key")
-            
+
             if key == "level":
                 where_clauses = ["workspace_id = ?", "level IS NOT NULL"]
                 query_field = "level"
             else:
-                where_clauses = ["workspace_id = ?", f"json_extract_string(facets, '$.\"{key}\"') IS NOT NULL"]
+                where_clauses = [
+                    "workspace_id = ?",
+                    f"json_extract_string(facets, '$.\"{key}\"') IS NOT NULL",
+                ]
                 query_field = f"json_extract_string(facets, '$.\"{key}\"')"
-                
+
             sql_params = [params.workspace_id]
-            
+
             if params.source_ids:
                 placeholders = ",".join(["?"] * len(params.source_ids))
                 where_clauses.append(f"source_id IN ({placeholders})")
                 sql_params.extend(params.source_ids)
-                
+
             where_sql = " AND ".join(where_clauses)
-            
+
             query = f"""
                 SELECT {query_field} as val, count(*) as count
                 FROM logs
@@ -1854,7 +1857,7 @@ class App:
     def method_get_dashboard_stats(self, workspace_id: str | None = None) -> dict:
         """Fetch high-level metrics for the Dashboard view."""
         cursor = self.db.get_cursor()
-        
+
         # 1. Total Logs
         if workspace_id:
             cursor.execute("SELECT COUNT(*) FROM logs WHERE workspace_id = ?", (workspace_id,))
@@ -1864,7 +1867,10 @@ class App:
 
         # 2. Level breakdown
         if workspace_id:
-            cursor.execute("SELECT level, COUNT(*) FROM logs WHERE workspace_id = ? GROUP BY level", (workspace_id,))
+            cursor.execute(
+                "SELECT level, COUNT(*) FROM logs WHERE workspace_id = ? GROUP BY level",
+                (workspace_id,),
+            )
         else:
             cursor.execute("SELECT level, COUNT(*) FROM logs GROUP BY level")
         level_counts = {row[0]: row[1] for row in cursor.fetchall()}
@@ -1878,9 +1884,14 @@ class App:
 
         # 4. Top Clusters (by frequency)
         if workspace_id:
-            cursor.execute("SELECT template, count FROM clusters WHERE workspace_id = ? ORDER BY count DESC LIMIT 5", (workspace_id,))
+            cursor.execute(
+                "SELECT template, count FROM clusters WHERE workspace_id = ? ORDER BY count DESC LIMIT 5",
+                (workspace_id,),
+            )
         else:
-            cursor.execute("SELECT template, SUM(count) as total FROM clusters GROUP BY template ORDER BY total DESC LIMIT 5")
+            cursor.execute(
+                "SELECT template, SUM(count) as total FROM clusters GROUP BY template ORDER BY total DESC LIMIT 5"
+            )
         top_clusters = [{"template": row[0], "count": row[1]} for row in cursor.fetchall()]
 
         # 5. Workspace count
@@ -1893,7 +1904,7 @@ class App:
             "level_counts": level_counts,
             "top_clusters": top_clusters,
             "workspace_count": workspace_count,
-            "active_tailers": len([k for k, t in self.tailers.items() if t.running])
+            "active_tailers": len([k for k, t in self.tailers.items() if t.running]),
         }
 
 

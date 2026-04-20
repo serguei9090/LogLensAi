@@ -92,8 +92,10 @@ export function InvestigationLayout({
       {showDistribution && workspaceId && (
         <LogDistributionWidget
           workspaceId={workspaceId}
-          sourceIds={activeSource && activeSource.type !== "fusion" ? [activeSource.path] : null}
-          fusionId={activeSource && activeSource.type === "fusion" ? activeSource.path : undefined}
+          sourceIds={
+            activeSource?.type && activeSource.type !== "fusion" ? [activeSource.path] : null
+          }
+          fusionId={activeSource?.type === "fusion" ? activeSource.path : undefined}
           isTailing={activeSourceId ? tailingSourceIds?.has(activeSourceId) : false}
           filters={activeFilters}
           onClose={onDistributionClose}
