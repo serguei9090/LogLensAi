@@ -1,7 +1,8 @@
 from unittest.mock import MagicMock
 
 import pytest
-from api import App, IngestLogEntry
+from api import App
+from models import FusionSourceConfig, IngestLogEntry
 
 
 @pytest.fixture
@@ -124,7 +125,6 @@ def test_get_fusion_config_empty(api):
 
 
 def test_update_fusion_config(api):
-    from api import FusionSourceConfig
 
     sources = [FusionSourceConfig(source_id="src1", enabled=True, tz_offset=0)]
     api.method_update_fusion_config(workspace_id="ws1", sources=sources)

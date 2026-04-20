@@ -1,5 +1,6 @@
 import pytest
-from api import App, FusionSourceConfig, IngestLogEntry
+from api import App
+from models import FusionSourceConfig, IngestLogEntry
 
 
 @pytest.fixture

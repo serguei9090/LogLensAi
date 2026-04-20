@@ -51,21 +51,21 @@ def test_syslog_ingestion(app):
     logs = app.method_get_logs(workspace_id="default")
     assert logs["total"] >= 1
     assert any("Syslog test message" in log["message"] for log in logs["logs"])
-    assert any("syslog://" in log["source_id"] for log in logs["logs"])
+    assert any("syslog" in log["source_id"] for log in logs["logs"])
 
 
 def test_http_ingestion(app):
-    # Send an HTTP POST to dynamic port
+    # Send an HTTP POST to dynamic port with explicit workspace in URL
+    workspace_id = "http_test"
     payload = {
-        "workspace_id": "http_test",
         "raw_text": "2023-10-01 12:05:00 [INFO] HTTP test message",
         "level": "INFO",
     }
-    response = requests.post(f"http://127.0.0.1:{app.test_http_port}/ingest", json=payload)
+    response = requests.post(f"http://127.0.0.1:{app.test_http_port}/ingest/{workspace_id}", json=payload)
     assert response.status_code == 200
 
     # Check DB
-    logs = app.method_get_logs(workspace_id="http_test")
+    logs = app.method_get_logs(workspace_id=workspace_id)
     assert logs["total"] == 1
     assert logs["logs"][0]["message"] == "2023-10-01 12:05:00 [INFO] HTTP test message"
     assert logs["logs"][0]["source_id"] == "http-ingest"

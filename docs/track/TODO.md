@@ -75,12 +75,12 @@
 - [x] **FIX-AI-002**: Standardized AI History & Universal Auto-Healing (Context Injection)
   - **Files**: `sidecar/src/api.py`, `sidecar/src/ai/gemini_cli.py`, `sidecar/src/ai/ai_studio.py`
   - **Detail**: `docs/TODOC/FIX-AI-002.md`
-- [ ] **FIX-FE-001**: Sidebar Button Nesting & Sync (Fix component recursion + Initial fetch)
+- [x] **FIX-FE-001**: Sidebar Button Nesting & Sync (Fix component recursion + Initial fetch)
   - **Files**: `src/components/organisms/AIInvestigationSidebar.tsx`, `src/store/aiStore.ts`
-- [ ] **FIX-UX-004**: Context-Aware AI Hub (Highlight session logs + VS Code style history + Renaming)
+- [x] **FIX-UX-004**: Context-Aware AI Hub (Highlight session logs + VS Code style history + Renaming)
   - **Files**: `src/components/organisms/AIInvestigationSidebar.tsx`, `src/components/organisms/VirtualLogTable.tsx`, `sidecar/src/api.py`, `src/store/aiStore.ts`
   - **Detail**: `docs/TODOC/FIX-UX-004.md`
-- [ ] **FIX-UX-006**: Chat Scroll & Context Persistence (Auto-Scroll to Last Answer)
+- [x] **FIX-UX-006**: Chat Scroll & Context Persistence (Auto-Scroll to Last Answer)
   - **Files**: `src/components/organisms/AIInvestigationSidebar.tsx`
   - **Detail**: `docs/TODOC/FIX-UX-006.md`
 - [x] **FIX-UX-005**: Async LLM Provider Stability (Non-blocking CLI execution)
@@ -110,7 +110,7 @@
 - [x] **FIX-UI-002**: Missing 'Layers' Import in LogToolbar (Regression from Engine Settings implementation)
   - **Files**: `src/components/organisms/LogToolbar.tsx`
   - **Detail**: `docs/TODOC/FIX-UI-002.md`
-- [ ] **FIX-D3-001**: Workspace Engine Settings Persistence & UI Polish (Force sync + Padding fix)
+- [x] **FIX-D3-001**: Workspace Engine Settings Persistence & UI Polish (Force sync + Padding fix)
   - **Files**: `src/components/organisms/WorkspaceEngineSettings.tsx`
   - **Detail**: `docs/TODOC/FIX-D3-001.md`
 - [x] **STABILITY-001**: [FIX-STABILITY-001](i:/01-Master_Code/Apps/LogLensAi/docs/TODOC/FIX-STABILITY-001.md) - Global IDE Resolution (DONE)
@@ -176,7 +176,7 @@
 - [x] **AI-002**: Display AI explanation in Diagnostic Sidebar
 - [x] **FEAT-AI-TOOLS-001**: Advanced AI Copilot Tools & Memory (Search, Memory, Autocompletes)
   - **Detail**: `docs/TODOC/FEAT_AI_TOOLS_001.md`
-- [ ] **FEAT-AI-TOOLS-002**: Copilot Context, Skills Manager & UX Polish
+- [x] **FEAT-AI-TOOLS-002**: Copilot Context, Skills Manager & UX Polish
   - **Detail**: `docs/TODOC/FEAT_AI_TOOLS_002.md`
 
 ---

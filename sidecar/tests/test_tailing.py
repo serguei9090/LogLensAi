@@ -9,7 +9,7 @@ from db import Database
 def api_app():
     # Ensure DuckDB is reset
     Database.reset()
-    app = App()
+    app = App(db_path=":memory:")
     return app
 
 
