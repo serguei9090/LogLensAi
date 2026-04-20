@@ -162,6 +162,18 @@ class GetMetadataFacetsRequest(BaseModel):
     workspace_id: str
 
 
+class ExportLogsRequest(BaseModel):
+    workspace_id: str
+    filepath: str
+    format: str = "csv"  # "csv" or "json"
+    filters: list[LogFilter] | None = None
+    query: str | None = None
+    source_ids: list[str] | None = None
+    fusion_id: str | None = None
+    start_time: str | None = None
+    end_time: str | None = None
+
+
 # AI Models
 class SendAiMessageRequest(BaseModel):
     workspace_id: str

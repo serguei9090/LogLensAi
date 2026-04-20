@@ -98,7 +98,7 @@ export function InvestigationPage() {
 
   // Anomalies state
   const [anomalousClusters, setAnomalousClusters] = useState<Set<string>>(new Set());
-  const { settings } = useSettingsStore();
+  useSettingsStore();
 
   // Memoized non-fusion sources
   const nonFusionSources = useMemo(() => sources.filter((s) => s.type !== "fusion"), [sources]);
@@ -432,6 +432,55 @@ export function InvestigationPage() {
     }
   };
 
+  const handleExport = async () => {
+    if (!activeWorkspaceId) {
+      return;
+    }
+
+    try {
+      const { save } = await import("@tauri-apps/plugin-dialog");
+      const path = await save({
+        title: "Export Logs",
+        filters: [
+          { name: "CSV", extensions: ["csv"] },
+          { name: "JSON", extensions: ["json"] },
+        ],
+        defaultPath: `loglens_export_${new Date().toISOString().split("T")[0]}.csv`,
+      });
+
+      if (!path) {
+        return;
+      }
+
+      const format = path.endsWith(".json") ? "json" : "csv";
+
+      toast.loading(`Exporting logs to ${format.toUpperCase()}...`, { id: "export" });
+
+      const activeSource = sources.find((s) => s.id === activeSourceId);
+      const isFusion = activeSource?.type === "fusion";
+      const fusionId = isFusion ? activeSource.path : null;
+
+      await callSidecar({
+        method: "export_logs",
+        params: {
+          workspace_id: activeWorkspaceId,
+          filepath: path,
+          format,
+          query: searchQuery || undefined,
+          filters: filters.length > 0 ? filters : undefined,
+          fusion_id: fusionId,
+          start_time: timeRange.start || undefined,
+          end_time: timeRange.end || undefined,
+        },
+      });
+
+      toast.success("Export complete", { id: "export", description: `Saved to ${path}` });
+    } catch (e) {
+      console.error("Export failed", e);
+      toast.error("Export failed", { id: "export" });
+    }
+  };
+
   const handleAnalyzeCluster = async (clusterId: string) => {
     // Collect up to 5 log IDs belonging to this cluster to avoid token explosion
     const clusterLogs = logs.filter((l) => l.cluster_id === clusterId);
@@ -461,7 +510,9 @@ export function InvestigationPage() {
   return (
     <>
       <InvestigationLayout
+        searchQuery={searchQuery}
         onSearch={setSearchQuery}
+        onExport={handleExport}
         activeFilters={filters}
         onFilterChange={setFilters}
         activeHighlights={highlights}

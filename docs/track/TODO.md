@@ -54,6 +54,8 @@
 - [x] **NOTE-FE-001**: Refactor Note View into a smaller floating card/bottom panel
 - [x] **UX-001**: Sidebar Collapse Functionality (Mini workspace icons + Tooltips)
 - [x] **UX-002**: Source Tab Aliasing (Pencil icon renaming + Persistence)
+- [x] **EXPORT-001**: Export filtered logs to CSV / JSON (Native Save Dialog + Sidecar)
+- [x] **FEAT-AI-TOOLS-003**: AI Chat SSE Streaming Protocol (Real-time Token Streaming)
 
 
 ---
@@ -151,7 +153,7 @@
   - **Detail**: `docs/TODOC/ingestion_001.md`
 - [x] **FACET-001**: Custom Regex Facet Extraction (Global & Workspace Rules)
   - **Detail**: `docs/TODOC/FACET-001.md`
-- [ ] **ui_004**: Native File Picker & Search Molecules
+- [x] **ui_004**: Native File Picker & Search Molecules
  
 ## 🔵 Sprint 07 — Advanced UX & Intelligence (Active)
 
@@ -178,6 +180,8 @@
   - **Detail**: `docs/TODOC/FEAT_AI_TOOLS_001.md`
 - [x] **FEAT-AI-TOOLS-002**: Copilot Context, Skills Manager & UX Polish
   - **Detail**: `docs/TODOC/FEAT_AI_TOOLS_002.md`
+- [x] **FEAT-AI-TOOLS-003**: AI Chat SSE Streaming Protocol (Real-time Token Streaming)
+  - **Detail**: `docs/TODOC/FEAT_AI_TOOLS_003.md`
 
 ---
 
@@ -194,5 +198,4 @@
 ## ⚪ Backlog (Future Sprints)
 
 - [ ] **DASH-001**: Dashboard page (placeholder nav item)
-- [ ] **EXPORT-001**: Export filtered logs to CSV / JSON
 - [ ] **KEYBIND-001**: Keyboard shortcuts (⌘K command palette)

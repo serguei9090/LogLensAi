@@ -1,7 +1,5 @@
 import { SettingsPanel } from "@/components/organisms/SettingsPanel";
-import { callSidecar } from "@/lib/hooks/useSidecarBridge";
 import { type AppSettings, useSettingsStore } from "@/store/settingsStore";
-import { toast } from "sonner";
 
 export function SettingsPage() {
   const { updateSettings } = useSettingsStore();

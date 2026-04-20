@@ -10,12 +10,12 @@ import { useAiStore } from "@/store/aiStore";
 import { useInvestigationStore } from "@/store/investigationStore";
 import { useUIStore } from "@/store/uiStore";
 import type { LogSource } from "@/store/workspaceStore";
-import { Bookmark, Columns, Cpu, Sparkles, Upload } from "lucide-react";
+import { Bookmark, Columns, Cpu, Download, Sparkles, Upload } from "lucide-react";
 import { useState } from "react";
-import { toast } from "sonner";
 import { SaveTemplateModal } from "./SaveTemplateModal";
 
 interface LogToolbarProps {
+  readonly searchQuery: string;
   readonly onSearch: (q: string) => void;
   readonly activeFilters: FilterEntry[];
   readonly onFilterChange: (f: FilterEntry[]) => void;
@@ -34,9 +34,11 @@ interface LogToolbarProps {
   readonly onEditFusion?: (sourceId: string) => void;
   readonly onRenameSource?: (workspaceId: string, sourceId: string, name: string) => void;
   readonly activeWorkspaceId?: string;
+  readonly onExport: () => void;
 }
 
 export function LogToolbar({
+  searchQuery,
   onSearch,
   activeFilters,
   onFilterChange,
@@ -55,6 +57,7 @@ export function LogToolbar({
   onEditFusion,
   onRenameSource,
   activeWorkspaceId,
+  onExport,
 }: LogToolbarProps) {
   const { timeRange, setTimeRange } = useInvestigationStore();
   const { isSidebarOpen, setSidebarOpen } = useAiStore();
@@ -72,7 +75,6 @@ export function LogToolbar({
         highlights={activeHighlights}
       />
 
-
       {/* Import button */}
       <button
         type="button"
@@ -81,6 +83,16 @@ export function LogToolbar({
       >
         <Upload className="h-3.5 w-3.5" />
         Import
+      </button>
+
+      {/* Export button */}
+      <button
+        type="button"
+        onClick={onExport}
+        className="inline-flex items-center gap-2 rounded-md bg-zinc-800 hover:bg-zinc-700 active:bg-zinc-900 text-zinc-300 text-xs font-semibold px-3 py-1.5 transition-colors border border-zinc-700 shrink-0"
+      >
+        <Download className="h-3.5 w-3.5" />
+        Export
       </button>
 
       {/* Orchestrate — always visible */}
@@ -125,7 +137,7 @@ export function LogToolbar({
 
       {/* Search */}
       <div className="flex-1 min-w-[180px] max-w-xs">
-        <SearchBar value="" onChange={onSearch} />
+        <SearchBar value={searchQuery} onChange={onSearch} />
       </div>
 
       {/* Global Time Filter */}

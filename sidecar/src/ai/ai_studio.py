@@ -14,8 +14,9 @@ DEFAULT_MODEL = "gemini-2.5-flash"
 class AIStudioProvider(AIProvider):
     """Direct provider using Google AI Studio (API Key)."""
 
-    def __init__(self, api_key: str, system_prompt: str = ""):
+    def __init__(self, api_key: str, system_prompt: str = "", model: str | None = None):
         super().__init__(api_key=api_key, system_prompt=system_prompt)
+        self.active_model = model or DEFAULT_MODEL
         # We wrap the client for list_models and other direct calls
         self._client = Client(api_key=api_key) if api_key else None
 
@@ -50,7 +51,7 @@ class AIStudioProvider(AIProvider):
         # In a real session, we'd use the ADK session management
         agent = LlmAgent(
             name="ai_studio_agent",
-            model=model,
+            model=model or self.active_model,
             instruction=self.system_prompt,
         )
 
@@ -108,7 +109,7 @@ class AIStudioProvider(AIProvider):
         os.environ["GOOGLE_API_KEY"] = self.api_key
         agent = LlmAgent(
             name="ai_studio_agent",
-            model=model,
+            model=model or self.active_model,
             instruction=self.system_prompt,
         )
 
@@ -151,7 +152,7 @@ class AIStudioProvider(AIProvider):
             response = await loop.run_in_executor(
                 None,
                 lambda: self._client.models.generate_content(
-                    model=DEFAULT_MODEL,
+                    model=self.active_model,
                     config=types.GenerateContentConfig(response_mime_type="application/json"),
                     contents=prompt,
                 ),

@@ -23,6 +23,6 @@
     "lineWidth": 100
   },
   "files": {
-    "ignore": [".venv", "node_modules", "dist", "src-tauri/target"]
+    "ignore": [".venv", "node_modules", "dist", "src-tauri/target", ".vscode"]
   }
 }

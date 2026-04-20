@@ -3,7 +3,7 @@ import { cn } from "@/lib/utils";
 import { useInvestigationStore } from "@/store/investigationStore";
 import { useUIStore } from "@/store/uiStore";
 import { motion } from "framer-motion";
-import { FilterX, PanelLeftClose, PanelLeftOpen } from "lucide-react";
+import { FilterX, PanelLeftClose } from "lucide-react";
 import { FacetList } from "../molecules/FacetList";
 
 export function FacetSidebar() {

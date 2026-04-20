@@ -6,7 +6,9 @@ import type { LogSource } from "@/store/workspaceStore";
 import type { ReactNode } from "react";
 
 interface InvestigationLayoutProps {
+  readonly searchQuery: string;
   readonly onSearch: (q: string) => void;
+  readonly onExport: () => void;
   readonly activeFilters: FilterEntry[];
   readonly onFilterChange: (f: FilterEntry[]) => void;
   readonly activeHighlights: HighlightEntry[];
@@ -32,7 +34,9 @@ interface InvestigationLayoutProps {
 }
 
 export function InvestigationLayout({
+  searchQuery,
   onSearch,
+  onExport,
   activeFilters,
   onFilterChange,
   activeHighlights,
@@ -61,7 +65,9 @@ export function InvestigationLayout({
   return (
     <div className="flex flex-col h-full w-full bg-[#0a0c0b] overflow-hidden">
       <LogToolbar
+        searchQuery={searchQuery}
         onSearch={onSearch}
+        onExport={onExport}
         activeFilters={activeFilters}
         onFilterChange={onFilterChange}
         activeHighlights={activeHighlights}

@@ -43,7 +43,7 @@ class GeminiCLIProvider(AIProvider):
         return json.loads(output[start : end + 1])
 
     async def list_models(self) -> list[str]:
-        return [self.DEFAULT_MODEL, "gemini-pro"]
+        return ["flash", "pro", "flash-lite", "auto", "auto-gemini-3", "auto-gemini-2.5"]
 
     async def _get_or_create_task(
         self,

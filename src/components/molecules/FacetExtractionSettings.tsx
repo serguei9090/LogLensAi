@@ -1,7 +1,6 @@
 import { HelpTooltip } from "@/components/atoms/HelpTooltip";
 import { cn } from "@/lib/utils";
-import { Check, HelpCircle, Plus, ToggleLeft, ToggleRight, Trash2, X } from "lucide-react";
-import type React from "react";
+import { Plus, ToggleLeft, ToggleRight, Trash2 } from "lucide-react";
 import { useState } from "react";
 
 export interface FacetExtractionRule {
@@ -142,62 +141,63 @@ export function FacetExtractionSettings({
             </tr>
           </thead>
           <tbody className="divide-y divide-border/50">
-            {Array.isArray(rules) && rules.map((rule, idx) => (
-              <tr
-                key={`${rule.name}-${idx}`}
-                className={cn("group", !rule.enabled && "opacity-50")}
-              >
-                <td className="px-4 py-3">
-                  <input
-                    type="text"
-                    value={rule.name}
-                    onChange={(e) => updateRule(idx, { name: e.target.value })}
-                    className="w-full bg-transparent border-none focus:ring-0 text-sm text-text-primary h-6"
-                  />
-                </td>
-                <td className="px-4 py-3">
-                  <input
-                    type="text"
-                    value={rule.regex}
-                    onChange={(e) => updateRule(idx, { regex: e.target.value })}
-                    className="w-full bg-transparent border-none focus:ring-0 text-sm text-text-muted font-mono h-6 placeholder:text-text-muted/20"
-                    placeholder="e.g. user_id=(\d+)"
-                  />
-                </td>
-                <td className="px-4 py-3">
-                  <input
-                    type="number"
-                    value={rule.group}
-                    onChange={(e) =>
-                      updateRule(idx, { group: Number.parseInt(e.target.value) || 1 })
-                    }
-                    className="w-full bg-transparent border-none focus:ring-0 text-sm text-text-primary text-center h-6"
-                  />
-                </td>
-                <td className="px-4 py-3 text-center">
-                  <button
-                    type="button"
-                    onClick={() => toggleRule(idx)}
-                    className="text-text-muted hover:text-primary transition-colors inline-block align-middle"
-                  >
-                    {rule.enabled ? (
-                      <ToggleRight className="h-5 w-5 text-primary" />
-                    ) : (
-                      <ToggleLeft className="h-5 w-5" />
-                    )}
-                  </button>
-                </td>
-                <td className="px-4 py-3">
-                  <button
-                    type="button"
-                    onClick={() => removeRule(idx)}
-                    className="text-text-muted hover:text-error opacity-0 group-hover:opacity-100 transition-all p-1"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </button>
-                </td>
-              </tr>
-            ))}
+            {Array.isArray(rules) &&
+              rules.map((rule, idx) => (
+                <tr
+                  key={`${rule.name}-${idx}`}
+                  className={cn("group", !rule.enabled && "opacity-50")}
+                >
+                  <td className="px-4 py-3">
+                    <input
+                      type="text"
+                      value={rule.name}
+                      onChange={(e) => updateRule(idx, { name: e.target.value })}
+                      className="w-full bg-transparent border-none focus:ring-0 text-sm text-text-primary h-6"
+                    />
+                  </td>
+                  <td className="px-4 py-3">
+                    <input
+                      type="text"
+                      value={rule.regex}
+                      onChange={(e) => updateRule(idx, { regex: e.target.value })}
+                      className="w-full bg-transparent border-none focus:ring-0 text-sm text-text-muted font-mono h-6 placeholder:text-text-muted/20"
+                      placeholder="e.g. user_id=(\d+)"
+                    />
+                  </td>
+                  <td className="px-4 py-3">
+                    <input
+                      type="number"
+                      value={rule.group}
+                      onChange={(e) =>
+                        updateRule(idx, { group: Number.parseInt(e.target.value) || 1 })
+                      }
+                      className="w-full bg-transparent border-none focus:ring-0 text-sm text-text-primary text-center h-6"
+                    />
+                  </td>
+                  <td className="px-4 py-3 text-center">
+                    <button
+                      type="button"
+                      onClick={() => toggleRule(idx)}
+                      className="text-text-muted hover:text-primary transition-colors inline-block align-middle"
+                    >
+                      {rule.enabled ? (
+                        <ToggleRight className="h-5 w-5 text-primary" />
+                      ) : (
+                        <ToggleLeft className="h-5 w-5" />
+                      )}
+                    </button>
+                  </td>
+                  <td className="px-4 py-3">
+                    <button
+                      type="button"
+                      onClick={() => removeRule(idx)}
+                      className="text-text-muted hover:text-error opacity-0 group-hover:opacity-100 transition-all p-1"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </td>
+                </tr>
+              ))}
 
             {/* Add New Rule Row */}
             <tr className="bg-primary/5">

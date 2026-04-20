@@ -11,7 +11,6 @@ import { useSettingsStore } from "@/store/settingsStore";
 import { selectActiveWorkspace, useWorkspaceStore } from "@/store/workspaceStore";
 import { type VirtualItem, useVirtualizer } from "@tanstack/react-virtual";
 import {
-  Activity,
   ArrowDown,
   ArrowUp,
   ArrowUpDown,

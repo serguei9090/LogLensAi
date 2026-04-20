@@ -20,6 +20,7 @@ from metadata_extractor import extract_log_metadata
 from models import (
     CreateLogStreamRequest,
     DeleteLogStreamRequest,
+    ExportLogsRequest,
     GenerateExtractionRegexRequest,
     GetAiMessagesRequest,
     GetAiSessionsRequest,
@@ -107,20 +108,7 @@ class App:
 
         # Initialize AI Provider from settings
         settings = self.method_get_settings()
-        provider = settings.get("ai_provider", "ollama")
-        host = (
-            settings.get("ai_gemini_url", "http://localhost:22436")
-            if provider == "gemini-cli"
-            else settings.get("ai_ollama_host", "http://localhost:11434")
-        )
-
-        self.ai = AIProviderFactory.get_provider(
-            provider,
-            api_key=settings.get("ai_api_key", ""),
-            system_prompt=settings.get("ai_system_prompt", ""),
-            model=settings.get("ai_model", "gemma4:e2b"),
-            host=host,
-        )
+        self.ai = self._init_ai_provider(settings)
 
         # Initialize Ingestion Ports (Syslog/HTTP)
         syslog_port = int(settings.get("ingestion_syslog_port", "514"))
@@ -148,6 +136,26 @@ class App:
         # Auto-start if enabled in settings
         if settings.get("mcp_server_enabled", "false").lower() == "true":
             self._start_mcp_server()
+
+    def _init_ai_provider(self, settings: dict):
+        """Map the correct host based on provider and return an instance."""
+        provider = settings.get("ai_provider", "ollama")
+        if provider == "gemini-cli":
+            host = settings.get("ai_gemini_url", "http://localhost:22436")
+        elif provider in ["openai-compatible", "openai"]:
+            host = settings.get("ai_openai_host", "https://api.openai.com/v1")
+        elif provider == "ollama":
+            host = settings.get("ai_ollama_host", "http://localhost:11434")
+        else:
+            host = ""  # ai-studio etc.
+
+        return AIProviderFactory.get_provider(
+            provider,
+            api_key=settings.get("ai_api_key", ""),
+            system_prompt=settings.get("ai_system_prompt", ""),
+            model=settings.get("ai_model", "gemma4:e2b"),
+            host=host,
+        )
 
     def _start_mcp_server(self):
         """Starts the MCP server in a background thread using FastMCP SSE."""
@@ -243,6 +251,7 @@ class App:
                 "create_log_stream": CreateLogStreamRequest,
                 "delete_log_stream": DeleteLogStreamRequest,
                 "generate_facet_regex": GenerateExtractionRegexRequest,
+                "export_logs": ExportLogsRequest,
             }
 
             handler = getattr(self, method_name)
@@ -461,6 +470,57 @@ class App:
         """Fetch logs normally for a workspace/source."""
         params = GetLogsRequest(**kwargs)
         return self._get_logs_internal(**params.model_dump())
+
+    async def method_export_logs(self, **kwargs) -> dict:
+        """
+        Export matching logs to a file (CSV or JSON).
+        """
+        params = ExportLogsRequest(**kwargs)
+        
+        import csv
+        import json
+        
+        filepath = params.filepath
+        file_format = params.format
+        
+        # Determine which fetcher to use
+        if params.fusion_id:
+            # Re-use get_fused_logs logic but override limit
+            kwargs_copy = kwargs.copy()
+            kwargs_copy["limit"] = 1000000
+            kwargs_copy["offset"] = 0
+            result = self.method_get_fused_logs(**kwargs_copy)
+        else:
+            # Re-use get_logs logic but override limit
+            kwargs_copy = kwargs.copy()
+            kwargs_copy["limit"] = 1000000
+            kwargs_copy["offset"] = 0
+            # Remove Export-specific fields for the internal fetcher
+            kwargs_copy.pop("filepath", None)
+            kwargs_copy.pop("format", None)
+            result = self.method_get_logs(**kwargs_copy)
+            
+        logs = result.get("logs", [])
+        
+        if file_format == "csv":
+            if not logs:
+                with open(filepath, "w", newline="", encoding="utf-8") as f:
+                    f.write("")
+                return {"status": "ok", "count": 0}
+                
+            # Filter out internal fields starting with _
+            keys = [k for k in logs[0] if not k.startswith("_")]
+            
+            with open(filepath, "w", newline="", encoding="utf-8") as f:
+                dict_writer = csv.DictWriter(f, fieldnames=keys, extrasaction="ignore")
+                dict_writer.writeheader()
+                dict_writer.writerows(logs)
+        else:
+            # For JSON, we can export everything
+            with open(filepath, "w", encoding="utf-8") as f:
+                json.dump(logs, f, indent=2)
+                
+        return {"status": "ok", "count": len(logs)}
 
     def method_get_log_distribution(self, **kwargs) -> dict:
         """Fetch timeline distribution of logs aggregated by time bucket and level."""
@@ -1391,23 +1451,7 @@ class App:
             ]
         ):
             current_settings = self.method_get_settings()
-            provider = current_settings.get("ai_provider", "ollama")
-            
-            # Map the correct host based on the provider
-            if provider == "gemini-cli":
-                host = current_settings.get("ai_gemini_url", "http://localhost:22436")
-            elif provider == "openai-compatible" or provider == "openai":
-                host = current_settings.get("ai_openai_host", "https://api.openai.com/v1")
-            else:
-                host = current_settings.get("ai_ollama_host", "http://localhost:11434")
-
-            self.ai = AIProviderFactory.get_provider(
-                provider,
-                api_key=current_settings.get("ai_api_key", ""),
-                system_prompt=current_settings.get("ai_system_prompt", ""),
-                model=current_settings.get("ai_model", "gemma4:e2b"),
-                host=host,
-            )
+            self.ai = self._init_ai_provider(current_settings)
 
         # Reset specific Drain parser if clustering settings changed
         if any(k.startswith("drain_") for k in settings):

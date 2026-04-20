@@ -261,11 +261,21 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
   }, []);
 
   useEffect(() => {
-    // Trigger model pull when provider or connectivity settings change
-    if (settings.ai_provider === "ollama" || settings.ai_provider === "openai-compatible") {
-      fetchModels();
+    // Trigger model pull when provider or connectivity settings change (with debounce)
+    const dynamicProviders = ["ollama", "openai-compatible", "ai-studio"];
+    if (dynamicProviders.includes(settings.ai_provider)) {
+      const timer = setTimeout(() => {
+        fetchModels();
+      }, 1000);
+      return () => clearTimeout(timer);
     }
-  }, [fetchModels, settings.ai_provider, settings.ai_ollama_host, settings.ai_openai_host, settings.ai_api_key]);
+  }, [
+    fetchModels,
+    settings.ai_provider,
+    settings.ai_ollama_host,
+    settings.ai_openai_host,
+    settings.ai_api_key,
+  ]);
 
   // Removed handleSave in favor of auto-save via update()
 
@@ -368,6 +378,8 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
                         update("ai_model", "flash");
                       } else if (v === "openai-compatible") {
                         update("ai_model", "gpt-4o");
+                      } else if (v === "ai-studio") {
+                        update("ai_model", "gemini-2.5-flash");
                       }
                     }}
                   >
@@ -377,20 +389,24 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
                     <option value="openai-compatible">OpenAI Compatible</option>
                   </SettingSelect>
                 </div>
-                <div className="space-y-2">
-                  <SectionLabel htmlFor="ai_api_key">Secret API Key</SectionLabel>
-                  <SettingInput
-                    id="ai_api_key"
-                    type="password"
-                    value={settings.ai_api_key}
-                    onChange={(e) => update("ai_api_key", e.target.value, false)}
-                    onBlur={() => onSave(settings)}
-                    placeholder="Encrypted: sk-••••••••••••••••"
-                  />
-                  <p className="text-[10px] text-text-muted/50 px-1">
-                    Keys are stored securely in your local configuration.
-                  </p>
-                </div>
+
+                {(settings.ai_provider === "ai-studio" ||
+                  settings.ai_provider === "openai-compatible") && (
+                  <div className="space-y-2 animate-in fade-in slide-in-from-left-2 duration-300">
+                    <SectionLabel htmlFor="ai_api_key">Secret API Key</SectionLabel>
+                    <SettingInput
+                      id="ai_api_key"
+                      type="password"
+                      value={settings.ai_api_key}
+                      onChange={(e) => update("ai_api_key", e.target.value, false)}
+                      onBlur={() => onSave(settings)}
+                      placeholder="Encrypted: sk-••••••••••••••••"
+                    />
+                    <p className="text-[10px] text-text-muted/50 px-1">
+                      Keys are stored securely in your local configuration.
+                    </p>
+                  </div>
+                )}
               </div>
 
               {settings.ai_provider === "gemini-cli" && (
@@ -424,6 +440,65 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
                       placeholder="http://localhost:22436"
                     />
                     <p className="text-[10px] text-text-muted/50 px-1">Daemon port for Hot Mode.</p>
+                  </div>
+                </div>
+              )}
+
+              {settings.ai_provider === "ai-studio" && (
+                <div className="grid grid-cols-2 gap-8 pt-4 border-t border-border/30 animate-in slide-in-from-top-2 duration-300">
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <SectionLabel htmlFor="ai_model_studio">Gemini Model</SectionLabel>
+                      <button
+                        type="button"
+                        onClick={fetchModels}
+                        disabled={isFetchingModels}
+                        className="text-[9px] uppercase tracking-tighter font-bold text-primary hover:text-primary-light transition-colors disabled:opacity-30"
+                      >
+                        {isFetchingModels ? "Pulling..." : "Refresh List"}
+                      </button>
+                    </div>
+                    {availableModels.length > 0 ? (
+                      <SettingSelect
+                        id="ai_model_studio"
+                        value={settings.ai_model}
+                        onChange={(v) => update("ai_model", v)}
+                      >
+                        {!availableModels.includes(settings.ai_model) && (
+                          <option value={settings.ai_model}>{settings.ai_model}</option>
+                        )}
+                        {availableModels.map((m) => (
+                          <option key={m} value={m}>
+                            {m}
+                          </option>
+                        ))}
+                      </SettingSelect>
+                    ) : (
+                      <div className="space-y-1">
+                        <SettingInput
+                          id="ai_model"
+                          value={settings.ai_model}
+                          onChange={(e) => update("ai_model", e.target.value)}
+                          placeholder="e.g. gemini-2.5-flash"
+                        />
+                      </div>
+                    )}
+                    <p className="text-[10px] text-text-muted/50 px-1">
+                      Available models from Google AI Studio.
+                    </p>
+                  </div>
+                  <div className="col-span-2 flex items-center gap-3 p-3 bg-primary/5 rounded-xl border border-primary/10">
+                    <div className="bg-primary/20 p-2 rounded-lg">
+                      <Bot className="h-4 w-4 text-primary" />
+                    </div>
+                    <div>
+                      <p className="text-[11px] font-bold text-primary uppercase tracking-wider">
+                        Google Cloud Native
+                      </p>
+                      <p className="text-[10px] text-text-muted">
+                        Connect directly to Google's model infrastructure via API Key.
+                      </p>
+                    </div>
                   </div>
                 </div>
               )}
@@ -798,8 +873,8 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
                   </div>
                   <div className="space-y-2">
                     <p className="text-[10px] text-text-muted px-1 -mt-2">
-                      Sanitize logs by replacing dynamic variables like IPs or IDs with tokens before
-                      clustering.
+                      Sanitize logs by replacing dynamic variables like IPs or IDs with tokens
+                      before clustering.
                     </p>
 
                     {/* Standard Heuristics Visibility */}
@@ -1191,8 +1266,8 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
               Reset All Settings?
             </DialogTitle>
             <DialogDescription className="text-zinc-400 pt-2">
-              This will revert ALL global settings including AI Provider, Engine Parameters, and Network
-              Ingestion to their factory defaults.
+              This will revert ALL global settings including AI Provider, Engine Parameters, and
+              Network Ingestion to their factory defaults.
               <br />
               <br />
               <span className="text-red-400 font-bold uppercase text-[10px]">

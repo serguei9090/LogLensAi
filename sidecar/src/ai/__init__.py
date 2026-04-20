@@ -43,7 +43,11 @@ Action Details:
             system_prompt = f"{system_prompt}\n\n{a2ui_instructions}"
 
         if provider_name == "ai-studio":
-            return AIStudioProvider(api_key=api_key, system_prompt=system_prompt)
+            return AIStudioProvider(
+                api_key=api_key,
+                system_prompt=system_prompt,
+                model=kwargs.get("model", "gemini-2.5-flash"),
+            )
         elif provider_name == "ollama":
             return OllamaProvider(
                 host=kwargs.get("host", "http://localhost:11434"),
@@ -55,6 +59,7 @@ Action Details:
                 api_key=api_key,
                 system_prompt=system_prompt,
                 host=kwargs.get("host", "https://api.openai.com/v1"),
+                model=kwargs.get("model", "gpt-4o"),
             )
         else:
             return GeminiCLIProvider(
