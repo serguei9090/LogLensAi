@@ -1,9 +1,9 @@
-import type { ReactNode } from "react";
 import type { FilterEntry } from "@/components/molecules/FilterBuilder";
 import type { HighlightEntry } from "@/components/molecules/HighlightBuilder";
 import { LogDistributionWidget } from "@/components/organisms/LogDistributionWidget";
 import { LogToolbar } from "@/components/organisms/LogToolbar";
 import type { LogSource } from "@/store/workspaceStore";
+import type { ReactNode } from "react";
 
 interface InvestigationLayoutProps {
   readonly searchQuery: string;
@@ -31,6 +31,7 @@ interface InvestigationLayoutProps {
   readonly onDistributionClose?: () => void;
   readonly rightPanel?: ReactNode;
   readonly leftPanel?: ReactNode;
+  readonly searchRef?: React.RefObject<HTMLInputElement | null>;
 }
 
 export function InvestigationLayout({
@@ -59,12 +60,14 @@ export function InvestigationLayout({
   onDistributionClose,
   rightPanel,
   leftPanel,
+  searchRef,
 }: InvestigationLayoutProps) {
   const activeSource = sources?.find((s) => s.id === activeSourceId);
 
   return (
     <div className="flex flex-col h-full w-full bg-[#0a0c0b] overflow-hidden">
       <LogToolbar
+        searchRef={searchRef}
         searchQuery={searchQuery}
         onSearch={onSearch}
         onExport={onExport}

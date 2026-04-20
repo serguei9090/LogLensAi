@@ -1441,6 +1441,7 @@ class App:
                     "ai_provider",
                     "ai_api_key",
                     "ai_ollama_host",
+                    "ai_openai_host",
                     "ai_gemini_url",
                     "ai_model",
                     "ai_system_prompt",
@@ -1917,7 +1918,8 @@ def run_http(port=5000, db_path=DEFAULT_DB):
                 allow_credentials=True,
                 expose_headers="*",
                 allow_headers="*",
-            )
+                allow_methods="*",
+            ),
         },
     )
 

@@ -1,5 +1,3 @@
-import { Bookmark, Columns, Cpu, Download, Sparkles, Upload } from "lucide-react";
-import { useState } from "react";
 import { StatusDot } from "@/components/atoms/StatusDot";
 import { TailSwitch } from "@/components/atoms/TailSwitch";
 import { FilterBuilder, type FilterEntry } from "@/components/molecules/FilterBuilder";
@@ -12,6 +10,8 @@ import { useAiStore } from "@/store/aiStore";
 import { useInvestigationStore } from "@/store/investigationStore";
 import { useUIStore } from "@/store/uiStore";
 import type { LogSource } from "@/store/workspaceStore";
+import { Bookmark, Columns, Cpu, Download, Sparkles, Upload } from "lucide-react";
+import { useState } from "react";
 import { SaveTemplateModal } from "./SaveTemplateModal";
 
 interface LogToolbarProps {
@@ -35,6 +35,7 @@ interface LogToolbarProps {
   readonly onRenameSource?: (workspaceId: string, sourceId: string, name: string) => void;
   readonly activeWorkspaceId?: string;
   readonly onExport: () => void;
+  readonly searchRef?: React.RefObject<HTMLInputElement | null>;
 }
 
 export function LogToolbar({
@@ -58,6 +59,7 @@ export function LogToolbar({
   onRenameSource,
   activeWorkspaceId,
   onExport,
+  searchRef,
 }: LogToolbarProps) {
   const { timeRange, setTimeRange } = useInvestigationStore();
   const { isSidebarOpen, setSidebarOpen } = useAiStore();
@@ -137,7 +139,7 @@ export function LogToolbar({
 
       {/* Search */}
       <div className="flex-1 min-w-[180px] max-w-xs">
-        <SearchBar value={searchQuery} onChange={onSearch} />
+        <SearchBar ref={searchRef} value={searchQuery} onChange={onSearch} />
       </div>
 
       {/* Global Time Filter */}

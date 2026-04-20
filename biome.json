@@ -1,16 +1,22 @@
 {
-  "$schema": "https://biomejs.dev/schemas/2.4.6/schema.json",
+  "$schema": "https://biomejs.dev/schemas/1.9.4/schema.json",
   "vcs": {
     "enabled": true,
     "clientKind": "git",
     "useIgnoreFile": true
   },
-  "assist": {
-    "actions": {
-      "source": {
-        "organizeImports": "on"
-      }
-    }
+  "files": {
+    "ignore": [
+      ".vscode/**",
+      ".agents/**",
+      ".git/**",
+      "node_modules/**",
+      "dist/**",
+      "src-tauri/target/**"
+    ]
+  },
+  "organizeImports": {
+    "enabled": true
   },
   "linter": {
     "enabled": true,
@@ -25,8 +31,8 @@
         "useFragmentSyntax": "error"
       },
       "a11y": {
-        "noStaticElementInteractions": "off",
-        "useAriaPropsSupportedByRole": "off"
+        "noHeaderScope": "off",
+        "useAltText": "off"
       }
     }
   },
@@ -36,11 +42,6 @@
     "indentWidth": 2,
     "lineWidth": 100
   },
-  "css": {
-    "parser": {
-      "tailwindDirectives": true
-    }
-  },
   "javascript": {
     "formatter": {
       "quoteStyle": "double"
@@ -48,7 +49,7 @@
   },
   "overrides": [
     {
-      "includes": ["src/styles/globals.css"],
+      "include": ["src/styles/globals.css"],
       "css": {
         "parser": {
           "allowWrongLineComments": true

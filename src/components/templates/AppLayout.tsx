@@ -1,8 +1,8 @@
-import type { ReactNode } from "react";
 import type { NavTab } from "@/App";
 import { type DiagnosticData, DiagnosticSidebar } from "@/components/organisms/DiagnosticSidebar";
 import { Sidebar } from "@/components/organisms/Sidebar";
 import type { Workspace } from "@/store/workspaceStore";
+import type { ReactNode } from "react";
 
 interface AppLayoutProps {
   readonly workspaces: readonly Workspace[];
@@ -20,9 +20,6 @@ interface AppLayoutProps {
   readonly diagnosticLoading: boolean;
 }
 
-import { useEffect } from "react";
-import { useUIStore } from "@/store/uiStore";
-
 export function AppLayout({
   workspaces,
   activeWorkspaceId,
@@ -38,20 +35,6 @@ export function AppLayout({
   diagnosticData,
   diagnosticLoading,
 }: AppLayoutProps) {
-  const { toggleSidebar } = useUIStore();
-
-  // Keyboard shortcut: Ctrl + \
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.ctrlKey && e.key === "\\") {
-        e.preventDefault();
-        toggleSidebar();
-      }
-    };
-    globalThis.addEventListener("keydown", handleKeyDown);
-    return () => globalThis.removeEventListener("keydown", handleKeyDown);
-  }, [toggleSidebar]);
-
   return (
     <div className="flex h-screen w-full bg-[#0a0c0b] overflow-hidden relative font-sans">
       <Sidebar

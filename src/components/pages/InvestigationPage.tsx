@@ -1,5 +1,3 @@
-import { useEffect, useMemo, useState } from "react";
-import { toast } from "sonner";
 import { AIInvestigationSidebar } from "@/components/organisms/AIInvestigationSidebar";
 import { FacetSidebar } from "@/components/organisms/FacetSidebar";
 import { ImportFeedModal } from "@/components/organisms/ImportFeedModal";
@@ -8,11 +6,14 @@ import type { LogEntry } from "@/components/organisms/VirtualLogTable";
 import { VirtualLogTable } from "@/components/organisms/VirtualLogTable";
 import { WorkspaceEngineSettings } from "@/components/organisms/WorkspaceEngineSettings";
 import { InvestigationLayout } from "@/components/templates/InvestigationLayout";
+import { useKeyboardShortcuts } from "@/lib/hooks/useKeyboardShortcuts";
 import { callSidecar } from "@/lib/hooks/useSidecarBridge";
 import { useAiStore } from "@/store/aiStore";
 import { useInvestigationStore } from "@/store/investigationStore";
 import { useSettingsStore } from "@/store/settingsStore";
 import { type LogSource, selectActiveWorkspace, useWorkspaceStore } from "@/store/workspaceStore";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { toast } from "sonner";
 
 // ─── Local helpers ────────────────────────────────────────────────────────────
 
@@ -98,86 +99,67 @@ export function InvestigationPage() {
 
   // Anomalies state
   const [anomalousClusters, setAnomalousClusters] = useState<Set<string>>(new Set());
-  useSettingsStore();
+
+  // Search Bar Ref
+  const searchRef = useRef<HTMLInputElement>(null);
 
   // Memoized non-fusion sources
   const nonFusionSources = useMemo(() => sources.filter((s) => s.type !== "fusion"), [sources]);
 
-  // ── State Synchronization ──────────────────────────────────────────────────
-
-  useEffect(() => {
-    if (activeWorkspaceId) {
-      fetchSettings(activeWorkspaceId);
-    }
-  }, [activeWorkspaceId, fetchSettings]);
-
-  useEffect(() => {
-    syncActiveSource(activeSourceId);
-  }, [activeSourceId, syncActiveSource]);
-
   // ── Log fetching ──────────────────────────────────────────────────────────
 
-  useEffect(() => {
+  const fetchLogs = useCallback(async () => {
     if (!activeWorkspaceId) {
       return;
     }
-
-    const fetchLogs = async () => {
-      try {
-        if (showAnomalies) {
-          const anomRes = await callSidecar<{ anomalies: { cluster_id: string }[] }>({
-            method: "get_anomalies",
-            params: { workspace_id: activeWorkspaceId },
-          });
-          setAnomalousClusters(new Set(anomRes.anomalies.map((a) => a.cluster_id)));
-        } else {
-          setAnomalousClusters(new Set());
-        }
-
-        const activeSrc = sources.find((s) => s.id === activeSourceId);
-        const isFusion = activeSrc?.type === "fusion";
-        const sourceFilter =
-          activeSrc && !isFusion
-            ? [{ field: "source_id", operator: "equals", value: activeSrc.path }]
-            : [];
-        const combinedFilters =
-          filters.length > 0 || sourceFilter.length > 0 ? [...sourceFilter, ...filters] : undefined;
-        const fusionId = isFusion ? activeSrc?.path : undefined;
-
-        const result = await callSidecar<{ logs: LogEntry[]; total: number }>({
-          method: isFusion ? "get_fused_logs" : "get_logs",
-          params: {
-            workspace_id: activeWorkspaceId,
-            ...(fusionId ? { fusion_id: fusionId } : {}),
-            offset: 0,
-            limit: 1000,
-            query: searchQuery || undefined,
-            filters: combinedFilters,
-            sort_by: sortBy,
-            sort_order: sortOrder,
-            start_time: timeRange.start || undefined,
-            end_time: timeRange.end || undefined,
-          },
-        });
-        setLogs(result.logs ?? [], result.total ?? 0);
-
-        // Fetch Facets
-        const facetRes = await callSidecar<Record<string, { value: string; count: number }[]>>({
-          method: "get_metadata_facets",
+    try {
+      if (showAnomalies) {
+        const anomRes = await callSidecar<{ anomalies: { cluster_id: string }[] }>({
+          method: "get_anomalies",
           params: { workspace_id: activeWorkspaceId },
         });
-        setAvailableFacets(facetRes);
-
-        setIsConnected(true);
-      } catch (e) {
-        console.error("Fetch logs/facets failed", e);
-        setIsConnected(false);
+        setAnomalousClusters(new Set(anomRes.anomalies.map((a) => a.cluster_id)));
+      } else {
+        setAnomalousClusters(new Set());
       }
-    };
 
-    fetchLogs();
-    const interval = setInterval(fetchLogs, 2500);
-    return () => clearInterval(interval);
+      const activeSrc = sources.find((s) => s.id === activeSourceId);
+      const isFusion = activeSrc?.type === "fusion";
+      const sourceFilter =
+        activeSrc && !isFusion
+          ? [{ field: "source_id", operator: "equals", value: activeSrc.path }]
+          : [];
+      const combinedFilters =
+        filters.length > 0 || sourceFilter.length > 0 ? [...sourceFilter, ...filters] : undefined;
+      const fusionId = isFusion ? activeSrc?.path : undefined;
+
+      const result = await callSidecar<{ logs: LogEntry[]; total: number }>({
+        method: isFusion ? "get_fused_logs" : "get_logs",
+        params: {
+          workspace_id: activeWorkspaceId,
+          ...(fusionId ? { fusion_id: fusionId } : {}),
+          offset: 0,
+          limit: 1000,
+          query: searchQuery || undefined,
+          filters: combinedFilters,
+          sort_by: sortBy,
+          sort_order: sortOrder,
+          start_time: timeRange.start || undefined,
+          end_time: timeRange.end || undefined,
+        },
+      });
+      setLogs(result.logs ?? [], result.total ?? 0);
+
+      const facetRes = await callSidecar<Record<string, { value: string; count: number }[]>>({
+        method: "get_metadata_facets",
+        params: { workspace_id: activeWorkspaceId },
+      });
+      setAvailableFacets(facetRes);
+      setIsConnected(true);
+    } catch (e) {
+      console.error("Fetch logs/facets failed", e);
+      setIsConnected(false);
+    }
   }, [
     activeWorkspaceId,
     activeSourceId,
@@ -191,6 +173,68 @@ export function InvestigationPage() {
     showAnomalies,
     timeRange,
   ]);
+
+  useEffect(() => {
+    fetchLogs();
+    const interval = setInterval(fetchLogs, 2500);
+    return () => clearInterval(interval);
+  }, [fetchLogs]);
+
+  // ── Event Listeners ────────────────────────────────────────────────────────
+
+  useEffect(() => {
+    const handleRefresh = () => fetchLogs();
+    const handleClear = () => {
+      setSearchQuery("");
+      setFilters([]);
+      setHighlights([]);
+      toast.info("Filters cleared");
+    };
+
+    window.addEventListener("loglens:refresh-logs", handleRefresh);
+    window.addEventListener("loglens:clear-filters", handleClear);
+    return () => {
+      window.removeEventListener("loglens:refresh-logs", handleRefresh);
+      window.removeEventListener("loglens:clear-filters", handleClear);
+    };
+  }, [fetchLogs, setSearchQuery, setFilters, setHighlights]);
+
+  // ── Keyboard Shortcuts ─────────────────────────────────────────────────────
+
+  useKeyboardShortcuts([
+    {
+      key: "f",
+      ctrl: true,
+      description: "Focus Search",
+      handler: () => searchRef.current?.focus(),
+    },
+    {
+      key: "r",
+      description: "Refresh Logs",
+      handler: () => fetchLogs(),
+    },
+    {
+      key: "Escape",
+      description: "Clear Filters",
+      handler: () => {
+        setSearchQuery("");
+        setFilters([]);
+        setHighlights([]);
+      },
+    },
+  ]);
+
+  // ── State Synchronization ──────────────────────────────────────────────────
+
+  useEffect(() => {
+    if (activeWorkspaceId) {
+      fetchSettings(activeWorkspaceId);
+    }
+  }, [activeWorkspaceId, fetchSettings]);
+
+  useEffect(() => {
+    syncActiveSource(activeSourceId);
+  }, [activeSourceId, syncActiveSource]);
 
   const handleSort = (field: string) => {
     setSort(field, sortBy === field && sortOrder === "asc" ? "desc" : "asc");
@@ -510,6 +554,7 @@ export function InvestigationPage() {
   return (
     <>
       <InvestigationLayout
+        searchRef={searchRef}
         searchQuery={searchQuery}
         onSearch={setSearchQuery}
         onExport={handleExport}

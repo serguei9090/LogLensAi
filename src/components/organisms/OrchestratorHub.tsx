@@ -1,13 +1,13 @@
-import { Check, Clock, Cpu, Layers, Settings2, Sparkles, X, Zap } from "lucide-react";
-import { useEffect, useState } from "react";
-import { createPortal } from "react-dom";
-import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { callSidecar } from "@/lib/hooks/useSidecarBridge";
 import { cn } from "@/lib/utils";
 import { useInvestigationStore } from "@/store/investigationStore";
 import type { LogSource } from "@/store/workspaceStore";
+import { Check, Clock, Cpu, Layers, Settings2, Sparkles, X, Zap } from "lucide-react";
+import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
+import { toast } from "sonner";
 import { CustomParserModal } from "./CustomParserModal";
 import { TimeShiftModal } from "./TimeShiftModal";
 

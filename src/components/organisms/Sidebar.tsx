@@ -1,3 +1,9 @@
+import type { NavTab } from "@/App";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { cn } from "@/lib/utils";
+import { useUIStore } from "@/store/uiStore";
+import type { Workspace } from "@/store/workspaceStore";
 import { motion } from "framer-motion";
 import {
   Check,
@@ -13,12 +19,6 @@ import {
   X,
 } from "lucide-react";
 import { useRef, useState } from "react";
-import type { NavTab } from "@/App";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { cn } from "@/lib/utils";
-import { useUIStore } from "@/store/uiStore";
-import type { Workspace } from "@/store/workspaceStore";
 
 interface SidebarProps {
   readonly workspaces: readonly Workspace[];

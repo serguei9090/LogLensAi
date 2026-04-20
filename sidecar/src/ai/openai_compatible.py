@@ -15,13 +15,26 @@ class OpenAICompatibleProvider(AIProvider):
             self._client = AsyncOpenAI(api_key=api_key, base_url=host)
 
     async def list_models(self) -> list[str]:
-        """Fetch available models from the provider."""
+        """Fetch available models from the provider (OpenAI or LM Studio)."""
         if not self._client:
             return ["gpt-4o", "gpt-3.5-turbo"]
         try:
+            # Fetch directly to avoid dependency on OpenAI client internals if possible
+            # or use the client to get the raw response
             res = await self._client.models.list()
-            return [m.id for m in res.data]
-        except Exception:
+            
+            # OpenAI standard: m.id
+            # LM Studio: m.key
+            models = []
+            for m in res.data:
+                if hasattr(m, "id"):
+                    models.append(m.id)
+                elif hasattr(m, "key"):
+                    models.append(m.key)
+            
+            return models if models else ["gpt-4o", "gpt-3.5-turbo"]
+        except Exception as e:
+            print(f"Error fetching models from {self.host}: {e}", file=sys.stderr)
             return ["gpt-4o", "gpt-3.5-turbo"]
 
     async def chat(

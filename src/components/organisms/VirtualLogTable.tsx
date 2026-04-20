@@ -1,4 +1,15 @@
-import { useVirtualizer, type VirtualItem } from "@tanstack/react-virtual";
+import { IconButton } from "@/components/atoms/IconButton";
+import { type LogLevel, LogLevelBadge } from "@/components/atoms/LogLevelBadge";
+import type { FilterEntry } from "@/components/molecules/FilterBuilder";
+import type { HighlightEntry } from "@/components/molecules/HighlightBuilder";
+import { Button } from "@/components/ui/button";
+import { callSidecar } from "@/lib/hooks/useSidecarBridge";
+import { cn } from "@/lib/utils";
+import { useAiStore } from "@/store/aiStore";
+import { useInvestigationStore } from "@/store/investigationStore";
+import { useSettingsStore } from "@/store/settingsStore";
+import { selectActiveWorkspace, useWorkspaceStore } from "@/store/workspaceStore";
+import { type VirtualItem, useVirtualizer } from "@tanstack/react-virtual";
 import {
   ArrowDown,
   ArrowUp,
@@ -13,17 +24,6 @@ import {
 import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { toast } from "sonner";
-import { IconButton } from "@/components/atoms/IconButton";
-import { type LogLevel, LogLevelBadge } from "@/components/atoms/LogLevelBadge";
-import type { FilterEntry } from "@/components/molecules/FilterBuilder";
-import type { HighlightEntry } from "@/components/molecules/HighlightBuilder";
-import { Button } from "@/components/ui/button";
-import { callSidecar } from "@/lib/hooks/useSidecarBridge";
-import { cn } from "@/lib/utils";
-import { useAiStore } from "@/store/aiStore";
-import { useInvestigationStore } from "@/store/investigationStore";
-import { useSettingsStore } from "@/store/settingsStore";
-import { selectActiveWorkspace, useWorkspaceStore } from "@/store/workspaceStore";
 
 export interface LogEntry {
   id: number;

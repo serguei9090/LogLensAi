@@ -1,6 +1,3 @@
-import { Clock, HelpCircle } from "lucide-react";
-import { useEffect, useState } from "react";
-import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -13,6 +10,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
+import { Clock, HelpCircle } from "lucide-react";
+import { useEffect, useState } from "react";
+import { toast } from "sonner";
 
 interface TimeShiftModalProps {
   readonly isOpen: boolean;

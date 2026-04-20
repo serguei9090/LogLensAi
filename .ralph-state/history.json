@@ -15,6 +15,10 @@
     {
       "iteration": 3,
       "note": "Task completed. Refactored frontend and backend for provider-aware AI settings."
+    },
+    {
+      "iteration": 4,
+      "note": "Fixed CORS and addressed model discovery for LM Studio."
     }
   ]
 }

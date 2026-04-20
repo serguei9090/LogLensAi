@@ -1,6 +1,3 @@
-import { Cpu, Info, Layers, Plus, RefreshCcw, Trash2 } from "lucide-react";
-import { useEffect, useState } from "react";
-import { toast } from "sonner";
 import { FacetExtractionSettings } from "@/components/molecules/FacetExtractionSettings";
 import { Button } from "@/components/ui/button";
 import {
@@ -15,6 +12,9 @@ import { Switch } from "@/components/ui/switch";
 import { callSidecar } from "@/lib/hooks/useSidecarBridge";
 import { cn } from "@/lib/utils";
 import { useSettingsStore } from "@/store/settingsStore";
+import { Cpu, Info, Layers, Plus, RefreshCcw, Trash2 } from "lucide-react";
+import { useEffect, useState } from "react";
+import { toast } from "sonner";
 
 interface WorkspaceEngineSettingsProps {
   isOpen: boolean;

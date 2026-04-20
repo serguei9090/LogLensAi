@@ -1,8 +1,8 @@
-import { Activity, AlertTriangle, Lightbulb, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
+import { Activity, AlertTriangle, Lightbulb, X } from "lucide-react";
 
 export interface DiagnosticData {
   summary: string;

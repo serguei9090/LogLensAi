@@ -1,9 +1,9 @@
+import { callSidecar } from "@/lib/hooks/useSidecarBridge";
+import { useWorkspaceStore } from "@/store/workspaceStore";
 import { motion } from "framer-motion";
 import { Activity, AlertCircle, BarChart3, Cpu, Database, Layers, RefreshCcw } from "lucide-react";
 import type React from "react";
 import { useCallback, useEffect, useState } from "react";
-import { callSidecar } from "@/lib/hooks/useSidecarBridge";
-import { useWorkspaceStore } from "@/store/workspaceStore";
 
 interface DashboardStats {
   total_logs: number;

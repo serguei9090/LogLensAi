@@ -1,7 +1,7 @@
-import { Pencil, X } from "lucide-react";
-import { useState } from "react";
 import { cn } from "@/lib/utils";
 import type { LogSource } from "@/store/workspaceStore";
+import { Pencil, X } from "lucide-react";
+import { useState } from "react";
 
 interface WorkspaceTabsProps {
   /** All sources attached to the active workspace */

@@ -1,5 +1,5 @@
-import { create } from "zustand";
 import { callSidecar } from "@/lib/hooks/useSidecarBridge";
+import { create } from "zustand";
 
 export interface AppSettings {
   ai_provider: string;

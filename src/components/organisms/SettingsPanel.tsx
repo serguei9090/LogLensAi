@@ -1,3 +1,19 @@
+import { HelpTooltip } from "@/components/atoms/HelpTooltip";
+import { FacetExtractionSettings } from "@/components/molecules/FacetExtractionSettings";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Switch } from "@/components/ui/switch";
+import { callSidecar } from "@/lib/hooks/useSidecarBridge";
+import { cn } from "@/lib/utils";
+import { type AppSettings, defaultSettings, useSettingsStore } from "@/store/settingsStore";
+import { useWorkspaceStore } from "@/store/workspaceStore";
 import {
   Activity,
   Bot,
@@ -18,22 +34,6 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
-import { HelpTooltip } from "@/components/atoms/HelpTooltip";
-import { FacetExtractionSettings } from "@/components/molecules/FacetExtractionSettings";
-import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Switch } from "@/components/ui/switch";
-import { callSidecar } from "@/lib/hooks/useSidecarBridge";
-import { cn } from "@/lib/utils";
-import { type AppSettings, defaultSettings, useSettingsStore } from "@/store/settingsStore";
-import { useWorkspaceStore } from "@/store/workspaceStore";
 
 type SectionId = "ai" | "drain" | "ingestion" | "general";
 
@@ -367,16 +367,17 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
                     id="ai_provider"
                     value={settings.ai_provider}
                     onChange={(v) => {
-                      update("ai_provider", v);
-                      if (v === "ollama") {
-                        update("ai_model", "gemma4:e2b");
-                      } else if (v === "gemini-cli") {
-                        update("ai_model", "flash");
-                      } else if (v === "openai-compatible") {
-                        update("ai_model", "gpt-4o");
-                      } else if (v === "ai-studio") {
-                        update("ai_model", "gemini-2.5-flash");
-                      }
+                      let newModel = settings.ai_model;
+                      if (v === "ollama") newModel = "gemma4:e2b";
+                      else if (v === "gemini-cli") newModel = "flash";
+                      else if (v === "openai-compatible") newModel = "gpt-4o";
+                      else if (v === "ai-studio") newModel = "gemini-2.5-flash";
+
+                      const updated = { ...settings, ai_provider: v, ai_model: newModel };
+                      setSettings(updated);
+                      onSave(updated);
+                      setSaved(true);
+                      setTimeout(() => setSaved(false), 2000);
                     }}
                   >
                     <option value="gemini-cli">Gemini CLI</option>

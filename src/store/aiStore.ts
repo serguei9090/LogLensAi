@@ -1,5 +1,5 @@
+import { SIDECAR_BASE_URL, callSidecar } from "@/lib/hooks/useSidecarBridge";
 import { create } from "zustand";
-import { callSidecar, SIDECAR_BASE_URL } from "@/lib/hooks/useSidecarBridge";
 
 export interface AiMessage {
   id: number;

@@ -1,6 +1,6 @@
-import { describe, expect, it, vi } from "vitest";
 import { callSidecar } from "@/lib/hooks/useSidecarBridge";
 import { useInvestigationStore } from "@/store/investigationStore";
+import { describe, expect, it, vi } from "vitest";
 
 // Mock fetch for web-mode sidecar calls
 globalThis.fetch = vi.fn();
@@ -15,6 +15,7 @@ describe("Investigation Integration (Headless E2E)", () => {
           timestamp: "2024-04-20 12:00:00",
           level: "ERROR",
           message: "Error 1",
+          cluster_id: "1",
           facets: { ip: "1.1.1.1" },
         },
         {
@@ -22,6 +23,7 @@ describe("Investigation Integration (Headless E2E)", () => {
           timestamp: "2024-04-20 12:05:00",
           level: "INFO",
           message: "Info 1",
+          cluster_id: "2",
           facets: { ip: "2.2.2.2" },
         },
       ],
@@ -49,10 +51,8 @@ describe("Investigation Integration (Headless E2E)", () => {
       }),
     });
 
-    const _store = useInvestigationStore.getState();
-
     // Simulate what InvestigationPage does
-    const result = await callSidecar<typeof mockLogsResponse>({
+    const result = await callSidecar<any>({
       method: "get_logs",
       params: { workspace_id: "ws1" },
     });

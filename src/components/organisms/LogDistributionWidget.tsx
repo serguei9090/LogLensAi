@@ -1,9 +1,9 @@
-import { X } from "lucide-react";
-import { useEffect, useState } from "react";
-import { Bar, BarChart, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import type { FilterEntry } from "@/components/molecules/FilterBuilder";
 import { callSidecar } from "@/lib/hooks/useSidecarBridge";
 import { useInvestigationStore } from "@/store/investigationStore";
+import { X } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Bar, BarChart, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 
 interface Bucket {
   bucket: string;

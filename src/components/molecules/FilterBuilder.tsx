@@ -1,8 +1,8 @@
-import { Filter, Plus, X } from "lucide-react";
-import { useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
+import { Filter, Plus, X } from "lucide-react";
+import { useState } from "react";
 
 export interface FilterEntry {
   id: string;
