@@ -37,6 +37,7 @@ export function FacetSidebar() {
         <div className="flex items-center gap-1">
           {hasFacetFilters && (
             <button
+              type="button"
               onClick={clearFacetFilters}
               className="p-1 hover:bg-[#22C55E10] text-[#4d6057] hover:text-[#22C55E] rounded transition-colors"
               title="Clear Facet Filters"
@@ -45,6 +46,7 @@ export function FacetSidebar() {
             </button>
           )}
           <button
+            type="button"
             onClick={toggleFacetSidebar}
             className="p-1 hover:bg-[#22C55E10] text-[#4d6057] hover:text-[#22C55E] rounded transition-colors"
             title="Collapse Facets"

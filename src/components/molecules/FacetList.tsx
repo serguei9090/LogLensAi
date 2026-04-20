@@ -55,6 +55,7 @@ export function FacetList({ onApplyFilter, className }: FacetListProps) {
       {Object.entries(availableFacets).map(([key, values]) => (
         <div key={key} className="px-2">
           <button
+            type="button"
             onClick={() => toggleKey(key)}
             className="w-full flex items-center gap-2 px-2 py-1.5 hover:bg-[#1E2520] rounded text-[#E8F5EC] transition-colors group"
           >
@@ -86,6 +87,7 @@ export function FacetList({ onApplyFilter, className }: FacetListProps) {
                     return (
                       <button
                         key={v.value}
+                        type="button"
                         onClick={() => handleApplyFilter(key, v.value)}
                         className={cn(
                           "w-full flex items-center justify-between group py-1 px-2 rounded text-[11px] transition-all",

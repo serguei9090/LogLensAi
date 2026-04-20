@@ -1,3 +1,4 @@
+import { FacetExtractionSettings } from "@/components/molecules/FacetExtractionSettings";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -48,29 +49,43 @@ export function WorkspaceEngineSettings({
   // 3. Fetch global settings once for reference
   useEffect(() => {
     if (isOpen) {
+      const safeParse = (raw: string | null) => {
+        if (!raw) {
+          return null;
+        }
+        try {
+          return JSON.parse(raw);
+        } catch (e) {
+          try {
+            const jsonified = raw
+              .replaceAll("'", '"')
+              .replaceAll("True", "true")
+              .replaceAll("False", "false")
+              .replaceAll("None", "null");
+            return JSON.parse(jsonified);
+          } catch {
+            return null;
+          }
+        }
+      };
+
       callSidecar({ method: "get_settings", params: {} }).then((res) => {
-        const settings = res as Record<string, unknown>;
-        if (settings) {
-          // Parse numeric values same as store
+        const remoteSettings = res as Record<string, any>;
+        if (remoteSettings) {
           setGlobalSettings({
-            ...settings,
+            ...remoteSettings,
             drain_similarity_threshold: Number.parseFloat(
-              (settings.drain_similarity_threshold as string) || "0.5",
+              remoteSettings.drain_similarity_threshold || "0.5",
             ),
-            drain_max_children: Number.parseInt((settings.drain_max_children as string) || "100"),
-            drain_max_clusters: Number.parseInt((settings.drain_max_clusters as string) || "1000"),
+            drain_max_children: Number.parseInt(remoteSettings.drain_max_children || "100", 10),
+            drain_max_clusters: Number.parseInt(remoteSettings.drain_max_clusters || "1000", 10),
             drain_masks: (() => {
-              const raw = settings.drain_masks as string;
-              if (!raw) {
-                return [];
-              }
-              try {
-                const parsed = JSON.parse(raw);
-                const final = typeof parsed === "string" ? JSON.parse(parsed) : parsed;
-                return Array.isArray(final) ? final : [];
-              } catch {
-                return [];
-              }
+              const parsed = safeParse(remoteSettings.drain_masks);
+              return Array.isArray(parsed) ? parsed : [];
+            })(),
+            facet_extractions: (() => {
+              const parsed = safeParse(remoteSettings.facet_extractions);
+              return Array.isArray(parsed) ? parsed : [];
             })(),
           });
         }
@@ -91,6 +106,7 @@ export function WorkspaceEngineSettings({
         drain_max_children: localSettings.drain_max_children,
         drain_max_clusters: localSettings.drain_max_clusters,
         drain_masks: localSettings.drain_masks,
+        facet_extractions: localSettings.facet_extractions,
       };
       await updateSettings(overrides, workspaceId);
       toast.success("Workspace overrides saved successfully");
@@ -308,6 +324,14 @@ export function WorkspaceEngineSettings({
                 Add Custom Workspace Mask
               </Button>
             </div>
+          </div>
+
+          <div className="pt-4 border-t border-zinc-800">
+            <FacetExtractionSettings
+              rules={localSettings.facet_extractions || []}
+              onChange={(rules) => update("facet_extractions", rules)}
+              title="Workspace Facet Extraction"
+            />
           </div>
         </div>
 

@@ -8,6 +8,7 @@ export interface AppSettings {
   ai_system_prompt: string;
   ai_gemini_url: string;
   ai_ollama_host: string;
+  ai_openai_host: string;
   drain_similarity_threshold: number;
   drain_max_children: number;
   drain_max_clusters: number;
@@ -22,6 +23,7 @@ export interface AppSettings {
   ingestion_syslog_port: number;
   ingestion_http_enabled: boolean;
   ingestion_http_port: number;
+  facet_extractions: Array<{ name: string; regex: string; group: number; enabled: boolean }>;
 }
 
 export const defaultSettings: AppSettings = {
@@ -32,6 +34,7 @@ export const defaultSettings: AppSettings = {
     "You are LogLens Assistant, a senior DevOps engineer and SRE specializing in root cause analysis.",
   ai_gemini_url: "http://localhost:22436",
   ai_ollama_host: "http://localhost:11434",
+  ai_openai_host: "https://api.openai.com/v1",
   drain_similarity_threshold: 0.5,
   drain_max_children: 100,
   drain_max_clusters: 1000,
@@ -57,6 +60,7 @@ export const defaultSettings: AppSettings = {
   ingestion_syslog_port: 514,
   ingestion_http_enabled: true,
   ingestion_http_port: 5002,
+  facet_extractions: [],
 };
 
 interface SettingsStore {
@@ -75,6 +79,26 @@ export const useSettingsStore = create<SettingsStore>((set) => ({
         params: { workspace_id: workspaceId },
       });
 
+      const safeParse = (raw: string | null) => {
+        if (!raw) {
+          return null;
+        }
+        try {
+          return JSON.parse(raw);
+        } catch (e) {
+          try {
+            const jsonified = raw
+              .replace(/'/g, '"')
+              .replace(/True/g, "true")
+              .replace(/False/g, "false")
+              .replace(/None/g, "null");
+            return JSON.parse(jsonified);
+          } catch {
+            return null;
+          }
+        }
+      };
+
       if (remote) {
         set({
           settings: {
@@ -85,30 +109,23 @@ export const useSettingsStore = create<SettingsStore>((set) => ({
             ),
             drain_max_children: Number.parseInt(remote.drain_max_children || "100", 10),
             drain_max_clusters: Number.parseInt(remote.drain_max_clusters || "1000", 10),
-            mcp_server_enabled: remote.mcp_server_enabled === "true",
-            ai_tool_search: remote.ai_tool_search !== "false", // default true
-            ai_tool_memory: remote.ai_tool_memory !== "false", // default true
+            mcp_server_enabled: remote.mcp_server_enabled?.toLowerCase() === "true",
+            ai_tool_search: remote.ai_tool_search?.toLowerCase() !== "false", // default true
+            ai_tool_memory: remote.ai_tool_memory?.toLowerCase() !== "false", // default true
             drain_template_scope:
               (remote.drain_template_scope as "global" | "workspace") || "global",
             drain_masks: (() => {
-              const raw = remote.drain_masks;
-              if (!raw) {
-                return defaultSettings.drain_masks;
-              }
-              try {
-                const parsed = JSON.parse(raw);
-                // Handle potential double-encoding
-                const final = typeof parsed === "string" ? JSON.parse(parsed) : parsed;
-                return Array.isArray(final) ? final : defaultSettings.drain_masks;
-              } catch (e) {
-                console.warn("Faulty drain_masks in settings:", e);
-                return defaultSettings.drain_masks;
-              }
+              const parsed = safeParse(remote.drain_masks);
+              return Array.isArray(parsed) ? parsed : defaultSettings.drain_masks;
             })(),
-            ingestion_syslog_enabled: remote.ingestion_syslog_enabled !== "false",
+            ingestion_syslog_enabled: remote.ingestion_syslog_enabled?.toLowerCase() !== "false",
             ingestion_syslog_port: Number.parseInt(remote.ingestion_syslog_port || "514", 10),
-            ingestion_http_enabled: remote.ingestion_http_enabled !== "false",
+            ingestion_http_enabled: remote.ingestion_http_enabled?.toLowerCase() !== "false",
             ingestion_http_port: Number.parseInt(remote.ingestion_http_port || "5002", 10),
+            facet_extractions: (() => {
+              const parsed = safeParse(remote.facet_extractions);
+              return Array.isArray(parsed) ? parsed : [];
+            })(),
           },
         });
       }
@@ -133,7 +150,7 @@ export const useSettingsStore = create<SettingsStore>((set) => ({
         // The sidecar expects a dict of settings to update.
         // To be safe and consistent with the existing API, we'll send the updated fields.
         for (const [k, v] of Object.entries(newSettings)) {
-          if (k === "drain_masks") {
+          if (k === "drain_masks" || k === "facet_extractions") {
             payload[k] = JSON.stringify(v);
           } else {
             payload[k] = v as string | number | boolean;

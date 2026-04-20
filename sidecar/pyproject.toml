@@ -17,6 +17,7 @@ dependencies = [
     "google-genai>=1.0.0",
     "google-adk>=2.0.0a2",
     "python-dotenv>=1.2.2",
+    "openai>=2.32.0",
 ]
 requires-python = ">=3.12"
 

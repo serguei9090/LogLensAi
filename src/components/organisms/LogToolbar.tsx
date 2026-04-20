@@ -10,7 +10,7 @@ import { useAiStore } from "@/store/aiStore";
 import { useInvestigationStore } from "@/store/investigationStore";
 import { useUIStore } from "@/store/uiStore";
 import type { LogSource } from "@/store/workspaceStore";
-import { Bookmark, Cpu, PanelLeftClose, PanelLeftOpen, Sparkles, Upload } from "lucide-react";
+import { Bookmark, Columns, Cpu, Sparkles, Upload } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { SaveTemplateModal } from "./SaveTemplateModal";
@@ -71,24 +71,7 @@ export function LogToolbar({
         filters={activeFilters}
         highlights={activeHighlights}
       />
-      {/* Facet Toggle */}
-      <button
-        type="button"
-        onClick={toggleFacetSidebar}
-        className={cn(
-          "p-1.5 rounded-md transition-all shrink-0 border",
-          !facetSidebarCollapsed
-            ? "bg-zinc-800 border-zinc-700 text-zinc-300 hover:text-white"
-            : "bg-emerald-500/10 border-emerald-500/20 text-emerald-400 hover:text-emerald-300 shadow-[0_0_12px_rgba(52,211,153,0.1)]",
-        )}
-        title={facetSidebarCollapsed ? "Show Facets" : "Hide Facets"}
-      >
-        {facetSidebarCollapsed ? (
-          <PanelLeftOpen className="size-4" />
-        ) : (
-          <PanelLeftClose className="size-4" />
-        )}
-      </button>
+
 
       {/* Import button */}
       <button
@@ -108,6 +91,21 @@ export function LogToolbar({
       >
         <Cpu className="size-3.5" />
         Orchestrate
+      </button>
+
+      {/* Facet Toggle */}
+      <button
+        type="button"
+        onClick={toggleFacetSidebar}
+        className={cn(
+          "p-1.5 rounded-md transition-all shrink-0 border",
+          !facetSidebarCollapsed
+            ? "bg-zinc-800 border-zinc-700 text-zinc-300 hover:text-white"
+            : "bg-emerald-500/10 border-emerald-500/20 text-emerald-400 hover:text-emerald-300 shadow-[0_0_12px_rgba(52,211,153,0.1)]",
+        )}
+        title={facetSidebarCollapsed ? "Show Facets" : "Hide Facets"}
+      >
+        <Columns className="size-4" />
       </button>
 
       {/* Divider */}

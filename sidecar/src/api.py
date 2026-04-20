@@ -20,6 +20,7 @@ from metadata_extractor import extract_log_metadata
 from models import (
     CreateLogStreamRequest,
     DeleteLogStreamRequest,
+    GenerateExtractionRegexRequest,
     GetAiMessagesRequest,
     GetAiSessionsRequest,
     GetAnomaliesRequest,
@@ -241,6 +242,7 @@ class App:
                 "get_log_streams": GetLogStreamsRequest,
                 "create_log_stream": CreateLogStreamRequest,
                 "delete_log_stream": DeleteLogStreamRequest,
+                "generate_facet_regex": GenerateExtractionRegexRequest,
             }
 
             handler = getattr(self, method_name)
@@ -772,14 +774,16 @@ class App:
         with open(abs_path, encoding="utf-8", errors="replace") as f:
             return f.read()
 
-    def _ingest_single_log(self, cursor: Any, log: dict) -> list[Any]:
+    def _ingest_single_log(self, cursor: Any, log: dict, custom_rules: list = None) -> list[Any]:
         """Extracts clustering logic into a reusable helper"""
         workspace_id = log.get("workspace_id")
         source_id = log.get("source_id", "manual")
         raw_text = log.get("raw_text", "")
 
         # 1. Advanced Metadata Extraction (Shared Logic)
-        metadata = extract_log_metadata(workspace_id, source_id, raw_text)
+        metadata = extract_log_metadata(
+            workspace_id, source_id, raw_text, custom_rules=custom_rules
+        )
 
         # Override metadata with provided values if they explicitly exist (important for manual ingest)
         timestamp = log.get("timestamp") or metadata["timestamp"]
@@ -830,8 +834,40 @@ class App:
         # Map logs to dict if they are models
         log_dicts = [log.model_dump() if hasattr(log, "model_dump") else log for log in logs]
 
+        # Optimization: Fetch and cache rules for all involved workspaces
+        rules_cache = {}
+
+        # Get global rules once
+        global_rules = []
+        cursor.execute("SELECT value FROM settings WHERE key = 'facet_extractions'")
+        gr = cursor.fetchone()
+        if gr and gr[0]:
+            try:
+                parsed = json.loads(gr[0])
+                global_rules = parsed if isinstance(parsed, list) else []
+            except Exception:
+                pass
+
         for log in log_dicts:
-            batch_data.append(self._ingest_single_log(cursor, log))
+            ws_id = log.get("workspace_id")
+            if ws_id not in rules_cache:
+                ws_rules = []
+                cursor.execute(
+                    "SELECT value FROM workspace_settings WHERE workspace_id = ? AND key = 'facet_extractions'",
+                    (ws_id,),
+                )
+                wr = cursor.fetchone()
+                if wr and wr[0]:
+                    try:
+                        parsed = json.loads(wr[0])
+                        ws_rules = parsed if isinstance(parsed, list) else []
+                    except Exception:
+                        pass
+                rules_cache[ws_id] = global_rules + ws_rules
+
+            batch_data.append(
+                self._ingest_single_log(cursor, log, custom_rules=rules_cache.get(ws_id))
+            )
 
         if batch_data:
             cursor.executemany(
@@ -846,17 +882,48 @@ class App:
         """Return the top unique metadata facets across all logs in a workspace."""
         cursor = self.db.get_cursor()
 
-        # Define priority facets to extract
+        # 1. Define priority/standard facets
         keys = ["ip", "uuid", "user_id", "host", "thread", "logger", "status", "method"]
+
+        # 2. Add custom facet names from settings
+        # Fetch global rules
+        cursor.execute("SELECT value FROM settings WHERE key = 'facet_extractions'")
+        gr = cursor.fetchone()
+        if gr and gr[0]:
+            try:
+                rules = json.loads(gr[0])
+                for r in rules if isinstance(rules, list) else []:
+                    name = r.get("name")
+                    if name and name not in keys:
+                        keys.append(name)
+            except Exception:
+                pass
+
+        # Fetch workspace rules
+        cursor.execute(
+            "SELECT value FROM workspace_settings WHERE workspace_id = ? AND key = 'facet_extractions'",
+            (workspace_id,),
+        )
+        wr = cursor.fetchone()
+        if wr and wr[0]:
+            try:
+                rules = json.loads(wr[0])
+                for r in rules if isinstance(rules, list) else []:
+                    name = r.get("name")
+                    if name and name not in keys:
+                        keys.append(name)
+            except Exception:
+                pass
+
         results = {}
 
         for key in keys:
             # Efficiently query top 10 unique values for each facet key if they exist
-            # Note: Using json_extract_string for better compatibility with column type JSON
+            # Note: Using json_extract_string with double-quoted keys for special char safety ($."key")
             query = f"""
-                SELECT json_extract_string(facets, '$.{key}') as val, count(*) as count
+                SELECT json_extract_string(facets, '$."{key}"') as val, count(*) as count
                 FROM logs
-                WHERE workspace_id = ? AND json_extract_string(facets, '$.{key}') IS NOT NULL
+                WHERE workspace_id = ? AND json_extract_string(facets, '$."{key}"') IS NOT NULL
                 GROUP BY val
                 ORDER BY count DESC
                 LIMIT 10
@@ -1277,7 +1344,9 @@ class App:
                 "ON CONFLICT (workspace_id, key) DO UPDATE SET value = excluded.value"
             )
             for k, v in settings.items():
-                cursor.execute(query, (workspace_id, k, str(v)))
+                # Use json.dumps for complex values (lists/dicts) to ensure valid JSON in DB
+                val_to_save = json.dumps(v) if isinstance(v, (list, dict)) else str(v)
+                cursor.execute(query, (workspace_id, k, val_to_save))
         else:
             # Re-initialize AI Provider if relevant global settings changed
             if any(
@@ -1304,7 +1373,9 @@ class App:
                 "ON CONFLICT (key) DO UPDATE SET value = excluded.value"
             )
             for k, v in settings.items():
-                cursor.execute(query, (k, str(v)))
+                # Use json.dumps for complex values (lists/dicts) to ensure valid JSON in DB
+                val_to_save = json.dumps(v) if isinstance(v, (list, dict)) else str(v)
+                cursor.execute(query, (k, val_to_save))
 
         # Re-initialize AI Provider if relevant settings changed (Global-only for now)
         if not workspace_id and any(
@@ -1313,6 +1384,7 @@ class App:
                 "ai_provider",
                 "ai_api_key",
                 "ai_ollama_host",
+                "ai_openai_host",
                 "ai_gemini_url",
                 "ai_model",
                 "ai_system_prompt",
@@ -1320,11 +1392,14 @@ class App:
         ):
             current_settings = self.method_get_settings()
             provider = current_settings.get("ai_provider", "ollama")
-            host = (
-                current_settings.get("ai_gemini_url", "http://localhost:22436")
-                if provider == "gemini-cli"
-                else current_settings.get("ai_ollama_host", "http://localhost:11434")
-            )
+            
+            # Map the correct host based on the provider
+            if provider == "gemini-cli":
+                host = current_settings.get("ai_gemini_url", "http://localhost:22436")
+            elif provider == "openai-compatible" or provider == "openai":
+                host = current_settings.get("ai_openai_host", "https://api.openai.com/v1")
+            else:
+                host = current_settings.get("ai_ollama_host", "http://localhost:11434")
 
             self.ai = AIProviderFactory.get_provider(
                 provider,
@@ -1399,7 +1474,7 @@ class App:
             )
         return self._parsers[key]
 
-    def method_reset_drain_templates(self, workspace_id: str = None) -> dict:
+    def method_reset_templates(self, workspace_id: str = None) -> dict:
         """Deletes the persistence state for the given workspace or global scope."""
         settings = self.method_get_settings()
         scope = settings.get("drain_template_scope", "global")
@@ -1633,6 +1708,51 @@ class App:
             await response.write(f"data: {json.dumps({'error': str(e)})}\n\n".encode())
             return response
 
+    async def method_generate_facet_regex(
+        self, log_line: str, selected_text: str, workspace_id: str = None
+    ) -> dict:
+        """Uses AI to generate a regex pattern for extracting a selected value from a log line."""
+        prompt = (
+            f"Given the log line: '{log_line}'\n"
+            f"Generate a robust Python regex that extracts the exact substring: '{selected_text}'.\n"
+            "The regex MUST have exactly one capturing group (e.g. (...) ) for the extraction.\n"
+            "Avoid overly greedy matches. Be specific to the surrounding anchor characters if possible.\n"
+            "Return ONLY the raw regex string, no markdown, no explanation, no backticks."
+        )
+
+        try:
+            import re
+
+            from ai import AIChatMessage
+
+            messages = [AIChatMessage(role="user", content=prompt)]
+            # We use the current AI provider
+            response = await self.ai.chat(messages)
+            regex = response.content.strip().strip("`").strip()
+
+            # Remove potential 'python' or 'regex' labels if AI used markdown
+            if regex.startswith("python"):
+                regex = regex[6:].strip()
+            if regex.startswith("regex"):
+                regex = regex[5:].strip()
+
+            # Basic validation
+            try:
+                re.compile(regex)
+                # Verify it has at least one capturing group
+                if "(" not in regex or ")" not in regex:
+                    regex = f"({re.escape(selected_text)})"
+            except Exception:
+                # Fallback to literal if AI fails to produce a valid regex
+                regex = f"({re.escape(selected_text)})"
+
+            return {"regex": regex}
+        except Exception as e:
+            logger.error("Failed to generate regex with AI: %s", e)
+            import re
+
+            return {"regex": f"({re.escape(selected_text)})"}
+
     def method_get_health(self) -> dict:
         """Fetch sidecar internal health and status metrics."""
         cursor = self.db.get_cursor()
@@ -1661,7 +1781,11 @@ class App:
         }
 
 
-def on_cleanup(_app):
+async def on_cleanup(server_app):
+    """Lifecycle hook to clean up background workers when aiohttp stops."""
+    app = server_app.get("sidecar_app")
+    if app:
+        app.stop()
     LogDatabase.reset()
 
 
@@ -1690,6 +1814,7 @@ def run_http(port=5000, db_path=DEFAULT_DB):
     stream_route = stream_resource.add_route("POST", app.aiohttp_stream_chat)
     cors.add(stream_route)
 
+    server["sidecar_app"] = app
     server.on_cleanup.append(on_cleanup)
     web.run_app(server, host="127.0.0.1", port=port)
 

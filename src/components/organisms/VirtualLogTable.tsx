@@ -3,12 +3,15 @@ import { type LogLevel, LogLevelBadge } from "@/components/atoms/LogLevelBadge";
 import type { FilterEntry } from "@/components/molecules/FilterBuilder";
 import type { HighlightEntry } from "@/components/molecules/HighlightBuilder";
 import { Button } from "@/components/ui/button";
+import { callSidecar } from "@/lib/hooks/useSidecarBridge";
 import { cn } from "@/lib/utils";
 import { useAiStore } from "@/store/aiStore";
 import { useInvestigationStore } from "@/store/investigationStore";
+import { useSettingsStore } from "@/store/settingsStore";
 import { selectActiveWorkspace, useWorkspaceStore } from "@/store/workspaceStore";
 import { type VirtualItem, useVirtualizer } from "@tanstack/react-virtual";
 import {
+  Activity,
   ArrowDown,
   ArrowUp,
   ArrowUpDown,
@@ -65,6 +68,7 @@ export function VirtualLogTable({
     x: number;
     y: number;
     field: string;
+    logText: string;
   } | null>(null);
   const [lastSelectedId, setLastSelectedId] = useState<number | null>(null);
 
@@ -124,6 +128,7 @@ export function VirtualLogTable({
       x: rect.left + rect.width / 2,
       y: rect.bottom + globalThis.scrollY + 10,
       field,
+      logText: selection.anchorNode?.parentElement?.innerText || "",
     });
   }, []);
 
@@ -167,6 +172,75 @@ export function VirtualLogTable({
     setSelectionInfo(null);
     globalThis.getSelection()?.removeAllRanges();
     toast.success(`Filter added: ${selectionInfo.field} ${operator} "${selectionInfo.text}"`);
+  };
+
+  const handleAddFacet = async (useAi: boolean) => {
+    if (!selectionInfo) {
+      return;
+    }
+
+    const { settings, updateSettings } = useSettingsStore.getState();
+    let regex = "";
+
+    if (useAi) {
+      toast.promise(
+        async () => {
+          const res = await callSidecar<{ regex: string }>({
+            method: "generate_facet_regex",
+            params: {
+              log_line: selectionInfo.logText,
+              selected_text: selectionInfo.text,
+            },
+          });
+          regex = res.regex;
+
+          const currentFacets = settings.facet_extractions || [];
+          await updateSettings(
+            {
+              facet_extractions: [
+                ...currentFacets,
+                {
+                  name: `AI: ${selectionInfo.text.slice(0, 8)}`,
+                  regex,
+                  group: 1,
+                  enabled: true,
+                },
+              ],
+            },
+            activeWorkspace?.id,
+          );
+        },
+        {
+          loading: "AI is generating extraction pattern...",
+          success: "AI Facet extraction created!",
+          error: "Failed to generate regex with AI.",
+        },
+      );
+    } else {
+      // Escape special regex characters for a literal match
+      const escaped = selectionInfo.text.replace(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`);
+      regex = `(${escaped})`;
+
+      const currentFacets = settings.facet_extractions || [];
+      await updateSettings(
+        {
+          facet_extractions: [
+            ...currentFacets,
+            {
+              name: `Ex: ${selectionInfo.text.slice(0, 10)}${selectionInfo.text.length > 10 ? "..." : ""}`,
+              regex,
+              group: 1,
+              enabled: true,
+            },
+          ],
+        },
+        activeWorkspace?.id,
+      );
+      toast.success(`Literal facet extraction added for "${selectionInfo.text}"`);
+    }
+
+    setSelectionInfo(null);
+    globalThis.getSelection()?.removeAllRanges();
   };
 
   const rowVirtualizer = useVirtualizer({
@@ -478,6 +552,15 @@ export function VirtualLogTable({
               className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-full bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-colors cursor-pointer"
             >
               <Minus className="size-3" /> Exclude
+            </button>
+            <div className="w-px h-4 bg-white/10" />
+            <button
+              type="button"
+              onClick={() => handleAddFacet(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-full bg-amber-500/10 text-amber-400 hover:bg-amber-500/20 transition-colors cursor-pointer"
+              title="Use AI to generate a smart extraction regex"
+            >
+              <Sparkles className="size-3" /> AI Facet
             </button>
             <div className="w-px h-4 bg-white/10" />
             <button

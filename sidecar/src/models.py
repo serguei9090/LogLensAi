@@ -3,6 +3,14 @@ from typing import Any
 from pydantic import BaseModel
 
 
+# --- Configuration Models ---
+class FacetExtractionRule(BaseModel):
+    name: str
+    regex: str
+    group: int = 1
+    enabled: bool = True
+
+
 # RPC Base Models
 class JSONRPCRequest(BaseModel):
     jsonrpc: str = "2.0"
@@ -208,3 +216,9 @@ class CreateLogStreamRequest(BaseModel):
 
 class DeleteLogStreamRequest(BaseModel):
     id: int
+
+
+class GenerateExtractionRegexRequest(BaseModel):
+    log_line: str
+    selected_text: str
+    workspace_id: str | None = None

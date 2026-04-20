@@ -115,6 +115,9 @@
   - **Detail**: `docs/TODOC/FIX-D3-001.md`
 - [x] **STABILITY-001**: [FIX-STABILITY-001](i:/01-Master_Code/Apps/LogLensAi/docs/TODOC/FIX-STABILITY-001.md) - Global IDE Resolution (DONE)
   - **Files**: `src/components/atoms/A2UIRenderer.tsx`, `src/components/organisms/AIInvestigationSidebar.tsx`, `src/components/organisms/WorkspaceEngineSettings.tsx`
+- [x] **FIX-UX-007**: AI Provider Polish & Dependency Alignment (DONE)
+  - **Files**: `sidecar/pyproject.toml`, `src/components/organisms/SettingsPanel.tsx`
+  - **Detail**: `docs/TODOC/FIX-UX-007.md`
 
 ---
 
@@ -146,6 +149,8 @@
 - [x] **ipc_002**: Type-Sync Auto-Generator (Pydantic to TypeScript pipeline)
 - [x] **ingestion_001**: Configurable Ingestion Listeners (Enable/Disable/Ports)
   - **Detail**: `docs/TODOC/ingestion_001.md`
+- [x] **FACET-001**: Custom Regex Facet Extraction (Global & Workspace Rules)
+  - **Detail**: `docs/TODOC/FACET-001.md`
 - [ ] **ui_004**: Native File Picker & Search Molecules
  
 ## 🔵 Sprint 07 — Advanced UX & Intelligence (Active)

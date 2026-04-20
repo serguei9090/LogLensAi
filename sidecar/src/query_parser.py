@@ -41,11 +41,11 @@ class FieldNode(Node):
         else:
             # Fallback to facets
             if self.operator in (":", ":="):
-                return f"json_extract_string(l.facets, '$.{self.field}') = ?", [self.value]
+                return f"json_extract_string(l.facets, '$.\"{self.field}\"') = ?", [self.value]
             elif self.operator == ":!=":
-                return f"json_extract_string(l.facets, '$.{self.field}') != ?", [self.value]
+                return f"json_extract_string(l.facets, '$.\"{self.field}\"') != ?", [self.value]
             elif self.operator == ":~":
-                return f"json_extract_string(l.facets, '$.{self.field}') ILIKE ?", [
+                return f"json_extract_string(l.facets, '$.\"{self.field}\"') ILIKE ?", [
                     f"%{self.value}%"
                 ]
 
@@ -98,7 +98,7 @@ class LLQLParser:
 
     def _tokenize(self, query):
         token_spec = [
-            ("FIELD", r'[a-zA-Z_][a-zA-Z0-9_]*:(?:=|!=|~)?(?:"[^"]*"|[^()\s]+)'),
+            ("FIELD", r'[a-zA-Z_][a-zA-Z0-9_\.]*:(?:=|!=|~)?(?:"[^"]*"|[^()\s]+)'),
             ("SEARCH", r'search\s+"[^"]*"|search\s+[^()\s]+'),
             ("STRING", r'"[^"]*"'),
             ("AND", r"\bAND\b"),

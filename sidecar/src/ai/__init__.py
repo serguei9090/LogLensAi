@@ -2,6 +2,7 @@ from .ai_studio import AIStudioProvider
 from .base import AIChatMessage, AIProvider
 from .gemini_cli import GeminiCLIProvider
 from .ollama import OllamaProvider
+from .openai_compatible import OpenAICompatibleProvider
 
 __all__ = [
     "AIChatMessage",
@@ -9,6 +10,7 @@ __all__ = [
     "AIStudioProvider",
     "GeminiCLIProvider",
     "OllamaProvider",
+    "OpenAICompatibleProvider",
     "AIProviderFactory",
 ]
 
@@ -47,6 +49,12 @@ Action Details:
                 host=kwargs.get("host", "http://localhost:11434"),
                 system_prompt=system_prompt,
                 model=kwargs.get("model", "gemma4:e2b"),
+            )
+        elif provider_name == "openai-compatible" or provider_name == "openai":
+            return OpenAICompatibleProvider(
+                api_key=api_key,
+                system_prompt=system_prompt,
+                host=kwargs.get("host", "https://api.openai.com/v1"),
             )
         else:
             return GeminiCLIProvider(

@@ -246,7 +246,13 @@ class IngestionServer:
             self._http_loop.run_until_complete(site.start())
             self._http_runner = runner
         except Exception as e:
-            logger.error("Failed to start TCPSite on %s: %s", self.http_port, e)
+            if "10048" in str(e) or "EADDRINUSE" in str(e):
+                logger.error(
+                    "Failed to start HTTP Ingestion on %s: Port in use. A zombie process may be running.",
+                    self.http_port,
+                )
+            else:
+                logger.error("Failed to start TCPSite on %s: %s", self.http_port, e)
             self._http_loop.run_until_complete(runner.cleanup())
             return
 

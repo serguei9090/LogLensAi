@@ -86,10 +86,14 @@ When an AI subagent refactors logic or alters a component path, it is **strictly
 - Maintain consistent visual severity mappings across UI (e.g. strict hex colors for Info vs Error boundaries in logs/toasts).
 
 ## 8. LogLensAi Core Guardrails (@jules mandated)
-- **RPC Contract Integrity**: Every JSON-RPC method added to `api.py` MUST have a corresponding `BaseModel` request class defined. Failing this triggers a `NameError`.
+- **RPC Contract Integrity**: Every JSON-RPC method added to `api.py` MUST have a corresponding `BaseModel` request class defined and **explicitly imported** in `api.py`. Failing this triggers a fatal `NameError`.
+- **Atomic Reference Integrity**: When injecting new Store, Hook, or Utility logic into a component/module, the agent MUST immediately verify that the target file has the correct import statement.
+- **Mandatory Health Verification**: After any significant edit to `src/` (Frontend) or `sidecar/` (Backend), the agent MUST run the following checks before finishing the turn:
+  - **Backend**: `uv run ruff check sidecar/src/api.py`
+  - **Frontend**: `bunx biome check src/components/...`
 - **UI State Verification**: When styling stateful components (Switch, Checkbox, Tabs), verify the `data-` attributes in the underlying `ui/` component implementation. (e.g., Base-UI uses `data-[checked]` not Radix's `data-[state=checked]`).
 - **Bridge Protocol**: All React-to-Sidecar communication MUST use the `callSidecar` bridge. Direct `invoke` calls to the sidecar are strictly forbidden to ensure consistent error handling and dev/prod parity.
 - **DuckDB Thread Safety**: Always use `self.db.get_cursor()` within sidecar methods. Sharing cursors across async calls will cause database corruption.
 - **Serialization Safety**: JSON-RPC methods in the sidecar MUST NEVER return native Python `datetime` objects. All timestamps and dates must be explicitly stringified (e.g., `str(dt)`) before returning to the `aiohttp` handler to prevent JSON serialization `TypeErrors`.
 - **Hydration & DOM Nesting**: Interactive elements (Buttons, Anchors, etc.) MUST NEVER be nested within each other. In lists or sidebars, use `div` with `role="button"` and `tabIndex` for the outer container to permit inner interactive buttons without violating React hydration rules.
-- **Providier Lifecycle Parity**: When updating settings that affect backend state (e.g., `ai_model`, `ai_provider`), the `App` constructor or update handler MUST explicitly re-initialize the corresponding provider to reflect the new user preference immediately.
+- **Provider Lifecycle Parity**: When updating settings that affect backend state (e.g., `ai_model`, `ai_provider`), the `App` constructor or update handler MUST explicitly re-initialize the corresponding provider to reflect the new user preference immediately.

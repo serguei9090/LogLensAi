@@ -1,4 +1,14 @@
 import { HelpTooltip } from "@/components/atoms/HelpTooltip";
+import { FacetExtractionSettings } from "@/components/molecules/FacetExtractionSettings";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Switch } from "@/components/ui/switch";
 import { callSidecar } from "@/lib/hooks/useSidecarBridge";
 import { cn } from "@/lib/utils";
@@ -16,13 +26,15 @@ import {
   Palette,
   Plus,
   RefreshCcw,
+  RotateCcw,
   Terminal,
   Trash2,
   X,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { toast } from "sonner";
 
-import { type AppSettings, defaultSettings } from "@/store/settingsStore";
+import { type AppSettings, defaultSettings, useSettingsStore } from "@/store/settingsStore";
 
 type SectionId = "ai" | "drain" | "ingestion" | "general";
 
@@ -91,15 +103,14 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
   const [settings, setSettings] = useState<AppSettings>(defaultSettings);
   const [activeSection, setActiveSection] = useState<SectionId>("ai");
   const [saved, setSaved] = useState(false);
-  const [availableModels, setAvailableModels] = useState<string[]>([
-    "gemma4:e2b",
-    "llama3",
-    "mistral",
-  ]);
+  const [availableModels, setAvailableModels] = useState<string[]>([]);
+  const [isFetchingModels, setIsFetchingModels] = useState(false);
 
   const [isToolsExpanded, setIsToolsExpanded] = useState(false);
   const [isSkillModalOpen, setIsSkillModalOpen] = useState(false);
+  const [isResetPatternsModalOpen, setIsResetPatternsModalOpen] = useState(false);
   const { activeWorkspaceId } = useWorkspaceStore();
+  const { updateSettings } = useSettingsStore();
 
   const update = <K extends keyof AppSettings>(key: K, value: AppSettings[K], immediate = true) => {
     const newSettings = { ...settings, [key]: value };
@@ -112,21 +123,113 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
     }
   };
 
-  const handleResetTemplates = async () => {
+  const [isResetModalOpen, setIsResetModalOpen] = useState(false);
+
+  const handleResetAll = async () => {
+    try {
+      // Use the store's updateSettings to ensure complex types (masks, facets)
+      // are stringified correctly before sending to the sidecar.
+      await updateSettings(defaultSettings);
+
+      toast.success("Settings reset to defaults successfully");
+
+      // Delay reload slightly to let toast be seen and DB to commit
+      globalThis.setTimeout(() => globalThis.location.reload(), 1000);
+    } catch (error) {
+      console.error("Failed to reset all settings:", error);
+      toast.error("Failed to reset settings");
+    }
+  };
+
+  const handleResetPatterns = async () => {
     try {
       await callSidecar({
-        method: "reset_drain_templates",
-        params: { workspace_id: activeWorkspaceId },
+        method: "reset_templates",
+        params: {
+          workspace_id: settings.drain_template_scope === "global" ? undefined : activeWorkspaceId,
+        },
       });
-      setSaved(true);
-      setTimeout(() => setSaved(false), 2000);
+      toast.success("Pattern cache cleared successfully");
+      setIsResetPatternsModalOpen(false);
     } catch (error) {
-      console.error("Failed to reset templates:", error);
+      console.error("Failed to reset patterns:", error);
+      toast.error("Failed to reset patterns");
     }
+  };
+
+  const handleResetMasks = () => {
+    update("drain_masks", defaultSettings.drain_masks);
+    toast.success("Variable masking reset to standard heuristics");
   };
 
   // Load settings on mount
   useEffect(() => {
+    const safeParse = (raw: string | null) => {
+      if (!raw) {
+        return null;
+      }
+      try {
+        // Try standard JSON first
+        return JSON.parse(raw);
+      } catch (e) {
+        // Fallback for Python repr strings (single quotes, True/False/None)
+        try {
+          const jsonified = raw
+            .replaceAll("'", '"')
+            .replaceAll("True", "true")
+            .replaceAll("False", "false")
+            .replaceAll("None", "null");
+          return JSON.parse(jsonified);
+        } catch {
+          return null;
+        }
+      }
+    };
+
+    const parseRemote = (
+      remoteSettings: Record<string, string>,
+      prev: AppSettings,
+    ): AppSettings => {
+      const next = {
+        ...prev,
+        ...remoteSettings,
+        drain_similarity_threshold: Number.parseFloat(
+          remoteSettings.drain_similarity_threshold || "0.4",
+        ),
+        drain_max_children: Number.parseInt(remoteSettings.drain_max_children || "100", 10),
+        drain_max_clusters: Number.parseInt(remoteSettings.drain_max_clusters || "1000", 10),
+        mcp_server_enabled: remoteSettings.mcp_server_enabled?.toLowerCase() === "true",
+        ai_tool_search: remoteSettings.ai_tool_search?.toLowerCase() !== "false",
+        ai_tool_memory: remoteSettings.ai_tool_memory?.toLowerCase() !== "false",
+        ingestion_syslog_enabled:
+          remoteSettings.ingestion_syslog_enabled?.toLowerCase() !== "false",
+        ingestion_syslog_port: Number.parseInt(remoteSettings.ingestion_syslog_port || "514", 10),
+        ingestion_http_enabled: remoteSettings.ingestion_http_enabled?.toLowerCase() !== "false",
+        ingestion_http_port: Number.parseInt(remoteSettings.ingestion_http_port || "5002", 10),
+        drain_masks: (() => {
+          const parsed = safeParse(remoteSettings.drain_masks);
+          return Array.isArray(parsed) ? parsed : defaultSettings.drain_masks;
+        })(),
+        facet_extractions: (() => {
+          const parsed = safeParse(remoteSettings.facet_extractions);
+          return Array.isArray(parsed) ? parsed : [];
+        })(),
+      };
+
+      if (Array.isArray(next.drain_masks)) {
+        next.drain_masks = next.drain_masks.filter((m) => m.label.trim() || m.pattern.trim());
+        if (next.drain_masks.length === 0) {
+          next.drain_masks = defaultSettings.drain_masks;
+        }
+      }
+      if (Array.isArray(next.facet_extractions)) {
+        next.facet_extractions = next.facet_extractions.filter(
+          (f) => f.name.trim() || f.regex.trim(),
+        );
+      }
+      return next;
+    };
+
     const loadSettings = async () => {
       try {
         const remoteSettings = await callSidecar<Record<string, string>>({
@@ -134,26 +237,7 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
           params: {},
         });
         if (remoteSettings) {
-          setSettings((prev) => ({
-            ...prev,
-            ...remoteSettings,
-            // Cast numeric/boolean strings back to proper types
-            drain_similarity_threshold: Number.parseFloat(
-              remoteSettings.drain_similarity_threshold || "0.4",
-            ),
-            drain_max_children: Number.parseInt(remoteSettings.drain_max_children || "100", 10),
-            drain_max_clusters: Number.parseInt(remoteSettings.drain_max_clusters || "1000", 10),
-            mcp_server_enabled: remoteSettings.mcp_server_enabled === "true",
-            ai_tool_search: remoteSettings.ai_tool_search !== "false",
-            ai_tool_memory: remoteSettings.ai_tool_memory !== "false",
-            ingestion_syslog_enabled: remoteSettings.ingestion_syslog_enabled !== "false",
-            ingestion_syslog_port: Number.parseInt(
-              remoteSettings.ingestion_syslog_port || "514",
-              10,
-            ),
-            ingestion_http_enabled: remoteSettings.ingestion_http_enabled !== "false",
-            ingestion_http_port: Number.parseInt(remoteSettings.ingestion_http_port || "5002", 10),
-          }));
+          setSettings((prev) => parseRemote(remoteSettings, prev));
         }
       } catch (error) {
         console.error("Failed to load settings:", error);
@@ -162,21 +246,26 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
     loadSettings();
   }, []);
 
-  useEffect(() => {
-    const fetchModels = async () => {
-      try {
-        const models = await callSidecar<string[]>({ method: "list_ai_models", params: {} });
-        if (models && models.length > 0) {
-          setAvailableModels(models);
-        }
-      } catch (e) {
-        console.error("Failed to fetch ai models:", e);
+  const fetchModels = useCallback(async () => {
+    setIsFetchingModels(true);
+    try {
+      const models = await callSidecar<string[]>({ method: "list_ai_models", params: {} });
+      if (models && Array.isArray(models)) {
+        setAvailableModels(models);
       }
-    };
-    if (settings.ai_provider === "ollama") {
+    } catch (e) {
+      console.error("Failed to fetch ai models:", e);
+    } finally {
+      setIsFetchingModels(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    // Trigger model pull when provider or connectivity settings change
+    if (settings.ai_provider === "ollama" || settings.ai_provider === "openai-compatible") {
       fetchModels();
     }
-  }, [settings.ai_provider]);
+  }, [fetchModels, settings.ai_provider, settings.ai_ollama_host, settings.ai_openai_host, settings.ai_api_key]);
 
   // Removed handleSave in favor of auto-save via update()
 
@@ -221,7 +310,7 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
           ))}
         </nav>
 
-        <div className="mt-auto pt-6 flex flex-col gap-2">
+        <div className="mt-auto pt-6 flex flex-col gap-4">
           <div
             className={cn(
               "flex items-center gap-2 px-4 py-2 rounded-xl text-[10px] font-bold uppercase tracking-wider transition-all duration-500",
@@ -242,10 +331,17 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
               </>
             )}
           </div>
+
+          <button
+            type="button"
+            onClick={() => setIsResetModalOpen(true)}
+            className="flex items-center gap-2 px-4 py-3 text-text-muted hover:text-red-400 hover:bg-red-500/5 rounded-2xl text-[11px] font-bold uppercase transition-all border border-transparent hover:border-red-500/10 group"
+          >
+            <Trash2 className="size-4 shrink-0 opacity-50 group-hover:opacity-100" />
+            Reset to Defaults
+          </button>
         </div>
       </aside>
-
-      {/* Main Content Area */}
       <main className="flex-1 overflow-auto bg-bg-base/50 relative">
         <div className="max-w-3xl mx-auto px-12 py-12 space-y-12">
           {/* AI Intelligence Section */}
@@ -270,13 +366,15 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
                         update("ai_model", "gemma4:e2b");
                       } else if (v === "gemini-cli") {
                         update("ai_model", "flash");
+                      } else if (v === "openai-compatible") {
+                        update("ai_model", "gpt-4o");
                       }
                     }}
                   >
-                    <option value="gemini-cli">Gemini CLI (Native Local)</option>
-                    <option value="ollama">Ollama (Local Llama/Mistral)</option>
-                    <option value="ai-studio">Gemini AI Studio (Free Tier)</option>
-                    <option value="openai">OpenAI (Waitlist/Future)</option>
+                    <option value="gemini-cli">Gemini CLI</option>
+                    <option value="ollama">Ollama</option>
+                    <option value="ai-studio">Gemini AI Studio</option>
+                    <option value="openai-compatible">OpenAI Compatible</option>
                   </SettingSelect>
                 </div>
                 <div className="space-y-2">
@@ -304,10 +402,10 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
                       value={settings.ai_model}
                       onChange={(v) => update("ai_model", v)}
                     >
-                      <option value="flash">Flash (Default - Fast)</option>
-                      <option value="pro">Pro (Complex Logic)</option>
-                      <option value="flash-lite">Flash Lite (Ultra Light)</option>
-                      <option value="auto">Auto (Best Match)</option>
+                      <option value="flash">Flash</option>
+                      <option value="pro">Pro</option>
+                      <option value="flash-lite">Flash Lite</option>
+                      <option value="auto">Auto</option>
                       <option value="auto-gemini-3">Auto Gemini 3</option>
                       <option value="auto-gemini-2.5">Auto Gemini 2.5</option>
                     </SettingSelect>
@@ -333,18 +431,45 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
               {settings.ai_provider === "ollama" && (
                 <div className="grid grid-cols-2 gap-8 pt-4 border-t border-border/30 animate-in slide-in-from-top-2 duration-300">
                   <div className="space-y-2">
-                    <SectionLabel htmlFor="ai_model">Ollama Model</SectionLabel>
-                    <SettingSelect
-                      id="ai_model_ollama"
-                      value={settings.ai_model}
-                      onChange={(v) => update("ai_model", v)}
-                    >
-                      {availableModels.map((m) => (
-                        <option key={m} value={m}>
-                          {m}
-                        </option>
-                      ))}
-                    </SettingSelect>
+                    <div className="flex items-center justify-between">
+                      <SectionLabel htmlFor="ai_model">Ollama Model</SectionLabel>
+                      <button
+                        type="button"
+                        onClick={fetchModels}
+                        disabled={isFetchingModels}
+                        className="text-[9px] uppercase tracking-tighter font-bold text-primary hover:text-primary-light transition-colors disabled:opacity-30"
+                      >
+                        {isFetchingModels ? "Pulling..." : "Refresh List"}
+                      </button>
+                    </div>
+                    {availableModels.length > 0 ? (
+                      <SettingSelect
+                        id="ai_model_ollama"
+                        value={settings.ai_model}
+                        onChange={(v) => update("ai_model", v)}
+                      >
+                        {!availableModels.includes(settings.ai_model) && (
+                          <option value={settings.ai_model}>{settings.ai_model}</option>
+                        )}
+                        {availableModels.map((m) => (
+                          <option key={m} value={m}>
+                            {m}
+                          </option>
+                        ))}
+                      </SettingSelect>
+                    ) : (
+                      <div className="space-y-1">
+                        <SettingInput
+                          id="ai_model"
+                          value={settings.ai_model}
+                          onChange={(e) => update("ai_model", e.target.value)}
+                          placeholder="e.g. gemma4:e2b"
+                        />
+                        <p className="text-[10px] text-amber-500/80 px-1 italic">
+                          No models found. Ensure Ollama is running or enter ID manually.
+                        </p>
+                      </div>
+                    )}
                     <p className="text-[10px] text-text-muted/50 px-1">
                       Available models are fetched dynamically.
                     </p>
@@ -369,7 +494,78 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
                         Local Inference
                       </p>
                       <p className="text-[10px] text-text-muted">
-                        Ensure Ollama is running and model (e.g. gemma4:e2b) is pulled.
+                        Ensure Ollama is running and model e.g. gemma4:e2b is pulled.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {settings.ai_provider === "openai-compatible" && (
+                <div className="grid grid-cols-2 gap-8 pt-4 border-t border-border/30 animate-in slide-in-from-top-2 duration-300">
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <SectionLabel htmlFor="ai_openai_model">Model ID</SectionLabel>
+                      <button
+                        type="button"
+                        onClick={fetchModels}
+                        disabled={isFetchingModels}
+                        className="text-[9px] uppercase tracking-tighter font-bold text-primary hover:text-primary-light transition-colors disabled:opacity-30"
+                      >
+                        {isFetchingModels ? "Pulling..." : "Refresh List"}
+                      </button>
+                    </div>
+                    {availableModels.length > 0 ? (
+                      <SettingSelect
+                        id="ai_openai_model"
+                        value={settings.ai_model}
+                        onChange={(v) => update("ai_model", v)}
+                      >
+                        {!availableModels.includes(settings.ai_model) && (
+                          <option value={settings.ai_model}>{settings.ai_model}</option>
+                        )}
+                        {availableModels.map((m) => (
+                          <option key={m} value={m}>
+                            {m}
+                          </option>
+                        ))}
+                      </SettingSelect>
+                    ) : (
+                      <SettingInput
+                        id="ai_openai_model"
+                        value={settings.ai_model}
+                        onChange={(e) => update("ai_model", e.target.value)}
+                        placeholder="e.g. gpt-4o, gpt-3.5-turbo"
+                      />
+                    )}
+                    <p className="text-[10px] text-text-muted/50 px-1">
+                      Choose or enter any model ID supported by your provider.
+                    </p>
+                  </div>
+                  <div className="space-y-2">
+                    <SectionLabel htmlFor="ai_openai_host">API Base URL</SectionLabel>
+                    <SettingInput
+                      id="ai_openai_host"
+                      type="url"
+                      value={settings.ai_openai_host}
+                      onChange={(e) => update("ai_openai_host", e.target.value, false)}
+                      onBlur={() => onSave(settings)}
+                      placeholder="https://api.openai.com/v1"
+                    />
+                    <p className="text-[10px] text-text-muted/50 px-1">
+                      Protocol & host for the OpenAI-standard endpoint.
+                    </p>
+                  </div>
+                  <div className="col-span-2 flex items-center gap-3 p-3 bg-primary/5 rounded-xl border border-primary/10">
+                    <div className="bg-primary/20 p-2 rounded-lg">
+                      <Network className="h-4 w-4 text-primary" />
+                    </div>
+                    <div>
+                      <p className="text-[11px] font-bold text-primary uppercase tracking-wider">
+                        Universal API
+                      </p>
+                      <p className="text-[10px] text-text-muted">
+                        Supports Azure, Groq, Perplexity, or any OpenAI-compatible proxy.
                       </p>
                     </div>
                   </div>
@@ -477,7 +673,7 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
                   <div>
                     <p className="text-sm font-bold text-text-primary">Agentic MCP Server</p>
                     <p className="text-[10px] text-text-muted mt-0.5">
-                      Expose log analysis tools via SSE (Port 5001) for external AI agents.
+                      Expose log analysis tools via SSE Port 5001 for external AI agents.
                     </p>
                   </div>
                 </div>
@@ -491,184 +687,259 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
 
           {/* Engine Core Section */}
           {activeSection === "drain" && (
-            <div className="space-y-8 animate-in fade-in slide-in-from-right-4 duration-300">
+            <div className="space-y-12 animate-in fade-in slide-in-from-right-4 duration-300">
               <div className="border-b border-border pb-6">
-                <h2 className="text-2xl font-bold text-text-primary">
-                  Global Core Engine (Drain3)
-                </h2>
+                <h2 className="text-2xl font-bold text-text-primary">Core Log Engine</h2>
                 <p className="text-sm text-text-muted mt-2">
-                  System-wide defaults for pattern mining. These can be overridden in each
-                  workspace.
+                  Configure high-performance log parsing, clustering, and metadata extraction.
                 </p>
               </div>
 
-              <div className="grid grid-cols-3 gap-8">
-                <div className="space-y-2">
-                  <SectionLabel htmlFor="drain_sim">Similarity</SectionLabel>
-                  <SettingInput
-                    id="drain_sim"
-                    type="number"
-                    step="0.05"
+              {/* Sub-Section: Drain3 Clustering */}
+              <div className="space-y-6">
+                <div className="flex items-center gap-3">
+                  <div className="bg-primary/20 p-2 rounded-xl">
+                    <Layers className="h-5 w-5 text-primary" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-bold text-text-primary">
+                      Drain3 Clustering Engine
+                    </h3>
+                    <p className="text-xs text-text-muted">
+                      Template discovery and variable masking engine.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-3 gap-8 pt-2">
+                  <div className="space-y-2">
+                    <SectionLabel htmlFor="drain_sim">Similarity</SectionLabel>
+                    <SettingInput
+                      id="drain_sim"
+                      type="number"
+                      step="0.05"
+                      min="0"
+                      max="1"
+                      value={settings.drain_similarity_threshold}
+                      onChange={(e) =>
+                        update(
+                          "drain_similarity_threshold",
+                          Number.parseFloat(e.target.value),
+                          false,
+                        )
+                      }
+                      onBlur={() => onSave(settings)}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <SectionLabel htmlFor="drain_children">Branches</SectionLabel>
+                    <SettingInput
+                      id="drain_children"
+                      type="number"
+                      min="1"
+                      value={settings.drain_max_children}
+                      onChange={(e) =>
+                        update("drain_max_children", Number.parseInt(e.target.value, 10), false)
+                      }
+                      onBlur={() => onSave(settings)}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <SectionLabel htmlFor="drain_clusters">Cluster Cap</SectionLabel>
+                    <SettingInput
+                      id="drain_clusters"
+                      type="number"
+                      min="1"
+                      value={settings.drain_max_clusters}
+                      onChange={(e) =>
+                        update("drain_max_clusters", Number.parseInt(e.target.value, 10), false)
+                      }
+                      onBlur={() => onSave(settings)}
+                    />
+                  </div>
+                </div>
+
+                <div className="bg-bg-surface/50 border border-border rounded-2xl p-6">
+                  <div className="flex justify-between text-xs font-bold text-text-muted mb-4 uppercase tracking-tighter">
+                    <span>Permissive</span>
+                    <span className="text-primary text-sm">
+                      {settings.drain_similarity_threshold * 100}% Sensitivity
+                    </span>
+                    <span>Strict</span>
+                  </div>
+                  <input
+                    type="range"
                     min="0"
                     max="1"
+                    step="0.01"
                     value={settings.drain_similarity_threshold}
                     onChange={(e) =>
-                      update("drain_similarity_threshold", Number.parseFloat(e.target.value), false)
+                      update("drain_similarity_threshold", Number.parseFloat(e.target.value))
                     }
-                    onBlur={() => onSave(settings)}
+                    className="w-full h-2 bg-border rounded-lg appearance-none cursor-pointer accent-primary"
                   />
-                </div>
-                <div className="space-y-2">
-                  <SectionLabel htmlFor="drain_children">Branches</SectionLabel>
-                  <SettingInput
-                    id="drain_children"
-                    type="number"
-                    min="1"
-                    value={settings.drain_max_children}
-                    onChange={(e) =>
-                      update("drain_max_children", Number.parseInt(e.target.value, 10), false)
-                    }
-                    onBlur={() => onSave(settings)}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <SectionLabel htmlFor="drain_clusters">Cluster Cap</SectionLabel>
-                  <SettingInput
-                    id="drain_clusters"
-                    type="number"
-                    min="1"
-                    value={settings.drain_max_clusters}
-                    onChange={(e) =>
-                      update("drain_max_clusters", Number.parseInt(e.target.value, 10), false)
-                    }
-                    onBlur={() => onSave(settings)}
-                  />
-                </div>
-              </div>
-
-              <div className="bg-bg-surface/50 border border-border rounded-2xl p-6">
-                <div className="flex justify-between text-xs font-bold text-text-muted mb-4 uppercase tracking-tighter">
-                  <span>Permissive</span>
-                  <span className="text-primary text-sm">
-                    {settings.drain_similarity_threshold * 100}% Sensitivity
-                  </span>
-                  <span>Strict</span>
-                </div>
-                <input
-                  type="range"
-                  min="0"
-                  max="1"
-                  step="0.01"
-                  value={settings.drain_similarity_threshold}
-                  onChange={(e) =>
-                    update("drain_similarity_threshold", Number.parseFloat(e.target.value))
-                  }
-                  className="w-full h-2 bg-border rounded-lg appearance-none cursor-pointer accent-primary"
-                />
-                <p className="text-[10px] text-text-muted/60 mt-4 leading-relaxed">
-                  The similarity threshold determines how 'close' two log lines must be to share a
-                  template. Lower values (0.1–0.4) are better for high-variance logs.
-                </p>
-              </div>
-
-              <div className="space-y-4">
-                <SectionLabel>Variable Masking</SectionLabel>
-                <div className="space-y-2">
-                  <p className="text-[10px] text-text-muted px-1 -mt-2">
-                    Sanitize logs by replacing dynamic variables (IPs, IDs) with tokens before
-                    clustering.
+                  <p className="text-[10px] text-text-muted/60 mt-4 leading-relaxed">
+                    The similarity threshold determines how 'close' two log lines must be to share a
+                    template. Lower values 0.1–0.4 are better for high-variance logs.
                   </p>
-                  {(Array.isArray(settings.drain_masks) ? settings.drain_masks : []).map(
-                    (mask, idx) => (
-                      <div
-                        key={`${mask.label}-${idx}`}
-                        className="flex items-center gap-3 bg-bg-surface/30 p-2 rounded-xl border border-border group animate-in slide-in-from-left-2 duration-200"
-                      >
-                        <div className="px-2">
-                          <Switch
-                            checked={mask.enabled}
-                            onCheckedChange={(val) => {
-                              const newMasks = [...settings.drain_masks];
-                              newMasks[idx].enabled = val;
+                </div>
+
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <SectionLabel>Variable Masking</SectionLabel>
+                    <button
+                      type="button"
+                      onClick={handleResetMasks}
+                      className="text-[10px] font-bold text-primary/60 hover:text-primary transition-colors flex items-center gap-1.5 uppercase pr-1 cursor-pointer"
+                    >
+                      <RotateCcw className="size-3" />
+                      Reset to Standard
+                    </button>
+                  </div>
+                  <div className="space-y-2">
+                    <p className="text-[10px] text-text-muted px-1 -mt-2">
+                      Sanitize logs by replacing dynamic variables like IPs or IDs with tokens before
+                      clustering.
+                    </p>
+
+                    {/* Standard Heuristics Visibility */}
+                    <div className="bg-bg-card/30 border border-border rounded-xl p-3 space-y-2 opacity-80 scale-[0.98] origin-left">
+                      <p className="text-[10px] font-bold text-primary-muted uppercase tracking-wider mb-1">
+                        Standard System Heuristics
+                      </p>
+                      <div className="flex items-center justify-between gap-4 py-1 border-b border-primary/10">
+                        <span className="text-[10px] font-semibold text-text-primary">
+                          IP ADDRESS
+                        </span>
+                        <span className="text-[9px] font-mono text-text-muted truncate">
+                          IPv4 / IPv6 Formats
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between gap-4 py-1">
+                        <span className="text-[10px] font-semibold text-text-primary">
+                          UUID / GUID
+                        </span>
+                        <span className="text-[9px] font-mono text-text-muted truncate">
+                          Standard 36-char markers
+                        </span>
+                      </div>
+                    </div>
+                    {(Array.isArray(settings.drain_masks) ? settings.drain_masks : []).map(
+                      (mask, idx) => (
+                        <div
+                          key={`${mask.label}-${idx}`}
+                          className="flex items-center gap-3 bg-bg-surface/30 p-2 rounded-xl border border-border group animate-in slide-in-from-left-2 duration-200"
+                        >
+                          <div className="px-2">
+                            <Switch
+                              checked={mask.enabled}
+                              onCheckedChange={(val) => {
+                                const newMasks = [...settings.drain_masks];
+                                newMasks[idx].enabled = val;
+                                update("drain_masks", newMasks);
+                              }}
+                              className="scale-75"
+                            />
+                          </div>
+                          <div className="flex-1 grid grid-cols-12 gap-2">
+                            <div className="col-span-3">
+                              <input
+                                type="text"
+                                value={mask.label}
+                                onChange={(e) => {
+                                  const newMasks = [...settings.drain_masks];
+                                  newMasks[idx].label = e.target.value;
+                                  update("drain_masks", newMasks);
+                                }}
+                                className="w-full bg-transparent border-none text-[11px] font-bold text-primary focus:ring-0 px-0 h-6 uppercase"
+                                placeholder="LABEL"
+                              />
+                            </div>
+                            <div className="col-span-9">
+                              <input
+                                type="text"
+                                value={mask.pattern}
+                                onChange={(e) => {
+                                  const newMasks = [...settings.drain_masks];
+                                  newMasks[idx].pattern = e.target.value;
+                                  update("drain_masks", newMasks);
+                                }}
+                                className="w-full bg-transparent border-none text-[11px] text-text-primary font-mono focus:ring-0 px-0 h-6"
+                                placeholder="Regex Pattern"
+                              />
+                            </div>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const newMasks = settings.drain_masks.filter((_, i) => i !== idx);
                               update("drain_masks", newMasks);
                             }}
-                            className="scale-75"
-                          />
+                            className="opacity-0 group-hover:opacity-100 p-1.5 text-text-muted hover:text-red-400 transition-all cursor-pointer"
+                          >
+                            <Trash2 className="size-3.5" />
+                          </button>
                         </div>
-                        <div className="flex-1 grid grid-cols-12 gap-2">
-                          <div className="col-span-3">
-                            <input
-                              type="text"
-                              value={mask.label}
-                              onChange={(e) => {
-                                const newMasks = [...settings.drain_masks];
-                                newMasks[idx].label = e.target.value;
-                                update("drain_masks", newMasks);
-                              }}
-                              className="w-full bg-transparent border-none text-[11px] font-bold text-primary focus:ring-0 px-0 h-6 uppercase"
-                              placeholder="LABEL"
-                            />
-                          </div>
-                          <div className="col-span-9">
-                            <input
-                              type="text"
-                              value={mask.pattern}
-                              onChange={(e) => {
-                                const newMasks = [...settings.drain_masks];
-                                newMasks[idx].pattern = e.target.value;
-                                update("drain_masks", newMasks);
-                              }}
-                              className="w-full bg-transparent border-none text-[11px] text-text-primary font-mono focus:ring-0 px-0 h-6"
-                              placeholder="Regex Pattern"
-                            />
-                          </div>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const newMasks = settings.drain_masks.filter((_, i) => i !== idx);
-                            update("drain_masks", newMasks);
-                          }}
-                          className="opacity-0 group-hover:opacity-100 p-1.5 text-text-muted hover:text-red-400 transition-all cursor-pointer"
-                        >
-                          <Trash2 className="size-3.5" />
-                        </button>
-                      </div>
-                    ),
-                  )}
+                      ),
+                    )}
 
+                    <button
+                      type="button"
+                      onClick={() => {
+                        update("drain_masks", [
+                          ...settings.drain_masks,
+                          { label: "NEW_MASK", pattern: "", enabled: true },
+                        ]);
+                      }}
+                      className="w-full flex items-center justify-center gap-2 py-3 border border-dashed border-border rounded-xl text-[10px] font-bold text-text-muted hover:border-primary hover:text-primary hover:bg-primary/5 transition-all uppercase tracking-tighter cursor-pointer"
+                    >
+                      <Plus className="size-3" />
+                      Add Custom Masking Instruction
+                    </button>
+                  </div>
+                </div>
+
+                {/* Reset Templates within Drain3 Section */}
+                <div className="bg-red-500/5 border border-red-500/10 rounded-2xl p-6 flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-bold text-red-400">Pattern Memory</p>
+                    <p className="text-[10px] text-text-muted mt-1 max-w-[300px]">
+                      Clearing patterns will force the engine to re-learn log templates from
+                      scratch. This does not affect your masking rules.
+                    </p>
+                  </div>
                   <button
                     type="button"
-                    onClick={() => {
-                      update("drain_masks", [
-                        ...settings.drain_masks,
-                        { label: "NEW_MASK", pattern: "", enabled: true },
-                      ]);
-                    }}
-                    className="w-full flex items-center justify-center gap-2 py-3 border border-dashed border-border rounded-xl text-[10px] font-bold text-text-muted hover:border-primary hover:text-primary hover:bg-primary/5 transition-all uppercase tracking-tighter cursor-pointer"
+                    onClick={() => setIsResetPatternsModalOpen(true)}
+                    className="flex items-center gap-2 px-4 py-2 bg-red-500/10 text-red-400 hover:bg-red-500/20 rounded-xl text-xs font-bold transition-all border border-red-500/20"
                   >
-                    <Plus className="size-3" />
-                    Add Custom Masking Instruction
+                    <RefreshCcw className="size-3.5" />
+                    Clear Pattern Cache
                   </button>
                 </div>
               </div>
 
-              <div className="pt-6 border-t border-border/30 flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-bold text-text-primary">Clustering Memory</p>
-                  <p className="text-[10px] text-text-muted mt-0.5">
-                    Resetting templates will force the parser to re-learn patterns from scratch.
-                  </p>
+              {/* Sub-Section: Metadata Facets */}
+              <div className="space-y-6 pt-6 border-t border-border/30">
+                <div className="flex items-center gap-3">
+                  <div className="bg-blue-500/10 p-2 rounded-xl">
+                    <Activity className="h-5 w-5 text-blue-400" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-bold text-text-primary">
+                      Metadata extraction (Facets)
+                    </h3>
+                    <p className="text-xs text-text-muted">
+                      Regex rules to extract structured fields from raw text.
+                    </p>
+                  </div>
                 </div>
-                <button
-                  type="button"
-                  onClick={handleResetTemplates}
-                  className="flex items-center gap-2 px-4 py-2 bg-red-500/10 text-red-400 hover:bg-red-500/20 rounded-xl text-xs font-bold transition-all border border-red-500/20"
-                >
-                  <RefreshCcw className="size-3.5" />
-                  Reset {settings.drain_template_scope === "global" ? "Global" : "Workspace"}{" "}
-                  Templates
-                </button>
+
+                <FacetExtractionSettings
+                  rules={settings.facet_extractions || []}
+                  onChange={(rules) => update("facet_extractions", rules)}
+                  title="Global Extraction Rules"
+                />
               </div>
             </div>
           )}
@@ -755,20 +1026,23 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
                 </div>
 
                 <div className="p-4 bg-primary/5 rounded-2xl border border-primary/10">
-                  <p className="text-[11px] font-bold text-primary uppercase tracking-widest mb-2">
+                  <p className="text-[11px] font-bold text-primary uppercase tracking-widest mb-2 font-mono">
                     Routing Instructions
                   </p>
-                  <p className="text-[10px] text-text-secondary leading-relaxed">
-                    To route logs to a specific workspace and collection, use the path:{" "}
-                    <code className="bg-white/5 px-1.5 py-0.5 rounded text-text-primary">
-                      POST http://localhost:{settings.ingestion_http_port}
-                      /ingest/my-workspace/my-collection
-                    </code>
-                    <br />
-                    Or use query parameters:{" "}
-                    <code className="bg-white/5 px-1.5 py-0.5 rounded text-text-primary">
-                      /ingest?ws=my-workspace&source_id=my-collection
-                    </code>
+                  <p className="text-[10px] text-text-secondary leading-relaxed space-y-2 flex flex-col">
+                    <span>
+                      To route logs to a specific workspace and collection, use the path:{" "}
+                      <code className="bg-white/5 px-1.5 py-0.5 rounded text-text-primary ml-1">
+                        POST http://localhost:{settings.ingestion_http_port}
+                        /ingest/my-workspace/my-collection
+                      </code>
+                    </span>
+                    <span>
+                      Or use query parameters:{" "}
+                      <code className="bg-white/5 px-1.5 py-0.5 rounded text-text-primary ml-1">
+                        /ingest?ws=my-workspace&source_id=my-collection
+                      </code>
+                    </span>
                   </p>
                 </div>
               </div>
@@ -794,7 +1068,7 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
                     onChange={(v) => update("ui_row_height", v)}
                   >
                     <option value="compact">Ultra Compact</option>
-                    <option value="default">Balanced (Default)</option>
+                    <option value="default">Balanced</option>
                     <option value="comfortable">Comfortable</option>
                   </SettingSelect>
                 </div>
@@ -909,6 +1183,71 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
           </div>
         </div>
       )}
+      {/* Reset Confirmation Modal */}
+      <Dialog open={isResetModalOpen} onOpenChange={setIsResetModalOpen}>
+        <DialogContent className="sm:max-w-[425px] bg-[#0d0f0e] border-zinc-800">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-bold text-red-500">
+              Reset All Settings?
+            </DialogTitle>
+            <DialogDescription className="text-zinc-400 pt-2">
+              This will revert ALL global settings including AI Provider, Engine Parameters, and Network
+              Ingestion to their factory defaults.
+              <br />
+              <br />
+              <span className="text-red-400 font-bold uppercase text-[10px]">
+                Warning: This action cannot be undone and the application will reload.
+              </span>
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button
+              variant="outline"
+              className="bg-transparent border-zinc-700 hover:bg-zinc-800 text-zinc-300"
+              onClick={() => setIsResetModalOpen(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              className="bg-red-600 hover:bg-red-700 text-white border-none"
+              onClick={handleResetAll}
+            >
+              Reset Everything
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      {/* Pattern Reset Confirmation Modal */}
+      <Dialog open={isResetPatternsModalOpen} onOpenChange={setIsResetPatternsModalOpen}>
+        <DialogContent className="sm:max-w-[425px] bg-[#0d0f0e] border-zinc-800">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-bold text-red-500">
+              Clear Pattern Memory?
+            </DialogTitle>
+            <DialogDescription className="text-zinc-400 pt-2">
+              This will force the engine to re-learn log templates from scratch.
+              <br />
+              <b>Note:</b> This will reset Cluster IDs in the log table, but your Masking Rules and
+              Settings will be preserved.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button
+              variant="outline"
+              className="bg-transparent border-zinc-700 hover:bg-zinc-800 text-zinc-300"
+              onClick={() => setIsResetPatternsModalOpen(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              className="bg-red-600 hover:bg-red-700 text-white border-none"
+              onClick={handleResetPatterns}
+            >
+              Clear Patterns
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

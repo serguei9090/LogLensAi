@@ -49,15 +49,44 @@ class FileTailer:
         if not line:
             return
 
-        # 1. Shared Metadata Extraction (Regex/Parser logic)
-        metadata = extract_log_metadata(self.workspace_id, self.filepath, line)
+        # 1. Fetch custom extraction rules (TODO: Cache these)
+        custom_rules = []
+        try:
+            cursor = self.db.get_cursor()
+            # Fetch global rules
+            cursor.execute("SELECT value FROM settings WHERE key = 'facet_extractions'")
+            global_row = cursor.fetchone()
+            if global_row and global_row[0]:
+                import json
+
+                rules = json.loads(global_row[0])
+                custom_rules.extend(rules if isinstance(rules, list) else [])
+
+            # Fetch workspace-specific rules
+            cursor.execute(
+                "SELECT value FROM workspace_settings WHERE workspace_id = ? AND key = 'facet_extractions'",
+                (self.workspace_id,),
+            )
+            ws_row = cursor.fetchone()
+            if ws_row and ws_row[0]:
+                import json
+
+                rules = json.loads(ws_row[0])
+                custom_rules.extend(rules if isinstance(rules, list) else [])
+        except Exception:
+            pass
+
+        # 2. Shared Metadata Extraction (Regex/Parser logic)
+        metadata = extract_log_metadata(
+            self.workspace_id, self.filepath, line, custom_rules=custom_rules
+        )
         timestamp = metadata["timestamp"]
         level = metadata["level"]
         raw_message = metadata["message"]
+        facets = metadata.get("facets", {})
 
-        # 2. Clustering (Pattern Mining)
+        # 3. Clustering (Pattern Mining)
         try:
-            # Cluster on the extracted message (cleaner)
             res = self.parser.parse(raw_message)
             cluster_id = str(res["cluster_id"])
             message = res["template"]
@@ -65,12 +94,24 @@ class FileTailer:
             cluster_id = "unknown"
             message = raw_message
 
-        # 3. Persistence
+        # 4. Persistence
         cursor = self.db.get_cursor()
+        import json
+
+        facets_json = json.dumps(facets) if facets else None
         cursor.execute(
             """
-            INSERT INTO logs (workspace_id, source_id, timestamp, level, message, cluster_id, raw_text)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO logs (workspace_id, source_id, timestamp, level, message, cluster_id, raw_text, facets)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             """,
-            (self.workspace_id, self.filepath, timestamp, level, message, cluster_id, line),
+            (
+                self.workspace_id,
+                self.filepath,
+                timestamp,
+                level,
+                message,
+                cluster_id,
+                line,
+                facets_json,
+            ),
         )
