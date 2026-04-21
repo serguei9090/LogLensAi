@@ -9,7 +9,7 @@ from typing import Any
 
 import aiohttp_cors
 from ai import AIChatMessage, AIProviderFactory
-from ai.context_manager import ContextManager
+from ai.context import SmartContextManager
 from aiohttp import web
 from anomalies import AnomalyDetector
 from db import LogDatabase
@@ -139,6 +139,9 @@ class App:
         self.anomaly_detector = AnomalyDetector(self.db)
         if start_anomalies:
             self.anomaly_detector.start()
+
+        # Initialize Context Manager for AI
+        self.context_manager = SmartContextManager()
 
         init_mcp(self)
         self._mcp_thread = None
@@ -1055,7 +1058,7 @@ class App:
             logs = [dict(zip(columns, row, strict=False)) for row in cursor.fetchall()]
 
             if logs:
-                summary = ContextManager.prepare_log_context(logs)
+                summary = self.context_manager.prepare_log_context(logs)
                 log_context = f"\n\nContextual Log Summary:\n{summary}"
 
         cursor.execute(

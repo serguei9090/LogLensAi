@@ -31,3 +31,22 @@ class SmartContextManager:
             processed_lines.append(f"[{lvl}] {msg}")
 
         return "\n".join(processed_lines)
+
+    def prepare_log_context(
+        self, logs: list[dict], max_tokens: int = 4000, keep_levels: list[str] = None
+    ) -> str:
+        if keep_levels is None:
+            keep_levels = ["INFO", "WARN", "ERROR", "FATAL", "CRITICAL"]
+
+        filtered = self.filter_logs(logs, keep_levels)
+        if not filtered:
+            filtered = logs[:20]  # Fallback
+
+        context_str = self.summarize_logs(filtered)
+
+        # Character-based truncation (approx 4 chars per token)
+        max_chars = int(max_tokens * 3.5)
+        if len(context_str) > max_chars:
+            return context_str[:max_chars] + "\n... [Truncated to fit LLM Context Window]"
+
+        return context_str

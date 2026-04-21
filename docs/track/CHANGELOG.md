@@ -7,6 +7,7 @@ All notable changes to the LogLensAi project will be documented in this file.
 ### Added
 - **AI Studio Model Compatibility**: Updated `AIStudioProvider` to automatically strip the `models/` prefix from model strings, ensuring compatibility with Google ADK 2.0 `LLMRegistry` and preventing misinterpretation of model names as external providers.
 - **Enhanced Sidecar Tracing**: Implemented a prominent startup banner on `stderr` and added detailed initialization logging for AI providers to improve debug visibility in the console.
+- **SmartContextManager Refactor**: Migrated log context preparation to a stateful `SmartContextManager` with improved filtering and token-aware summarization logic.
 
 ### Fixed
 - **Sidecar Stdout Pollution**: Replaced all `print()` statements in `db.py`, `query_parser.py`, and `api.py` with structured `logging`. This resolves the `SyntaxError: Unexpected token 'D'` error caused by plain-text logs corrupting the JSON-RPC stdout stream.
