@@ -35,3 +35,6 @@ docs/reports/*.md
 # Gemini CLI Bridge (External)
 gemini-cli/
 gemini_sessions/
+
+# Worktrees
+.worktrees/
