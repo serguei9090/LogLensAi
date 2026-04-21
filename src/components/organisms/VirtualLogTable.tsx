@@ -31,6 +31,7 @@ export interface LogEntry {
   level: LogLevel;
   message: string;
   cluster_id: string;
+  source_id: string;
   cluster_percent?: number;
   cluster_template?: string;
   has_comment?: boolean;
@@ -44,6 +45,7 @@ interface VirtualLogTableProps {
   readonly onAddComment: (id: number, comment: string) => void;
   readonly onSort: (sortBy: string) => void;
   readonly onAnalyzeCluster?: (clusterId: string) => void;
+  readonly onOpenParser?: (sourceId: string, initialConfig: string | null) => void;
   readonly sortBy: string;
   readonly sortOrder: "asc" | "desc";
   readonly anomalousClusters?: Set<string>;
@@ -55,6 +57,7 @@ export function VirtualLogTable({
   onAddComment,
   onSort,
   onAnalyzeCluster,
+  onOpenParser,
   sortBy,
   sortOrder,
   anomalousClusters,
@@ -68,6 +71,7 @@ export function VirtualLogTable({
     y: number;
     field: string;
     logText: string;
+    sourceId: string;
   } | null>(null);
   const [lastSelectedId, setLastSelectedId] = useState<number | null>(null);
 
@@ -108,14 +112,20 @@ export function VirtualLogTable({
     const range = selection.getRangeAt(0);
     const rect = range.getBoundingClientRect();
 
-    // Determine the field based on the closest data-field attribute
+    // Determine the field and source based on the closest data attributes
     let field = "raw_text";
+    let sourceId = "";
     let node = selection.anchorNode;
     while (node && node.nodeType !== Node.DOCUMENT_NODE) {
       if (node.nodeType === Node.ELEMENT_NODE) {
         const el = node as HTMLElement;
         if (el.dataset.field) {
           field = el.dataset.field;
+        }
+        if (el.dataset.sourceId) {
+          sourceId = el.dataset.sourceId;
+        }
+        if (field !== "raw_text" && sourceId) {
           break;
         }
       }
@@ -128,6 +138,7 @@ export function VirtualLogTable({
       y: rect.bottom + globalThis.scrollY + 10,
       field,
       logText: selection.anchorNode?.parentElement?.innerText || "",
+      sourceId,
     });
   }, []);
 
@@ -565,8 +576,13 @@ export function VirtualLogTable({
             <button
               type="button"
               onClick={() => {
-                // Future Parse logic
-                toast.info("Parser map feature coming soon.");
+                if (selectionInfo?.sourceId && onOpenParser) {
+                  onOpenParser(selectionInfo.sourceId, null);
+                  setSelectionInfo(null);
+                  globalThis.getSelection()?.removeAllRanges();
+                } else {
+                  toast.info("Select a specific log source to use the parser map.");
+                }
               }}
               className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-full bg-white/5 text-text-muted hover:text-text-primary hover:bg-white/10 transition-colors cursor-pointer"
             >
@@ -694,6 +710,7 @@ function LogTableRow({
     <tr
       ref={measureElement}
       data-index={virtualRow.index}
+      data-source-id={log.source_id}
       tabIndex={0}
       aria-expanded={isExpanded}
       aria-controls={isExpanded ? `row-details-${log.id}` : undefined}

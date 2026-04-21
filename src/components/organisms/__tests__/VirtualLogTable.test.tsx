@@ -83,6 +83,7 @@ describe("VirtualLogTable", () => {
       level: "INFO",
       message: "Test log 1",
       cluster_id: "c1",
+      source_id: "s1",
     },
     {
       id: 2,
@@ -90,6 +91,7 @@ describe("VirtualLogTable", () => {
       level: "ERROR",
       message: "Test log 2",
       cluster_id: "c2",
+      source_id: "s1",
     },
   ];
 

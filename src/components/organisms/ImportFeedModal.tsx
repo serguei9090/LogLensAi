@@ -1,27 +1,10 @@
 import { TailSwitch } from "@/components/atoms/TailSwitch";
+import { NativeFilePicker } from "@/components/molecules/NativeFilePicker";
 import { cn } from "@/lib/utils";
 import { useSettingsStore } from "@/store/settingsStore";
 import { useWorkspaceStore } from "@/store/workspaceStore";
-import {
-  Activity,
-  Code,
-  Folder,
-  FolderOpen,
-  Info,
-  Server,
-  Terminal,
-  Upload,
-  Wifi,
-  X,
-} from "lucide-react";
+import { Activity, Code, FolderOpen, Info, Server, Terminal, Upload, Wifi, X } from "lucide-react";
 import { useState } from "react";
-import { toast } from "sonner"; // For environmental feedback
-
-/**
- * Detects whether the app is running inside a Tauri desktop shell.
- * When false, we're in web mode and must use browser-native file APIs.
- */
-const isTauri = globalThis.window !== undefined && "__TAURI_INTERNALS__" in globalThis.window;
 
 interface ImportFeedModalProps {
   readonly open: boolean;
@@ -82,43 +65,6 @@ export function ImportFeedModal({
     return null;
   }
 
-  const handleBrowse = async () => {
-    if (isTauri) {
-      // Desktop mode: use Tauri native file dialog
-      try {
-        const { open: openDialog } = await import("@tauri-apps/plugin-dialog");
-        const selected = await openDialog({
-          multiple: false,
-          directory: false,
-          title: "Select Log Source",
-          filters: [
-            { name: "Common Logs", extensions: ["log", "syslog", "txt", "json", "csv"] },
-            { name: "All Files", extensions: ["*"] },
-          ],
-        });
-
-        if (selected) {
-          setLocalPath(Array.isArray(selected) ? selected[0] : selected);
-        }
-      } catch (e) {
-        console.warn("Native dialog error:", e);
-        toast.error("Could not open file picker.");
-      }
-    } else {
-      // Web mode: use browser file input
-      const input = document.createElement("input");
-      input.type = "file";
-      input.accept = ".log,.syslog,.txt,.json,.csv";
-      input.onchange = () => {
-        const file = input.files?.[0];
-        if (file) {
-          setLocalPath(file.name);
-        }
-      };
-      input.click();
-    }
-  };
-
   const labelCls = "text-[11px] font-bold uppercase tracking-wider text-text-muted mb-2 ml-1 block";
 
   return (
@@ -177,23 +123,11 @@ export function ImportFeedModal({
                 <label htmlFor="local-path" className={labelCls}>
                   Source File Path
                 </label>
-                <div className="flex gap-3">
-                  <input
-                    id="local-path"
-                    placeholder="e.g. C:\logs\engine.log"
-                    className={cn(inputCls, "flex-1 font-mono text-[11px] h-12")}
-                    value={localPath}
-                    onChange={(e) => setLocalPath(e.target.value)}
-                  />
-                  <button
-                    type="button"
-                    onClick={handleBrowse}
-                    className="h-12 px-5 rounded-xl bg-bg-surface border border-border text-text-secondary hover:text-text-primary hover:border-primary transition-all flex items-center gap-2 font-bold text-xs shrink-0 shadow-sm"
-                  >
-                    <Folder className="h-4 w-4" />
-                    Browse
-                  </button>
-                </div>
+                <NativeFilePicker
+                  value={localPath}
+                  onChange={setLocalPath}
+                  placeholder="e.g. C:\logs\engine.log"
+                />
 
                 <div className="flex items-start gap-3 border border-info/20 bg-info/5 rounded-2xl p-4 transition-colors">
                   <Info className="h-5 w-5 shrink-0 mt-0.5 text-info" />

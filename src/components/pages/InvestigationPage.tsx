@@ -1,4 +1,5 @@
 import { AIInvestigationSidebar } from "@/components/organisms/AIInvestigationSidebar";
+import { CustomParserModal } from "@/components/organisms/CustomParserModal";
 import { FacetSidebar } from "@/components/organisms/FacetSidebar";
 import { ImportFeedModal } from "@/components/organisms/ImportFeedModal";
 import { OrchestratorHub } from "@/components/organisms/OrchestratorHub";
@@ -96,6 +97,10 @@ export function InvestigationPage() {
   const [isOrchestratorOpen, setIsOrchestratorOpen] = useState(false);
   const [editingFusionId, setEditingFusionId] = useState<string | null>(null);
   const [editingFusionName, setEditingFusionName] = useState<string | null>(null);
+
+  // Parser Modal state
+  const [activeParserSource, setActiveParserSource] = useState<string | null>(null);
+  const [initialParserConfig, setInitialParserConfig] = useState<string | null>(null);
 
   // Anomalies state
   const [anomalousClusters, setAnomalousClusters] = useState<Set<string>>(new Set());
@@ -606,9 +611,43 @@ export function InvestigationPage() {
               });
           }}
           onAnalyzeCluster={handleAnalyzeCluster}
+          onOpenParser={(sourceId) => {
+            setActiveParserSource(sourceId);
+            setInitialParserConfig(null); // Fetch latest from sidecar if needed
+          }}
         />
       </InvestigationLayout>
 
+      <CustomParserModal
+        workspaceId={activeWorkspaceId ?? ""}
+        sourceId={activeParserSource ?? ""}
+        isOpen={!!activeParserSource}
+        onClose={() => setActiveParserSource(null)}
+        initialConfig={initialParserConfig}
+        onSaved={async (config) => {
+          if (!activeWorkspaceId || !activeParserSource) {
+            return;
+          }
+          try {
+            // Update the source-specific parser in the DB
+            // This is typically stored in fusion_configs or a dedicated table
+            // For now, we'll assume we update the fusion config for the active source
+            await callSidecar({
+              method: "update_source_parser",
+              params: {
+                workspace_id: activeWorkspaceId,
+                source_id: activeParserSource,
+                parser_config: config,
+              },
+            });
+            toast.success("Log parser re-calibrated.");
+            fetchLogs();
+          } catch (e) {
+            console.error("Failed to update parser", e);
+            toast.error("Failed to update log parser.");
+          }
+        }}
+      />
       <ImportFeedModal
         open={isImportOpen}
         onOpenChange={setIsImportOpen}

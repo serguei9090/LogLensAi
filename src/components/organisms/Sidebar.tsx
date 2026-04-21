@@ -358,7 +358,10 @@ function SidebarNavItem({
     return (
       <Tooltip>
         <TooltipTrigger className="w-full">{navContent}</TooltipTrigger>
-        <TooltipContent side="right" className="bg-bg-surface-bright border-border text-text-primary">
+        <TooltipContent
+          side="right"
+          className="bg-bg-surface-bright border-border text-text-primary"
+        >
           {label} {badge && `(${badge})`}
         </TooltipContent>
       </Tooltip>

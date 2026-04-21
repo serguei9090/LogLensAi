@@ -2,6 +2,17 @@
 
 All notable changes to the LogLensAi project will be documented in this file.
 
+## [Phase 5] - Desktop Integration & UI Polish (2026-04-21)
+
+### Added
+- **NativeFilePicker Molecule**: Implemented a standardized file selection component using Tauri's `@tauri-apps/plugin-dialog` for desktop and browser fallback for web mode.
+- **Tauri Plugin Support**: Enabled native dialog integration for local log ingestion.
+
+### Fixed
+- **Ingestion Modal UX**: Integrated `NativeFilePicker` into `ImportFeedModal` to streamline local file path selection.
+- **Orchestrator Stability**: Refined state management in `OrchestratorHub` and `Sidebar` to prevent hydration mismatches during workspace transitions.
+- **Performance Optimization**: Improved `VirtualLogTable` rendering performance for high-volume log streams.
+
 ## [Phase 4.2] - Core Hardening & Complexity Reduction (2026-04-20)
 
 ### Refactored

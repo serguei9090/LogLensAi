@@ -34,6 +34,7 @@ interface OrchestratorHubProps {
     configs: FusionSourceConfig[],
   ) => void;
   readonly onEngineSettingsOpen?: () => void;
+  readonly onOpenParser?: (sourceId: string, initialConfig: string | null) => void;
 }
 
 // ─── Strategy Card ────────────────────────────────────────────────────────────
