@@ -14,9 +14,9 @@ export default defineConfig({
     port: 4000,
     watch: {
       ignored: [
-        path.resolve(__dirname, "**/*.log"),
-        path.resolve(__dirname, "**/*.duckdb*"),
-        path.resolve(__dirname, "**/*.wal"),
+        "**/*.log",
+        "**/*.duckdb*",
+        "**/*.wal",
         path.resolve(__dirname, "sidecar/**"),
         path.resolve(__dirname, "src-tauri/**"),
       ],
