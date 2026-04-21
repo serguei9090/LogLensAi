@@ -262,6 +262,7 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
     }
   }, []);
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: Must re-fetch on these changes even if not directly used in the effect body
   useEffect(() => {
     // Trigger model pull when provider or connectivity settings change (with debounce)
     const dynamicProviders = ["ollama", "openai-compatible", "ai-studio"];
@@ -271,7 +272,13 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
       }, 1000);
       return () => clearTimeout(timer);
     }
-  }, [fetchModels, settings.ai_provider]);
+  }, [
+    fetchModels,
+    settings.ai_provider,
+    settings.ai_api_key,
+    settings.ai_ollama_host,
+    settings.ai_openai_host,
+  ]);
 
   // Removed handleSave in favor of auto-save via update()
 
@@ -766,9 +773,11 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
           {activeSection === "drain" && (
             <div className="space-y-12 animate-in fade-in slide-in-from-right-4 duration-300">
               <div className="border-b border-border pb-6">
-                <h2 className="text-2xl font-bold text-text-primary">Core Log Engine</h2>
+                <h2 className="text-2xl font-bold text-text-primary">
+                  Global Core Engine (Drain3)
+                </h2>
                 <p className="text-sm text-text-muted mt-2">
-                  Configure high-performance log parsing, clustering, and metadata extraction.
+                  System-wide defaults for log parsing, clustering, and pattern discovery.
                 </p>
               </div>
 
@@ -1192,7 +1201,7 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
       {/* Add Skill Modal overlay */}
       {isSkillModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-[#121413] border border-white/10 rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden flex flex-col max-h-[85vh]">
+          <div className="bg-bg-surface border border-border-subtle rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden flex flex-col max-h-[85vh]">
             <div className="flex items-center justify-between p-4 border-b border-white/5 bg-white/[0.02]">
               <h3 className="text-sm font-bold text-white flex items-center gap-2">
                 <FolderOpen className="size-4 text-primary" />
@@ -1262,7 +1271,7 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
       )}
       {/* Reset Confirmation Modal */}
       <Dialog open={isResetModalOpen} onOpenChange={setIsResetModalOpen}>
-        <DialogContent className="sm:max-w-[425px] bg-[#0d0f0e] border-zinc-800">
+        <DialogContent className="sm:max-w-[425px] bg-bg-base border-border">
           <DialogHeader>
             <DialogTitle className="text-xl font-bold text-red-500">
               Reset All Settings?
@@ -1296,7 +1305,7 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
       </Dialog>
       {/* Pattern Reset Confirmation Modal */}
       <Dialog open={isResetPatternsModalOpen} onOpenChange={setIsResetPatternsModalOpen}>
-        <DialogContent className="sm:max-w-[425px] bg-[#0d0f0e] border-zinc-800">
+        <DialogContent className="sm:max-w-[425px] bg-bg-base border-border">
           <DialogHeader>
             <DialogTitle className="text-xl font-bold text-red-500">
               Clear Pattern Memory?

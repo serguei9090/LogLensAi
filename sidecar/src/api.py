@@ -1437,27 +1437,6 @@ class App:
                 val_to_save = json.dumps(v) if isinstance(v, (list, dict)) else str(v)
                 cursor.execute(query, (workspace_id, k, val_to_save))
         else:
-            # Re-initialize AI Provider if relevant global settings changed
-            if any(
-                k in settings
-                for k in [
-                    "ai_provider",
-                    "ai_api_key",
-                    "ai_ollama_host",
-                    "ai_openai_host",
-                    "ai_gemini_url",
-                    "ai_model",
-                    "ai_system_prompt",
-                ]
-            ):
-                # Update transient AI state immediately for global changes
-                if "ai_provider" in settings:
-                    self.ai.provider = settings["ai_provider"]
-                if "ai_api_key" in settings:
-                    self.ai.api_key = settings["ai_api_key"]
-                if "ai_system_prompt" in settings:
-                    self.ai.system_prompt = settings["ai_system_prompt"]
-
             query = (
                 "INSERT INTO settings (key, value) VALUES (?, ?) "
                 "ON CONFLICT (key) DO UPDATE SET value = excluded.value"

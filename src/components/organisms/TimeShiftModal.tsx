@@ -94,7 +94,7 @@ export function TimeShiftModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[420px] bg-[#111] border-white/10 text-white shadow-xl z-[250] p-0 overflow-hidden rounded-xl">
+      <DialogContent className="sm:max-w-[420px] bg-bg-tooltip border-border-subtle text-text-primary shadow-xl z-[250] p-0 overflow-hidden rounded-xl">
         <div className="p-6">
           <DialogHeader className="mb-6">
             <div className="flex items-center gap-3">

@@ -12,6 +12,7 @@ import { selectActiveWorkspace, useWorkspaceStore } from "@/store/workspaceStore
 import {
   Bot,
   Clock,
+  Cpu,
   Lightbulb,
   LightbulbOff,
   MessageSquare,
@@ -141,7 +142,9 @@ export function parseThinking(content: string): {
   };
 }
 
-export function AIInvestigationSidebar() {
+export function AIInvestigationSidebar({
+  onEngineSettingsOpen,
+}: { readonly onEngineSettingsOpen?: () => void }) {
   const {
     isSidebarOpen,
     setSidebarOpen,
@@ -414,6 +417,16 @@ export function AIInvestigationSidebar() {
             title="New Investigation"
           >
             <Plus className="h-4 w-4" />
+          </Button>
+
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 text-zinc-500 hover:text-amber-400 hover:bg-amber-500/10"
+            onClick={onEngineSettingsOpen}
+            title="Engine Settings"
+          >
+            <Cpu className="h-4 w-4" />
           </Button>
 
           <Button

@@ -205,35 +205,35 @@ export function LogDistributionWidget({
           <BarChart data={formattedData} margin={{ top: 0, right: 10, left: -20, bottom: 0 }}>
             <XAxis
               dataKey="displayTime"
-              tick={{ fill: "#878c8e", fontSize: 10 }}
+              tick={{ fill: "var(--color-text-muted)", fontSize: 10 }}
               tickLine={false}
               axisLine={false}
               dy={5}
             />
             <YAxis
-              tick={{ fill: "#878c8e", fontSize: 10 }}
+              tick={{ fill: "var(--color-text-muted)", fontSize: 10 }}
               tickLine={false}
               axisLine={false}
               dx={-5}
             />
             <Tooltip
-              cursor={{ fill: "rgba(255, 255, 255, 0.05)" }}
+              cursor={{ fill: "var(--color-bg-hover)" }}
               contentStyle={{
-                backgroundColor: "#111312",
-                borderColor: "rgba(255, 255, 255, 0.1)",
+                backgroundColor: "var(--color-bg-tooltip)",
+                borderColor: "var(--color-border-subtle)",
                 borderRadius: "8px",
                 fontSize: "12px",
               }}
               itemStyle={{ fontSize: "12px" }}
             />
-            <Bar dataKey="INFO" stackId="a" fill="#0ea5e9" radius={[0, 0, 4, 4]} />
-            <Bar dataKey="WARN" stackId="a" fill="#eab308" />
-            <Bar dataKey="ERROR" stackId="a" fill="#ef4444" radius={[4, 4, 0, 0]}>
+            <Bar dataKey="INFO" stackId="a" fill="var(--color-info)" radius={[0, 0, 4, 4]} />
+            <Bar dataKey="WARN" stackId="a" fill="var(--color-warning)" />
+            <Bar dataKey="ERROR" stackId="a" fill="var(--color-error)" radius={[4, 4, 0, 0]}>
               {formattedData.map((entry, index) => (
                 <Cell
                   key={`cell-${index}`}
-                  fill={entry.hasAnomaly ? "#ff4444" : "#ef4444"}
-                  stroke={entry.hasAnomaly ? "#ffffff" : "none"}
+                  fill={entry.hasAnomaly ? "var(--color-error)" : "var(--color-error)"}
+                  stroke={entry.hasAnomaly ? "var(--color-text-primary)" : "none"}
                   strokeWidth={entry.hasAnomaly ? 2 : 0}
                 />
               ))}

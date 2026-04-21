@@ -4,11 +4,15 @@
 
 @theme {
   --color-bg-base: #0d0f0e;
+  --color-bg-app: #0a0c0b;
+  --color-bg-sidebar: #0a0c0b;
   --color-bg-surface: #111613;
   --color-bg-surface-bright: #1a1f1c;
   --color-bg-hover: #1e2520;
+  --color-bg-tooltip: #111312;
   --color-border: #2a3430;
   --color-border-muted: #1d2420;
+  --color-border-subtle: #1d2420;
   --color-primary: #22c55e;
   --color-primary-hover: #16a34a;
   --color-primary-muted: #14532d;
@@ -41,11 +45,15 @@
 
 :root {
   --bg-base: var(--color-bg-base);
+  --bg-app: var(--color-bg-app);
+  --bg-sidebar: var(--color-bg-sidebar);
   --bg-surface: var(--color-bg-surface);
   --bg-surface-bright: var(--color-bg-surface-bright);
   --bg-hover: var(--color-bg-hover);
+  --bg-tooltip: var(--color-bg-tooltip);
   --border: var(--color-border);
   --border-muted: var(--color-border-muted);
+  --border-subtle: var(--color-border-subtle);
   --primary: var(--color-primary);
   --primary-hover: var(--color-primary-hover);
   --primary-muted: var(--color-primary-muted);

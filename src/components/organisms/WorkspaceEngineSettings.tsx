@@ -147,7 +147,7 @@ export function WorkspaceEngineSettings({
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="sm:max-w-[600px] bg-[#0d0f0e] border-zinc-800 p-0 overflow-hidden">
+      <DialogContent className="sm:max-w-[600px] bg-bg-base border-border p-0 overflow-hidden">
         <DialogHeader className="p-6 border-b border-zinc-900 bg-zinc-950/50">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-emerald-500/10 rounded-lg">
@@ -180,10 +180,23 @@ export function WorkspaceEngineSettings({
                   {(localSettings.drain_similarity_threshold * 100).toFixed(0)}%
                 </span>
                 {globalSettings?.drain_similarity_threshold ===
-                  localSettings.drain_similarity_threshold && (
-                  <span className="text-[9px] bg-zinc-800 text-zinc-500 px-1.5 py-0.5 rounded border border-zinc-700/50">
-                    GLOBAL
+                localSettings.drain_similarity_threshold ? (
+                  <span className="text-[9px] bg-emerald-500/10 text-emerald-500 px-1.5 py-0.5 rounded border border-emerald-500/20 font-bold uppercase tracking-tighter">
+                    Global Default
                   </span>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      update(
+                        "drain_similarity_threshold",
+                        globalSettings?.drain_similarity_threshold,
+                      )
+                    }
+                    className="text-[9px] bg-zinc-800 text-zinc-400 hover:text-emerald-400 px-1.5 py-0.5 rounded border border-zinc-700/50 font-bold uppercase tracking-tighter transition-colors"
+                  >
+                    Reset to Global
+                  </button>
                 )}
               </div>
             </div>
@@ -213,8 +226,16 @@ export function WorkspaceEngineSettings({
                 >
                   Max Branches
                 </label>
-                {localSettings.drain_max_children === globalSettings?.drain_max_children && (
-                  <span className="text-[8px] text-zinc-600 uppercase">Default</span>
+                {localSettings.drain_max_children === globalSettings?.drain_max_children ? (
+                  <span className="text-[8px] text-emerald-500/50 uppercase font-bold">Global</span>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => update("drain_max_children", globalSettings?.drain_max_children)}
+                    className="text-[8px] text-zinc-500 hover:text-emerald-400 uppercase font-bold transition-colors"
+                  >
+                    Reset
+                  </button>
                 )}
               </div>
               <input
@@ -233,8 +254,16 @@ export function WorkspaceEngineSettings({
                 >
                   Cluster Cap
                 </label>
-                {localSettings.drain_max_clusters === globalSettings?.drain_max_clusters && (
-                  <span className="text-[8px] text-zinc-600 uppercase">Default</span>
+                {localSettings.drain_max_clusters === globalSettings?.drain_max_clusters ? (
+                  <span className="text-[8px] text-emerald-500/50 uppercase font-bold">Global</span>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => update("drain_max_clusters", globalSettings?.drain_max_clusters)}
+                    className="text-[8px] text-zinc-500 hover:text-emerald-400 uppercase font-bold transition-colors"
+                  >
+                    Reset
+                  </button>
                 )}
               </div>
               <input

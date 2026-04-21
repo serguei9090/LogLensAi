@@ -26,6 +26,7 @@ interface LogToolbarProps {
   readonly status: boolean;
   readonly onImportOpen: () => void;
   readonly onOrchestrateOpen: () => void;
+  readonly onEngineSettingsOpen?: () => void;
   readonly sources?: LogSource[];
   readonly activeSourceId?: string | null;
   readonly tailingSourceIds?: Set<string>;
@@ -67,7 +68,7 @@ export function LogToolbar({
   const [isSaveTemplateModalOpen, setIsSaveTemplateModalOpen] = useState(false);
 
   return (
-    <div className="sticky top-0 z-10 flex flex-nowrap items-center gap-3 bg-[#0d0f0e]/95 backdrop-blur-sm border-b border-zinc-800/60 px-4 py-2.5 shadow-sm overflow-x-auto scrollbar-none">
+    <div className="sticky top-0 z-10 flex flex-nowrap items-center gap-3 bg-bg-base/95 backdrop-blur-sm border-b border-border/60 px-4 py-2.5 shadow-sm overflow-x-auto scrollbar-none">
       {/* ... previous buttons ... */}
       <SaveTemplateModal
         isOpen={isSaveTemplateModalOpen}
@@ -81,7 +82,7 @@ export function LogToolbar({
       <button
         type="button"
         onClick={onImportOpen}
-        className="inline-flex items-center gap-2 rounded-md bg-emerald-500 hover:bg-emerald-400 active:bg-emerald-600 text-[#0a0c0b] text-xs font-semibold px-3 py-1.5 transition-colors shadow-[0_0_12px_rgba(52,211,153,0.2)] shrink-0"
+        className="inline-flex items-center gap-2 rounded-md bg-primary hover:bg-primary/90 active:bg-primary/80 text-bg-app text-xs font-semibold px-3 py-1.5 transition-colors shadow-[0_0_12px_rgba(var(--color-primary-rgb),0.2)] shrink-0"
       >
         <Upload className="h-3.5 w-3.5" />
         Import
@@ -91,7 +92,7 @@ export function LogToolbar({
       <button
         type="button"
         onClick={onExport}
-        className="inline-flex items-center gap-2 rounded-md bg-zinc-800 hover:bg-zinc-700 active:bg-zinc-900 text-zinc-300 text-xs font-semibold px-3 py-1.5 transition-colors border border-zinc-700 shrink-0"
+        className="inline-flex items-center gap-2 rounded-md bg-bg-surface hover:bg-bg-hover active:bg-bg-base text-text-secondary text-xs font-semibold px-3 py-1.5 transition-colors border border-border shrink-0"
       >
         <Download className="h-3.5 w-3.5" />
         Export

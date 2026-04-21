@@ -220,3 +220,15 @@
 - [x] **ANOMALY-001**: Time-Series Anomaly Detection (Done)
   - **Detail**: `docs/TODOC/ANALYSIS-004.md`
 
+---
+
+## 🟣 Sprint 11 — Engine Refinement & Auto-Evolution (Done)
+
+- [x] **AUTOC-A2UI-001**: A2UI v0.9 Integration
+  - **Detail**: Interactive UI components in AI sidebar with persistence.
+- [x] **AUTOC-ENGINE-UI**: Engine UI Refinement
+  - **Detail**: Centralized workspace engine settings, removed global scope toggle, added AI sidebar shortcuts.
+- [x] **FIX-SETTINGS-001**: AI Model Discovery Debounce
+  - **Detail**: Fixed `useEffect` dependencies in `SettingsPanel.tsx` to trigger model re-fetch on host/key changes.
+
+

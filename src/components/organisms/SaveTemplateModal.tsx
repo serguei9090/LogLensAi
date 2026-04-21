@@ -68,7 +68,7 @@ export function SaveTemplateModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[425px] bg-[#0D1110] border-border/40 text-text-primary">
+      <DialogContent className="sm:max-w-[425px] bg-bg-surface border-border-subtle text-text-primary">
         <DialogHeader>
           <div className="flex items-center gap-3 mb-2">
             <div className="p-2 rounded-lg bg-primary/10 text-primary border border-primary/20">

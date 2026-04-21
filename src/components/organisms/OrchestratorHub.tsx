@@ -235,7 +235,7 @@ export function OrchestratorHub({
 
       {/* Drawer */}
       <div
-        className="fixed top-0 right-0 bottom-0 z-[160] w-[380px] flex flex-col bg-[#111] border-l border-white/10 shadow-2xl animate-in slide-in-from-right duration-300 ease-out"
+        className="fixed top-0 right-0 bottom-0 z-[160] w-[380px] flex flex-col bg-bg-tooltip border-l border-border-subtle shadow-2xl animate-in slide-in-from-right duration-300 ease-out"
         onPointerDown={(e) => e.stopPropagation()}
       >
         {/* Header */}

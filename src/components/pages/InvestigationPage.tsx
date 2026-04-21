@@ -578,7 +578,9 @@ export function InvestigationPage() {
         onDistributionClose={() => setShowDistribution(!showDistribution)}
         workspaceId={activeWorkspaceId}
         leftPanel={<FacetSidebar />}
-        rightPanel={<AIInvestigationSidebar />}
+        rightPanel={
+          <AIInvestigationSidebar onEngineSettingsOpen={() => setIsEngineSettingsOpen(true)} />
+        }
       >
         <VirtualLogTable
           logs={logs}

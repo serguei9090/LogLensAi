@@ -428,7 +428,7 @@ export function VirtualLogTable({
         {expandedRow !== null && (
           <div
             id={`row-details-${expandedRow}`}
-            className="sticky bottom-0 left-0 w-full bg-[#111312]/95 border-t border-white/10 p-6 shadow-2xl z-20 animate-in slide-in-from-bottom duration-300 backdrop-blur-xl max-h-[400px]"
+            className="sticky bottom-0 left-0 w-full bg-bg-tooltip/95 border-t border-white/10 p-6 shadow-2xl z-20 animate-in slide-in-from-bottom duration-300 backdrop-blur-xl max-h-[400px]"
           >
             <div className="flex justify-between items-center mb-6">
               <h3 className="text-sm font-bold text-text-primary flex items-center gap-3">
@@ -497,7 +497,7 @@ export function VirtualLogTable({
       {/* Batch Selection Action Pill */}
       {selectedLogIds.length > 0 && expandedRow === null && (
         <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-[100] animate-in slide-in-from-bottom-4 duration-300">
-          <div className="bg-[#111312] border border-white/10 shadow-2xl rounded-full p-1.5 flex items-center gap-2 backdrop-blur-xl">
+          <div className="bg-bg-tooltip border border-white/10 shadow-2xl rounded-full p-1.5 flex items-center gap-2 backdrop-blur-xl">
             <span className="pl-4 pr-2 text-xs font-bold text-text-primary">
               {selectedLogIds.length} lines selected
             </span>
@@ -529,7 +529,7 @@ export function VirtualLogTable({
           <div
             role="toolbar"
             aria-label="Selection actions"
-            className="fixed z-[200] flex items-center gap-1 bg-[#111312] border border-white/10 shadow-2xl rounded-full p-1 animate-in fade-in slide-in-from-bottom-2"
+            className="fixed z-[200] flex items-center gap-1 bg-bg-tooltip border border-white/10 shadow-2xl rounded-full p-1 animate-in fade-in slide-in-from-bottom-2"
             style={{
               left: selectionInfo.x,
               top: selectionInfo.y,

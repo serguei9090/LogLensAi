@@ -10,7 +10,7 @@ export function SettingsPage() {
   };
 
   return (
-    <div className="flex-1 overflow-auto bg-[#0a0c0b] h-full">
+    <div className="flex-1 overflow-auto bg-bg-app h-full">
       <SettingsPanel onSave={handleSave} />
     </div>
   );

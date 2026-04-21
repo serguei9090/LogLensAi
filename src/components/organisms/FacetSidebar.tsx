@@ -26,12 +26,12 @@ export function FacetSidebar() {
       }}
       transition={{ type: "spring", stiffness: 400, damping: 40 }}
       className={cn(
-        "border-r border-[#1D2420] bg-[#0d0f0e] flex flex-col h-full overflow-hidden select-none relative",
+        "border-r border-border-subtle bg-bg-base flex flex-col h-full overflow-hidden select-none relative",
         facetSidebarCollapsed ? "pointer-events-none" : "",
       )}
     >
-      <div className="h-12 border-b border-[#1D2420] flex items-center justify-between px-4 shrink-0">
-        <span className="text-xs font-semibold text-[#8FA898] uppercase tracking-wider whitespace-nowrap">
+      <div className="h-12 border-b border-border-subtle flex items-center justify-between px-4 shrink-0">
+        <span className="text-xs font-semibold text-text-secondary uppercase tracking-wider whitespace-nowrap">
           Log Facets
         </span>
         <div className="flex items-center gap-1">
@@ -39,7 +39,7 @@ export function FacetSidebar() {
             <button
               type="button"
               onClick={clearFacetFilters}
-              className="p-1 hover:bg-[#22C55E10] text-[#4d6057] hover:text-[#22C55E] rounded transition-colors"
+              className="p-1 hover:bg-primary/10 text-text-muted hover:text-primary rounded transition-colors"
               title="Clear Facet Filters"
             >
               <FilterX className="h-3.5 w-3.5" />
@@ -48,7 +48,7 @@ export function FacetSidebar() {
           <button
             type="button"
             onClick={toggleFacetSidebar}
-            className="p-1 hover:bg-[#22C55E10] text-[#4d6057] hover:text-[#22C55E] rounded transition-colors"
+            className="p-1 hover:bg-primary/10 text-text-muted hover:text-primary rounded transition-colors"
             title="Collapse Facets"
           >
             <PanelLeftClose className="h-3.5 w-3.5" />

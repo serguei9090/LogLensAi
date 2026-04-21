@@ -18,6 +18,7 @@ interface InvestigationLayoutProps {
   readonly status: boolean;
   readonly onImportOpen: () => void;
   readonly onOrchestrateOpen: () => void;
+  readonly onEngineSettingsOpen?: () => void;
   readonly children: ReactNode;
   readonly sources?: LogSource[];
   readonly activeSourceId?: string | null;
@@ -47,6 +48,7 @@ export function InvestigationLayout({
   status,
   onImportOpen,
   onOrchestrateOpen,
+  onEngineSettingsOpen,
   children,
   sources,
   activeSourceId,
@@ -65,7 +67,7 @@ export function InvestigationLayout({
   const activeSource = sources?.find((s) => s.id === activeSourceId);
 
   return (
-    <div className="flex flex-col h-full w-full bg-[#0a0c0b] overflow-hidden">
+    <div className="flex flex-col h-full w-full bg-bg-app overflow-hidden">
       <LogToolbar
         searchRef={searchRef}
         searchQuery={searchQuery}
@@ -80,6 +82,7 @@ export function InvestigationLayout({
         status={status}
         onImportOpen={onImportOpen}
         onOrchestrateOpen={onOrchestrateOpen}
+        onEngineSettingsOpen={onEngineSettingsOpen}
         sources={sources}
         activeSourceId={activeSourceId}
         tailingSourceIds={tailingSourceIds}

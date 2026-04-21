@@ -36,7 +36,7 @@ export function AppLayout({
   diagnosticLoading,
 }: AppLayoutProps) {
   return (
-    <div className="flex h-screen w-full bg-[#0a0c0b] overflow-hidden relative font-sans">
+    <div className="flex h-screen w-full bg-bg-app overflow-hidden relative font-sans">
       <Sidebar
         workspaces={workspaces}
         activeWorkspaceId={activeWorkspaceId}
@@ -47,7 +47,7 @@ export function AppLayout({
         activeNav={activeNav}
         onNavSelect={onNavSelect}
       />
-      <main className="flex-1 flex flex-col min-w-0 relative h-full bg-[#0d0f0e]">{children}</main>
+      <main className="flex-1 flex flex-col min-w-0 relative h-full bg-bg-base">{children}</main>
       <DiagnosticSidebar
         open={diagnosticOpen}
         onClose={onDiagnosticClose}

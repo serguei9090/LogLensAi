@@ -80,20 +80,20 @@ export function Sidebar({
       initial={false}
       animate={{ width: sidebarCollapsed ? 60 : 240 }}
       transition={{ type: "spring", stiffness: 400, damping: 40 }}
-      className="h-screen bg-[#0a0c0b] border-r border-[#1D2420] flex flex-col select-none overflow-hidden relative"
+      className="h-screen bg-bg-sidebar border-r border-border-subtle flex flex-col select-none overflow-hidden relative"
     >
       {/* Logo Section */}
-      <div className="h-16 border-b border-[#1D2420] flex items-center px-4 shrink-0 overflow-hidden">
-        <div className="bg-[#22C55E10] border border-[#22C55E20] p-1.5 rounded-lg shrink-0 flex items-center justify-center">
-          <Terminal className="h-5 w-5 text-[#22C55E]" />
+      <div className="h-16 border-b border-border-subtle flex items-center px-4 shrink-0 overflow-hidden">
+        <div className="bg-primary/10 border border-primary/20 p-1.5 rounded-lg shrink-0 flex items-center justify-center">
+          <Terminal className="h-5 w-5 text-primary" />
         </div>
         {!sidebarCollapsed && (
           <motion.h1
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            className="ml-3 font-bold text-[15px] tracking-tight text-[#E8F5EC] whitespace-nowrap"
+            className="ml-3 font-bold text-[15px] tracking-tight text-text-primary whitespace-nowrap"
           >
-            LogLens<span className="text-[#22C55E]">Ai</span>
+            LogLens<span className="text-primary">Ai</span>
           </motion.h1>
         )}
       </div>
@@ -106,16 +106,16 @@ export function Sidebar({
           )}
         >
           {sidebarCollapsed ? (
-            <div className="h-px w-5 bg-[#1D2420]" />
+            <div className="h-px w-5 bg-border-subtle" />
           ) : (
             <>
-              <span className="text-[10px] font-semibold uppercase tracking-widest text-[#4D6057] whitespace-nowrap">
+              <span className="text-[10px] font-semibold uppercase tracking-widest text-text-muted whitespace-nowrap">
                 Workspaces
               </span>
               <button
                 type="button"
                 onClick={handleStartAdd}
-                className="text-[#4D6057] hover:text-[#22C55E] transition-colors"
+                className="text-text-muted hover:text-primary transition-colors"
               >
                 <Plus className="h-3.5 w-3.5" />
               </button>
@@ -133,8 +133,8 @@ export function Sidebar({
                     className={cn(
                       "group w-full flex items-center px-1 py-1 text-[13px] rounded-md transition-all text-left outline-none overflow-hidden",
                       activeWorkspaceId === ws.id && activeNav !== "settings"
-                        ? "bg-[#22C55E10] border border-[#22C55E20]"
-                        : "hover:bg-[#1E2520]",
+                        ? "bg-primary/10 border border-primary/20"
+                        : "hover:bg-bg-hover",
                       sidebarCollapsed && "justify-center",
                     )}
                   >
@@ -144,8 +144,8 @@ export function Sidebar({
                       className={cn(
                         "flex flex-1 items-center px-2 py-1.5 rounded transition-all text-left outline-none overflow-hidden border-none bg-transparent cursor-pointer",
                         activeWorkspaceId === ws.id && activeNav !== "settings"
-                          ? "text-[#22C55E] font-medium"
-                          : "text-[#8FA898] group-hover:text-[#E8F5EC]",
+                          ? "text-primary font-medium"
+                          : "text-text-secondary group-hover:text-text-primary",
                         sidebarCollapsed && "justify-center px-0",
                       )}
                     >
@@ -153,8 +153,8 @@ export function Sidebar({
                         className={cn(
                           "h-4 w-4 shrink-0 transition-colors",
                           activeWorkspaceId === ws.id && activeNav !== "settings"
-                            ? "text-[#22C55E]"
-                            : "text-[#4D6057]",
+                            ? "text-primary"
+                            : "text-text-muted",
                         )}
                       />
                       {!sidebarCollapsed && (
@@ -170,7 +170,7 @@ export function Sidebar({
                             setRenamingId(ws.id);
                             setRenameValue(ws.name);
                           }}
-                          className="p-1 rounded text-[#4D6057] hover:text-[#22C55E] border-none bg-transparent transition-colors"
+                          className="p-1 rounded text-text-muted hover:text-primary border-none bg-transparent transition-colors"
                         >
                           <Pencil className="h-3.5 w-3.5" />
                         </button>
@@ -181,7 +181,7 @@ export function Sidebar({
                               e.stopPropagation();
                               onWorkspaceDelete?.(ws.id);
                             }}
-                            className="p-1 rounded text-[#EF444490] hover:text-[#EF4444] border-none bg-transparent transition-colors"
+                            className="p-1 rounded text-error/90 hover:text-error border-none bg-transparent transition-colors"
                           >
                             <Trash2 className="h-3.5 w-3.5" />
                           </button>
@@ -206,12 +206,12 @@ export function Sidebar({
                             setRenamingId(null);
                           }
                         }}
-                        className="flex-1 bg-black/40 border border-[#22C55E30] rounded px-2 py-0.5 text-xs text-[#E8F5EC] outline-none"
+                        className="flex-1 bg-black/40 border border-primary/30 rounded px-2 py-0.5 text-xs text-text-primary outline-none"
                       />
                       <button
                         type="button"
                         onClick={() => handleConfirmRename(ws.id)}
-                        className="text-[#22C55E] border-none bg-transparent"
+                        className="text-primary border-none bg-transparent"
                       >
                         <Check className="h-3.5 w-3.5" />
                       </button>
@@ -223,7 +223,7 @@ export function Sidebar({
                       <TooltipTrigger className="w-full">{WorkspaceItem}</TooltipTrigger>
                       <TooltipContent
                         side="right"
-                        className="bg-[#1A1F1C] border-[#2A3430] text-[#E8F5EC]"
+                        className="bg-bg-surface-bright border-border text-text-primary"
                       >
                         {ws.name}
                       </TooltipContent>
@@ -254,12 +254,12 @@ export function Sidebar({
                       handleCancelAdd();
                     }
                   }}
-                  className="w-full bg-black/40 border border-[#22C55E30] rounded px-2 py-1 text-xs text-[#E8F5EC] outline-none"
+                  className="w-full bg-black/40 border border-primary/30 rounded px-2 py-1 text-xs text-text-primary outline-none"
                 />
-                <button type="button" onClick={handleConfirmAdd} className="text-[#22C55E]">
+                <button type="button" onClick={handleConfirmAdd} className="text-primary">
                   <Check className="h-3.5 w-3.5" />
                 </button>
-                <button type="button" onClick={handleCancelAdd} className="text-[#4D6057]">
+                <button type="button" onClick={handleCancelAdd} className="text-text-muted">
                   <X className="h-3.5 w-3.5" />
                 </button>
               </div>
@@ -267,7 +267,7 @@ export function Sidebar({
           </div>
         </ScrollArea>
 
-        <div className="mt-auto border-t border-[#1D2420] bg-[#0a0c0b] px-2 py-4 space-y-1 overflow-hidden shrink-0">
+        <div className="mt-auto border-t border-border-subtle bg-bg-sidebar px-2 py-4 space-y-1 overflow-hidden shrink-0">
           <TooltipProvider delay={0}>
             <SidebarNavItem
               icon={<LayoutDashboard className="h-4 w-4" />}
@@ -285,7 +285,7 @@ export function Sidebar({
               onClick={() => onNavSelect("settings")}
             />
 
-            <div className="pt-2 border-t border-[#1D2420]/40 mt-1">
+            <div className="pt-2 border-t border-border-subtle/40 mt-1">
               <SidebarNavItem
                 icon={
                   sidebarCollapsed ? (
@@ -337,8 +337,8 @@ function SidebarNavItem({
       className={cn(
         "flex items-center px-3 py-2.5 text-[13px] rounded-md transition-all text-left outline-none overflow-hidden border-none bg-transparent w-full",
         active
-          ? "bg-[#22C55E10] text-[#22C55E] font-medium border border-[#22C55E20] cursor-default"
-          : "text-[#8FA898] hover:bg-[#1E2520] hover:text-[#E8F5EC] cursor-pointer",
+          ? "bg-primary/10 text-primary font-medium border border-primary/20 cursor-default"
+          : "text-text-secondary hover:bg-bg-hover hover:text-text-primary cursor-pointer",
         disabled && "opacity-40 cursor-not-allowed",
         collapsed ? "justify-center" : "gap-3",
         className,
@@ -347,7 +347,7 @@ function SidebarNavItem({
       <span className="shrink-0">{icon}</span>
       {!collapsed && <span className="flex-1 whitespace-nowrap truncate">{label}</span>}
       {!collapsed && badge && (
-        <span className="ml-auto text-[8px] bg-[#1A1F1C] text-[#4D6057] border border-[#2A3430] px-1 rounded">
+        <span className="ml-auto text-[8px] bg-bg-surface-bright text-text-muted border border-border px-1 rounded">
           {badge}
         </span>
       )}
@@ -358,7 +358,7 @@ function SidebarNavItem({
     return (
       <Tooltip>
         <TooltipTrigger className="w-full">{navContent}</TooltipTrigger>
-        <TooltipContent side="right" className="bg-[#1A1F1C] border-[#2A3430] text-[#E8F5EC]">
+        <TooltipContent side="right" className="bg-bg-surface-bright border-border text-text-primary">
           {label} {badge && `(${badge})`}
         </TooltipContent>
       </Tooltip>
