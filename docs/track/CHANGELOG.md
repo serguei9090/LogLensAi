@@ -5,10 +5,12 @@ All notable changes to the LogLensAi project will be documented in this file.
 ## [Phase 5] - Desktop Integration & UI Polish (2026-04-21)
 
 ### Added
-- **NativeFilePicker Molecule**: Implemented a standardized file selection component using Tauri's `@tauri-apps/plugin-dialog` for desktop and browser fallback for web mode.
-- **Tauri Plugin Support**: Enabled native dialog integration for local log ingestion.
+- **AI Studio Model Compatibility**: Updated `AIStudioProvider` to automatically strip the `models/` prefix from model strings, ensuring compatibility with Google ADK 2.0 `LLMRegistry` and preventing misinterpretation of model names as external providers.
+- **Enhanced Sidecar Tracing**: Implemented a prominent startup banner on `stderr` and added detailed initialization logging for AI providers to improve debug visibility in the console.
 
 ### Fixed
+- **Sidecar Stdout Pollution**: Replaced all `print()` statements in `db.py`, `query_parser.py`, and `api.py` with structured `logging`. This resolves the `SyntaxError: Unexpected token 'D'` error caused by plain-text logs corrupting the JSON-RPC stdout stream.
+- **Tauri Dev Rebuild Loop**: Migrated Drain3 persistence state to use absolute project-root paths. This prevents the Tauri dev watcher from triggering recursive rebuilds when the sidecar writes state files inside the `src-tauri` directory.
 - **Ingestion Modal UX**: Integrated `NativeFilePicker` into `ImportFeedModal` to streamline local file path selection.
 - **Orchestrator Stability**: Refined state management in `OrchestratorHub` and `Sidebar` to prevent hydration mismatches during workspace transitions.
 - **Performance Optimization**: Improved `VirtualLogTable` rendering performance for high-volume log streams.

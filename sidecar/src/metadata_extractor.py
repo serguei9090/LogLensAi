@@ -78,11 +78,11 @@ def extract_log_metadata(
     # --- Facet Extraction (Generic Heuristics) ---
     facets = {}
 
-    # 1. IP Addresses (IPv4 and IPv6)
+    # 1. IP Addresses (IPv4 and IPv6) - Searching in raw_line for better coverage
     ipv4_pattern = r"\b(?:\d{1,3}\.){3}\d{1,3}\b"
     ipv6_pattern = r"\b(?:(?:[0-9a-fA-F]{1,4}:){2,7}[0-9a-fA-F]{1,4}|(?:[0-9a-fA-F]{1,4}:){1,7}:|:(?::[0-9a-fA-F]{1,4}){1,7}|::)\b"
 
-    candidates = re.findall(f"{ipv4_pattern}|{ipv6_pattern}", message)
+    candidates = re.findall(f"{ipv4_pattern}|{ipv6_pattern}", raw_line)
     for cand in candidates:
         try:
             ip_obj = ipaddress.ip_address(cand)
@@ -103,14 +103,52 @@ def extract_log_metadata(
     if email_match:
         facets["email"] = email_match.group(0)
 
-    # 4. Key=Value pairs
+    # 4. HTTP Methods
+    method_match = re.search(r"\b(GET|POST|PUT|DELETE|PATCH|HEAD|OPTIONS)\b", raw_line)
+    if method_match:
+        facets["method"] = method_match.group(1)
+
+    # 5. Common fields (Host, Thread, Logger)
+    # Host (e.g. host:myserver or [myserver] at start)
+    if "host" not in facets:
+        host_match = re.search(r"\bhost[:=]([a-zA-Z0-9\.\-]+)\b", raw_line, re.I)
+        if host_match:
+            facets["host"] = host_match.group(1)
+
+    # Thread (e.g. [thread-1] or thread=thread-1)
+    if "thread" not in facets:
+        thread_match = re.search(r"\[([^\]]{3,20})\]|thread[:=]([\w\-]+)", raw_line, re.I)
+        if thread_match:
+            # Check if it's not a level or timestamp
+            val = thread_match.group(1) or thread_match.group(2)
+            if val and val.upper() not in ["INFO", "ERROR", "WARN", "DEBUG", "TRACE", "FATAL"]:
+                facets["thread"] = val
+
+    # Logger (e.g. com.example.App: or logger=com.example.App)
+    if "logger" not in facets:
+        logger_match = re.search(r"\b([\w\.]{5,40})[:\s]+(?=[A-Z])|logger[:=]([\w\.]+)", raw_line)
+        if logger_match:
+            facets["logger"] = logger_match.group(1) or logger_match.group(2)
+
+    # 6. Key=Value pairs
     kv_matches = re.finditer(r"\b(\w+)=([\w\-\.@]+)\b", raw_line)
     for m in kv_matches:
         key, val = m.groups()
-        if key.lower() not in ["timestamp", "level", "id", "ip", "uuid", "email"]:
+        if key.lower() not in [
+            "timestamp",
+            "level",
+            "id",
+            "ip",
+            "uuid",
+            "email",
+            "host",
+            "thread",
+            "logger",
+            "method",
+        ]:
             facets[key.lower()] = val
 
-    # 5. Specialized common fields
+    # 7. Specialized common fields (backwards compatibility)
     if "user_id" not in facets:
         uid_match = re.search(r"user[:_]?id[:\s=]+(\w+)", raw_line, re.I)
         if uid_match:

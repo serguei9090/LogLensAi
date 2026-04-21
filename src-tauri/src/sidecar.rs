@@ -24,12 +24,14 @@ impl SidecarManager {
         // Determine if we are in dev mode or prod
         // For dev: uv run sidecar/main.py --stdio
         // For prod: sidecar binary (Tauri sidecar)
-        
         let mut cmd = if cfg!(debug_assertions) {
             let mut c = Command::new("uv");
             c.arg("run")
                 .arg("../sidecar/main.py")
-                .arg("--stdio");
+                .arg("--stdio")
+                .arg("--with-http")
+                .arg("--db")
+                .arg("loglens_tauri.duckdb");
             c
         } else {
             // Production: Use Tauri sidecar binary

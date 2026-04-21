@@ -89,7 +89,10 @@ sh.setFormatter(formatter)
 root_logger.addHandler(sh)
 
 logger = logging.getLogger("LogLensSidecar")
-logger.info("--- Sidecar Tracing Session Started --- (Level: %s)", logging.getLevelName(LOG_LEVEL))
+banner = f"--- Sidecar Tracing Session Started --- (Level: {logging.getLevelName(LOG_LEVEL)})"
+logger.info(banner)
+sys.stderr.write(f"{banner}\n")
+sys.stderr.flush()
 logger.info("Log path: %s", LOG_FILE)
 
 DEFAULT_DB = "loglens.duckdb"
@@ -118,7 +121,7 @@ class App:
 
         # Initialize Ingestion Ports (Syslog/HTTP)
         syslog_port = int(settings.get("ingestion_syslog_port", "514"))
-        http_port = int(settings.get("ingestion_http_port", "5002"))
+        http_port = int(settings.get("ingestion_http_port", "5001"))
         syslog_enabled = settings.get("ingestion_syslog_enabled", "true").lower() == "true"
         http_enabled = settings.get("ingestion_http_enabled", "true").lower() == "true"
 
@@ -148,6 +151,8 @@ class App:
     def _init_ai_provider(self, settings: dict):
         """Map the correct host based on provider and return an instance."""
         provider = settings.get("ai_provider", "ollama")
+        logger.info("Initializing AI Provider: %s", provider)
+
         if provider == "gemini-cli":
             host = settings.get("ai_gemini_url", "http://localhost:22436")
         elif provider in ["openai-compatible", "openai"]:
@@ -156,6 +161,8 @@ class App:
             host = settings.get("ai_ollama_host", "http://localhost:11434")
         else:
             host = ""  # ai-studio etc.
+
+        logger.debug("AI Provider Host: %s, Model: %s", host, settings.get("ai_model"))
 
         return AIProviderFactory.get_provider(
             provider,
@@ -175,7 +182,7 @@ class App:
                 import uvicorn
 
                 config = uvicorn.Config(
-                    mcp_server.application, host="127.0.0.1", port=5001, log_level="error"
+                    mcp_server.application, host="127.0.0.1", port=5002, log_level="error"
                 )
                 self._mcp_server_instance = uvicorn.Server(config)
                 self._mcp_server_instance.run()
@@ -292,9 +299,7 @@ class App:
 
             return JSONRPCResponse(id=req.id, result=result)
         except Exception as e:
-            import traceback
-
-            traceback.print_exc()
+            logger.exception("JSON-RPC Dispatch Error")
             return JSONRPCResponse(
                 id=req.id, error={"code": -32603, "message": "Internal error", "data": str(e)}
             )
@@ -949,80 +954,7 @@ class App:
     def method_get_metadata_facets(self, **kwargs) -> dict:
         """Return the top unique metadata facets across all logs in a workspace."""
         params = GetMetadataFacetsRequest(**kwargs)
-        cursor = self.db.get_cursor()
-
-        # 1. Define priority/standard facets
-        keys = ["ip", "uuid", "user_id", "host", "thread", "logger", "status", "method", "level"]
-
-        # 2. Add custom facet names from settings
-        # Fetch global rules
-        cursor.execute("SELECT value FROM settings WHERE key = 'facet_extractions'")
-        gr = cursor.fetchone()
-        if gr and gr[0]:
-            try:
-                rules = json.loads(gr[0])
-                for r in rules if isinstance(rules, list) else []:
-                    name = r.get("name")
-                    if name and name not in keys:
-                        keys.append(name)
-            except Exception:
-                pass
-
-        # Fetch workspace rules
-        cursor.execute(
-            "SELECT value FROM workspace_settings WHERE workspace_id = ? AND key = 'facet_extractions'",
-            (params.workspace_id,),
-        )
-        wr = cursor.fetchone()
-        if wr and wr[0]:
-            try:
-                rules = json.loads(wr[0])
-                for r in rules if isinstance(rules, list) else []:
-                    name = r.get("name")
-                    if name and name not in keys:
-                        keys.append(name)
-            except Exception:
-                pass
-
-        results = {}
-
-        for key in keys:
-            # Efficiently query top 10 unique values for each facet key if they exist
-            # Note: Using json_extract_string with double-quoted keys for special char safety ($."key")
-
-            if key == "level":
-                where_clauses = ["workspace_id = ?", "level IS NOT NULL"]
-                query_field = "level"
-            else:
-                where_clauses = [
-                    "workspace_id = ?",
-                    f"json_extract_string(facets, '$.\"{key}\"') IS NOT NULL",
-                ]
-                query_field = f"json_extract_string(facets, '$.\"{key}\"')"
-
-            sql_params = [params.workspace_id]
-
-            if params.source_ids:
-                placeholders = ",".join(["?"] * len(params.source_ids))
-                where_clauses.append(f"source_id IN ({placeholders})")
-                sql_params.extend(params.source_ids)
-
-            where_sql = " AND ".join(where_clauses)
-
-            query = f"""
-                SELECT {query_field} as val, count(*) as count
-                FROM logs
-                WHERE {where_sql}
-                GROUP BY val
-                ORDER BY count DESC
-                LIMIT 10
-            """
-            cursor.execute(query, sql_params)
-            rows = cursor.fetchall()
-            if rows:
-                results[key] = [{"value": r[0], "count": r[1]} for r in rows]
-
-        return results
+        return self.db.get_metadata_facets(params.workspace_id, params.source_ids)
 
     def method_update_log_comment(self, log_id: int, comment: str) -> dict:
         """Update annotation for a specific log entry. If empty, the note is removed."""
@@ -1473,7 +1405,7 @@ class App:
         if not workspace_id and any(k.startswith("ingestion_") for k in settings):
             current_settings = self.method_get_settings()
             syslog_port = int(current_settings.get("ingestion_syslog_port", "514"))
-            http_port = int(current_settings.get("ingestion_http_port", "5002"))
+            http_port = int(current_settings.get("ingestion_http_port", "5001"))
             syslog_enabled = (
                 current_settings.get("ingestion_syslog_enabled", "true").lower() == "true"
             )
@@ -1510,12 +1442,15 @@ class App:
         except Exception:
             masking_instructions = []
 
+        data_dir = os.path.join(PROJECT_ROOT, "data", "drain")
+        os.makedirs(data_dir, exist_ok=True)
+
         if scope == "global" or not workspace_id:
             key = "__global__"
-            path = "data/drain/global.state"
+            path = os.path.join(data_dir, "global.state")
         else:
             key = workspace_id
-            path = f"data/drain/workspace_{workspace_id}.state"
+            path = os.path.join(data_dir, f"workspace_{workspace_id}.state")
 
         if key not in self._parsers:
             self._parsers[key] = DrainParser(
@@ -1926,9 +1861,55 @@ def run_http(port=5000, db_path=DEFAULT_DB):
     web.run_app(server, host="127.0.0.1", port=port)
 
 
-async def run_stdio_async(db_path=DEFAULT_DB):
+async def start_background_http(app: App, port: int = 5000):
+    """Starts the aiohttp server in the background without blocking."""
+    server = web.Application()
+
+    # Configure CORS
+    cors = aiohttp_cors.setup(
+        server,
+        defaults={
+            "*": aiohttp_cors.ResourceOptions(
+                allow_credentials=True,
+                expose_headers="*",
+                allow_headers="*",
+                allow_methods="*",
+            ),
+        },
+    )
+
+    resource = server.router.add_resource("/rpc")
+    route = resource.add_route("POST", app.aiohttp_handler)
+    cors.add(route)
+
+    stream_resource = server.router.add_resource("/api/stream_chat")
+    stream_route = stream_resource.add_route("POST", app.aiohttp_stream_chat)
+    cors.add(stream_route)
+
+    server["sidecar_app"] = app
+
+    runner = web.AppRunner(server)
+    await runner.setup()
+    site = web.TCPSite(runner, "127.0.0.1", port)
+    try:
+        await site.start()
+        logger.info("Background HTTP server started on port %s", port)
+        return runner
+    except Exception as e:
+        if "10048" in str(e) or "EADDRINUSE" in str(e):
+            logger.warning("Port %s in use. Background HTTP server skipped.", port)
+        else:
+            logger.error("Failed to start background HTTP server: %s", e)
+        return None
+
+
+async def run_stdio_async(db_path=DEFAULT_DB, start_http=False, http_port=5000):
     app = App(db_path=db_path)
     app.dev_mode = False
+
+    _http_runner = None
+    if start_http:
+        _http_runner = await start_background_http(app, port=http_port)
 
     try:
         # Use aioconsole or simple async iterator for stdin
@@ -1982,7 +1963,7 @@ async def run_stdio_async(db_path=DEFAULT_DB):
         logger.info("Sidecar: Cleanly exited.")
 
 
-def run_stdio(db_path=DEFAULT_DB):
+def run_stdio(db_path=DEFAULT_DB, start_http=False, http_port=5000):
     import asyncio
 
-    asyncio.run(run_stdio_async(db_path=db_path))
+    asyncio.run(run_stdio_async(db_path=db_path, start_http=start_http, http_port=http_port))

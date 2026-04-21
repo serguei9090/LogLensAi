@@ -1,5 +1,6 @@
 import contextlib
 import json
+import logging
 import os
 import threading
 from datetime import datetime, timedelta
@@ -7,6 +8,8 @@ from typing import Any
 
 import duckdb
 from query_parser import parse_llql
+
+logger = logging.getLogger(__name__)
 
 
 class LogDatabase:
@@ -33,16 +36,16 @@ class LogDatabase:
             if db_path != ":memory:":
                 wal_path = f"{db_path}.wal"
                 if os.path.exists(wal_path):
-                    print(f"[DB] WAL replay failed: {e}")
-                    print(f"[DB] Attempting recovery by removing WAL file: {wal_path}")
+                    logger.warning("[DB] WAL replay failed: %s", e)
+                    logger.info("[DB] Attempting recovery by removing WAL file: %s", wal_path)
                     try:
                         os.remove(wal_path)
                         self.conn = duckdb.connect(db_path)
-                        print("[DB] Recovery successful.")
+                        logger.info("[DB] Recovery successful.")
                         self._create_tables()
                         return
                     except Exception as retry_err:
-                        print(f"[DB] Recovery failed: {retry_err}")
+                        logger.error("[DB] Recovery failed: %s", retry_err)
             raise e
 
         self._create_tables()
@@ -242,7 +245,7 @@ class LogDatabase:
             pk_cols = [row[0] for row in cursor.fetchall()]
 
             if "fusion_id" not in pk_cols:
-                print("[DB] Migrating fusion_configs to update Primary Key...")
+                logger.info("[DB] Migrating fusion_configs to update Primary Key...")
                 cursor.execute(
                     "CREATE TEMP TABLE fusion_configs_backup AS SELECT * FROM fusion_configs"
                 )
@@ -264,13 +267,13 @@ class LogDatabase:
                     """)
                 cursor.execute("DROP TABLE fusion_configs_backup")
         except Exception as e:
-            print(f"[DB] Error migrating fusion_configs: {e}")
+            logger.error("[DB] Error migrating fusion_configs: %s", e)
 
     def _migrate_fusion_time_shift(self, cursor):
         try:
             cursor.execute("SELECT time_shift_seconds FROM fusion_configs LIMIT 1")
         except Exception:
-            print("[DB] Adding time_shift_seconds to fusion_configs...")
+            logger.info("[DB] Adding time_shift_seconds to fusion_configs...")
             cursor.execute(
                 "ALTER TABLE fusion_configs ADD COLUMN time_shift_seconds INTEGER DEFAULT 0"
             )
@@ -288,21 +291,21 @@ class LogDatabase:
         try:
             cursor.execute("SELECT facets FROM logs LIMIT 1")
         except Exception:
-            print("[DB] Adding facets column to logs table...")
+            logger.info("[DB] Adding facets column to logs table...")
             cursor.execute("ALTER TABLE logs ADD COLUMN facets JSON")
 
     def _initialize_cluster_cache(self, cursor):
         try:
             cursor.execute("SELECT count(*) FROM clusters")
             if cursor.fetchone()[0] == 0:
-                print("[DB] Initializing clusters cache...")
+                logger.info("[DB] Initializing clusters cache...")
                 cursor.execute("""
                     INSERT INTO clusters (workspace_id, cluster_id, template, count)
                     SELECT workspace_id, cluster_id, 'Pattern ' || cluster_id, count(*)
                     FROM logs WHERE cluster_id IS NOT NULL GROUP BY workspace_id, cluster_id
                 """)
         except Exception as e:
-            print(f"[DB] Cluster cache initialization failure: {e}")
+            logger.error("[DB] Cluster cache initialization failure: %s", e)
 
     def get_cursor(self):
         return self.conn.cursor()
@@ -508,6 +511,97 @@ class LogDatabase:
         self._apply_temporal_offsets(workspace_id, logs)
 
         return {"total": total, "logs": logs, "offset": offset, "limit": limit}
+
+    def get_metadata_facets(self, workspace_id: str, source_ids: list = None) -> dict:
+        """Return the top unique metadata facets across all logs in a workspace."""
+        cursor = self.get_cursor()
+
+        # 1. Define priority/standard facets
+        keys = [
+            "ip",
+            "uuid",
+            "user_id",
+            "host",
+            "thread",
+            "logger",
+            "status",
+            "method",
+            "level",
+            "email",
+        ]
+
+        # 2. Add custom facet names from settings
+        # Fetch global rules
+        cursor.execute("SELECT value FROM settings WHERE key = 'facet_extractions'")
+        gr = cursor.fetchone()
+        if gr and gr[0]:
+            try:
+                rules = json.loads(gr[0])
+                for r in rules if isinstance(rules, list) else []:
+                    name = r.get("name")
+                    if name and name not in keys:
+                        keys.append(name)
+            except Exception:
+                pass
+
+        # Fetch workspace rules
+        cursor.execute(
+            "SELECT value FROM workspace_settings WHERE workspace_id = ? AND key = 'facet_extractions'",
+            (workspace_id,),
+        )
+        wr = cursor.fetchone()
+        if wr and wr[0]:
+            try:
+                rules = json.loads(wr[0])
+                for r in rules if isinstance(rules, list) else []:
+                    name = r.get("name")
+                    if name and name not in keys:
+                        keys.append(name)
+            except Exception:
+                pass
+
+        results = {}
+
+        for key in keys:
+            # Efficiently query top 10 unique values for each facet key if they exist
+            if key == "level":
+                where_clauses = ["workspace_id = ?", "level IS NOT NULL"]
+                query_field = "level"
+            else:
+                where_clauses = [
+                    "workspace_id = ?",
+                    f"json_extract_string(facets, '$.\"{key}\"') IS NOT NULL",
+                ]
+                query_field = f"json_extract_string(facets, '$.\"{key}\"')"
+
+            sql_params = [workspace_id]
+
+            if source_ids:
+                placeholders = ",".join(["?"] * len(source_ids))
+                where_clauses.append(f"source_id IN ({placeholders})")
+                sql_params.extend(source_ids)
+
+            where_sql = " AND ".join(where_clauses)
+
+            query = f"""
+                SELECT {query_field} as val, count(*) as count
+                FROM logs
+                WHERE {where_sql}
+                GROUP BY val
+                ORDER BY count DESC
+                LIMIT 10
+            """
+            try:
+                cursor.execute(query, sql_params)
+                rows = cursor.fetchall()
+                if rows:
+                    results[key] = [{"value": str(r[0]), "count": r[1]} for r in rows]
+            except Exception as e:
+                # Silently skip if column/field doesn't exist or query fails
+                logger.warning("[DB] Facet aggregation failed for '%s': %s", key, e)
+                continue
+
+        return results
 
 
 # Alias for backward compatibility

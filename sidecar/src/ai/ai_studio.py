@@ -1,37 +1,66 @@
 import asyncio
 import os
+import time
 
 from google.adk.agents.llm_agent import LlmAgent
+from google.adk.events.event import Event
 from google.adk.runners import Runner
 from google.adk.sessions import InMemorySessionService
 from google.genai import Client, types
 
 from .base import AIChatMessage, AIProvider
 
-DEFAULT_MODEL = "gemini-2.5-flash"
+DEFAULT_MODEL = "gemini-2.0-flash-exp"
+APP_NAME = "LogLensAi"
 
 
 class AIStudioProvider(AIProvider):
     """Direct provider using Google AI Studio (API Key)."""
 
+    # Class-level cache for available models to reduce API spam
+    _cached_models: list[str] | None = None
+    _cache_timestamp: float = 0
+    CACHE_DURATION: float = 3600  # 1 hour in seconds
+
     def __init__(self, api_key: str, system_prompt: str = "", model: str | None = None):
         super().__init__(api_key=api_key, system_prompt=system_prompt)
-        self.active_model = model or DEFAULT_MODEL
+        active = model or DEFAULT_MODEL
+        if active.startswith("models/"):
+            active = active[7:]
+        self.active_model = active
         # We wrap the client for list_models and other direct calls
         self._client = Client(api_key=api_key) if api_key else None
 
     async def list_models(self) -> list[str]:
-        """Fetches available Gemini models from the API."""
+        """Fetches available Gemini models from the API with caching."""
         if not self._client:
             return [DEFAULT_MODEL]
+
+        # Return cached models if valid
+        now = time.time()
+        if (
+            AIStudioProvider._cached_models
+            and (now - AIStudioProvider._cache_timestamp) < AIStudioProvider.CACHE_DURATION
+        ):
+            return AIStudioProvider._cached_models
 
         try:
             # Note: This is a synchronous call in google-genai currently
             # but we run it in executor for safety
             loop = asyncio.get_event_loop()
             models = await loop.run_in_executor(None, self._client.models.list)
-            return [m.name for m in models if "gemini" in m.name.lower()]
+            AIStudioProvider._cached_models = [
+                m.name.replace("models/", "")
+                for m in models
+                if any(keyword in m.name.lower() for keyword in ["gemini", "gemma"])
+            ]
+            AIStudioProvider._cache_timestamp = now
+            return AIStudioProvider._cached_models
         except Exception:
+            # If API fails, don't update cache timestamp so we retry next time
+            # But return the old cache if it exists, otherwise defaults
+            if AIStudioProvider._cached_models:
+                return AIStudioProvider._cached_models
             return [DEFAULT_MODEL, "gemini-2.5-pro"]
 
     async def chat(
@@ -48,31 +77,43 @@ class AIStudioProvider(AIProvider):
             )
 
         # Create a transient agent for this request
-        # In a real session, we'd use the ADK session management
+        target_model = model or self.active_model
+        if target_model.startswith("models/"):
+            target_model = target_model[7:]
+
         agent = LlmAgent(
             name="ai_studio_agent",
-            model=model or self.active_model,
+            model=target_model,
             instruction=self.system_prompt,
         )
 
-        # Configure the client via environment or ADK config if possible
-        # For now, we manually use the client/runner if ADK allows
-        # Actually ADK uses the environment variable 'GOOGLE_API_KEY'
         os.environ["GOOGLE_API_KEY"] = self.api_key
 
         # Reconstruct context for the runner
-        # Since we use InMemorySessionService, we must populate it with history
-        # of the current session before running the new message.
         session_service = InMemorySessionService()
         user_id = "default_user"
-        # 1. Standard history injection via ADK Session (this is the AI Studio "Auto-Heal")
         adk_session_id = session_id or "temp_session"
-        for msg in messages[:-1]:
-            role = "user" if msg.role == "user" else "model"
-            content = types.Content(role=role, parts=[types.Part(text=msg.content)])
-            await session_service.add_message(user_id, adk_session_id, content)
 
-        runner = Runner(agent=agent, app_name="LogLensAi", session_service=session_service)
+        # 1. Create session explicitly in the service
+        session = await session_service.create_session(
+            app_name=APP_NAME, user_id=user_id, session_id=adk_session_id
+        )
+
+        # 2. History injection via ADK Event appending
+        for msg in messages[:-1]:
+            role = "user" if msg.role == "user" else "ai_studio_agent"
+            content = types.Content(
+                role="user" if role == "user" else "model", parts=[types.Part(text=msg.content)]
+            )
+            event = Event(invocation_id="historical", author=role, content=content)
+            await session_service.append_event(session, event)
+
+        runner = Runner(
+            agent=agent,
+            app_name=APP_NAME,
+            session_service=session_service,
+            auto_create_session=True,
+        )
 
         last_msg = messages[-1]
         content = types.Content(role="user", parts=[types.Part(text=last_msg.content)])
@@ -107,9 +148,13 @@ class AIStudioProvider(AIProvider):
             return
 
         os.environ["GOOGLE_API_KEY"] = self.api_key
+        target_model = model or self.active_model
+        if target_model.startswith("models/"):
+            target_model = target_model[7:]
+
         agent = LlmAgent(
             name="ai_studio_agent",
-            model=model or self.active_model,
+            model=target_model,
             instruction=self.system_prompt,
         )
 
@@ -117,13 +162,26 @@ class AIStudioProvider(AIProvider):
         user_id = "default_user"
         adk_session_id = session_id or "temp_session"
 
-        # Auto-Heal: Reconstruct history
-        for msg in messages[:-1]:
-            role = "user" if msg.role == "user" else "model"
-            content = types.Content(role=role, parts=[types.Part(text=msg.content)])
-            await session_service.add_message(user_id, adk_session_id, content)
+        # 1. Create session explicitly
+        session = await session_service.create_session(
+            app_name=APP_NAME, user_id=user_id, session_id=adk_session_id
+        )
 
-        runner = Runner(agent=agent, app_name="LogLensAi", session_service=session_service)
+        # 2. History injection
+        for msg in messages[:-1]:
+            role = "user" if msg.role == "user" else "ai_studio_agent"
+            content = types.Content(
+                role="user" if role == "user" else "model", parts=[types.Part(text=msg.content)]
+            )
+            event = Event(invocation_id="historical", author=role, content=content)
+            await session_service.append_event(session, event)
+
+        runner = Runner(
+            agent=agent,
+            app_name=APP_NAME,
+            session_service=session_service,
+            auto_create_session=True,
+        )
         last_msg = messages[-1]
         content = types.Content(role="user", parts=[types.Part(text=last_msg.content)])
 

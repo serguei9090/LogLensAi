@@ -19,6 +19,7 @@ When the user types `/autostartcycle <idea>`, execute the entire development cyc
 
 3. **Core Sidecar Engine Logic (@backend)**:
    - Execute `generate_backend_code.md` skill in `sidecar/src/`.
+   - Execute `lint-sidecar.md` skill to fix style and consistency.
    - Ensure all backend code has docstrings and `// TODO(ID)`'s.
 
 4. **Premium Interface implementation (@frontend)**:

@@ -164,7 +164,7 @@
 
 ---
 
-## 🟡 Sprint 05 — Advanced Intelligence (Planning)
+## 🔵 Sprint 05 — Advanced Intelligence (Done)
 
 ### P0 — Visualization & Context
 - [x] **ANALYSIS-001**: Log Distribution Chart (Histogram) — Toggleable via Orchestrator Hub
@@ -185,7 +185,7 @@
 
 ---
 
-## 🔵 Sprint 06 — Logical Alignment (Planning)
+## 🔵 Sprint 06 — Logical Alignment (Done)
 
 ### P1 — Time Normalization
 - [x] **TIME-001**: Backend Implementation — Support `time_shift_seconds` in `FusionSourceConfig` and `get_fused_logs`
@@ -230,5 +230,15 @@
   - **Detail**: Centralized workspace engine settings, removed global scope toggle, added AI sidebar shortcuts.
 - [x] **FIX-SETTINGS-001**: AI Model Discovery Debounce
   - **Detail**: Fixed `useEffect` dependencies in `SettingsPanel.tsx` to trigger model re-fetch on host/key changes.
+
+---
+
+## 🔵 Sprint 12 — Productivity Acceleration (Done)
+
+- [x] **ACCEL-001**: Implement `lint-sidecar` skill for rapid `ruff` checks.
+  - **Detail**: Created specialized agent skill `.agents/skills/lint-sidecar.md`.
+- [x] **ACCEL-002**: Automate lint/test pass in startcycle workflow.
+  - **Detail**: Integrated `lint-sidecar.md` into `.agents/workflows/autostartcycle.md`.
+
 
 

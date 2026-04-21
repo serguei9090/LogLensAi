@@ -23,13 +23,16 @@ def main():
 
     parser.add_argument("--port", type=int, default=5000, help="Port for HTTP mode (default: 5000)")
     parser.add_argument("--db", type=str, default="loglens.duckdb", help="Path to DuckDB file")
+    parser.add_argument(
+        "--with-http", action="store_true", help="Start background HTTP server in Stdio mode"
+    )
 
     args = parser.parse_args()
 
     if args.http or args.dev:
-        run_http(port=args.port)
+        run_http(port=args.port, db_path=args.db)
     else:
-        run_stdio()
+        run_stdio(db_path=args.db, start_http=args.with_http, http_port=args.port)
 
 
 if __name__ == "__main__":

@@ -19,6 +19,14 @@ class FieldNode(Node):
         self.operator = operator
         self.value = value
 
+    def _process_value(self, val):
+        # Use placeholders that don't contain * or ?
+        protected = val.replace("\\*", "___X_AST_X___").replace("\\?", "___X_QM_X___")
+        has_wildcard = "*" in protected or "?" in protected
+        processed = protected.replace("*", "%").replace("?", "_")
+        final = processed.replace("___X_AST_X___", "*").replace("___X_QM_X___", "?")
+        return has_wildcard, final
+
     def to_sql(self):
         field_mapping = {
             "level": "l.level",
@@ -27,29 +35,64 @@ class FieldNode(Node):
             "content": "l.message",
             "message": "l.message",
             "raw": "l.raw_text",
+            "id": "l.id",
+            "timestamp": "l.timestamp",
         }
 
         db_field = field_mapping.get(self.field)
+        has_wildcard, processed_val = self._process_value(self.value)
 
         if db_field:
+            if has_wildcard:
+                return f"{db_field} ILIKE ?", [processed_val]
             if self.operator in (":", ":="):
-                return f"{db_field} = ?", [self.value]
+                return f"{db_field} = ?", [processed_val]
             elif self.operator == ":!=":
-                return f"{db_field} != ?", [self.value]
+                return f"{db_field} != ?", [processed_val]
             elif self.operator == ":~":
-                return f"{db_field} ILIKE ?", [f"%{self.value}%"]
+                return f"{db_field} ILIKE ?", [f"%{processed_val}%"]
         else:
             # Fallback to facets
+            if has_wildcard:
+                return f"json_extract_string(l.facets, '$.\"{self.field}\"') ILIKE ?", [
+                    processed_val
+                ]
             if self.operator in (":", ":="):
-                return f"json_extract_string(l.facets, '$.\"{self.field}\"') = ?", [self.value]
+                return f"json_extract_string(l.facets, '$.\"{self.field}\"') = ?", [processed_val]
             elif self.operator == ":!=":
-                return f"json_extract_string(l.facets, '$.\"{self.field}\"') != ?", [self.value]
+                return f"json_extract_string(l.facets, '$.\"{self.field}\"') != ?", [processed_val]
             elif self.operator == ":~":
                 return f"json_extract_string(l.facets, '$.\"{self.field}\"') ILIKE ?", [
-                    f"%{self.value}%"
+                    f"%{processed_val}%"
                 ]
 
         return f"{self.field} = ?", [self.value]
+
+
+class RangeNode(Node):
+    def __init__(self, field, start, end, inclusive_start=True, inclusive_end=True):
+        self.field = field
+        self.start = start
+        self.end = end
+        self.inclusive_start = inclusive_start
+        self.inclusive_end = inclusive_end
+
+    def to_sql(self):
+        field_mapping = {
+            "level": "l.level",
+            "source": "l.source_id",
+            "cluster": "l.cluster_id",
+            "id": "l.id",
+            "timestamp": "l.timestamp",
+        }
+        db_field = field_mapping.get(self.field)
+        if not db_field:
+            db_field = f"json_extract_string(l.facets, '$.\"{self.field}\"')"
+
+        op_start = ">=" if self.inclusive_start else ">"
+        op_end = "<=" if self.inclusive_end else "<"
+
+        return f"({db_field} {op_start} ? AND {db_field} {op_end} ?)", [self.start, self.end]
 
 
 class SearchNode(Node):
@@ -57,7 +100,21 @@ class SearchNode(Node):
         self.term = term
 
     def to_sql(self):
-        return "(l.message ILIKE ? OR l.raw_text ILIKE ?)", [f"%{self.term}%", f"%{self.term}%"]
+        protected = self.term.replace("\\*", "___X_AST_X___").replace("\\?", "___X_QM_X___")
+        if "*" in protected or "?" in protected:
+            processed = (
+                protected.replace("*", "%")
+                .replace("?", "_")
+                .replace("___X_AST_X___", "*")
+                .replace("___X_QM_X___", "?")
+            )
+            return "(l.message ILIKE ? OR l.raw_text ILIKE ?)", [processed, processed]
+
+        final_term = self.term.replace("\\*", "*").replace("\\?", "?")
+        return "(l.message ILIKE ? OR l.raw_text ILIKE ?)", [
+            f"%{final_term}%",
+            f"%{final_term}%",
+        ]
 
 
 class AndNode(Node):
@@ -98,8 +155,10 @@ class LLQLParser:
 
     def _tokenize(self, query):
         token_spec = [
+            ("RANGE", r"[a-zA-Z_][a-zA-Z0-9_\.]*:([\[\{].+?\s+TO\s+.+?[\]\}])"),
             ("FIELD", r'[a-zA-Z_][a-zA-Z0-9_\.]*:(?:=|!=|~)?(?:"[^"]*"|[^()\s]+)'),
             ("SEARCH", r'search\s+"[^"]*"|search\s+[^()\s]+'),
+            ("PLUS", r"\+"),
             ("STRING", r'"[^"]*"'),
             ("AND", r"\bAND\b"),
             ("OR", r"\bOR\b"),
@@ -152,7 +211,16 @@ class LLQLParser:
         while self.peek() and self.peek()[0] not in ("OR", "RPAREN"):
             if self.peek()[0] == "AND":
                 self.consume()
-            elif self.peek()[0] not in ("LPAREN", "FIELD", "SEARCH", "STRING", "WORD", "NOT"):
+            elif self.peek()[0] not in (
+                "LPAREN",
+                "FIELD",
+                "RANGE",
+                "SEARCH",
+                "STRING",
+                "WORD",
+                "NOT",
+                "PLUS",
+            ):
                 break
 
             right = self.parse_not_expr()
@@ -161,7 +229,7 @@ class LLQLParser:
 
     def parse_not_expr(self):
         tok = self.peek()
-        if tok and tok[0] == "NOT":
+        if tok and (tok[0] == "NOT"):
             self.consume()
             return NotNode(self.parse_primary())
         return self.parse_primary()
@@ -172,17 +240,33 @@ class LLQLParser:
             raise ParseError("Unexpected end of query")
 
         kind, val = tok
-        if kind == "LPAREN":
+        if kind == "PLUS":
+            self.consume()
+            return self.parse_primary()
+        elif kind == "LPAREN":
             self.consume()
             node = self.parse_or_expr()
             if not self.peek() or self.peek()[0] != "RPAREN":
                 raise ParseError("Expected ')'")
             self.consume()
             return node
+        elif kind == "RANGE":
+            self.consume()
+            m = re.match(r"^([a-zA-Z_][a-zA-Z0-9_.]*):([\[\{])(.+?)\s+TO\s+(.+?)([\]\}])$", val)
+            if m:
+                field, lbracket, start, end, rbracket = m.groups()
+                return RangeNode(
+                    field,
+                    start.strip('"'),
+                    end.strip('"'),
+                    inclusive_start=(lbracket == "["),
+                    inclusive_end=(rbracket == "]"),
+                )
+            raise ParseError(f"Invalid range format: {val}")
         elif kind == "FIELD":
             self.consume()
             # Match longest operators first
-            m = re.match(r"^([a-zA-Z_][a-zA-Z0-9_]*)(:!=|:=|:~|:)(.*)$", val)
+            m = re.match(r"^([a-zA-Z_][a-zA-Z0-9_.]*)(:!=|:=|:~|:)(.*)$", val)
             if m:
                 field, op, val_str = m.groups()
                 if val_str.startswith('"') and val_str.endswith('"'):
@@ -216,5 +300,5 @@ def parse_llql(query: str):
             return ast.to_sql()
         return "", []
     except Exception as e:
-        print(f"[LLQL] Parsing error: {e}, falling back to text search")
+        logger.error("[LLQL] Parsing error: %s, falling back to text search", e)
         return "(l.message ILIKE ? OR l.raw_text ILIKE ?)", [f"%{query}%", f"%{query}%"]
