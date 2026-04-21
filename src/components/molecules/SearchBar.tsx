@@ -11,7 +11,15 @@ interface SearchBarProps {
 }
 
 export const SearchBar = forwardRef<HTMLInputElement, SearchBarProps>(
-  ({ value, onChange, placeholder = "Search logs...", className }, ref) => {
+  (
+    {
+      value,
+      onChange,
+      placeholder = "Search logs (e.g., level:error AND 'database')...",
+      className,
+    },
+    ref,
+  ) => {
     const [localValue, setLocalValue] = useState(value);
     const debouncedValue = useDebounce(localValue, 300);
 
