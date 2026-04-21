@@ -298,7 +298,7 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
               type="button"
               onClick={() => setActiveSection(id)}
               className={cn(
-                "flex items-center gap-4 px-4 py-3.5 rounded-2xl text-left transition-all relative group overflow-hidden",
+                "flex items-center gap-3 px-4 py-3 rounded-2xl text-left transition-all relative group overflow-hidden",
                 activeSection === id
                   ? "bg-primary/10 text-primary border border-primary/20"
                   : "text-text-secondary hover:bg-white/5 hover:text-text-primary border border-transparent",

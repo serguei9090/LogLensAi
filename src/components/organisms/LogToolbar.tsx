@@ -5,13 +5,30 @@ import { HighlightBuilder, type HighlightEntry } from "@/components/molecules/Hi
 import { SearchBar } from "@/components/molecules/SearchBar";
 import { TimeRangePicker } from "@/components/molecules/TimeRangePicker";
 import { WorkspaceTabs } from "@/components/molecules/WorkspaceTabs";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 import { useAiStore } from "@/store/aiStore";
 import { useInvestigationStore } from "@/store/investigationStore";
 import { useUIStore } from "@/store/uiStore";
 import type { LogSource } from "@/store/workspaceStore";
-import { Bookmark, Columns, Cpu, Download, Sparkles, Upload } from "lucide-react";
+import {
+  Bookmark,
+  Columns,
+  Cpu,
+  Download,
+  LayoutTemplate,
+  List,
+  Plus,
+  Sparkles,
+  Upload,
+} from "lucide-react";
 import { useState } from "react";
+import { LoadTemplateModal } from "./LoadTemplateModal";
 import { SaveTemplateModal } from "./SaveTemplateModal";
 
 interface LogToolbarProps {
@@ -66,6 +83,7 @@ export function LogToolbar({
   const { isSidebarOpen, setSidebarOpen } = useAiStore();
   const { facetSidebarCollapsed, toggleFacetSidebar } = useUIStore();
   const [isSaveTemplateModalOpen, setIsSaveTemplateModalOpen] = useState(false);
+  const [isLoadTemplateModalOpen, setIsLoadTemplateModalOpen] = useState(false);
 
   return (
     <div className="sticky top-0 z-10 flex flex-nowrap items-center gap-3 bg-bg-base/95 backdrop-blur-sm border-b border-border/60 px-4 py-2.5 shadow-sm overflow-x-auto scrollbar-none">
@@ -76,6 +94,15 @@ export function LogToolbar({
         workspaceId={activeWorkspaceId ?? ""}
         filters={activeFilters}
         highlights={activeHighlights}
+      />
+      <LoadTemplateModal
+        isOpen={isLoadTemplateModalOpen}
+        onClose={() => setIsLoadTemplateModalOpen(false)}
+        workspaceId={activeWorkspaceId ?? ""}
+        onLoad={(f, h) => {
+          onFilterChange(f);
+          onHighlightChange(h);
+        }}
       />
 
       {/* Import button */}
@@ -154,14 +181,33 @@ export function LogToolbar({
         <HighlightBuilder highlights={activeHighlights} onChange={onHighlightChange} />
 
         {/* Template Summary Button */}
-        <button
-          type="button"
-          onClick={() => setIsSaveTemplateModalOpen(true)}
-          className="p-1.5 rounded-md hover:bg-white/5 text-text-muted hover:text-text-primary transition-colors ml-1"
-          title="Save as Template"
-        >
-          <Bookmark className="size-4" />
-        </button>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button
+              type="button"
+              className="p-1.5 rounded-md hover:bg-white/5 text-text-muted hover:text-text-primary transition-colors ml-1"
+              title="Template Actions"
+            >
+              <LayoutTemplate className="size-4" />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-48 bg-bg-surface border-border-subtle">
+            <DropdownMenuItem
+              onClick={() => setIsSaveTemplateModalOpen(true)}
+              className="gap-2 text-xs py-2"
+            >
+              <Plus className="size-3.5" />
+              Save as Template
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={() => setIsLoadTemplateModalOpen(true)}
+              className="gap-2 text-xs py-2"
+            >
+              <List className="size-3.5" />
+              Load Template
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
 
         <div className="h-5 w-px bg-zinc-800 shrink-0 mx-1" />
 

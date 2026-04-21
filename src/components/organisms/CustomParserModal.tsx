@@ -1,3 +1,4 @@
+import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { callSidecar } from "@/lib/hooks/useSidecarBridge";
 import { cn } from "@/lib/utils";
@@ -285,7 +286,7 @@ export function CustomParserModal({
     <TooltipProvider delay={200}>
       <div className="fixed inset-0 z-[200] flex flex-col overflow-y-auto py-8 px-4 bg-black/85 backdrop-blur-md animate-in fade-in duration-300">
         <div className="max-w-5xl w-full my-auto mx-auto min-h-[520px] flex flex-col bg-[#0D1110] border border-border/60 rounded-2xl shadow-2xl overflow-hidden ring-1 ring-white/10">
-          <div className="flex items-center justify-between p-6 border-b border-border/40 bg-white/5">
+          <div className="flex items-center justify-between px-8 py-6 border-b border-border/40 bg-white/5">
             <div className="flex items-center gap-4">
               <div className="p-2.5 rounded-xl bg-primary/10 text-primary border border-primary/20">
                 <Terminal className="size-5" />
@@ -514,23 +515,23 @@ export function CustomParserModal({
                   </p>
                 </div>
                 <div className="flex gap-3">
-                  <button
-                    type="button"
+                  <Button
+                    variant="outline"
+                    size="icon"
                     onClick={() => {
                       setRegexPattern("");
                       setMapping({});
                     }}
-                    className="p-2.5 rounded-xl border border-border/40 text-text-muted hover:text-red-400"
+                    className="border-border/40 text-text-muted hover:text-red-400 hover:bg-red-500/10"
                   >
                     <Trash2 className="size-5" />
-                  </button>
-                  <button
-                    type="button"
+                  </Button>
+                  <Button
                     onClick={handleSave}
-                    className="flex-1 bg-primary text-black h-11 rounded-xl font-bold text-sm hover:bg-primary-hover shadow-lg"
+                    className="flex-1 bg-primary text-black h-11 font-bold text-sm hover:bg-primary-hover shadow-lg shadow-primary/10"
                   >
                     Save Definition
-                  </button>
+                  </Button>
                 </div>
               </div>
             </div>

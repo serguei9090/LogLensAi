@@ -9,7 +9,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { callSidecar } from "@/lib/hooks/useSidecarBridge";
-import { Bookmark, Filter, Highlighter } from "lucide-react";
+import { Filter, Highlighter, LayoutTemplate } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import type { FilterEntry } from "../molecules/FilterBuilder";
@@ -72,7 +72,7 @@ export function SaveTemplateModal({
         <DialogHeader>
           <div className="flex items-center gap-3 mb-2">
             <div className="p-2 rounded-lg bg-primary/10 text-primary border border-primary/20">
-              <Bookmark className="size-4" />
+              <LayoutTemplate className="size-4" />
             </div>
             <DialogTitle className="text-xl font-bold tracking-tight">Save Template</DialogTitle>
           </div>

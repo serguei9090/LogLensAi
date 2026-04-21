@@ -148,7 +148,7 @@ export function WorkspaceEngineSettings({
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="sm:max-w-[600px] bg-bg-base border-border p-0 overflow-hidden">
-        <DialogHeader className="p-6 border-b border-zinc-900 bg-zinc-950/50">
+        <DialogHeader className="px-8 py-6 border-b border-zinc-900 bg-zinc-950/50">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-emerald-500/10 rounded-lg">
               <Cpu className="size-5 text-emerald-400" />
@@ -374,32 +374,31 @@ export function WorkspaceEngineSettings({
           </div>
         </div>
 
-        <DialogFooter className="px-6 pb-6 pt-4 bg-zinc-900/50 border-t border-zinc-800 flex items-center justify-between">
-          <button
-            type="button"
+        <DialogFooter className="px-8 pb-8 pt-4 bg-zinc-900/50 border-t border-zinc-800 flex items-center justify-between">
+          <Button
+            variant="ghost"
             onClick={handleReset}
-            className="flex items-center gap-2 px-4 h-9 rounded-lg text-[10px] font-bold uppercase tracking-wider text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800 transition-all border border-transparent hover:border-zinc-700"
+            className="flex items-center gap-2 px-4 h-9 text-[10px] font-bold uppercase tracking-wider text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800 transition-all border border-transparent hover:border-zinc-700"
           >
             <RefreshCcw className="size-3" />
             Reset Overrides
-          </button>
+          </Button>
           <div className="flex items-center gap-2">
-            <button
-              type="button"
+            <Button
+              variant="ghost"
               onClick={onClose}
-              className="px-4 h-9 rounded-lg text-[10px] font-bold uppercase tracking-wider text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 transition-all"
+              className="px-4 h-9 text-[10px] font-bold uppercase tracking-wider text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 transition-all"
             >
               Cancel
-            </button>
-            <button
-              type="button"
+            </Button>
+            <Button
               onClick={handleSave}
               disabled={isSaving}
-              className="flex items-center gap-2 px-6 h-9 rounded-lg bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500 hover:text-zinc-900 disabled:opacity-50 disabled:cursor-not-allowed transition-all border border-emerald-500/20 text-[10px] font-black uppercase tracking-widest shadow-[0_0_20px_rgba(16,185,129,0.1)]"
+              className="flex items-center gap-2 px-6 h-9 bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500 hover:text-zinc-900 disabled:opacity-50 disabled:cursor-not-allowed transition-all border border-emerald-500/20 text-[10px] font-black uppercase tracking-widest shadow-[0_0_20px_rgba(16,185,129,0.1)]"
             >
               {isSaving ? "Saving..." : "Save Overrides"}
               {!isSaving && <Cpu className="size-3" />}
-            </button>
+            </Button>
           </div>
         </DialogFooter>
       </DialogContent>

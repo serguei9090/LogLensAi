@@ -5,6 +5,14 @@ All notable changes to the LogLensAi project will be documented in this file.
 ## [Phase 5] - Desktop Integration & UI Polish (2026-04-21)
 
 ### Added
+- **Discovery Template Management**: 
+    - Replaced the static `Bookmark` button in `LogToolbar.tsx` with a `DropdownMenu` using the `LayoutTemplate` icon.
+    - Implemented a new `LoadTemplateModal.tsx` organism to allow users to fetch, apply, and delete saved filter/highlight configurations from the sidecar.
+
+### Refactored
+- **High-Density UI Atomic Migration**: Standardized the LogLensAi interface toward a high-density "Engine Precision" aesthetic.
+    - **Modal Spacing Standard**: Updated `ImportFeedModal`, `CustomParserModal`, and `WorkspaceEngineSettings` headers and footers to a compact `px-8 / py-6` padding system, reducing visual noise.
+    - **Button Atom Integration**: Replaced legacy raw `<button>` elements with the project's `Button` atom across management modals to ensure consistent hover states, glows, and rhythmic spacing.
 - **AI Studio Model Compatibility**: Updated `AIStudioProvider` to automatically strip the `models/` prefix from model strings, ensuring compatibility with Google ADK 2.0 `LLMRegistry` and preventing misinterpretation of model names as external providers.
 - **Enhanced Sidecar Tracing**: Implemented a prominent startup banner on `stderr` and added detailed initialization logging for AI providers to improve debug visibility in the console.
 - **SmartContextManager Refactor**: Migrated log context preparation to a stateful `SmartContextManager` with improved filtering and token-aware summarization logic.

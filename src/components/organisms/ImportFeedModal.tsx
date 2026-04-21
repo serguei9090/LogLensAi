@@ -1,5 +1,7 @@
 import { TailSwitch } from "@/components/atoms/TailSwitch";
 import { NativeFilePicker } from "@/components/molecules/NativeFilePicker";
+import { SourceSelector } from "@/components/molecules/SourceSelector";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useSettingsStore } from "@/store/settingsStore";
 import { useWorkspaceStore } from "@/store/workspaceStore";
@@ -77,46 +79,34 @@ export function ImportFeedModal({
       />
 
       <div className="relative z-10 w-full max-w-[560px] bg-bg-surface/60 border border-border/80 rounded-[2rem] shadow-[0_30px_60px_-15px_rgba(0,0,0,0.8)] overflow-hidden animate-in zoom-in-95 fade-in duration-300">
-        <div className="flex items-center justify-between px-10 py-8 border-b border-border/50 bg-white/[0.03]">
+        <div className="flex items-center justify-between px-8 py-6 border-b border-border/50 bg-white/[0.03]">
           <div>
-            <div className="flex items-center gap-2 mb-1">
-              <h2 className="text-2xl font-bold text-text-primary tracking-tight">Ingest Source</h2>
+            <div className="flex items-center gap-2 mb-0.5">
+              <h2 className="text-lg font-bold text-text-primary tracking-tight">Ingest Source</h2>
             </div>
-            <p className="text-[13px] text-text-muted opacity-60">
+            <p className="text-xs text-text-muted opacity-60">
               Connect a data source for real-time analysis
             </p>
           </div>
-          <button
-            type="button"
+          <Button
+            variant="ghost"
+            size="icon-sm"
             onClick={() => onOpenChange(false)}
-            className="h-10 w-10 rounded-2xl flex items-center justify-center text-text-muted/50 hover:text-text-primary hover:bg-white/10 transition-all"
+            className="text-text-muted/50 hover:text-text-primary"
           >
-            <X className="h-6 w-6" />
-          </button>
+            <X className="size-5" />
+          </Button>
         </div>
 
-        <div className="px-10 mt-8">
-          <div className="flex gap-1.5 bg-bg-base/80 rounded-2xl p-1.5 border border-border/60 shadow-inner">
-            {TABS.map(({ id, icon: Icon, label }) => (
-              <button
-                key={id}
-                type="button"
-                onClick={() => setActiveTab(id)}
-                className={cn(
-                  "flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-[14px] text-xs font-bold transition-all",
-                  activeTab === id
-                    ? "bg-primary text-bg-base shadow-xl shadow-primary/20"
-                    : "text-text-muted hover:text-text-secondary hover:bg-white/5",
-                )}
-              >
-                <Icon className="h-4 w-4" />
-                {label}
-              </button>
-            ))}
-          </div>
+        <div className="px-8 mt-6">
+          <SourceSelector
+            options={TABS}
+            activeId={activeTab}
+            onSelect={(id) => setActiveTab(id as TabId)}
+          />
         </div>
 
-        <div className="px-10 py-10 min-h-[340px]">
+        <div className="px-8 py-8 min-h-[340px]">
           {activeTab === "local" && (
             <div className="space-y-6 animate-in slide-in-from-left-4 duration-500">
               <div className="space-y-4">
@@ -145,18 +135,18 @@ export function ImportFeedModal({
                   onCheckedChange={setLocalTail}
                   label="Activate Live Stream"
                 />
-                <button
-                  type="button"
+                <Button
                   disabled={!localPath.trim()}
+                  size="lg"
                   onClick={() => {
                     onImportLocal(localPath.trim(), localTail);
                     onOpenChange(false);
                   }}
-                  className="inline-flex items-center gap-3 px-8 py-3.5 rounded-2xl bg-primary hover:bg-primary-hover disabled:opacity-30 disabled:grayscale disabled:cursor-not-allowed text-bg-base text-[13px] font-black transition-all shadow-[0_15px_30px_-5px_rgba(34,197,94,0.4)] hover:-translate-y-0.5 active:translate-y-0"
+                  className="font-black"
                 >
-                  <Upload className="h-5 w-5" />
+                  <Upload className="size-5" />
                   Initialize
-                </button>
+                </Button>
               </div>
             </div>
           )}
@@ -233,18 +223,18 @@ export function ImportFeedModal({
                   onCheckedChange={setSshTail}
                   label="Stream remotely"
                 />
-                <button
-                  type="button"
+                <Button
                   disabled={!sshHost || !sshUser || !sshPath}
+                  size="lg"
                   onClick={() => {
                     onImportSSH(sshHost, Number(sshPort), sshUser, sshPass, sshPath, sshTail);
                     onOpenChange(false);
                   }}
-                  className="inline-flex items-center gap-3 px-8 py-3.5 rounded-2xl bg-primary hover:bg-primary-hover disabled:opacity-30 text-bg-base text-[13px] font-black transition-all shadow-xl shadow-primary/20"
+                  className="font-black"
                 >
-                  <Terminal className="h-5 w-5" />
+                  <Terminal className="size-5" />
                   Connect
-                </button>
+                </Button>
               </div>
             </div>
           )}
@@ -271,18 +261,18 @@ export function ImportFeedModal({
                 </div>
               </div>
               <div className="flex justify-end pt-2">
-                <button
-                  type="button"
+                <Button
                   disabled={!manualLogs.trim()}
+                  size="lg"
                   onClick={() => {
                     onIngestManual(manualLogs.trim());
                     onOpenChange(false);
                   }}
-                  className="inline-flex items-center gap-3 px-8 py-3.5 rounded-2xl bg-primary hover:bg-primary-hover disabled:opacity-30 text-bg-base text-[13px] font-black transition-all shadow-xl shadow-primary/20"
+                  className="font-black"
                 >
-                  <Upload className="h-5 w-5" />
+                  <Upload className="size-5" />
                   Process Buffer
-                </button>
+                </Button>
               </div>
             </div>
           )}
@@ -425,18 +415,18 @@ export function ImportFeedModal({
               </div>
 
               <div className="flex justify-end pt-2">
-                <button
-                  type="button"
+                <Button
                   disabled={!liveName.trim() || (!liveSyslog && !liveHttp)}
+                  size="lg"
                   onClick={() => {
                     onImportLive(liveName.trim(), { syslog: liveSyslog, http: liveHttp });
                     onOpenChange(false);
                   }}
-                  className="inline-flex items-center gap-3 px-8 py-3.5 rounded-2xl bg-primary hover:bg-primary-hover disabled:opacity-30 text-bg-base text-[13px] font-black transition-all shadow-xl shadow-primary/20 hover:-translate-y-0.5 active:translate-y-0"
+                  className="font-black"
                 >
-                  <Wifi className="h-5 w-5" />
+                  <Wifi className="size-5" />
                   Start Collection
-                </button>
+                </Button>
               </div>
             </div>
           )}
