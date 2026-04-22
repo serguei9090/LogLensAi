@@ -182,14 +182,11 @@ export function LogToolbar({
 
         {/* Template Summary Button */}
         <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <button
-              type="button"
-              className="p-1.5 rounded-md hover:bg-white/5 text-text-muted hover:text-text-primary transition-colors ml-1"
-              title="Template Actions"
-            >
-              <LayoutTemplate className="size-4" />
-            </button>
+          <DropdownMenuTrigger
+            className="p-1.5 rounded-md hover:bg-white/5 text-text-muted hover:text-text-primary transition-colors ml-1"
+            title="Template Actions"
+          >
+            <LayoutTemplate className="size-4" />
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-48 bg-bg-surface border-border-subtle">
             <DropdownMenuItem

@@ -114,11 +114,17 @@ export function LoadTemplateModal({
               </div>
             ) : (
               templates.map((template) => (
-                <button
+                <div
                   key={template.id}
-                  type="button"
+                  role="button"
+                  tabIndex={0}
                   onClick={() => handleApply(template)}
-                  className="w-full flex items-center justify-between p-4 rounded-xl bg-white/5 border border-white/5 hover:bg-white/10 hover:border-primary/20 transition-all group text-left"
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      handleApply(template);
+                    }
+                  }}
+                  className="w-full flex items-center justify-between p-4 rounded-xl bg-white/5 border border-white/5 hover:bg-white/10 hover:border-primary/20 transition-all group text-left cursor-pointer outline-none focus-visible:ring-1 focus-visible:ring-primary/50"
                 >
                   <div className="space-y-1">
                     <p className="text-sm font-bold text-text-primary group-hover:text-primary transition-colors">
@@ -136,7 +142,7 @@ export function LoadTemplateModal({
                   >
                     <Trash2 className="size-3.5" />
                   </Button>
-                </button>
+                </div>
               ))
             )}
           </div>
