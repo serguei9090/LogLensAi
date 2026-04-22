@@ -956,24 +956,8 @@ class App:
 
         for log in log_dicts:
             ws_id = log.get("workspace_id")
-            if ws_id not in rules_cache:
-                ws_rules = []
-                cursor.execute(
-                    "SELECT value FROM workspace_settings WHERE workspace_id = ? AND key = 'facet_extractions'",
-                    (ws_id,),
-                )
-                wr = cursor.fetchone()
-                if wr and wr[0]:
-                    try:
-                        parsed = json.loads(wr[0])
-                        ws_rules = parsed if isinstance(parsed, list) else []
-                    except Exception:
-                        pass
-                rules_cache[ws_id] = global_rules + ws_rules
-
-            batch_data.append(
-                self._ingest_single_log(cursor, log, custom_rules=rules_cache.get(ws_id))
-            )
+            rules = self._get_facet_rules_for_workspace(cursor, ws_id, rules_cache, global_rules)
+            batch_data.append(self._ingest_single_log(cursor, log, custom_rules=rules))
 
         if batch_data:
             cursor.executemany(
@@ -1391,41 +1375,11 @@ class App:
     def method_update_settings(self, settings: dict, workspace_id: str | None = None) -> dict:
         cursor = self.db.get_cursor()
 
-        # Update persistent settings (Global vs Workspace)
-        if workspace_id:
-            query = (
-                "INSERT INTO workspace_settings (workspace_id, key, value) VALUES (?, ?, ?) "
-                "ON CONFLICT (workspace_id, key) DO UPDATE SET value = excluded.value"
-            )
-            for k, v in settings.items():
-                # Use json.dumps for complex values (lists/dicts) to ensure valid JSON in DB
-                val_to_save = json.dumps(v) if isinstance(v, (list, dict)) else str(v)
-                cursor.execute(query, (workspace_id, k, val_to_save))
-        else:
-            query = (
-                "INSERT INTO settings (key, value) VALUES (?, ?) "
-                "ON CONFLICT (key) DO UPDATE SET value = excluded.value"
-            )
-            for k, v in settings.items():
-                # Use json.dumps for complex values (lists/dicts) to ensure valid JSON in DB
-                val_to_save = json.dumps(v) if isinstance(v, (list, dict)) else str(v)
-                cursor.execute(query, (k, val_to_save))
+        # 1. Update persistent settings
+        self._persist_settings(cursor, settings, workspace_id)
 
-        # Re-initialize AI Provider if relevant settings changed (Global-only for now)
-        if not workspace_id and any(
-            k in settings
-            for k in [
-                "ai_provider",
-                "ai_api_key",
-                "ai_ollama_host",
-                "ai_openai_host",
-                "ai_gemini_url",
-                "ai_model",
-                "ai_system_prompt",
-            ]
-        ):
-            current_settings = self.method_get_settings()
-            self.ai = self._init_ai_provider(current_settings)
+        # 2. Re-initialize AI Provider if relevant settings changed
+        self._check_ai_provider_reload(settings, workspace_id)
 
         # Reset specific Drain parser if clustering settings changed
         if any(k.startswith("drain_") for k in settings):
@@ -1620,93 +1574,21 @@ class App:
             await response.write(f"data: {json.dumps({'session_id': session_id})}\n\n".encode())
 
             full_text = []
-            a2ui_buffer = ""
-            is_collecting_a2ui = False
             extracted_a2ui = None
 
             if hasattr(self.ai, "chat_stream"):
-                async for chunk in self.ai.chat_stream(
-                    messages=history,
-                    model=params.model,
-                    reasoning=params.reasoning,
-                    session_id=session_id,
-                    provider_session_id=provider_session_id,
-                ):
-                    full_text.append(chunk)
-
-                    # --- A2UI Streaming Logic ---
-                    # Check if we're entering an A2UI block
-                    if "[[A2UI]]" in chunk and not is_collecting_a2ui:
-                        is_collecting_a2ui = True
-                        parts = chunk.split("[[A2UI]]")
-                        a2ui_buffer = parts[1]
-                    elif is_collecting_a2ui:
-                        a2ui_buffer += chunk
-
-                    # Check if we're leaving an A2UI block
-                    if "[[/A2UI]]" in a2ui_buffer and is_collecting_a2ui:
-                        try:
-                            # 1. Fragment the raw content
-                            raw_content = a2ui_buffer.split("[[/A2UI]]")[0].strip()
-
-                            # 2. Strategy A: Attempt JSON parse (Legacy/Standard)
-                            try:
-                                extracted_a2ui = json.loads(raw_content)
-                            except ValueError:
-                                # Strategy B: It's likely Markup format (button label="...")
-                                # We pass it as a special object that the frontend A2UIRenderer will understand
-                                extracted_a2ui = {"type": "markup", "raw": raw_content}
-
-                            # 3. Stream to UI
-                            await response.write(
-                                f"data: {json.dumps({'a2ui_payload': extracted_a2ui})}\n\n".encode()
-                            )
-                        except Exception as e:
-                            logger.error("Failed to parse A2UI block: %s", e)
-                        is_collecting_a2ui = False
-
-                    payload = {"chunk": chunk}
-                    await response.write(f"data: {json.dumps(payload)}\n\n".encode())
-            else:
-                # Fallback to cold full fetch
-                resp_msg = await self.ai.chat(
-                    history,
-                    model=params.model,
-                    session_id=session_id,
-                    provider_session_id=provider_session_id,
+                extracted_a2ui = await self._handle_chat_streaming(
+                    response, params, history, session_id, provider_session_id, full_text
                 )
-                full_text.append(resp_msg.content)
-
-                # Extract A2UI from full message
-                if "[[A2UI]]" in resp_msg.content:
-                    try:
-                        parts = resp_msg.content.split("[[A2UI]]")
-                        raw_content = parts[1].split("[[/A2UI]]")[0].strip()
-                        try:
-                            extracted_a2ui = json.loads(raw_content)
-                        except ValueError:
-                            extracted_a2ui = {"type": "markup", "raw": raw_content}
-                    except Exception:
-                        pass
-
-                payload = {"chunk": resp_msg.content}
-                if extracted_a2ui:
-                    payload["a2ui_payload"] = extracted_a2ui
-
-                await response.write(f"data: {json.dumps(payload)}\n\n".encode())
+            else:
+                extracted_a2ui = await self._handle_chat_sync_fallback(
+                    response, params, history, session_id, provider_session_id, full_text
+                )
 
             final_text = "".join(full_text)
-            # If we didn't extract it during stream (e.g. malformed closing tag), try one last time on full text
-            if not extracted_a2ui and "[[A2UI]]" in final_text:
-                try:
-                    parts = final_text.split("[[A2UI]]")
-                    raw_content = parts[1].split("[[/A2UI]]")[0].strip()
-                    try:
-                        extracted_a2ui = json.loads(raw_content)
-                    except ValueError:
-                        extracted_a2ui = {"type": "markup", "raw": raw_content}
-                except Exception:
-                    pass
+            # Last resort extraction if stream failed to catch it
+            if not extracted_a2ui:
+                extracted_a2ui = self._extract_a2ui_payload(final_text)
 
             # ... existing session finalization ...
             # Wait for backend transactions to commit by introducing a tiny delay in UI logic
@@ -1730,7 +1612,7 @@ class App:
             return response
 
     async def method_generate_facet_regex(
-        self, log_line: str, selected_text: str, workspace_id: str = None
+        self, log_line: str, selected_text: str, **kwargs
     ) -> dict:
         """Uses AI to generate a regex pattern for extracting a selected value from a log line."""
         prompt = (
@@ -1854,8 +1736,143 @@ class App:
             "active_tailers": len([k for k, t in self.tailers.items() if t.running]),
         }
 
+    # --- Private Helpers for Complexity Reduction ---
 
-async def on_cleanup(server_app):
+    def _get_facet_rules_for_workspace(
+        self, cursor: Any, workspace_id: str, cache: dict, global_rules: list
+    ) -> list:
+        if workspace_id not in cache:
+            ws_rules = []
+            cursor.execute(
+                "SELECT value FROM workspace_settings WHERE workspace_id = ? AND key = 'facet_extractions'",
+                (workspace_id,),
+            )
+            wr = cursor.fetchone()
+            if wr and wr[0]:
+                try:
+                    parsed = json.loads(wr[0])
+                    ws_rules = parsed if isinstance(parsed, list) else []
+                except Exception:
+                    pass
+            cache[workspace_id] = global_rules + ws_rules
+        return cache[workspace_id]
+
+    def _persist_settings(self, cursor: Any, settings: dict, workspace_id: str | None):
+        if workspace_id:
+            query = (
+                "INSERT INTO workspace_settings (workspace_id, key, value) VALUES (?, ?, ?) "
+                "ON CONFLICT (workspace_id, key) DO UPDATE SET value = excluded.value"
+            )
+            for k, v in settings.items():
+                val = json.dumps(v) if isinstance(v, (list, dict)) else str(v)
+                cursor.execute(query, (workspace_id, k, val))
+        else:
+            query = (
+                "INSERT INTO settings (key, value) VALUES (?, ?) "
+                "ON CONFLICT (key) DO UPDATE SET value = excluded.value"
+            )
+            for k, v in settings.items():
+                val = json.dumps(v) if isinstance(v, (list, dict)) else str(v)
+                cursor.execute(query, (k, val))
+
+    def _check_ai_provider_reload(self, settings: dict, workspace_id: str | None):
+        ai_keys = {
+            "ai_provider",
+            "ai_api_key",
+            "ai_ollama_host",
+            "ai_openai_host",
+            "ai_gemini_url",
+            "ai_model",
+            "ai_system_prompt",
+        }
+        if not workspace_id and any(k in settings for k in ai_keys):
+            current_settings = self.method_get_settings()
+            self.ai = self._init_ai_provider(current_settings)
+
+    async def _handle_chat_streaming(
+        self,
+        response: web.StreamResponse,
+        params: SendAiMessageRequest,
+        history: list,
+        session_id: str,
+        provider_session_id: str | None,
+        full_text: list[str],
+    ) -> dict | None:
+        extracted_a2ui = None
+        is_collecting_a2ui = False
+        a2ui_buffer = ""
+
+        async for chunk in self.ai.chat_stream(
+            messages=history,
+            model=params.model,
+            reasoning=params.reasoning,
+            session_id=session_id,
+            provider_session_id=provider_session_id,
+        ):
+            full_text.append(chunk)
+
+            # A2UI Transition Detection
+            if A2UI_START in chunk and not is_collecting_a2ui:
+                is_collecting_a2ui = True
+                parts = chunk.split(A2UI_START)
+                a2ui_buffer = parts[1]
+            elif is_collecting_a2ui:
+                a2ui_buffer += chunk
+
+            # A2UI Completion Detection
+            if is_collecting_a2ui and A2UI_END in a2ui_buffer:
+                extracted_a2ui = self._extract_a2ui_payload(a2ui_buffer)
+                if extracted_a2ui:
+                    await response.write(
+                        f"data: {json.dumps({'a2ui_payload': extracted_a2ui})}\n\n".encode()
+                    )
+                is_collecting_a2ui = False
+
+            await response.write(f"data: {json.dumps({'chunk': chunk})}\n\n".encode())
+
+        return extracted_a2ui
+
+    async def _handle_chat_sync_fallback(
+        self,
+        response: web.StreamResponse,
+        params: SendAiMessageRequest,
+        history: list,
+        session_id: str,
+        provider_session_id: str | None,
+        full_text: list[str],
+    ) -> dict | None:
+        resp_msg = await self.ai.chat(
+            history,
+            model=params.model,
+            session_id=session_id,
+            provider_session_id=provider_session_id,
+        )
+        full_text.append(resp_msg.content)
+        extracted_a2ui = self._extract_a2ui_payload(resp_msg.content)
+
+        payload = {"chunk": resp_msg.content}
+        if extracted_a2ui:
+            payload["a2ui_payload"] = extracted_a2ui
+
+        await response.write(f"data: {json.dumps(payload)}\n\n".encode())
+        return extracted_a2ui
+
+    def _extract_a2ui_payload(self, text: str) -> dict | None:
+        """Parses A2UI block from text, supporting both JSON and raw markup."""
+        if A2UI_START not in text:
+            return None
+
+        try:
+            raw_content = text.split(A2UI_START)[1].split(A2UI_END)[0].strip()
+            try:
+                return json.loads(raw_content)
+            except ValueError:
+                return {"type": "markup", "raw": raw_content}
+        except Exception:
+            return None
+
+
+def on_cleanup(server_app):
     """Lifecycle hook to clean up background workers when aiohttp stops."""
     app = server_app.get("sidecar_app")
     if app:

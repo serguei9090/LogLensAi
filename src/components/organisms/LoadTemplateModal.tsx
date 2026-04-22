@@ -109,7 +109,7 @@ export function LoadTemplateModal({
         type="button"
         key={template.id}
         aria-label={`Load template ${template.name}`}
-        onClick={(e) => handleApply(template)}
+        onClick={() => handleApply(template)}
         className="w-full flex items-center justify-between p-4 rounded-xl bg-white/5 border border-white/5 hover:bg-white/10 hover:border-primary/20 transition-all group text-left cursor-pointer outline-none focus-visible:ring-1 focus-visible:ring-primary/50"
       >
         <div className="space-y-1">
