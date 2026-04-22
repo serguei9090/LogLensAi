@@ -12,6 +12,7 @@ from .base import AIChatMessage, AIProvider
 
 DEFAULT_MODEL = "gemini-2.0-flash-exp"
 APP_NAME = "LogLensAi"
+MODELS_PREFIX = "models/"
 
 
 class AIStudioProvider(AIProvider):
@@ -25,8 +26,8 @@ class AIStudioProvider(AIProvider):
     def __init__(self, api_key: str, system_prompt: str = "", model: str | None = None):
         super().__init__(api_key=api_key, system_prompt=system_prompt)
         active = model or DEFAULT_MODEL
-        if active.startswith("models/"):
-            active = active[7:]
+        if active.startswith(MODELS_PREFIX):
+            active = active[len(MODELS_PREFIX) :]
         self.active_model = active
         # We wrap the client for list_models and other direct calls
         self._client = Client(api_key=api_key) if api_key else None
@@ -50,7 +51,7 @@ class AIStudioProvider(AIProvider):
             loop = asyncio.get_event_loop()
             models = await loop.run_in_executor(None, self._client.models.list)
             AIStudioProvider._cached_models = [
-                m.name.replace("models/", "")
+                m.name.replace(MODELS_PREFIX, "")
                 for m in models
                 if any(keyword in m.name.lower() for keyword in ["gemini", "gemma"])
             ]
@@ -78,8 +79,8 @@ class AIStudioProvider(AIProvider):
 
         # Create a transient agent for this request
         target_model = model or self.active_model
-        if target_model.startswith("models/"):
-            target_model = target_model[7:]
+        if target_model.startswith(MODELS_PREFIX):
+            target_model = target_model[len(MODELS_PREFIX) :]
 
         agent = LlmAgent(
             name="ai_studio_agent",
@@ -149,8 +150,8 @@ class AIStudioProvider(AIProvider):
 
         os.environ["GOOGLE_API_KEY"] = self.api_key
         target_model = model or self.active_model
-        if target_model.startswith("models/"):
-            target_model = target_model[7:]
+        if target_model.startswith(MODELS_PREFIX):
+            target_model = target_model[len(MODELS_PREFIX) :]
 
         agent = LlmAgent(
             name="ai_studio_agent",

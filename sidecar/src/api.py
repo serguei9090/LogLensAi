@@ -56,6 +56,9 @@ from pydantic import ValidationError
 from ssh_loader import SSHLoader
 from tailer import FileTailer
 
+A2UI_START = "[[A2UI]]"
+A2UI_END = "[[/A2UI]]"
+
 # --- Professional Logging Setup ---
 SIDE_CAR_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PROJECT_ROOT = os.path.dirname(SIDE_CAR_DIR)
@@ -310,69 +313,59 @@ class App:
     def _parse_filters(self, filters: list[dict]) -> tuple[list[str], list[Any]]:
         where_clauses = []
         params = []
-        allowed_fields = ["level", "source_id", "cluster_id", "raw_text", "has_comment"]
+        allowed_fields = {"level", "source_id", "cluster_id", "raw_text", "has_comment"}
 
         for f in filters:
             field = f.get("field")
             value = f.get("value")
             op = f.get("operator", "equals")
 
-            if field.startswith("facets."):
-                facet_key = field.split(".", 1)[1]
-                # Use json_extract_string for JSON type column
-                field = f"json_extract_string(facets, '$.{facet_key}')"
-            elif field not in allowed_fields or value is None:
+            if not field or value is None:
                 continue
 
-            if op == "contains":
-                where_clauses.append(f"{field} ILIKE ?")
-                params.append(f"%{value}%")
-            elif op == "not_contains":
-                where_clauses.append(f"{field} NOT ILIKE ?")
-                params.append(f"%{value}%")
-            elif op == "equals":
-                if field == "source_id":
-                    where_clauses.append(f"{field} ILIKE ?")
-                else:
-                    where_clauses.append(f"{field} = ?")
-                params.append(value)
-            elif op == "not_equals":
-                where_clauses.append(f"{field} != ?")
-                params.append(value)
-            elif op == "starts_with":
-                where_clauses.append(f"{field} ILIKE ?")
-                params.append(f"{value}%")
-            elif op == "regex":
-                where_clauses.append(f"regexp_matches({field}, ?)")
-                params.append(value)
+            if field.startswith("facets."):
+                facet_key = field.split(".", 1)[1]
+                field_sql = f"json_extract_string(facets, '$.{facet_key}')"
+            elif field in allowed_fields:
+                field_sql = field
+            else:
+                continue
+
+            clause, param = self._build_filter_clause(field_sql, op, value)
+            if clause:
+                where_clauses.append(clause)
+                params.append(param)
 
         return where_clauses, params
 
-    def _get_logs_internal(
+    def _build_filter_clause(self, field: str, op: str, value: Any) -> tuple[str | None, Any]:
+        """Maps filter operators to SQL clauses and parameters."""
+        mapping = {
+            "contains": (f"{field} ILIKE ?", f"%{value}%"),
+            "not_contains": (f"{field} NOT ILIKE ?", f"%{value}%"),
+            "equals": (f"{field} ILIKE ?" if "source_id" in field else f"{field} = ?", value),
+            "not_equals": (f"{field} != ?", value),
+            "starts_with": (f"{field} ILIKE ?", f"{value}%"),
+            "regex": (f"regexp_matches({field}, ?)", value),
+        }
+        return mapping.get(op, (None, None))
+
+    def _build_logs_where_clause(
         self,
         workspace_id: str,
-        offset: int = 0,
-        limit: int = 100,
+        source_ids: list[str] | None = None,
         filters: Any | None = None,
         query: str | None = None,
-        sort_by: str = "id",
-        sort_order: str = "DESC",
-        source_ids: list[str] | None = None,
         start_time: str | None = None,
         end_time: str | None = None,
-    ) -> dict:
-        """Unified internal log fetcher with temporal offset calibration.
-        Adjusts timestamps on-the-fly using workspace-defined offsets.
-        """
-        cursor = self.db.get_cursor()
-
-        # Build base WHERE clause
+    ) -> tuple[str | None, list[Any]]:
+        """Constructs the WHERE clause and parameters for log queries."""
         where_clauses = ["l.workspace_id = ?"]
         params: list[Any] = [workspace_id]
 
         if source_ids is not None:
             if not source_ids:
-                return {"total": 0, "logs": [], "offset": offset, "limit": limit}
+                return None, []
             placeholders = ",".join(["?"] * len(source_ids))
             where_clauses.append(f"l.source_id IN ({placeholders})")
             params.extend(source_ids)
@@ -397,9 +390,35 @@ class App:
             where_clauses.append("l.timestamp <= ?")
             params.append(end_time)
 
-        where_sql = " AND ".join(where_clauses)
-        total_logs_subquery = "(SELECT count(*) FROM logs WHERE workspace_id = ?)"
+        return " AND ".join(where_clauses), params
 
+    def _get_logs_internal(
+        self,
+        workspace_id: str,
+        offset: int = 0,
+        limit: int = 100,
+        filters: Any | None = None,
+        query: str | None = None,
+        sort_by: str = "id",
+        sort_order: str = "DESC",
+        source_ids: list[str] | None = None,
+        start_time: str | None = None,
+        end_time: str | None = None,
+    ) -> dict:
+        """Unified internal log fetcher with temporal offset calibration."""
+        cursor = self.db.get_cursor()
+        where_sql, params = self._build_logs_where_clause(
+            workspace_id, source_ids, filters, query, start_time, end_time
+        )
+
+        if where_sql is None:
+            return {"total": 0, "logs": [], "offset": offset, "limit": limit}
+
+        count_query = f"SELECT COUNT(*) FROM logs l WHERE {where_sql}"
+        cursor.execute(count_query, params)
+        total = cursor.fetchone()[0]
+
+        total_logs_subquery = "(SELECT count(*) FROM logs WHERE workspace_id = ?)"
         base_query = f"""
             SELECT
                 l.*,
@@ -410,12 +429,7 @@ class App:
             LEFT JOIN clusters c ON l.workspace_id = c.workspace_id AND l.cluster_id = c.cluster_id
             WHERE {where_sql}
         """
-
         params_for_data = [workspace_id] + params
-        count_query = f"SELECT COUNT(*) FROM logs l WHERE {where_sql}"
-        cursor.execute(count_query, params)
-
-        total = cursor.fetchone()[0]
 
         allowed_sort = [
             "id",
@@ -454,6 +468,60 @@ class App:
         self._apply_temporal_offsets(workspace_id, logs)
 
         return {"total": total, "logs": logs, "offset": offset, "limit": limit}
+
+    def _build_distribution_where_clause(
+        self, params: GetLogDistributionRequest
+    ) -> tuple[str | None, list[Any]]:
+        """Constructs the WHERE clause and parameters for log distribution queries."""
+        cursor = self.db.get_cursor()
+        where_clauses = ["workspace_id = ?"]
+        sql_params: list[Any] = [params.workspace_id]
+
+        # 1. Resolve source restrictions
+        effective_source_ids = params.source_ids
+
+        # If fusion_id is provided, override source_ids with those from the fusion config
+        if params.fusion_id:
+            cursor.execute(
+                "SELECT source_id FROM fusion_configs WHERE workspace_id = ? AND fusion_id = ? AND enabled = TRUE",
+                (params.workspace_id, params.fusion_id),
+            )
+            effective_source_ids = [row[0] for row in cursor.fetchall()]
+
+        if effective_source_ids is not None:
+            if not effective_source_ids:
+                return None, []
+            placeholders = ",".join(["?"] * len(effective_source_ids))
+            where_clauses.append(f"source_id IN ({placeholders})")
+            sql_params.extend(effective_source_ids)
+
+        if params.filters:
+            dict_filters = [
+                f.model_dump() if hasattr(f, "model_dump") else f for f in params.filters
+            ]
+            f_clauses, f_params = self._parse_filters(dict_filters)
+            where_clauses.extend(f_clauses)
+            sql_params.extend(f_params)
+
+        if params.query:
+            from query_parser import parse_llql
+
+            llql_sql, llql_params = parse_llql(params.query)
+            if llql_sql:
+                where_clauses.append(f"({llql_sql})")
+                sql_params.extend(llql_params)
+
+        if params.start_time:
+            norm_start = params.start_time.replace("T", " ").split(".")[0].replace("Z", "")
+            where_clauses.append("timestamp >= ?")
+            sql_params.append(norm_start)
+
+        if params.end_time:
+            norm_end = params.end_time.replace("T", " ").split(".")[0].replace("Z", "")
+            where_clauses.append("timestamp <= ?")
+            sql_params.append(norm_end)
+
+        return " AND ".join(where_clauses), sql_params
 
     def _apply_temporal_offsets(self, workspace_id: str, logs: list[dict]):
         """Apply global temporal offsets to a list of logs."""
@@ -518,79 +586,41 @@ class App:
 
         logs = result.get("logs", [])
 
-        if file_format == "csv":
-            if not logs:
+        def write_to_file():
+            if file_format == "csv":
+                if not logs:
+                    with open(filepath, "w", newline="", encoding="utf-8") as f:
+                        f.write("")
+                    return 0
+
+                # Filter out internal fields starting with _
+                keys = [k for k in logs[0] if not k.startswith("_")]
+
                 with open(filepath, "w", newline="", encoding="utf-8") as f:
-                    f.write("")
-                return {"status": "ok", "count": 0}
+                    dict_writer = csv.DictWriter(f, fieldnames=keys, extrasaction="ignore")
+                    dict_writer.writeheader()
+                    dict_writer.writerows(logs)
+                return len(logs)
+            else:
+                # For JSON, we can export everything
+                with open(filepath, "w", encoding="utf-8") as f:
+                    json.dump(logs, f, indent=2)
+                return len(logs)
 
-            # Filter out internal fields starting with _
-            keys = [k for k in logs[0] if not k.startswith("_")]
+        import asyncio
 
-            with open(filepath, "w", newline="", encoding="utf-8") as f:
-                dict_writer = csv.DictWriter(f, fieldnames=keys, extrasaction="ignore")
-                dict_writer.writeheader()
-                dict_writer.writerows(logs)
-        else:
-            # For JSON, we can export everything
-            with open(filepath, "w", encoding="utf-8") as f:
-                json.dump(logs, f, indent=2)
+        count = await asyncio.to_thread(write_to_file)
 
-        return {"status": "ok", "count": len(logs)}
+        return {"status": "ok", "count": count}
 
     def method_get_log_distribution(self, **kwargs) -> dict:
         """Fetch timeline distribution of logs aggregated by time bucket and level."""
         params = GetLogDistributionRequest(**kwargs)
         cursor = self.db.get_cursor()
 
-        where_clauses = ["workspace_id = ?"]
-        sql_params: list[Any] = [params.workspace_id]
-
-        # 1. Resolve source restrictions
-        effective_source_ids = params.source_ids
-
-        # If fusion_id is provided, override source_ids with those from the fusion config
-        if params.fusion_id:
-            cursor.execute(
-                "SELECT source_id FROM fusion_configs WHERE workspace_id = ? AND fusion_id = ? AND enabled = TRUE",
-                (params.workspace_id, params.fusion_id),
-            )
-            effective_source_ids = [row[0] for row in cursor.fetchall()]
-
-        if effective_source_ids is not None:
-            if not effective_source_ids:  # None provided/found = show nothing
-                return {"buckets": []}
-            placeholders = ",".join(["?"] * len(effective_source_ids))
-            where_clauses.append(f"source_id IN ({placeholders})")
-            sql_params.extend(effective_source_ids)
-
-        if params.filters:
-            dict_filters = [
-                f.model_dump() if hasattr(f, "model_dump") else f for f in params.filters
-            ]
-            f_clauses, f_params = self._parse_filters(dict_filters)
-            where_clauses.extend(f_clauses)
-            sql_params.extend(f_params)
-
-        if params.query:
-            from query_parser import parse_llql
-
-            llql_sql, llql_params = parse_llql(params.query)
-            if llql_sql:
-                where_clauses.append(f"({llql_sql})")
-                sql_params.extend(llql_params)
-
-        if params.start_time:
-            norm_start = params.start_time.replace("T", " ").split(".")[0].replace("Z", "")
-            where_clauses.append("timestamp >= ?")
-            sql_params.append(norm_start)
-
-        if params.end_time:
-            norm_end = params.end_time.replace("T", " ").split(".")[0].replace("Z", "")
-            where_clauses.append("timestamp <= ?")
-            sql_params.append(norm_end)
-
-        where_sql = " AND ".join(where_clauses)
+        where_sql, sql_params = self._build_distribution_where_clause(params)
+        if where_sql is None:
+            return {"buckets": []}
 
         # Aggregate by time bucket
         # Default to minute-level bucketing, but support hour-level for larger ranges
@@ -1136,10 +1166,10 @@ class App:
 
         # 5. Extract A2UI if present (simple check for non-streaming mode)
         a2ui_payload = None
-        if "[[A2UI]]" in response_msg.content:
+        if A2UI_START in response_msg.content:
             try:
-                parts = response_msg.content.split("[[A2UI]]")
-                json_str = parts[1].split("[[/A2UI]]")[0]
+                parts = response_msg.content.split(A2UI_START)
+                json_str = parts[1].split(A2UI_END)[0]
                 a2ui_payload = json.loads(json_str)
             except Exception:
                 pass
