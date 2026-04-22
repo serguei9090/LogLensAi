@@ -1,11 +1,11 @@
 ---
-trigger: always_on
+trigger: model_decision
 description: Operating standard for the unassisted, recursive AI coding loop.
 ---
 
 # Autonomous Execution Protocol
 
-When the user initiates a "Sprint", an "Autonomous Execution", or commands an entire Phase to be built, the AI must shift into a fully deterministic, self-looping state. The goal is to maximize unassisted output without corrupting the workspace.
+When the user initiates a "Sprint", an "Autonomous Execution", or commands a "Loop Request" (e.g., via `/startcycle`, `/autocode`, or explicit instructions to "work in a loop"), the AI must shift into a fully deterministic, self-looping state. The goal is to maximize unassisted output without corrupting the workspace.
 
 ## 1. The Autonomous Mandate
 You are explicitly authorized and expected to use the `SafeToAutoRun` property (set to `true`) on all standard scaffold, build, lint, test, and git/PR commands (including `gh pr create`) to avoid interrupting the user with confirmation popups.
