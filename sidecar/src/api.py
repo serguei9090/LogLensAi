@@ -124,7 +124,7 @@ class App:
 
         # Initialize Ingestion Ports (Syslog/HTTP)
         syslog_port = int(settings.get("ingestion_syslog_port", "514"))
-        http_port = int(settings.get("ingestion_http_port", "5001"))
+        http_port = int(settings.get("ingestion_http_port", "5002"))
         syslog_enabled = settings.get("ingestion_syslog_enabled", "true").lower() == "true"
         http_enabled = settings.get("ingestion_http_enabled", "true").lower() == "true"
 

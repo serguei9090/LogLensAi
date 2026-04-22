@@ -42,6 +42,7 @@ interface LogToolbarProps {
   readonly onRenameSource?: (workspaceId: string, sourceId: string, name: string) => void;
   readonly activeWorkspaceId?: string;
   readonly onExport: () => void;
+  readonly onEngineSettingsOpen?: () => void;
   readonly searchRef?: React.RefObject<HTMLInputElement | null>;
 }
 
@@ -66,6 +67,7 @@ export function LogToolbar({
   onRenameSource,
   activeWorkspaceId,
   onExport,
+  onEngineSettingsOpen,
   searchRef,
 }: LogToolbarProps) {
   const { timeRange, setTimeRange } = useInvestigationStore();
@@ -192,6 +194,18 @@ export function LogToolbar({
               <List className="size-3.5" />
               Load Template
             </DropdownMenuItem>
+            {onEngineSettingsOpen && (
+              <>
+                <div className="h-px bg-border/50 my-1" />
+                <DropdownMenuItem
+                  onClick={onEngineSettingsOpen}
+                  className="gap-2 text-xs py-2 text-emerald-400 hover:text-emerald-300"
+                >
+                  <Cpu className="size-3.5" />
+                  Engine Settings
+                </DropdownMenuItem>
+              </>
+            )}
           </DropdownMenuContent>
         </DropdownMenu>
 

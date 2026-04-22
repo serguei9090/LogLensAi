@@ -1,9 +1,13 @@
 pre-commit:
   commands:
-    lint-agent:
-      run: gemini -y -p "Run @lint-agent on modified files to ensure SoftwareStandards.md and Quality.md compliance before commit."
+    biome:
+      glob: "*.{js,ts,jsx,tsx,json}"
+      run: bun run lint {staged_files}
+    ruff:
+      glob: "*.py"
+      run: uv run ruff check {staged_files}
 
 post-commit:
   commands:
     doc-agent:
-      run: gemini -y -p "Run @doc-agent to update docs/track/ and TODOC based on the recent commit changes to maintain living specs."
+      run: powershell -Command "Start-Process powershell -ArgumentList '-NoProfile -Command \"gemini -y -p \"\"Run @doc-agent to update docs/track/ and TODOC based on the recent commit changes to maintain living specs.\"\"\"' -NoNewWindow"

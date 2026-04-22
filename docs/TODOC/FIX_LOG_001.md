@@ -48,6 +48,8 @@ The LogLensAi codebase currently has multiple cumulative linting and quality iss
 - [x] `bun x @biomejs/biome check src --write` (Auto-fixed 100+ style issues)
 - [x] `uv run ruff check sidecar --fix` (Resolved 150+ import and formatting errors)
 - [x] Manual verification of Sidecar bridge and Investigation Page rendering.
+- [x] **2026-04-22 Maintenance**: Batch formatting correction for configuration files (`vite.config.ts`, `tauri.conf.json`) and core organisms (`LogToolbar`, `OrchestratorHub`) using `bun run lint:fix` and `bun run format`.
+
 
 ## Impact Analysis
 - **Low Risk**: Most changes are syntactical or structural refactoring.

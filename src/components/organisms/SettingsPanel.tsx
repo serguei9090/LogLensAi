@@ -101,6 +101,64 @@ function SectionLabel({
     </label>
   );
 }
+
+function ModelSelector({
+  value,
+  onChange,
+  availableModels,
+  isFetching,
+  onRefresh,
+  provider,
+}: {
+  readonly value: string;
+  readonly onChange: (v: string) => void;
+  readonly availableModels: string[];
+  readonly isFetching: boolean;
+  readonly onRefresh: () => void;
+  readonly provider: string;
+}) {
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between">
+        <SectionLabel htmlFor="ai_model_selector">Model</SectionLabel>
+        {["ollama", "ai-studio", "openai-compatible"].includes(provider) && (
+          <button
+            type="button"
+            onClick={onRefresh}
+            disabled={isFetching}
+            className="text-[9px] uppercase tracking-tighter font-bold text-primary hover:text-primary-light transition-colors disabled:opacity-30"
+          >
+            {isFetching ? "Pulling..." : "Refresh List"}
+          </button>
+        )}
+      </div>
+      {availableModels.length > 0 ? (
+        <SettingSelect id="ai_model_selector" value={value} onChange={onChange}>
+          {!availableModels.includes(value) && <option value={value}>{value}</option>}
+          {availableModels.map((m) => (
+            <option key={m} value={m}>
+              {m}
+            </option>
+          ))}
+        </SettingSelect>
+      ) : (
+        <div className="space-y-1">
+          <SettingInput
+            id="ai_model_selector"
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            placeholder="Enter model ID manually"
+          />
+          {provider === "ollama" && (
+            <p className="text-[10px] text-amber-500/80 px-1 italic">
+              No models found. Ensure Ollama is running or enter ID manually.
+            </p>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
 export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSettings) => void }) {
   const [settings, setSettings] = useState<AppSettings>(defaultSettings);
   const [activeSection, setActiveSection] = useState<SectionId>("ai");
@@ -382,7 +440,7 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
                       } else if (v === "openai-compatible") {
                         newModel = "gpt-4o";
                       } else if (v === "ai-studio") {
-                        newModel = "gemini-2.5-flash";
+                        newModel = "gemini-2.0-flash";
                       }
 
                       const updated = { ...settings, ai_provider: v, ai_model: newModel };
@@ -398,6 +456,38 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
                     <option value="openai-compatible">OpenAI Compatible</option>
                   </SettingSelect>
                 </div>
+
+                {settings.ai_provider === "gemini-cli" && (
+                  <div className="space-y-2 animate-in fade-in slide-in-from-left-2 duration-300">
+                    <SectionLabel htmlFor="ai_gemini_url">A2A Server URL</SectionLabel>
+                    <SettingInput
+                      id="ai_gemini_url"
+                      type="url"
+                      value={settings.ai_gemini_url}
+                      onChange={(e) => update("ai_gemini_url", e.target.value, false)}
+                      onBlur={() => onSave(settings)}
+                      placeholder="http://localhost:22436"
+                    />
+                    <p className="text-[10px] text-text-muted/50 px-1">Daemon port for Hot Mode.</p>
+                  </div>
+                )}
+
+                {settings.ai_provider === "ollama" && (
+                  <div className="space-y-2 animate-in fade-in slide-in-from-left-2 duration-300">
+                    <SectionLabel htmlFor="ai_ollama_host">Ollama Server Host</SectionLabel>
+                    <SettingInput
+                      id="ai_ollama_host"
+                      type="url"
+                      value={settings.ai_ollama_host}
+                      onChange={(e) => update("ai_ollama_host", e.target.value, false)}
+                      onBlur={() => onSave(settings)}
+                      placeholder="http://localhost:11434"
+                    />
+                    <p className="text-[10px] text-text-muted/50 px-1">
+                      Local Ollama instance URL.
+                    </p>
+                  </div>
+                )}
 
                 {(settings.ai_provider === "ai-studio" ||
                   settings.ai_provider === "openai-compatible") && (
@@ -418,8 +508,9 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
                 )}
               </div>
 
-              {settings.ai_provider === "gemini-cli" && (
-                <div className="grid grid-cols-2 gap-8 pt-4 border-t border-border/30 animate-in slide-in-from-top-2 duration-300">
+              {/* Model Selector Row */}
+              <div className="grid grid-cols-2 gap-8 pt-4 border-t border-border/30">
+                {settings.ai_provider === "gemini-cli" ? (
                   <div className="space-y-2">
                     <SectionLabel htmlFor="ai_model">Gemini Model Strategy</SectionLabel>
                     <SettingSelect
@@ -438,195 +529,19 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
                       Choose 'Flash' for speed or 'Pro' for deeper analysis.
                     </p>
                   </div>
-                  <div className="space-y-2">
-                    <SectionLabel htmlFor="ai_gemini_url">A2A Server URL</SectionLabel>
-                    <SettingInput
-                      id="ai_gemini_url"
-                      type="url"
-                      value={settings.ai_gemini_url}
-                      onChange={(e) => update("ai_gemini_url", e.target.value, false)}
-                      onBlur={() => onSave(settings)}
-                      placeholder="http://localhost:22436"
-                    />
-                    <p className="text-[10px] text-text-muted/50 px-1">Daemon port for Hot Mode.</p>
-                  </div>
-                </div>
-              )}
+                ) : (
+                  <ModelSelector
+                    value={settings.ai_model}
+                    onChange={(v) => update("ai_model", v)}
+                    availableModels={availableModels}
+                    isFetching={isFetchingModels}
+                    onRefresh={fetchModels}
+                    provider={settings.ai_provider}
+                  />
+                )}
 
-              {settings.ai_provider === "ai-studio" && (
-                <div className="grid grid-cols-2 gap-8 pt-4 border-t border-border/30 animate-in slide-in-from-top-2 duration-300">
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <SectionLabel htmlFor="ai_model_studio">Gemini Model</SectionLabel>
-                      <button
-                        type="button"
-                        onClick={fetchModels}
-                        disabled={isFetchingModels}
-                        className="text-[9px] uppercase tracking-tighter font-bold text-primary hover:text-primary-light transition-colors disabled:opacity-30"
-                      >
-                        {isFetchingModels ? "Pulling..." : "Refresh List"}
-                      </button>
-                    </div>
-                    {availableModels.length > 0 ? (
-                      <SettingSelect
-                        id="ai_model_studio"
-                        value={settings.ai_model}
-                        onChange={(v) => update("ai_model", v)}
-                      >
-                        {!availableModels.includes(settings.ai_model) && (
-                          <option value={settings.ai_model}>{settings.ai_model}</option>
-                        )}
-                        {availableModels.map((m) => (
-                          <option key={m} value={m}>
-                            {m}
-                          </option>
-                        ))}
-                      </SettingSelect>
-                    ) : (
-                      <div className="space-y-1">
-                        <SettingInput
-                          id="ai_model"
-                          value={settings.ai_model}
-                          onChange={(e) => update("ai_model", e.target.value)}
-                          placeholder="e.g. gemini-2.5-flash"
-                        />
-                      </div>
-                    )}
-                    <p className="text-[10px] text-text-muted/50 px-1">
-                      Available models from Google AI Studio.
-                    </p>
-                  </div>
-                  <div className="col-span-2 flex items-center gap-3 p-3 bg-primary/5 rounded-xl border border-primary/10">
-                    <div className="bg-primary/20 p-2 rounded-lg">
-                      <Bot className="h-4 w-4 text-primary" />
-                    </div>
-                    <div>
-                      <p className="text-[11px] font-bold text-primary uppercase tracking-wider">
-                        Google Cloud Native
-                      </p>
-                      <p className="text-[10px] text-text-muted">
-                        Connect directly to Google's model infrastructure via API Key.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {settings.ai_provider === "ollama" && (
-                <div className="grid grid-cols-2 gap-8 pt-4 border-t border-border/30 animate-in slide-in-from-top-2 duration-300">
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <SectionLabel htmlFor="ai_model">Ollama Model</SectionLabel>
-                      <button
-                        type="button"
-                        onClick={fetchModels}
-                        disabled={isFetchingModels}
-                        className="text-[9px] uppercase tracking-tighter font-bold text-primary hover:text-primary-light transition-colors disabled:opacity-30"
-                      >
-                        {isFetchingModels ? "Pulling..." : "Refresh List"}
-                      </button>
-                    </div>
-                    {availableModels.length > 0 ? (
-                      <SettingSelect
-                        id="ai_model_ollama"
-                        value={settings.ai_model}
-                        onChange={(v) => update("ai_model", v)}
-                      >
-                        {!availableModels.includes(settings.ai_model) && (
-                          <option value={settings.ai_model}>{settings.ai_model}</option>
-                        )}
-                        {availableModels.map((m) => (
-                          <option key={m} value={m}>
-                            {m}
-                          </option>
-                        ))}
-                      </SettingSelect>
-                    ) : (
-                      <div className="space-y-1">
-                        <SettingInput
-                          id="ai_model"
-                          value={settings.ai_model}
-                          onChange={(e) => update("ai_model", e.target.value)}
-                          placeholder="e.g. gemma4:e2b"
-                        />
-                        <p className="text-[10px] text-amber-500/80 px-1 italic">
-                          No models found. Ensure Ollama is running or enter ID manually.
-                        </p>
-                      </div>
-                    )}
-                    <p className="text-[10px] text-text-muted/50 px-1">
-                      Available models are fetched dynamically.
-                    </p>
-                  </div>
-                  <div className="space-y-2">
-                    <SectionLabel htmlFor="ai_ollama_host">Ollama Server Host</SectionLabel>
-                    <SettingInput
-                      id="ai_ollama_host"
-                      type="url"
-                      value={settings.ai_ollama_host}
-                      onChange={(e) => update("ai_ollama_host", e.target.value, false)}
-                      onBlur={() => onSave(settings)}
-                      placeholder="http://localhost:11434"
-                    />
-                  </div>
-                  <div className="col-span-2 flex items-center gap-3 p-3 bg-primary/5 rounded-xl border border-primary/10">
-                    <div className="bg-primary/20 p-2 rounded-lg">
-                      <Cpu className="h-4 w-4 text-primary" />
-                    </div>
-                    <div>
-                      <p className="text-[11px] font-bold text-primary uppercase tracking-wider">
-                        Local Inference
-                      </p>
-                      <p className="text-[10px] text-text-muted">
-                        Ensure Ollama is running and model e.g. gemma4:e2b is pulled.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {settings.ai_provider === "openai-compatible" && (
-                <div className="grid grid-cols-2 gap-8 pt-4 border-t border-border/30 animate-in slide-in-from-top-2 duration-300">
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <SectionLabel htmlFor="ai_openai_model">Model ID</SectionLabel>
-                      <button
-                        type="button"
-                        onClick={fetchModels}
-                        disabled={isFetchingModels}
-                        className="text-[9px] uppercase tracking-tighter font-bold text-primary hover:text-primary-light transition-colors disabled:opacity-30"
-                      >
-                        {isFetchingModels ? "Pulling..." : "Refresh List"}
-                      </button>
-                    </div>
-                    {availableModels.length > 0 ? (
-                      <SettingSelect
-                        id="ai_openai_model"
-                        value={settings.ai_model}
-                        onChange={(v) => update("ai_model", v)}
-                      >
-                        {!availableModels.includes(settings.ai_model) && (
-                          <option value={settings.ai_model}>{settings.ai_model}</option>
-                        )}
-                        {availableModels.map((m) => (
-                          <option key={m} value={m}>
-                            {m}
-                          </option>
-                        ))}
-                      </SettingSelect>
-                    ) : (
-                      <SettingInput
-                        id="ai_openai_model"
-                        value={settings.ai_model}
-                        onChange={(e) => update("ai_model", e.target.value)}
-                        placeholder="e.g. gpt-4o, gpt-3.5-turbo"
-                      />
-                    )}
-                    <p className="text-[10px] text-text-muted/50 px-1">
-                      Choose or enter any model ID supported by your provider.
-                    </p>
-                  </div>
-                  <div className="space-y-2">
+                {settings.ai_provider === "openai-compatible" && (
+                  <div className="space-y-2 animate-in fade-in slide-in-from-top-2 duration-300">
                     <SectionLabel htmlFor="ai_openai_host">API Base URL</SectionLabel>
                     <SettingInput
                       id="ai_openai_host"
@@ -640,21 +555,35 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
                       Protocol & host for the OpenAI-standard endpoint.
                     </p>
                   </div>
-                  <div className="col-span-2 flex items-center gap-3 p-3 bg-primary/5 rounded-xl border border-primary/10">
-                    <div className="bg-primary/20 p-2 rounded-lg">
-                      <Network className="h-4 w-4 text-primary" />
-                    </div>
-                    <div>
-                      <p className="text-[11px] font-bold text-primary uppercase tracking-wider">
-                        Universal API
-                      </p>
-                      <p className="text-[10px] text-text-muted">
-                        Supports Azure, Groq, Perplexity, or any OpenAI-compatible proxy.
-                      </p>
-                    </div>
-                  </div>
+                )}
+              </div>
+
+              {/* Status Banner */}
+              <div className="col-span-2 flex items-center gap-3 p-3 bg-primary/5 rounded-xl border border-primary/10">
+                <div className="bg-primary/20 p-2 rounded-lg">
+                  <Bot className="h-4 w-4 text-primary" />
                 </div>
-              )}
+                <div>
+                  <p className="text-[11px] font-bold text-primary uppercase tracking-wider">
+                    {settings.ai_provider === "gemini-cli"
+                      ? "Gemini CLI Integrated"
+                      : settings.ai_provider === "ollama"
+                        ? "Local Inference"
+                        : settings.ai_provider === "ai-studio"
+                          ? "Google Cloud Native"
+                          : "Universal API"}
+                  </p>
+                  <p className="text-[10px] text-text-muted">
+                    {settings.ai_provider === "gemini-cli"
+                      ? "Runs purely on your local hardware via the configured gemini-cli. Zero data egress to third-party APIs beyond the model provider."
+                      : settings.ai_provider === "ollama"
+                        ? "Ensure Ollama is running and desired model is pulled locally."
+                        : settings.ai_provider === "ai-studio"
+                          ? "Connect directly to Google's model infrastructure via API Key."
+                          : "Supports Azure, Groq, Perplexity, or any OpenAI-compatible proxy."}
+                  </p>
+                </div>
+              </div>
 
               <div className="space-y-2">
                 <div className="flex items-center gap-2">

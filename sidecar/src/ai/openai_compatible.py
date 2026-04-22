@@ -16,11 +16,11 @@ class OpenAICompatibleProvider(AIProvider):
         model: str | None = None,
     ):
         super().__init__(api_key=api_key, system_prompt=system_prompt)
-        self.host = host
+        self.host = host.rstrip("/")
         self.active_model = model or "gpt-4o"
         self._client = None
         if api_key:
-            self._client = AsyncOpenAI(api_key=api_key, base_url=host)
+            self._client = AsyncOpenAI(api_key=api_key, base_url=self.host)
 
     async def list_models(self) -> list[str]:
         """Fetch available models from the provider (OpenAI or LM Studio)."""
