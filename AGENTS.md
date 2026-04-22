@@ -13,6 +13,7 @@ LogLensAi is a **Tauri v2 desktop application** for professional log analysis. I
 - **AI Parsing**: `docs/architecture/ai_parsing.md` (Gemma 4 Reasoning logic)
 - **Test Tracking**: `docs/architecture/testing.md` (Coverage matrix & QA standards)
 - **Arch Mandate**: `.agents/rules/ArchitectureDocs.md` (Mandatory documentation rule)
+- **Design Standard**: `DESIGN.md` (Unified design tokens & rationale)
 
 ## 🎯 Product Scope (STRICT)
 The **only active modules** are:
@@ -84,6 +85,7 @@ sidecar/
 ```
 
 ## 🎨 Design System
+- **Source of Truth**: `DESIGN.md` (Unified tokens for colors, typography, and spacing)
 - See `docs/design/theme.md` for the full color palette (CSS token names + hex values)
 - See `docs/design/ui-components.md` for all shadcn components and their atomic layer
 - Dark theme: `#0D0F0E` base, `#22C55E` primary green accent
