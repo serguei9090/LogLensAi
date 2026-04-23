@@ -111,7 +111,7 @@ _MODEL_RULES: tuple[_ModelRule, ...] = (
     _ModelRule(r"gemma[-_]?3", ThinkingMode.CHANNEL_MARKERS),
     # Gemini Thinking Models (e.g. "gemini-2.0-flash-thinking", "gemini-3-flash")
     _ModelRule(r"gemini.*thinking", ThinkingMode.CHANNEL_MARKERS),
-    _ModelRule(r"gemini.*flash", ThinkingMode.CHANNEL_MARKERS),  # Defensive for Flash reasoning
+    _ModelRule(r"gemini.*flash.*thinking", ThinkingMode.CHANNEL_MARKERS),
     # Claude 3.7 Thinking (Claude 3.7 Sonnet)
     _ModelRule(r"claude-3-7", ThinkingMode.CHANNEL_MARKERS),
     # DeepSeek Reasoner / R1 / R-series

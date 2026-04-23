@@ -5,17 +5,22 @@ from tailer import FileTailer
 
 class SSHLoader(FileTailer):
     def __init__(
-        self, host, port, username, password, filepath, workspace_id, parser: DrainParser, db
+        self,
+        host,
+        port,
+        username,
+        password,
+        filepath,
+        workspace_id,
+        parser: DrainParser,
+        db,
+        source_id: str = None,
     ):
+        super().__init__(filepath, workspace_id, parser, db, source_id=source_id)
         self.host = host
         self.port = port
         self.username = username
         self.password = password
-        self.filepath = filepath
-        self.workspace_id = workspace_id
-        self.parser = parser
-        self.db = db
-        self.running = False
 
         self.client = paramiko.SSHClient()
         self.client.set_missing_host_key_policy(paramiko.AutoAddPolicy())

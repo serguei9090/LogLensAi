@@ -10,7 +10,7 @@ from ai.tools import SearchLogsParams, ToolRegistry
 @pytest.mark.parametrize(
     "input_text, expected",
     [
-        ("<|channel>thought Hello <|channel>text Hi", "<think> Hello </think> Hi"),
+        ("<|channel>thought Hello <|channel>text Hi", "<think>Hello</think>Hi"),
         ("<thought>Thinking</thought> Result", "<think>Thinking</think> Result"),
         ("[reasoning]Step 1[/reasoning] Answer", "<think>Step 1</think> Answer"),
     ],

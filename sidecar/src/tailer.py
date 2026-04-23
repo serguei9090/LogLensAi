@@ -7,10 +7,12 @@ from parser import DrainParser
 
 
 class FileTailer:
-    def __init__(self, filepath, workspace_id, parser: DrainParser, db):
+    def __init__(self, filepath, workspace_id, parser: DrainParser, db, source_id: str = None):
         # Normalize to forward slashes for consistent source_id across OS
         self.filepath = os.path.abspath(filepath).replace("\\", "/")
         self.workspace_id = workspace_id
+        # Use the provided source_id (UUID) or fallback to filepath (legacy)
+        self.source_id = source_id or self.filepath
         self.parser = parser
         self.running = False
         self.thread = None
@@ -76,8 +78,9 @@ class FileTailer:
             pass
 
         # 2. Shared Metadata Extraction (Regex/Parser logic)
+        # Use source_id for extraction context if needed
         metadata = extract_log_metadata(
-            self.workspace_id, self.filepath, line, custom_rules=custom_rules
+            self.workspace_id, self.source_id, line, custom_rules=custom_rules
         )
         timestamp = metadata["timestamp"]
         level = metadata["level"]
@@ -105,7 +108,7 @@ class FileTailer:
             """,
             (
                 self.workspace_id,
-                self.filepath,
+                self.source_id,
                 timestamp,
                 level,
                 message,

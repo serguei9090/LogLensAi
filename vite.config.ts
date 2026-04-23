@@ -17,6 +17,7 @@ export default defineConfig({
         "**/*.log",
         "**/*.duckdb*",
         "**/*.wal",
+        path.resolve(__dirname, "data/**"),
         path.resolve(__dirname, "sidecar/**"),
         path.resolve(__dirname, "src-tauri/**"),
       ],

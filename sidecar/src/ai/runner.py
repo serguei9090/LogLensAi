@@ -3,7 +3,7 @@ from collections.abc import AsyncGenerator
 from typing import Any
 
 from .graph import GraphManager, MissionState
-from .thinking_parser import detect_thinking_mode, parse_completed_response
+from .reasoning import parse_reasoning_blocks
 from .tools import ToolRegistry
 
 logger = logging.getLogger(__name__)
@@ -50,11 +50,6 @@ class HybridRunner:
 
         config = {"configurable": {"thread_id": session_id}}
 
-        # Detect the thinking mode once so we can normalise <think> tags correctly.
-        # `parse_completed_response` preserves <think>…</think> for the frontend,
-        # whereas `clean_thinking_markers` would strip them (Bug fix: thinking block invisible).
-        model_name = model or ""
-        thinking_mode = detect_thinking_mode(model_name)
 
         # Execute the graph and stream steps.
         # We only emit from the `reasoning` node — `final_answer` returns the
@@ -74,7 +69,7 @@ class HybridRunner:
                     if last_msg["role"] == "assistant":
                         # Normalise channel markers → <think>…</think> form.
                         # This ensures the frontend ThinkingBlock can parse them.
-                        normalised = parse_completed_response(last_msg["content"], thinking_mode)
+                        normalised = parse_reasoning_blocks(last_msg["content"])
                         yield normalised
 
         logger.info("Investigation mission complete for session %s", session_id)

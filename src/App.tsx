@@ -73,6 +73,8 @@ export default function App() {
     },
   ]);
 
+  const activeWorkspace = workspaces.find((w) => w.id === activeWorkspaceId);
+
   return (
     <>
       <Toaster theme="dark" position="top-center" />
@@ -84,6 +86,7 @@ export default function App() {
       <AppLayout
         workspaces={workspaces}
         activeWorkspaceId={activeWorkspaceId}
+        activeFolderId={activeWorkspace?.activeFolderId}
         onWorkspaceSelect={(id) => {
           setActive(id);
           setActiveNav("investigation");

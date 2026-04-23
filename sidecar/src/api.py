@@ -20,16 +20,22 @@ from ingestion import IngestionServer
 from mcp_server import init_mcp, mcp_server
 from metadata_extractor import extract_log_metadata
 from models import (
+    CreateLogSourceRequest,
     CreateLogStreamRequest,
+    DeleteLogSourceRequest,
     DeleteLogsRequest,
     DeleteLogStreamRequest,
     ExportLogsRequest,
+    FolderCreateRequest,
+    FolderDeleteRequest,
+    FolderUpdateRequest,
     GenerateExtractionRegexRequest,
     GetAiMessagesRequest,
     GetAiSessionsRequest,
     GetAnomaliesRequest,
     GetFusedLogsRequest,
     GetFusionConfigRequest,
+    GetHierarchyRequest,
     GetLogDistributionRequest,
     GetLogsRequest,
     GetLogStreamsRequest,
@@ -46,6 +52,8 @@ from models import (
     SaveMemoryRequest,
     SearchMemoryRequest,
     SendAiMessageRequest,
+    SourceMoveRequest,
+    SourceUpdateRequest,
     StartSSHTailRequest,
     StartTailRequest,
     TestAiConnectionRequest,
@@ -115,7 +123,7 @@ class App:
     ):
         if db_path is None:
             db_path = DEFAULT_DB
-        elif not os.path.isabs(db_path):
+        elif not os.path.isabs(db_path) and db_path != ":memory:":
             # If a relative path is provided, resolve it against PROJECT_ROOT/data
             db_path = os.path.join(PROJECT_ROOT, "data", db_path)
 
@@ -360,6 +368,14 @@ class App:
                 "generate_facet_regex": GenerateExtractionRegexRequest,
                 "export_logs": ExportLogsRequest,
                 "delete_logs": DeleteLogsRequest,
+                "get_hierarchy": GetHierarchyRequest,
+                "create_folder": FolderCreateRequest,
+                "update_folder": FolderUpdateRequest,
+                "delete_folder": FolderDeleteRequest,
+                "create_log_source": CreateLogSourceRequest,
+                "update_log_source": SourceUpdateRequest,
+                "delete_log_source": DeleteLogSourceRequest,
+                "move_source": SourceMoveRequest,
                 "factory_reset": None,
             }
 
@@ -882,19 +898,22 @@ class App:
 
         return {"sources": sources}
 
-    def method_start_tail(self, filepath: str, workspace_id: str) -> dict:
-        # Normalize to forward slashes for consistent source_id matching
+    def method_start_tail(
+        self, filepath: str, workspace_id: str, source_id: str | None = None
+    ) -> dict:
+        # Normalize to forward slashes for consistent tracking
         abs_path = os.path.abspath(filepath).replace("\\", "/")
-        key = f"{workspace_id}:{abs_path}"
+        # Use source_id as primary key if available, else fallback to path for legacy support
+        key = source_id if source_id else f"{workspace_id}:{abs_path}"
 
         if key in self.tailers and self.tailers[key].running:
             return {"status": "already tailing"}
 
-        tailer = FileTailer(abs_path, workspace_id, self.parser, self.db)
+        tailer = FileTailer(abs_path, workspace_id, self.parser, self.db, source_id=source_id)
         self.tailers[key] = tailer
         tailer.start()
 
-        return {"status": "started"}
+        return {"status": "started", "source_id": source_id}
 
     def method_start_ssh_tail(
         self,
@@ -904,20 +923,29 @@ class App:
         password: str | None = None,
         filepath: str | None = None,
         workspace_id: str | None = None,
+        source_id: str | None = None,
     ) -> dict:
 
-        key = f"ssh:{workspace_id}:{host}:{filepath}"
+        key = source_id if source_id else f"ssh:{workspace_id}:{host}:{filepath}"
         if key in self.tailers and self.tailers[key].running:
             return {"status": "already tailing"}
 
         tailer = SSHLoader(
-            host, port, username, password, filepath, workspace_id, self.parser, self.db
+            host,
+            port,
+            username,
+            password,
+            filepath,
+            workspace_id,
+            self.parser,
+            self.db,
+            source_id=source_id,
         )
 
         self.tailers[key] = tailer
         tailer.start()
 
-        return {"status": "started"}
+        return {"status": "started", "source_id": source_id}
 
     def _stop_all_workspace_tailers(self, workspace_id: str) -> int:
         """Internal helper to stop all tailers for a workspace."""
@@ -932,18 +960,25 @@ class App:
             self.tailers.pop(k, None)
         return count
 
-    def method_stop_tail(self, filepath: str, workspace_id: str) -> dict:
+    def method_stop_tail(
+        self, filepath: str, workspace_id: str, source_id: str | None = None
+    ) -> dict:
         """Stop one or all live stream tailers for a workspace."""
         if filepath == "ALL":
             count = self._stop_all_workspace_tailers(workspace_id)
             return {"status": "stopped", "count": count}
-        abs_path = os.path.abspath(filepath).replace("\\", "/")
-        key = f"{workspace_id}:{abs_path}"
+
+        # Use source_id as primary key if available
+        key = (
+            source_id
+            if source_id
+            else f"{workspace_id}:{os.path.abspath(filepath).replace('\\', '/')}"
+        )
 
         if key in self.tailers:
             self.tailers[key].stop()
             self.tailers.pop(key, None)
-            return {"status": "stopped", "count": 1}
+            return {"status": "stopped", "count": 1, "source_id": source_id}
 
         # Fallback for SSH or partial matches
         count_stopped = 0
@@ -1083,20 +1118,59 @@ class App:
         return {"status": "success"}
 
     def method_get_workspace_sources(self, workspace_id: str) -> list:
-        """Return the distinct source_id values present in a workspace's log table.
-
-        Args:
-            workspace_id: The ID of the workspace.
-
-        Returns:
-            Sorted list of unique source paths ingested into this workspace.
-        """
+        """Return the distinct source_id values present in a workspace's log table."""
         cursor = self.db.get_cursor()
         cursor.execute(
-            "SELECT DISTINCT source_id FROM logs WHERE workspace_id = ? AND source_id IS NOT NULL ORDER BY source_id",
-            (workspace_id,),
+            "SELECT DISTINCT source_id FROM logs WHERE workspace_id = ?", (workspace_id,)
         )
-        return [row[0] for row in cursor.fetchall()]
+        # Merge with log_sources table if available
+        existing_sources = [r[0] for r in cursor.fetchall()]
+
+        cursor.execute("SELECT path FROM log_sources WHERE workspace_id = ?", (workspace_id,))
+        managed_sources = [r[0] for r in cursor.fetchall()]
+
+        return sorted(set(existing_sources + managed_sources))
+
+    # --- Hierarchy Methods ---
+
+    def method_get_hierarchy(self, workspace_id: str) -> dict:
+        return self.db.get_hierarchy(workspace_id)
+
+    def method_create_folder(self, workspace_id: str, name: str, parent_id: str = None) -> dict:
+        import uuid
+
+        folder_id = str(uuid.uuid4())
+        self.db.create_folder(workspace_id, folder_id, name, parent_id)
+        return {"status": "success", "folder_id": folder_id}
+
+    def method_update_folder(self, folder_id: str, name: str = None, parent_id: str = None) -> dict:
+        self.db.update_folder(folder_id, name, parent_id)
+        return {"status": "success"}
+
+    def method_delete_folder(self, folder_id: str) -> dict:
+        self.db.delete_folder(folder_id)
+        return {"status": "success"}
+
+    def method_create_log_source(
+        self, workspace_id: str, name: str, type: str, path: str, folder_id: str = None
+    ) -> dict:
+        import uuid
+
+        source_id = str(uuid.uuid4())
+        self.db.upsert_log_source(workspace_id, source_id, name, type, path, folder_id)
+        return {"status": "success", "source_id": source_id}
+
+    def method_update_log_source(self, source_id: str, **kwargs) -> dict:
+        self.db.update_log_source(source_id, **kwargs)
+        return {"status": "success"}
+
+    def method_delete_log_source(self, source_id: str) -> dict:
+        self.db.delete_log_source(source_id)
+        return {"status": "success"}
+
+    def method_move_source(self, source_id: str, folder_id: str | None = None) -> dict:
+        self.db.update_log_source(source_id, folder_id=folder_id)
+        return {"status": "success"}
 
     def method_is_tailing(self, filepath: str, workspace_id: str) -> bool:
         abs_path = os.path.abspath(filepath).replace("\\", "/")

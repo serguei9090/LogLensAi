@@ -70,3 +70,12 @@ class ToolRegistry:
         except Exception as e:
             logger.error("Error in get_facets tool: %s", e)
             return {"error": str(e)}
+
+    async def get_hierarchy(self, ctx: RunContext[Any], workspace_id: str) -> dict:
+        """Get the folder and source hierarchy for a workspace."""
+        logger.info("Tool: get_hierarchy called for %s", workspace_id)
+        try:
+            return self.app.method_get_hierarchy(workspace_id=workspace_id)
+        except Exception as e:
+            logger.error("Error in get_hierarchy tool: %s", e)
+            return {"error": str(e)}

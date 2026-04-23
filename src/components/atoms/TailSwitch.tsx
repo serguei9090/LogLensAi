@@ -1,5 +1,4 @@
 import { cn } from "@/lib/utils";
-import { Radio } from "lucide-react";
 
 interface TailSwitchProps {
   checked: boolean;
@@ -12,7 +11,7 @@ interface TailSwitchProps {
 export function TailSwitch({
   checked,
   onCheckedChange,
-  label = "Live Tail",
+  label = "Tail",
   className,
 }: TailSwitchProps) {
   return (
@@ -22,7 +21,7 @@ export function TailSwitch({
       aria-checked={checked}
       onClick={() => onCheckedChange(!checked)}
       className={cn(
-        "relative inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-semibold transition-all duration-200 select-none cursor-pointer",
+        "relative inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-semibold transition-all duration-200 select-none cursor-pointer",
         checked
           ? "border-emerald-500/40 bg-emerald-950/60 text-emerald-400 shadow-[0_0_12px_0_rgba(52,211,153,0.15)]"
           : "border-zinc-700 bg-zinc-900 text-zinc-500 hover:border-zinc-600 hover:text-zinc-400",
@@ -41,16 +40,7 @@ export function TailSwitch({
           )}
         />
       </span>
-      <Radio className={cn("h-3 w-3", checked ? "text-emerald-400" : "text-zinc-600")} />
       {label}
-      <span
-        className={cn(
-          "ml-1 rounded px-1 py-0.5 text-[10px] font-bold tracking-wide transition-colors",
-          checked ? "bg-emerald-500/20 text-emerald-300" : "bg-zinc-800 text-zinc-600",
-        )}
-      >
-        {checked ? "ON" : "OFF"}
-      </span>
     </button>
   );
 }

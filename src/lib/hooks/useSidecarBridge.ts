@@ -41,12 +41,20 @@ import { toast } from "sonner";
  * The transport is selected automatically at runtime based on the presence of
  * Tauri internals, or can be forced to web mode via `VITE_APP_MODE=web`.
  */
-export async function callSidecar<T>(request: SidecarRequest): Promise<T> {
+export async function callSidecar<T>(
+  methodOrRequest: string | SidecarRequest,
+  params?: Record<string, unknown>,
+): Promise<T> {
+  // Normalize input: could be (requestObject) or (methodName, params)
+  const method = typeof methodOrRequest === "string" ? methodOrRequest : methodOrRequest.method;
+  const rpcParams =
+    typeof methodOrRequest === "string" ? (params ?? {}) : (methodOrRequest.params ?? {});
+
   const rpcReq = {
     jsonrpc: "2.0",
     id: Math.floor(Math.random() * 10000),
-    method: request.method,
-    params: request.params ?? {},
+    method,
+    params: rpcParams,
   };
 
   // Explicit override: VITE_APP_MODE=web forces web transport

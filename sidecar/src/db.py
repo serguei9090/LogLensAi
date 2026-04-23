@@ -22,8 +22,9 @@ class LogDatabase:
                 if db_path is None:
                     # In extreme cases, fallback to a memory DB rather than creating a random file
                     db_path = ":memory:"
-                cls._instance = super().__new__(cls)
-                cls._instance._init_db(db_path)
+                instance = super().__new__(cls)
+                instance._init_db(db_path)
+                cls._instance = instance
         return cls._instance
 
     def _init_db(self, db_path):
@@ -183,6 +184,24 @@ class LogDatabase:
                 PRIMARY KEY (workspace_id, cluster_id, timestamp)
             );
 
+            CREATE TABLE IF NOT EXISTS folders (
+                id           TEXT PRIMARY KEY,
+                workspace_id TEXT,
+                parent_id    TEXT,
+                name         TEXT,
+                created_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+
+            CREATE TABLE IF NOT EXISTS log_sources (
+                id           TEXT PRIMARY KEY,
+                workspace_id TEXT,
+                folder_id    TEXT,
+                name         TEXT,
+                type         TEXT,
+                path         TEXT,
+                created_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+
             -- Performance Indexes
             CREATE INDEX IF NOT EXISTS idx_logs_workspace_id ON logs (workspace_id);
             CREATE INDEX IF NOT EXISTS idx_logs_source_id ON logs (source_id);
@@ -208,6 +227,12 @@ class LogDatabase:
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_logs_cluster_id ON logs (cluster_id);")
         cursor.execute(
             "CREATE INDEX IF NOT EXISTS idx_ai_messages_session_id ON ai_messages (session_id);"
+        )
+        cursor.execute(
+            "CREATE INDEX IF NOT EXISTS idx_folders_workspace_id ON folders (workspace_id);"
+        )
+        cursor.execute(
+            "CREATE INDEX IF NOT EXISTS idx_log_sources_workspace_id ON log_sources (workspace_id);"
         )
 
     def _migrate_ai_tables(self, cursor):
@@ -647,6 +672,159 @@ class LogDatabase:
             cursor.execute("DELETE FROM clusters WHERE workspace_id = ?", (workspace_id,))
 
         self.commit()
+
+    # --- Hierarchy Management ---
+
+    def create_folder(self, workspace_id: str, folder_id: str, name: str, parent_id: str = None):
+        cursor = self.get_cursor()
+        cursor.execute(
+            "INSERT INTO folders (id, workspace_id, name, parent_id) VALUES (?, ?, ?, ?)",
+            (folder_id, workspace_id, name, parent_id),
+        )
+        self.commit()
+
+    def update_folder(self, folder_id: str, name: str = None, parent_id: str = None):
+        cursor = self.get_cursor()
+        if name:
+            cursor.execute("UPDATE folders SET name = ? WHERE id = ?", (name, folder_id))
+        if parent_id is not None:
+            # Note: parent_id can be empty string/None for root level
+            p_val = parent_id if parent_id != "" else None
+            cursor.execute("UPDATE folders SET parent_id = ? WHERE id = ?", (p_val, folder_id))
+        self.commit()
+
+    def _get_all_subfolder_ids(self, folder_id: str) -> list[str]:
+        """Recursively fetch all child folder IDs."""
+        cursor = self.get_cursor()
+        cursor.execute("SELECT id FROM folders WHERE parent_id = ?", (folder_id,))
+        child_ids = [row[0] for row in cursor.fetchall()]
+
+        all_ids = [folder_id]
+        for child_id in child_ids:
+            all_ids.extend(self._get_all_subfolder_ids(child_id))
+        return all_ids
+
+    def delete_folder(self, folder_id: str):
+        cursor = self.get_cursor()
+
+        # Recursive delete of children and sources
+        # 1. Find all subfolder IDs (including self)
+        all_folder_ids = self._get_all_subfolder_ids(folder_id)
+
+        # 2. Delete all log data for sources in these folders
+        placeholders = ",".join(["?" for _ in all_folder_ids])
+
+        # Get all source IDs in these folders first to wipe their logs
+        cursor.execute(
+            f"SELECT id FROM log_sources WHERE folder_id IN ({placeholders})", all_folder_ids
+        )
+        source_ids = [row[0] for row in cursor.fetchall()]
+        if source_ids:
+            s_placeholders = ",".join(["?" for _ in source_ids])
+            cursor.execute(f"DELETE FROM logs WHERE source_id IN ({s_placeholders})", source_ids)
+
+        # 3. Delete all log sources in these folders
+        cursor.execute(
+            f"DELETE FROM log_sources WHERE folder_id IN ({placeholders})", all_folder_ids
+        )
+
+        # 4. Delete the folders themselves
+        cursor.execute(f"DELETE FROM folders WHERE id IN ({placeholders})", all_folder_ids)
+
+        self.commit()
+
+    def upsert_log_source(
+        self,
+        workspace_id: str,
+        source_id: str,
+        name: str,
+        type: str,
+        path: str,
+        folder_id: str = None,
+    ):
+        cursor = self.get_cursor()
+        cursor.execute(
+            """
+            INSERT OR REPLACE INTO log_sources (id, workspace_id, folder_id, name, type, path)
+            VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            (source_id, workspace_id, folder_id, name, type, path),
+        )
+        self.commit()
+
+    def update_log_source(self, source_id: str, **kwargs):
+        if not kwargs:
+            return
+        cursor = self.get_cursor()
+        fields = []
+        params = []
+        for k, v in kwargs.items():
+            fields.append(f"{k} = ?")
+            params.append(v)
+        params.append(source_id)
+        cursor.execute(f"UPDATE log_sources SET {', '.join(fields)} WHERE id = ?", params)
+        self.commit()
+
+    def delete_log_source(self, source_id: str):
+        cursor = self.get_cursor()
+        # Wipe the actual logs first
+        cursor.execute("DELETE FROM logs WHERE source_id = ?", (source_id,))
+        # Then the source entry
+        cursor.execute("DELETE FROM log_sources WHERE id = ?", (source_id,))
+        self.commit()
+
+    def get_hierarchy(self, workspace_id: str) -> dict:
+        """Returns the tree structure for a workspace."""
+        cursor = self.get_cursor()
+
+        # 1. Fetch all folders
+        cursor.execute(
+            "SELECT id, name, parent_id FROM folders WHERE workspace_id = ?", (workspace_id,)
+        )
+        folders = [
+            {"id": r[0], "name": r[1], "parent_id": r[2], "children": [], "sources": []}
+            for r in cursor.fetchall()
+        ]
+
+        # 2. Fetch all sources
+        cursor.execute(
+            "SELECT id, name, type, path, folder_id FROM log_sources WHERE workspace_id = ?",
+            (workspace_id,),
+        )
+        sources = [
+            {"id": r[0], "name": r[1], "type": r[2], "path": r[3], "folder_id": r[4]}
+            for r in cursor.fetchall()
+        ]
+
+        # 3. Build tree
+        folder_map = {f["id"]: f for f in folders}
+        root_nodes = []
+        root_sources = []
+
+        for f in folders:
+            pid = f["parent_id"]
+            if pid and pid in folder_map:
+                folder_map[pid]["children"].append(f)
+            else:
+                root_nodes.append(f)
+
+        for s in sources:
+            fid = s["folder_id"]
+            if fid and fid in folder_map:
+                folder_map[fid]["sources"].append(s)
+            else:
+                root_sources.append(s)
+
+        return {
+            "workspace_id": workspace_id,
+            "root": {
+                "id": "root",
+                "name": "Root",
+                "type": "folder",
+                "children": root_nodes,
+                "sources": root_sources,
+            },
+        }
 
 
 # Alias for backward compatibility

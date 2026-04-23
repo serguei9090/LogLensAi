@@ -244,4 +244,12 @@
   - **Detail**: Integrated `lint-sidecar.md` into `.agents/workflows/autostartcycle.md`.
 
 
+## 🔵 Sprint 13 — Hierarchical Workspace Explorer (Done)
 
+- [x] **HIER-001**: Database Schema Evolution (folders, log_sources tables)
+- [x] **HIER-002**: Backend RPC API (CRUD for folders/sources)
+- [x] **HIER-003**: Frontend State Management (Tree-aware workspaceStore)
+- [x] **HIER-004**: UI Implementation (Recursive Sidebar Tree)
+- [x] **HIER-005**: UI Refactor (LogToolbar Breadcrumbs)
+- [x] **HIER-006**: AI Tool Integration (Hierarchy-aware context)
+- [x] **HIER-007**: Persistent Source Ingestion (Async createSource bridge)

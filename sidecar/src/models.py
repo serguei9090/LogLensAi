@@ -48,6 +48,72 @@ class GetLogsRequest(BaseModel):
 class StartTailRequest(BaseModel):
     filepath: str
     workspace_id: str
+    source_id: str | None = None
+
+
+class FolderCreateRequest(BaseModel):
+    workspace_id: str
+    name: str
+    parent_id: str | None = None
+
+
+class FolderUpdateRequest(BaseModel):
+    folder_id: str
+    name: str | None = None
+    parent_id: str | None = None
+
+
+class FolderDeleteRequest(BaseModel):
+    folder_id: str
+
+
+class SourceMoveRequest(BaseModel):
+    source_id: str
+    folder_id: str | None = None
+
+
+class SourceUpdateRequest(BaseModel):
+    source_id: str
+    name: str | None = None
+    type: str | None = None
+    path: str | None = None
+    folder_id: str | None = None
+
+
+class CreateLogSourceRequest(BaseModel):
+    workspace_id: str
+    name: str
+    type: str
+    path: str
+    folder_id: str | None = None
+
+
+class DeleteLogSourceRequest(BaseModel):
+    source_id: str
+
+
+class GetHierarchyRequest(BaseModel):
+    workspace_id: str
+
+
+class HierarchySource(BaseModel):
+    id: str
+    name: str
+    type: str
+    path: str
+
+
+class HierarchyNode(BaseModel):
+    id: str
+    name: str
+    type: str = "folder"
+    children: list["HierarchyNode"] = []
+    sources: list[HierarchySource] = []
+
+
+class HierarchyResponse(BaseModel):
+    workspace_id: str
+    root: HierarchyNode
 
 
 class StartSSHTailRequest(BaseModel):
@@ -57,6 +123,7 @@ class StartSSHTailRequest(BaseModel):
     password: str | None = None
     filepath: str
     workspace_id: str
+    source_id: str | None = None
 
 
 class IngestLogEntry(BaseModel):

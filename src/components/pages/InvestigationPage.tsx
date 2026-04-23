@@ -1,5 +1,6 @@
 import { AIInvestigationSidebar } from "@/components/organisms/AIInvestigationSidebar";
 import { CustomParserModal } from "@/components/organisms/CustomParserModal";
+import { ExplorerView } from "@/components/organisms/ExplorerView";
 import { FacetSidebar } from "@/components/organisms/FacetSidebar";
 import { ImportFeedModal } from "@/components/organisms/ImportFeedModal";
 import { OrchestratorHub } from "@/components/organisms/OrchestratorHub";
@@ -75,11 +76,13 @@ export function InvestigationPage() {
 
   const {
     activeWorkspaceId,
-    addSource,
+    createSource,
     removeSource,
     setActiveSource,
     renameSource,
     updateSource,
+    setActiveFolder,
+    createFolder,
   } = useWorkspaceStore();
   const { fetchSettings } = useSettingsStore();
   const activeWorkspace = useWorkspaceStore(selectActiveWorkspace);
@@ -87,6 +90,8 @@ export function InvestigationPage() {
 
   const sources: LogSource[] = activeWorkspace?.sources ?? [];
   const activeSourceId = activeWorkspace?.activeSourceId ?? null;
+  const activeFolderId = activeWorkspace?.activeFolderId ?? null;
+  const hierarchy = activeWorkspace?.hierarchy;
 
   const [tailingSourceIds, setTailingSourceIds] = useState<Set<string>>(new Set());
   const [isImportOpen, setIsImportOpen] = useState(false);
@@ -118,8 +123,9 @@ export function InvestigationPage() {
       return;
     }
 
-    // If no sources exist, don't even try to fetch logs (prevents ghost data display)
-    if (sources.length === 0) {
+    // If no source is selected (Explorer/Folder view) or no sources exist,
+    // clear everything to avoid stale data display.
+    if (sources.length === 0 || !activeSourceId) {
       setLogs([], 0);
       setAvailableFacets({});
       return;
@@ -140,7 +146,7 @@ export function InvestigationPage() {
       const isFusion = activeSrc?.type === "fusion";
       const sourceFilter =
         activeSrc && !isFusion
-          ? [{ field: "source_id", operator: "equals", value: activeSrc.path }]
+          ? [{ field: "source_id", operator: "equals", value: activeSrc.id }]
           : [];
       const combinedFilters =
         filters.length > 0 || sourceFilter.length > 0 ? [...sourceFilter, ...filters] : undefined;
@@ -165,7 +171,10 @@ export function InvestigationPage() {
 
       const facetRes = await callSidecar<Record<string, { value: string; count: number }[]>>({
         method: "get_metadata_facets",
-        params: { workspace_id: activeWorkspaceId },
+        params: {
+          workspace_id: activeWorkspaceId,
+          source_ids: activeSrc && !isFusion ? [activeSrc.id] : undefined,
+        },
       });
       setAvailableFacets(facetRes);
       setIsConnected(true);
@@ -253,13 +262,17 @@ export function InvestigationPage() {
     setSort(field, sortBy === field && sortOrder === "asc" ? "desc" : "asc");
   };
 
-  const handleImportLocal = async (path: string, tail: boolean) => {
+  const handleImportLocal = async (path: string, tail: boolean, folderId?: string | null) => {
     const normalizedPath = path.replaceAll("\\", "/");
-    const newSource = addSource(activeWorkspaceId, {
-      name: path.split(/[/\\]/).pop() ?? path,
-      type: "local",
-      path: normalizedPath,
-    });
+    const newSource = await createSource(
+      activeWorkspaceId,
+      {
+        name: path.split(/[/\\]/).pop() ?? path,
+        type: "local",
+        path: normalizedPath,
+      },
+      folderId,
+    );
 
     try {
       toast.loading("Reading file content…", { id: "ingest" });
@@ -270,7 +283,7 @@ export function InvestigationPage() {
       const entries = parseManualLogs(content).map((e) => ({
         ...e,
         workspace_id: activeWorkspaceId,
-        source_id: normalizedPath,
+        source_id: newSource.id,
       }));
 
       if (entries.length > 0) {
@@ -290,7 +303,11 @@ export function InvestigationPage() {
       if (tail) {
         await callSidecar({
           method: "start_tail",
-          params: { filepath: normalizedPath, workspace_id: activeWorkspaceId },
+          params: {
+            filepath: normalizedPath,
+            workspace_id: activeWorkspaceId,
+            source_id: newSource.id,
+          },
         });
         setTailingSourceIds((prev) => new Set(prev).add(newSource.id));
         setTailing(true);
@@ -308,13 +325,18 @@ export function InvestigationPage() {
     pass: string,
     path: string,
     tail: boolean,
+    folderId?: string | null,
   ) => {
     const connectionPath = `${user}@${host}:${path}`;
-    const newSource = addSource(activeWorkspaceId, {
-      name: `${host}: ${path.split("/").pop() ?? path}`,
-      type: "ssh",
-      path: connectionPath,
-    });
+    const newSource = await createSource(
+      activeWorkspaceId,
+      {
+        name: `${host}: ${path.split("/").pop() ?? path}`,
+        type: "ssh",
+        path: connectionPath,
+      },
+      folderId,
+    );
     if (!tail) {
       toast.info("Non-tail SSH import is not yet supported. Enable Live Stream.");
       return;
@@ -329,6 +351,7 @@ export function InvestigationPage() {
           password: pass,
           filepath: path,
           workspace_id: activeWorkspaceId,
+          source_id: newSource.id,
         },
       });
       setTailingSourceIds((prev) => new Set(prev).add(newSource.id));
@@ -339,10 +362,21 @@ export function InvestigationPage() {
     }
   };
 
-  const handleIngestManual = async (rawText: string) => {
+  const handleIngestManual = async (rawText: string, folderId?: string | null) => {
+    const newSource = await createSource(
+      activeWorkspaceId,
+      {
+        name: `Paste (${new Date().toLocaleTimeString()})`,
+        type: "manual",
+        path: "manual-buffer",
+      },
+      folderId,
+    );
+
     const entries = parseManualLogs(rawText).map((e) => ({
       ...e,
       workspace_id: activeWorkspaceId,
+      source_id: newSource.id,
     }));
     if (entries.length === 0) {
       toast.warning("Manual buffer is empty or invalid.");
@@ -365,7 +399,11 @@ export function InvestigationPage() {
     }
   };
 
-  const handleImportLive = async (name: string, types: { syslog: boolean; http: boolean }) => {
+  const handleImportLive = async (
+    name: string,
+    types: { syslog: boolean; http: boolean },
+    folderId?: string | null,
+  ) => {
     const { settings } = useSettingsStore.getState();
     try {
       toast.loading(`Initializing live collection: ${name}...`, { id: "live-ingest" });
@@ -401,11 +439,15 @@ export function InvestigationPage() {
       await Promise.all(promises);
 
       // Add as a formal source to the workspace so it gets a tab
-      const newSource = addSource(activeWorkspaceId, {
-        name: name,
-        type: "live",
-        path: name, // We'll filter by source_id matching this name
-      });
+      const newSource = await createSource(
+        activeWorkspaceId,
+        {
+          name: name,
+          type: "live",
+          path: name, // We'll filter by source_id matching this name
+        },
+        folderId,
+      );
 
       setActiveSource(activeWorkspaceId, newSource.id);
 
@@ -445,7 +487,11 @@ export function InvestigationPage() {
       try {
         await callSidecar({
           method: "stop_tail",
-          params: { filepath: src.path, workspace_id: activeWorkspaceId },
+          params: {
+            filepath: src.path,
+            workspace_id: activeWorkspaceId,
+            source_id: src.id,
+          },
         });
       } catch {
         /* Ignored */
@@ -462,7 +508,7 @@ export function InvestigationPage() {
     try {
       await callSidecar({
         method: "delete_logs",
-        params: { workspace_id: activeWorkspaceId, source_id: src?.path },
+        params: { workspace_id: activeWorkspaceId, source_id: src?.id },
       });
       fetchLogs();
     } catch (e) {
@@ -486,10 +532,10 @@ export function InvestigationPage() {
     setIsOrchestratorOpen(true);
   };
 
-  const handleFusionSaved = (fusionId: string, fusionName: string) => {
+  const handleFusionSaved = async (fusionId: string, fusionName: string) => {
     const existingSrc = sources.find((s) => s.path === fusionId);
     if (!existingSrc) {
-      const newSrc = addSource(activeWorkspaceId, {
+      const newSrc = await createSource(activeWorkspaceId, {
         name: fusionName,
         type: "fusion",
         path: fusionId,
@@ -606,36 +652,47 @@ export function InvestigationPage() {
           <AIInvestigationSidebar onEngineSettingsOpen={() => setIsEngineSettingsOpen(true)} />
         }
       >
-        <VirtualLogTable
-          logs={logs}
-          highlights={highlights}
-          sortBy={sortBy}
-          sortOrder={sortOrder}
-          onSort={handleSort}
-          anomalousClusters={anomalousClusters}
-          onAddComment={(id, comment) => {
-            const has_comment = comment.trim().length > 0;
-            const originalLog = logs.find((l) => l.id === id);
-            updateLog(id, { comment, has_comment });
-            callSidecar({ method: "update_log_comment", params: { log_id: id, comment } })
-              .then(() => toast.success("Annotation saved"))
-              .catch(() => {
-                if (originalLog) {
-                  updateLog(id, {
-                    comment: originalLog.comment,
-                    has_comment: originalLog.has_comment,
-                  });
-                }
-                toast.error("Failed to save annotation");
-              });
-          }}
-          onAnalyzeCluster={handleAnalyzeCluster}
-          onOpenParser={(sourceId) => {
-            setActiveParserSource(sourceId);
-            setInitialParserConfig(null); // Fetch latest from sidecar if needed
-          }}
-          onImport={() => setIsImportOpen(true)}
-        />
+        {activeSourceId ? (
+          <VirtualLogTable
+            logs={logs}
+            highlights={highlights}
+            sortBy={sortBy}
+            sortOrder={sortOrder}
+            onSort={handleSort}
+            anomalousClusters={anomalousClusters}
+            onAddComment={(id, comment) => {
+              const has_comment = comment.trim().length > 0;
+              const originalLog = logs.find((l) => l.id === id);
+              updateLog(id, { comment, has_comment });
+              callSidecar({ method: "update_log_comment", params: { log_id: id, comment } })
+                .then(() => toast.success("Annotation saved"))
+                .catch(() => {
+                  if (originalLog) {
+                    updateLog(id, {
+                      comment: originalLog.comment,
+                      has_comment: originalLog.has_comment,
+                    });
+                  }
+                  toast.error("Failed to save annotation");
+                });
+            }}
+            onAnalyzeCluster={handleAnalyzeCluster}
+            onOpenParser={(sourceId) => {
+              setActiveParserSource(sourceId);
+              setInitialParserConfig(null); // Fetch latest from sidecar if needed
+            }}
+            onImport={() => setIsImportOpen(true)}
+          />
+        ) : (
+          <ExplorerView
+            folderId={activeFolderId}
+            hierarchy={hierarchy}
+            onSelectFolder={(id) => setActiveFolder(activeWorkspaceId ?? "", id)}
+            onSelectSource={(id) => setActiveSource(activeWorkspaceId ?? "", id)}
+            onCreateFolder={(name) => createFolder(activeWorkspaceId ?? "", name)}
+            onImportOpen={() => setIsImportOpen(true)}
+          />
+        )}
       </InvestigationLayout>
 
       <CustomParserModal
@@ -671,10 +728,12 @@ export function InvestigationPage() {
       <ImportFeedModal
         open={isImportOpen}
         onOpenChange={setIsImportOpen}
-        onImportLocal={handleImportLocal}
-        onImportSSH={handleImportSSH}
-        onIngestManual={handleIngestManual}
-        onImportLive={handleImportLive}
+        onImportLocal={(path, tail) => handleImportLocal(path, tail, activeFolderId)}
+        onImportSSH={(host, port, user, pass, path, tail) =>
+          handleImportSSH(host, port, user, pass, path, tail, activeFolderId)
+        }
+        onIngestManual={(logs) => handleIngestManual(logs, activeFolderId)}
+        onImportLive={(name, types) => handleImportLive(name, types, activeFolderId)}
       />
 
       <OrchestratorHub
