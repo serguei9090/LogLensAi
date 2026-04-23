@@ -187,27 +187,16 @@ class App:
             self._start_mcp_server()
 
     def _init_ai_provider(self, settings: dict):
-        """Map the correct host based on provider and return an instance."""
+        """Initialize the AI provider using the factory."""
         provider = settings.get("ai_provider", "ollama")
         logger.info("Initializing AI Provider: %s", provider)
-
-        if provider == "gemini-cli":
-            host = settings.get("ai_gemini_url", "http://localhost:22436")
-        elif provider in ["openai-compatible", "openai"]:
-            host = settings.get("ai_openai_host", "https://api.openai.com/v1")
-        elif provider == "ollama":
-            host = settings.get("ai_ollama_host", "http://localhost:11434")
-        else:
-            host = ""  # ai-studio etc.
-
-        logger.debug("AI Provider Host: %s, Model: %s", host, settings.get("ai_model"))
 
         return AIProviderFactory.get_provider(
             provider,
             api_key=settings.get("ai_api_key", ""),
             system_prompt=settings.get("ai_system_prompt", ""),
             model=settings.get("ai_model", "gemma4:e2b"),
-            host=host,
+            settings=settings,
         )
 
     def method_delete_logs(self, workspace_id: str, source_id: str | None = None) -> dict:

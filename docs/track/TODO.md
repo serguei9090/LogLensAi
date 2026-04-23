@@ -2,10 +2,27 @@
 
 > Last updated: 2026-04-21 (Session: Sprint Finalization & Audit Completion)
 > Source of truth for all sprint work. All Jules sessions must be anchored to items here.
+> 📊 Last audited: 2026-04-23 — see [project-report-2026-04-23.md](../project-report-2026-04-23.md)
+
+---
+
+## 🔴 Audit Findings — Sprint 14 (Open)
+
+*(All critical health and testing issues resolved)*
 
 ---
 
 ## ✅ Done
+
+- [x] **HEALTH-STABILIZATION**: Comprehensive health remediation (Done 2026-04-23)
+  - [x] **FIX-HIER-001**: `db.delete_folder()` cascade re-parenting fix (P0)
+  - [x] **FIX-DEBT-001**: Structured logging in `openai_compatible.py` (Removed print debt)
+  - [x] **REFACTOR-META-001**: Metadata extractor decomposition (Complexity 39 -> 8)
+  - [x] **REFACTOR-AI-STUDIO-001**: AIStudioProvider refactoring (Complexity 18 -> 7)
+  - [x] **FIX-FE-CONSOLE-001**: Frontend console noise reduction
+  - [x] **TEST-SSH-001**: Add SSH integration tests for `ssh_loader.py` (Coverage restored)
+  - [x] **TEST-OPENAI-001**: Add OpenAI-compatible provider tests (Coverage restored)
+  - [x] **REFACTOR-DB-001**: Decompose `get_metadata_facets` (Complexity 14 -> <10)
 
 - [x] Project genesis & scaffolding (AGENTS.md, rules, lefthook)
 - [x] Core Python sidecar: DuckDB, Drain3, JSON-RPC API

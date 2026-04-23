@@ -558,31 +558,19 @@ class LogDatabase:
 
         return {"total": total, "logs": logs, "offset": offset, "limit": limit}
 
-    def get_metadata_facets(self, workspace_id: str, source_ids: list = None) -> dict:
-        """Return the top unique metadata facets across all logs in a workspace."""
+    def _get_facet_keys(self, workspace_id: str) -> list[str]:
+        """Resolve priority and custom facet keys from settings."""
         cursor = self.get_cursor()
-
-        # 1. Define priority/standard facets
         keys = [
-            "ip",
-            "uuid",
-            "user_id",
-            "host",
-            "thread",
-            "logger",
-            "status",
-            "method",
-            "level",
-            "email",
+            "ip", "uuid", "user_id", "host", "thread",
+            "logger", "status", "method", "level", "email",
         ]
 
-        # 2. Add custom facet names from settings
-        # Fetch global rules
-        cursor.execute("SELECT value FROM settings WHERE key = 'facet_extractions'")
-        gr = cursor.fetchone()
-        if gr and gr[0]:
+        def _append_rules(json_str: str | None):
+            if not json_str:
+                return
             try:
-                rules = json.loads(gr[0])
+                rules = json.loads(json_str)
                 for r in rules if isinstance(rules, list) else []:
                     name = r.get("name")
                     if name and name not in keys:
@@ -590,26 +578,25 @@ class LogDatabase:
             except Exception:
                 pass
 
-        # Fetch workspace rules
+        cursor.execute("SELECT value FROM settings WHERE key = 'facet_extractions'")
+        gr = cursor.fetchone()
+        _append_rules(gr[0] if gr else None)
+
         cursor.execute(
             "SELECT value FROM workspace_settings WHERE workspace_id = ? AND key = 'facet_extractions'",
             (workspace_id,),
         )
         wr = cursor.fetchone()
-        if wr and wr[0]:
-            try:
-                rules = json.loads(wr[0])
-                for r in rules if isinstance(rules, list) else []:
-                    name = r.get("name")
-                    if name and name not in keys:
-                        keys.append(name)
-            except Exception:
-                pass
+        _append_rules(wr[0] if wr else None)
 
+        return keys
+
+    def _get_facet_aggregations(self, workspace_id: str, keys: list[str], source_ids: list = None) -> dict:
+        """Query top 10 unique values for each facet key."""
+        cursor = self.get_cursor()
         results = {}
 
         for key in keys:
-            # Efficiently query top 10 unique values for each facet key if they exist
             if key == "level":
                 where_clauses = ["workspace_id = ?", "level IS NOT NULL"]
                 query_field = "level"
@@ -628,7 +615,6 @@ class LogDatabase:
                 sql_params.extend(source_ids)
 
             where_sql = " AND ".join(where_clauses)
-
             query = f"""
                 SELECT {query_field} as val, count(*) as count
                 FROM logs
@@ -643,11 +629,14 @@ class LogDatabase:
                 if rows:
                     results[key] = [{"value": str(r[0]), "count": r[1]} for r in rows]
             except Exception as e:
-                # Silently skip if column/field doesn't exist or query fails
                 logger.warning("[DB] Facet aggregation failed for '%s': %s", key, e)
-                continue
 
         return results
+
+    def get_metadata_facets(self, workspace_id: str, source_ids: list = None) -> dict:
+        """Return the top unique metadata facets across all logs in a workspace."""
+        keys = self._get_facet_keys(workspace_id)
+        return self._get_facet_aggregations(workspace_id, keys, source_ids)
 
     def delete_logs(self, workspace_id: str, source_id: str = None):
         """Delete logs for a workspace. Optionally filter by source_id."""
@@ -707,29 +696,20 @@ class LogDatabase:
     def delete_folder(self, folder_id: str):
         cursor = self.get_cursor()
 
-        # Recursive delete of children and sources
-        # 1. Find all subfolder IDs (including self)
-        all_folder_ids = self._get_all_subfolder_ids(folder_id)
-
-        # 2. Delete all log data for sources in these folders
-        placeholders = ",".join(["?" for _ in all_folder_ids])
-
-        # Get all source IDs in these folders first to wipe their logs
+        # 1. Promote child folders to root (NULL parent)
         cursor.execute(
-            f"SELECT id FROM log_sources WHERE folder_id IN ({placeholders})", all_folder_ids
-        )
-        source_ids = [row[0] for row in cursor.fetchall()]
-        if source_ids:
-            s_placeholders = ",".join(["?" for _ in source_ids])
-            cursor.execute(f"DELETE FROM logs WHERE source_id IN ({s_placeholders})", source_ids)
-
-        # 3. Delete all log sources in these folders
-        cursor.execute(
-            f"DELETE FROM log_sources WHERE folder_id IN ({placeholders})", all_folder_ids
+            "UPDATE folders SET parent_id = NULL WHERE parent_id = ?",
+            (folder_id,)
         )
 
-        # 4. Delete the folders themselves
-        cursor.execute(f"DELETE FROM folders WHERE id IN ({placeholders})", all_folder_ids)
+        # 2. Promote log sources in this folder to root
+        cursor.execute(
+            "UPDATE log_sources SET folder_id = NULL WHERE folder_id = ?",
+            (folder_id,)
+        )
+
+        # 3. Delete the folder itself
+        cursor.execute("DELETE FROM folders WHERE id = ?", (folder_id,))
 
         self.commit()
 

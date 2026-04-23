@@ -21,6 +21,7 @@ from .base import AIChatMessage, AIProvider
 from .thinking_parser import (
     THINK_CLOSE,
     THINK_OPEN,
+    ThinkingMode,
     ThinkingStreamParser,
     clean_thinking_markers,
     detect_thinking_mode,
@@ -127,30 +128,12 @@ class AIStudioProvider(AIProvider):
                 return AIStudioProvider._cached_models
             return [DEFAULT_MODEL, "gemini-2.0-flash", "gemini-1.5-pro"]
 
-    async def chat(
-        self,
-        messages: list[AIChatMessage],
-        model: str | None = None,
-        session_id: str | None = None,
-        provider_session_id: str | None = None,
-        reasoning: bool | None = True,
-    ) -> AIChatMessage:
-        """Sends a message to Gemini via ADK Agent.
-
-        After the response is assembled, thinking content is extracted and
-        normalised via ``parse_completed_response`` from ``thinking_parser``.
-        This ensures Gemma 4 (AI Studio) produces the same ``<think>`` format
-        as Ollama without duplicating any parsing logic.
-        """
-        if not self.api_key:
-            return AIChatMessage(
-                role="assistant", content="Error: No API Key configured for AI Studio."
-            )
-
+    def _get_target_model_and_mode(self, model: str | None) -> tuple[str, ThinkingMode]:
+        """Validates the model name and determines the thinking mode."""
         target_model = model or self.active_model
         mode = detect_thinking_mode(target_model)
 
-        # Safety fallback: If model name is likely incompatible (e.g. left over from Ollama)
+        # Safety fallback: incompatible model from a different provider
         if not any(x in target_model.lower() for x in ["gemini-", "gemma-", "learnlm"]):
             logger.warning(
                 "AI Studio: Model '%s' potentially incompatible. Falling back to %s",
@@ -159,17 +142,13 @@ class AIStudioProvider(AIProvider):
             )
             target_model = DEFAULT_MODEL
             mode = detect_thinking_mode(target_model)
+        return target_model, mode
 
-        # Gemma 3/4 do not support the 'system_instruction' parameter.
+    def _prepare_messages(
+        self, messages: list[AIChatMessage], target_model: str, reasoning: bool | None
+    ) -> list[AIChatMessage]:
+        """Injects system instructions or thinking tokens based on model capabilities."""
         is_gemma = "gemma" in target_model.lower()
-        instruction = self.system_prompt if not is_gemma else ""
-
-        agent = LlmAgent(
-            name="ai_studio_agent",
-            model=target_model,
-            instruction=instruction,
-        )
-
         if reasoning and is_gemma and self.system_prompt:
             messages = list(messages)
             last_msg = messages[-1]
@@ -177,13 +156,15 @@ class AIStudioProvider(AIProvider):
                 # Inject <|think|> token to enable thinking mode for Gemma
                 gemma_prefix = f"<|think|>\n{self.system_prompt}"
                 last_msg.content = f"{gemma_prefix}\n\nUser Question: {last_msg.content}"
-        elif not reasoning and is_gemma:
-            # If thinking is explicitly disabled, ensure we don't accidentally trigger it
-            pass
+        return messages
 
-        os.environ["GOOGLE_API_KEY"] = self.api_key
-
-        session_service = InMemorySessionService()
+    async def _prepare_adk_session(
+        self,
+        session_service: InMemorySessionService,
+        session_id: str | None,
+        messages: list[AIChatMessage],
+    ) -> str:
+        """Creates an ADK session and populates it with historical conversation events."""
         user_id = "default_user"
         adk_session_id = session_id or "temp_session"
 
@@ -205,6 +186,32 @@ class AIStudioProvider(AIProvider):
             event = Event(invocation_id="historical", author=role, content=adk_content)
             await session_service.append_event(session, event)
 
+        return adk_session_id
+
+    async def chat(
+        self,
+        messages: list[AIChatMessage],
+        model: str | None = None,
+        session_id: str | None = None,
+        provider_session_id: str | None = None,
+        reasoning: bool | None = True,
+    ) -> AIChatMessage:
+        """Sends a message to Gemini via ADK Agent."""
+        if not self.api_key:
+            return AIChatMessage(role="assistant", content="Error: No API Key configured.")
+
+        target_model, mode = self._get_target_model_and_mode(model)
+        messages = self._prepare_messages(messages, target_model, reasoning)
+
+        is_gemma = "gemma" in target_model.lower()
+        instruction = self.system_prompt if not is_gemma else ""
+
+        agent = LlmAgent(name="ai_studio_agent", model=target_model, instruction=instruction)
+        os.environ["GOOGLE_API_KEY"] = self.api_key
+
+        session_service = InMemorySessionService()
+        adk_session_id = await self._prepare_adk_session(session_service, session_id, messages)
+
         runner = Runner(
             agent=agent,
             app_name=APP_NAME,
@@ -215,22 +222,18 @@ class AIStudioProvider(AIProvider):
         last_msg = messages[-1]
         adk_msg = types.Content(role="user", parts=[types.Part(text=last_msg.content)])
 
-        raw_text = ""
-        thinking_text = ""
+        raw_text, thinking_text = "", ""
         try:
             async for event in runner.run_async(
-                user_id=user_id, session_id=adk_session_id, new_message=adk_msg
+                user_id="default_user", session_id=adk_session_id, new_message=adk_msg
             ):
                 if event.is_final_response() and event.content:
                     for part in event.content.parts:
-                        # ADK may expose separate thought parts
                         if hasattr(part, "thought") and part.thought:
-                            # Use part.text for the actual reasoning content
                             thinking_text += str(part.text or "")
                         elif hasattr(part, "text") and part.text:
                             raw_text += str(part.text)
 
-            # Normalise thinking content using the shared parser
             if thinking_text:
                 clean_thought = clean_thinking_markers(thinking_text).strip()
                 clean_answer = clean_thinking_markers(raw_text).strip()
@@ -239,19 +242,11 @@ class AIStudioProvider(AIProvider):
                 final_content = parse_completed_response(raw_text, mode)
 
             return AIChatMessage(
-                role="assistant",
-                content=final_content,
-                provider_session_id=adk_session_id,
+                role="assistant", content=final_content, provider_session_id=adk_session_id
             )
         except Exception as e:
             if "404" in str(e) and target_model != DEFAULT_MODEL:
-                logger.error(
-                    "Model '%s' not found (deprecated). Retrying with %s...",
-                    target_model,
-                    DEFAULT_MODEL,
-                )
                 return await self.chat(messages, model=DEFAULT_MODEL, session_id=session_id)
-
             logger.error("AI Studio Error: %s", str(e))
             return AIChatMessage(role="assistant", content=f"AI Studio Error: {str(e)}")
 
@@ -264,69 +259,21 @@ class AIStudioProvider(AIProvider):
         reasoning: bool = True,
         **kwargs,
     ):
-        """Streaming version using ADK Runner.
-
-        Thinking content is extracted using ``ThinkingStreamParser`` so that
-        Gemma 4 responses via AI Studio produce the same ``<think>`` format as
-        Ollama — zero code duplication.
-        """
+        """Streaming version using ADK Runner."""
         if not self.api_key:
             yield "Error: No API Key configured for AI Studio."
             return
 
         os.environ["GOOGLE_API_KEY"] = self.api_key
-        target_model = model or self.active_model
-        mode = detect_thinking_mode(target_model)
-
-        # Safety fallback: incompatible model from a different provider
-        if not any(x in target_model.lower() for x in ["gemini-", "gemma-", "learnlm"]):
-            logger.warning(
-                "AI Studio: Model '%s' potentially incompatible. Falling back to %s",
-                target_model,
-                DEFAULT_MODEL,
-            )
-            target_model = DEFAULT_MODEL
-            mode = detect_thinking_mode(target_model)
+        target_model, mode = self._get_target_model_and_mode(model)
+        messages = self._prepare_messages(messages, target_model, reasoning)
 
         is_gemma = "gemma" in target_model.lower()
         instruction = self.system_prompt if not is_gemma else ""
 
-        agent = LlmAgent(
-            name="ai_studio_agent",
-            model=target_model,
-            instruction=instruction,
-        )
-
-        if reasoning and is_gemma and self.system_prompt:
-            messages = list(messages)
-            last_msg = messages[-1]
-            if last_msg.role == "user":
-                gemma_prefix = f"<|think|>\n{self.system_prompt}"
-                last_msg.content = f"{gemma_prefix}\n\nUser Question: {last_msg.content}"
-        elif not reasoning and is_gemma:
-            # If thinking is explicitly disabled, ensure we don't accidentally trigger it
-            pass
-
+        agent = LlmAgent(name="ai_studio_agent", model=target_model, instruction=instruction)
         session_service = InMemorySessionService()
-        user_id = "default_user"
-        adk_session_id = session_id or "temp_session"
-
-        session = await session_service.create_session(
-            app_name=APP_NAME, user_id=user_id, session_id=adk_session_id
-        )
-
-        # Inject history — strip thinking markers so the model sees clean text
-        for msg in messages[:-1]:
-            role = "user" if msg.role == "user" else "ai_studio_agent"
-            clean_content = (
-                clean_thinking_markers(msg.content) if msg.role == "assistant" else msg.content
-            )
-            adk_content = types.Content(
-                role="user" if role == "user" else "model",
-                parts=[types.Part(text=clean_content)],
-            )
-            event = Event(invocation_id="historical", author=role, content=adk_content)
-            await session_service.append_event(session, event)
+        adk_session_id = await self._prepare_adk_session(session_service, session_id, messages)
 
         runner = Runner(
             agent=agent,
@@ -338,42 +285,32 @@ class AIStudioProvider(AIProvider):
         adk_msg = types.Content(role="user", parts=[types.Part(text=last_msg.content)])
 
         parser = ThinkingStreamParser(mode)
-
         try:
             async for event in runner.run_async(
-                user_id=user_id, session_id=adk_session_id, new_message=adk_msg
+                user_id="default_user", session_id=adk_session_id, new_message=adk_msg
             ):
                 if not (event.content and event.content.parts):
                     continue
 
                 for part in event.content.parts:
-                    # ADK may expose a thought part separate from the answer
                     if hasattr(part, "thought") and part.thought:
-                        # Use part.text for the actual reasoning content
                         for chunk in parser.feed(content="", native_thinking=str(part.text or "")):
                             yield chunk
                     elif hasattr(part, "text") and part.text:
                         for chunk in parser.feed(content=str(part.text)):
                             yield chunk
 
-            # Flush remaining buffered content
             for chunk in parser.flush():
                 yield chunk
 
         except Exception as e:
             if "404" in str(e) and target_model != DEFAULT_MODEL:
-                logger.error(
-                    "Model '%s' not found (deprecated). Retrying stream with %s...",
-                    target_model,
-                    DEFAULT_MODEL,
-                )
                 async for chunk in self.chat_stream(
                     messages, model=DEFAULT_MODEL, session_id=session_id
                 ):
                     yield chunk
                 return
-
-            logger.error("AI Studio Error: %s", str(e))
+            logger.error("AI Studio Stream Error: %s", str(e))
             yield f"AI Studio Stream Error: {str(e)}"
 
     async def analyze_logs(self, template: str, samples: list[str]) -> dict:

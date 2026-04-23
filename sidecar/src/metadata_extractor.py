@@ -7,14 +7,10 @@ import re
 from db import Database
 
 
-def extract_log_metadata(
-    workspace_id: str, source_id: str, raw_line: str, custom_rules: list = None
-) -> dict:
-    """
-    Applies source-specific regex patterns and timezone normalization to a raw log line.
-    Shared by both one-time ingestion and live tailing.
-    """
-    # Defaults
+def _extract_base_metadata(
+    workspace_id: str, source_id: str, raw_line: str
+) -> tuple[str, str, str]:
+    """Extracts timestamp, level, and message using source-specific regex."""
     timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     level = "INFO"
     message = raw_line
@@ -52,9 +48,7 @@ def extract_log_metadata(
                         extracted_ts = match.group(0)
 
                     if extracted_ts:
-                        # PARS-004: Basic Timezone Normalization
                         timestamp = extracted_ts
-
                         try:
                             # Attempt to parse common formats: YYYY-MM-DD HH:MM:SS
                             dt = datetime.datetime.strptime(timestamp[:19], "%Y-%m-%d %H:%M:%S")
@@ -63,11 +57,10 @@ def extract_log_metadata(
                                 dt = dt + datetime.timedelta(hours=offset_hrs)
                                 timestamp = dt.strftime("%Y-%m-%d %H:%M:%S")
                         except Exception:
-                            pass  # Keep raw extracted string if parsing fails
+                            pass
 
                     if "level" in groups:
                         level = groups["level"].upper()
-
                     if "message" in groups:
                         message = groups["message"]
     except Exception as e:
@@ -75,18 +68,20 @@ def extract_log_metadata(
             "Failed to process line from %s: %s", source_id, e
         )
 
-    # --- Facet Extraction (Generic Heuristics) ---
+    return timestamp, level, message
+
+
+def _extract_heuristic_facets(raw_line: str) -> dict:
+    """Extracts common facets using generic heuristics (IPs, UUIDs, methods, etc)."""
     facets = {}
 
-    # 1. IP Addresses (IPv4 and IPv6) - Searching in raw_line for better coverage
+    # 1. IPs
     ipv4_pattern = r"\b(?:\d{1,3}\.){3}\d{1,3}\b"
     ipv6_pattern = r"\b(?:(?:[0-9a-fA-F]{1,4}:){2,7}[0-9a-fA-F]{1,4}|(?:[0-9a-fA-F]{1,4}:){1,7}:|:(?::[0-9a-fA-F]{1,4}){1,7}|::)\b"
-
     candidates = re.findall(f"{ipv4_pattern}|{ipv6_pattern}", raw_line)
     for cand in candidates:
         try:
-            ip_obj = ipaddress.ip_address(cand)
-            facets["ip"] = str(ip_obj)
+            facets["ip"] = str(ipaddress.ip_address(cand))
             break
         except ValueError:
             continue
@@ -103,85 +98,103 @@ def extract_log_metadata(
     if email_match:
         facets["email"] = email_match.group(0)
 
-    # 4. HTTP Methods
+    # 4. HTTP Methods & Status
     method_match = re.search(r"\b(GET|POST|PUT|DELETE|PATCH|HEAD|OPTIONS)\b", raw_line)
     if method_match:
         facets["method"] = method_match.group(1)
 
-    # 5. Common fields (Host, Thread, Logger)
-    # Host (e.g. host:myserver or [myserver] at start)
+    status_match = re.search(r"status[:\s=]+(\d{3})", raw_line, re.I)
+    if status_match:
+        facets["status"] = status_match.group(1)
+
+    return facets
+
+
+def _extract_context_facets(raw_line: str, facets: dict):
+    """Extracts host, thread, logger information."""
     if "host" not in facets:
         host_match = re.search(r"\bhost[:=]([a-zA-Z0-9\.\-]+)\b", raw_line, re.I)
         if host_match:
             facets["host"] = host_match.group(1)
 
-    # Thread (e.g. [thread-1] or thread=thread-1)
     if "thread" not in facets:
         thread_match = re.search(r"\[([^\]]{3,20})\]|thread[:=]([\w\-]+)", raw_line, re.I)
         if thread_match:
-            # Check if it's not a level or timestamp
             val = thread_match.group(1) or thread_match.group(2)
             if val and val.upper() not in ["INFO", "ERROR", "WARN", "DEBUG", "TRACE", "FATAL"]:
                 facets["thread"] = val
 
-    # Logger (e.g. com.example.App: or logger=com.example.App)
     if "logger" not in facets:
         logger_match = re.search(r"\b([\w\.]{5,40})[:\s]+(?=[A-Z])|logger[:=]([\w\.]+)", raw_line)
         if logger_match:
             facets["logger"] = logger_match.group(1) or logger_match.group(2)
 
-    # 6. Key=Value pairs
+
+def _extract_kv_facets(raw_line: str, facets: dict):
+    """Extracts general key=value pairs."""
     kv_matches = re.finditer(r"\b(\w+)=([\w\-\.@]+)\b", raw_line)
+    reserved = {
+        "timestamp", "level", "id", "ip", "uuid", "email",
+        "host", "thread", "logger", "method", "status", "user_id"
+    }
     for m in kv_matches:
         key, val = m.groups()
-        if key.lower() not in [
-            "timestamp",
-            "level",
-            "id",
-            "ip",
-            "uuid",
-            "email",
-            "host",
-            "thread",
-            "logger",
-            "method",
-        ]:
+        if key.lower() not in reserved:
             facets[key.lower()] = val
 
-    # 7. Specialized common fields (backwards compatibility)
+
+def _apply_custom_extractions(raw_line: str, custom_rules: list, facets: dict):
+    """Applies user-defined regex extraction rules."""
+    if not custom_rules:
+        return
+
+    for rule in custom_rules:
+        if not rule.get("enabled", True):
+            continue
+        try:
+            pattern, name = rule.get("regex"), rule.get("name")
+            group = rule.get("group", 1)
+            if not pattern or not name:
+                continue
+
+            match = re.search(pattern, raw_line)
+            if match:
+                if match.groupdict() and name in match.groupdict():
+                    facets[name] = match.group(name)
+                else:
+                    facets[name] = match.group(group)
+        except Exception as e:
+            logging.getLogger("LogLensSidecar").debug(
+                "Custom extraction rule %s failed: %s", rule.get("name"), e
+            )
+
+
+def extract_log_metadata(
+    workspace_id: str, source_id: str, raw_line: str, custom_rules: list = None
+) -> dict:
+    """
+    Applies source-specific regex patterns and timezone normalization to a raw log line.
+    Shared by both one-time ingestion and live tailing.
+    """
+    # 1. Base Metadata
+    timestamp, level, message = _extract_base_metadata(workspace_id, source_id, raw_line)
+
+    # 2. Heuristic Facets
+    facets = _extract_heuristic_facets(raw_line)
+
+    # 3. Context Facets
+    _extract_context_facets(raw_line, facets)
+
+    # 4. Key-Value Facets
+    _extract_kv_facets(raw_line, facets)
+
+    # 5. Specialized (User ID)
     if "user_id" not in facets:
         uid_match = re.search(r"user[:_]?id[:\s=]+(\w+)", raw_line, re.I)
         if uid_match:
             facets["user_id"] = uid_match.group(1)
 
-    if "status" not in facets:
-        status_match = re.search(r"status[:\s=]+(\d{3})", raw_line, re.I)
-        if status_match:
-            facets["status"] = status_match.group(1)
-
-    # --- 6. Custom Facet Extraction (Regex) ---
-    if custom_rules:
-        for rule in custom_rules:
-            if not rule.get("enabled", True):
-                continue
-
-            try:
-                pattern = rule.get("regex")
-                name = rule.get("name")
-                group = rule.get("group", 1)
-
-                if not pattern or not name:
-                    continue
-
-                match = re.search(pattern, raw_line)
-                if match:
-                    if match.groupdict() and name in match.groupdict():
-                        facets[name] = match.group(name)
-                    else:
-                        facets[name] = match.group(group)
-            except Exception as e:
-                logging.getLogger("LogLensSidecar").debug(
-                    "Custom extraction rule %s failed: %s", rule.get("name"), e
-                )
+    # 6. Custom Rules
+    _apply_custom_extractions(raw_line, custom_rules, facets)
 
     return {"timestamp": timestamp, "level": level, "message": message, "facets": facets}

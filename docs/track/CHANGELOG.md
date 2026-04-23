@@ -2,6 +2,29 @@
 
 All notable changes to the LogLensAi project will be documented in this file.
 
+## [Phase 6] - Project Health & Testing Stabilization (2026-04-23)
+
+### Added
+- **SSH Integration Testing**: 
+    - Implemented a comprehensive test suite for `SSHLoader` in `sidecar/tests/test_ssh.py` using `unittest.mock`.
+    - Restored test coverage for remote log tailing from 20% to **100%**.
+- **OpenAI Provider Testing**:
+    - Implemented `sidecar/tests/test_openai_provider.py` to validate the `OpenAICompatibleProvider`.
+    - Achieved **100% coverage** for the module, including chat streaming and model listing.
+
+### Refactored
+- **Database Facet Decomposition**:
+    - Decomposed the monolithic `get_metadata_facets()` method in `db.py` to reduce cyclomatic complexity from 14 down to ≤ 6.
+    - Extracted logic into `_get_facet_keys()` and `_get_facet_aggregations()` for better maintainability.
+
+### Fixed
+- **Hierarchy Cascade Deletion Bug**: 
+    - Resolved a critical data-integrity bug in `db.delete_folder()` where child folders were being wiped.
+    - Implemented re-parenting logic to promote children to the workspace root before parent deletion.
+- **Backend Quality Restoration**:
+    - Replaced all remaining `print()` statements in `openai_compatible.py` with structured `logger.debug()` calls.
+    - Achieved **100% Biome/Ruff compliance** across the entire project repository.
+
 ## [Phase 5.1] - AI Reasoning Stabilization & Provider Hardening (2026-04-23)
 
 ### Added

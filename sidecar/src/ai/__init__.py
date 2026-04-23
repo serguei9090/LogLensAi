@@ -38,9 +38,20 @@ class AIProviderFactory:
     def get_provider(provider_name: str, **kwargs) -> AIProvider:
         api_key = kwargs.get("api_key", "")
         system_prompt = kwargs.get("system_prompt", "")
-
-        # Use model name exactly as provided (e.g. models/gemma-4-31b-it)
         model = kwargs.get("model", "")
+        settings = kwargs.get("settings", {})
+
+        # --- Host Resolution Logic (OCP) ---
+        # If host is not explicitly provided, resolve from settings keys
+        host = kwargs.get("host")
+        if not host and settings:
+            host_map = {
+                "gemini-cli": "ai_gemini_url",
+                "openai-compatible": "ai_openai_host",
+                "openai": "ai_openai_host",
+                "ollama": "ai_ollama_host",
+            }
+            host = settings.get(host_map.get(provider_name, ""), "")
 
         # --- A2UI v0.9 Protocol Injection ---
         a2ui_instructions = """
@@ -71,7 +82,7 @@ Action Details:
             )
         elif provider_name == "ollama":
             return OllamaProvider(
-                host=kwargs.get("host", "http://localhost:11434"),
+                host=host or "http://localhost:11434",
                 system_prompt=system_prompt,
                 model=model or "gemma4:e2b",
             )
@@ -79,12 +90,12 @@ Action Details:
             return OpenAICompatibleProvider(
                 api_key=api_key,
                 system_prompt=system_prompt,
-                host=kwargs.get("host", "https://api.openai.com/v1"),
+                host=host or "https://api.openai.com/v1",
                 model=model or "gpt-4o",
             )
         else:
             return GeminiCLIProvider(
-                host=kwargs.get("host", "http://localhost:22436"),
+                host=host or "http://localhost:22436",
                 system_prompt=system_prompt,
                 model=model,
             )

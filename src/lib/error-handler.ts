@@ -39,6 +39,4 @@ export function initGlobalErrorHandlers() {
       description: message || "An unhandled promise rejection occurred.",
     });
   };
-
-  console.log("[LogLensAi] Global error handlers initialized.");
 }

@@ -1,8 +1,10 @@
-import sys
+import logging
 
 from openai import AsyncOpenAI
 
 from .base import AIChatMessage, AIProvider
+
+logger = logging.getLogger(__name__)
 
 
 class OpenAICompatibleProvider(AIProvider):
@@ -25,10 +27,10 @@ class OpenAICompatibleProvider(AIProvider):
     async def list_models(self) -> list[str]:
         """Fetch available models from the provider (OpenAI or LM Studio)."""
         if not self._client:
-            print("No API key or client initialized for list_models", file=sys.stderr)
+            logger.debug("No API key or client initialized for list_models")
             return []
         try:
-            print(f"Sending models list request to: {self.host}", file=sys.stderr)
+            logger.debug("Sending models list request to: %s", self.host)
 
             # Use raw httpx/aiohttp or the underlying httpx client from openai
             # to log the exact request if possible.
@@ -36,14 +38,14 @@ class OpenAICompatibleProvider(AIProvider):
 
             async with httpx.AsyncClient() as client:
                 url = f"{self.host}/models"
-                print(f"Making direct HTTP GET to: {url}", file=sys.stderr)
+                logger.debug("Making direct HTTP GET to: %s", url)
                 headers = {}
                 if self.api_key:
                     headers["Authorization"] = f"Bearer {self.api_key}"
 
                 response = await client.get(url, headers=headers)
-                print(f"Response Status: {response.status_code}", file=sys.stderr)
-                print(f"Response Body: {response.text[:200]}...", file=sys.stderr)
+                logger.debug("Response Status: %s", response.status_code)
+                logger.debug("Response Body: %s...", response.text[:200])
 
                 if response.status_code == 200:
                     data = response.json()
@@ -60,7 +62,7 @@ class OpenAICompatibleProvider(AIProvider):
 
             return []
         except Exception as e:
-            print(f"Error fetching models from {self.host}: {e}", file=sys.stderr)
+            logger.error("Error fetching models from %s: %s", self.host, e)
             return []
 
     async def chat(

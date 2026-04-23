@@ -151,7 +151,6 @@ export const useSettingsStore = create<SettingsStore>((set) => ({
 
     saveTimeout = setTimeout(async () => {
       try {
-        console.log("Persisting settings to sidecar:", newSettings);
         const payload: Record<string, string | number | boolean> = {};
         // The sidecar expects a dict of settings to update.
         // To be safe and consistent with the existing API, we'll send the updated fields.
@@ -167,7 +166,6 @@ export const useSettingsStore = create<SettingsStore>((set) => ({
           method: "update_settings",
           params: { settings: payload, workspace_id: workspaceId },
         });
-        console.log("Settings persisted to sidecar");
       } catch (err) {
         console.error("Failed to persist settings to sidecar:", err);
       } finally {
