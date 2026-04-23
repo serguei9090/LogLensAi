@@ -117,6 +117,9 @@
   - **Detail**: `docs/TODOC/FIX-D3-001.md`
 - [x] **STABILITY-001**: [FIX-STABILITY-001](i:/01-Master_Code/Apps/LogLensAi/docs/TODOC/FIX-STABILITY-001.md) - Global IDE Resolution (DONE)
   - **Files**: `src/components/atoms/A2UIRenderer.tsx`, `src/components/organisms/AIInvestigationSidebar.tsx`, `src/components/organisms/WorkspaceEngineSettings.tsx`
+- [x] **FIX-RESET-001**: Unified Factory Reset & State Synchronization (Done)
+  - **Files**: `sidecar/src/api.py`, `src/store/workspaceStore.ts`, `src/components/organisms/SettingsPanel.tsx`
+  - **Detail**: `docs/TODOC/FIX-RESET-001.md`
 - [x] **FIX-UX-007**: AI Provider Polish & Dependency Alignment (DONE)
   - **Files**: `sidecar/pyproject.toml`, `src/components/organisms/SettingsPanel.tsx`
   - **Detail**: `docs/TODOC/FIX-UX-007.md`

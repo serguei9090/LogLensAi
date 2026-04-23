@@ -16,9 +16,12 @@ class LogDatabase:
     _instance = None
     _lock = threading.Lock()
 
-    def __new__(cls, db_path="loglens.duckdb"):
+    def __new__(cls, db_path=None):
         with cls._lock:
             if cls._instance is None:
+                if db_path is None:
+                    # In extreme cases, fallback to a memory DB rather than creating a random file
+                    db_path = ":memory:"
                 cls._instance = super().__new__(cls)
                 cls._instance._init_db(db_path)
         return cls._instance
@@ -57,8 +60,17 @@ class LogDatabase:
         self._initialize_cluster_cache(cursor)
 
     def _setup_schema(self, cursor):
-        """Initial table and sequence creation."""
+        """Initial table and sequence creation.
+
+        Each table with a synthetic integer PK gets its own dedicated sequence
+        to prevent cross-table ID collisions (the root cause of the duplicate-key
+        ConstraintException observed when ingesting logs across multiple workspaces).
+        """
+        # Dedicated sequences — one per table that needs a synthetic PK.
         cursor.execute("CREATE SEQUENCE IF NOT EXISTS log_id_seq;")
+        cursor.execute("CREATE SEQUENCE IF NOT EXISTS log_streams_id_seq;")
+        cursor.execute("CREATE SEQUENCE IF NOT EXISTS ai_messages_id_seq;")
+        cursor.execute("CREATE SEQUENCE IF NOT EXISTS settings_templates_id_seq;")
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS logs (
                 id        INTEGER PRIMARY KEY DEFAULT nextval('log_id_seq'),
@@ -111,7 +123,7 @@ class LogDatabase:
             );
 
             CREATE TABLE IF NOT EXISTS log_streams (
-                id           INTEGER PRIMARY KEY DEFAULT nextval('log_id_seq'),
+                id           INTEGER PRIMARY KEY DEFAULT nextval('log_streams_id_seq'),
                 workspace_id TEXT,
                 name         TEXT,
                 type         TEXT,
@@ -121,7 +133,7 @@ class LogDatabase:
             );
 
             CREATE TABLE IF NOT EXISTS ai_messages (
-                id           INTEGER PRIMARY KEY DEFAULT nextval('log_id_seq'),
+                id           INTEGER PRIMARY KEY DEFAULT nextval('ai_messages_id_seq'),
                 session_id   TEXT,
                 role         TEXT,
                 content      TEXT,
@@ -154,7 +166,7 @@ class LogDatabase:
             );
 
             CREATE TABLE IF NOT EXISTS settings_templates (
-                id           INTEGER PRIMARY KEY DEFAULT nextval('log_id_seq'),
+                id           INTEGER PRIMARY KEY DEFAULT nextval('settings_templates_id_seq'),
                 workspace_id TEXT,
                 name         TEXT,
                 config_json  TEXT,
@@ -283,6 +295,15 @@ class LogDatabase:
             cursor.execute("SELECT source_id FROM logs LIMIT 1")
         except Exception:
             cursor.execute("ALTER TABLE logs ADD COLUMN source_id TEXT")
+
+        # Ensure all per-table sequences exist on legacy databases that were
+        # created before the dedicated-sequence migration.
+        with contextlib.suppress(Exception):
+            cursor.execute("CREATE SEQUENCE IF NOT EXISTS log_streams_id_seq;")
+        with contextlib.suppress(Exception):
+            cursor.execute("CREATE SEQUENCE IF NOT EXISTS ai_messages_id_seq;")
+        with contextlib.suppress(Exception):
+            cursor.execute("CREATE SEQUENCE IF NOT EXISTS settings_templates_id_seq;")
 
         with contextlib.suppress(Exception):
             cursor.execute("ALTER TABLE logs ALTER id SET DEFAULT nextval('log_id_seq')")
@@ -602,6 +623,30 @@ class LogDatabase:
                 continue
 
         return results
+
+    def delete_logs(self, workspace_id: str, source_id: str = None):
+        """Delete logs for a workspace. Optionally filter by source_id."""
+        cursor = self.get_cursor()
+        if source_id:
+            cursor.execute(
+                "DELETE FROM logs WHERE workspace_id = ? AND source_id = ?",
+                (workspace_id, source_id),
+            )
+            # Re-initialize cluster cache for the workspace to reflect deletions
+            cursor.execute("DELETE FROM clusters WHERE workspace_id = ?", (workspace_id,))
+            cursor.execute(
+                """
+                INSERT INTO clusters (workspace_id, cluster_id, template, count)
+                SELECT workspace_id, cluster_id, 'Pattern ' || cluster_id, count(*)
+                FROM logs WHERE workspace_id = ? AND cluster_id IS NOT NULL GROUP BY workspace_id, cluster_id
+            """,
+                (workspace_id,),
+            )
+        else:
+            cursor.execute("DELETE FROM logs WHERE workspace_id = ?", (workspace_id,))
+            cursor.execute("DELETE FROM clusters WHERE workspace_id = ?", (workspace_id,))
+
+        self.commit()
 
 
 # Alias for backward compatibility

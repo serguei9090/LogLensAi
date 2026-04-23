@@ -47,6 +47,8 @@ interface WorkspaceStore {
   renameSource: (workspaceId: string, sourceId: string, name: string) => void;
   /** Update any field in a LogSource object */
   updateSource: (workspaceId: string, sourceId: string, updates: Partial<LogSource>) => void;
+  /** Reset store to empty state */
+  reset: () => void;
 }
 
 // ─── Helper ────────────────────────────────────────────────────────────────────
@@ -167,6 +169,8 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
             };
           }),
         })),
+
+      reset: () => set({ workspaces: [], activeWorkspaceId: "" }),
     }),
 
     {

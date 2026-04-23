@@ -38,3 +38,8 @@ class AIProvider(ABC):
     async def analyze_logs(self, template: str, samples: list[str]) -> dict:
         """One-off diagnostic analysis of a log cluster."""
         pass
+
+    @abstractmethod
+    async def test_connection(self) -> dict:
+        """Verify the provider credentials and connectivity."""
+        pass

@@ -31,7 +31,7 @@ impl SidecarManager {
                 .arg("--stdio")
                 .arg("--with-http")
                 .arg("--db")
-                .arg("loglens_tauri.duckdb");
+                .arg("loglens.duckdb");
             c
         } else {
             // Production: Use Tauri sidecar binary

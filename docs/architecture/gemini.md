@@ -25,6 +25,9 @@ graph TD
 
   subgraph Engine_Environment [Sidecar Engine (Python 3.12)]
     API["JSON-RPC API (api.py)"]
+    Runner["Hybrid Runner (ADK / runner.py)"]
+    Graph["LangGraph Machine (graph.py)"]
+    Tools["Tool Registry (tools.py)"]
     Parser["Log Parser (Drain3 / parser.py)"]
     DB["DuckDB Persistence (db.py)"]
     SSH["SSH Remote Loader (ssh_loader.py)"]
@@ -44,7 +47,12 @@ graph TD
   API <--> Parser
   API <--> DB
   API <--> Tailer
-  API <--> AI
+  API <--> Runner
+  Runner <--> Graph
+  Graph <--> AI
+  Graph <--> Tools
+  Tools <--> Parser
+  Tools <--> DB
   AI <--> A2A
   AI <--> Studio
   AI <--> Ollama

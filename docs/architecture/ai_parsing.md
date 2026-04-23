@@ -1,4 +1,4 @@
-# AI Reasoning Parsing (Gemma 4 / Ollama)
+# AI Reasoning Parsing (Universal Hybrid Orchestration)
 
 This document describes how LogLensAi handles the complex reasoning-to-response transition for models like Gemma 4 when served via Ollama.
 
@@ -7,9 +7,9 @@ Modern reasoning models (like Gemma 4) emit a "thought process" before their fin
 1. **Explicit Markers**: The reasoning is wrapped in tokens (e.g., `<|channel>thought` and `<|channel>text`) inside the standard `content` string.
 2. **Native Fields**: The reasoning is sent in a dedicated `thinking` or `thought` JSON field, while the response is sent in the `content` field.
 
-## The Solution: Field-Aware Multi-Marker Parser
+## The Solution: Universal Middleware Parser
 
-The `OllamaProvider` implementation in `sidecar/src/ai/ollama.py` uses a hybrid stateful parser to ensure perfectly separated output.
+LogLensAi uses a universal `reasoning.py` middleware that normalizes reasoning markers across all providers (Ollama, Gemini, AI Studio) into a standard format.
 
 ### 1. Phase Detection
 The parser maintains a `_StreamPhase` (TEXT or THOUGHT).
@@ -29,14 +29,14 @@ If the model sends everything in the `content` field (legacy or raw mode), the p
 - **Thought Markers**: `<|channel>thought`, `<|thought|>`
 - **Text Markers**: `<|channel>text`, `<|text|>`, `<|channel|>text`, `<channel|>`
 
-### 4. Cleanup & Normalization
-- **History Sanitization**: Before sending history back to the model, all `<think>...</think>` blocks and internal markers are stripped. This ensures the model's "inner monologue" doesn't pollute subsequent conversation turns.
-- **Frontend Parser**: The frontend (`AIInvestigationSidebar.tsx`) uses `parseThinking()` to extract the content between `<think>` tags and render it in a collapsible block.
+### 4. Normalization & Routing
+All detected markers are normalized to `<think>...</think>` blocks. The `HybridRunner` applies this normalization automatically to all assistant responses before they are yielded to the ADK stream.
 
 ## Implementation Details
-- **Backend Class**: `OllamaProvider`
-- **Method**: `chat_stream()`
-- **Markers Enum**: `_StreamPhase`
+- **Normalization Utility**: `sidecar/src/ai/reasoning.py`
+- **Orchestrator**: `sidecar/src/ai/runner.py` (HybridRunner)
+- **State Machine**: `sidecar/src/ai/graph.py` (LangGraph)
+- **Method**: `parse_reasoning_blocks()`
 
 ## Debugging & Observability
 The parsing process can be tracked via environment variables in the `.env` file:

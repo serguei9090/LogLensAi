@@ -42,6 +42,10 @@ Expert in test automation, code coverage, and regression prevention. Focuses on 
 | `method_update_settings` | ✅ `test_api_methods.py` | ✅ | Ready |
 | `AIProvider (Logic)` | ✅ `test_ai_providers.py` | ❌ | Ready (Providers) |
 | `Metadata Extraction` | ✅ `test_metadata.py` | ❌ | Ready |
+| `HybridRunner (Logic)` | ❌ | ❌ | Coverage Gap |
+| `GraphManager (Logic)` | ❌ | ❌ | Coverage Gap |
+| `ToolRegistry (Logic)` | ❌ | ❌ | Coverage Gap |
+| `ReasoningParser (Logic)`| ❌ | ❌ | Coverage Gap |
 | `method_get_health` | ✅ `test_tailing.py` | ❌ | Ready |
 | `method_start_tail` | ✅ `test_tailing.py` | ❌ | Ready |
 | `method_stop_tail` | ✅ `test_tailing.py` | ❌ | Ready |
@@ -57,8 +61,14 @@ Expert in test automation, code coverage, and regression prevention. Focuses on 
 | `LogToolbar` | ❌ | ❌ | Coverage Gap |
 | `useSidecarBridge` | ❌ | ❌ | Coverage Gap |
 
+## 📊 Coverage Summary (2026-04-22)
+- **Total Backend Coverage**: 55%
+- **AI Module Coverage**: 40%
+- **Target**: 80%+
+
 ## 🎯 Target Tasks
-- **`VirtualLogTable` Tests**: Ensuring virtualization doesn't break log interactivity.
+- **Hybrid Orchestration Tests**: Implement unit tests for `runner.py`, `graph.py`, `tools.py`, and `reasoning.py`.
+- **VirtualLogTable Tests**: Ensuring virtualization doesn't break log interactivity.
 
 ## 🧬 Rule-Doc Mapping
 Every architectural change defined in `docs/architecture/` must link its corresponding test in this status matrix. If a function is implemented but lacks a test, it MUST be listed here with the "Coverage Gap" status.

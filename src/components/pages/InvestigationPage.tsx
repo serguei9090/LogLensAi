@@ -117,6 +117,14 @@ export function InvestigationPage() {
     if (!activeWorkspaceId) {
       return;
     }
+
+    // If no sources exist, don't even try to fetch logs (prevents ghost data display)
+    if (sources.length === 0) {
+      setLogs([], 0);
+      setAvailableFacets({});
+      return;
+    }
+
     try {
       if (showAnomalies) {
         const anomRes = await callSidecar<{ anomalies: { cluster_id: string }[] }>({
@@ -449,6 +457,17 @@ export function InvestigationPage() {
       });
     }
     removeSource(activeWorkspaceId, sourceId);
+
+    // Also wipe the logs from the database for this specific source to avoid "ghost logs"
+    try {
+      await callSidecar({
+        method: "delete_logs",
+        params: { workspace_id: activeWorkspaceId, source_id: src?.path },
+      });
+      fetchLogs();
+    } catch (e) {
+      console.warn("Failed to delete logs for removed source:", e);
+    }
   };
 
   const handleOrchestrateOpen = () => {
@@ -615,6 +634,7 @@ export function InvestigationPage() {
             setActiveParserSource(sourceId);
             setInitialParserConfig(null); // Fetch latest from sidecar if needed
           }}
+          onImport={() => setIsImportOpen(true)}
         />
       </InvestigationLayout>
 

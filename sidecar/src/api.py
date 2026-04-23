@@ -10,6 +10,8 @@ from typing import Any
 import aiohttp_cors
 from ai import AIChatMessage, AIProviderFactory
 from ai.context import SmartContextManager
+from ai.reasoning import parse_reasoning_blocks
+from ai.runner import HybridRunner
 from aiohttp import web
 from anomalies import AnomalyDetector
 from db import LogDatabase
@@ -19,6 +21,7 @@ from mcp_server import init_mcp, mcp_server
 from metadata_extractor import extract_log_metadata
 from models import (
     CreateLogStreamRequest,
+    DeleteLogsRequest,
     DeleteLogStreamRequest,
     ExportLogsRequest,
     GenerateExtractionRegexRequest,
@@ -45,6 +48,7 @@ from models import (
     SendAiMessageRequest,
     StartSSHTailRequest,
     StartTailRequest,
+    TestAiConnectionRequest,
     UpdateCommentRequest,
     UpdateFusionConfigRequest,
     UpdateSettingsRequest,
@@ -98,18 +102,31 @@ sys.stderr.write(f"{banner}\n")
 sys.stderr.flush()
 logger.info("Log path: %s", LOG_FILE)
 
-DEFAULT_DB = "loglens.duckdb"
+DEFAULT_DB = os.path.join(PROJECT_ROOT, "data", "loglens.duckdb")
 
 
 class App:
     def __init__(
         self,
-        db_path=DEFAULT_DB,
+        db_path=None,
         start_ingestion=True,
         start_anomalies=True,
         start_mcp=True,
     ):
+        if db_path is None:
+            db_path = DEFAULT_DB
+        elif not os.path.isabs(db_path):
+            # If a relative path is provided, resolve it against PROJECT_ROOT/data
+            db_path = os.path.join(PROJECT_ROOT, "data", db_path)
+
+        # Ensure data dir exists
+        db_dir = os.path.dirname(db_path)
+        if db_dir:
+            os.makedirs(db_dir, exist_ok=True)
+
         self.db = LogDatabase(db_path)
+        logger.info("Database initialized at: %s", os.path.abspath(db_path))
+
         self._parsers = {}
         self.tailers = {}
         self._start_time = time.time()
@@ -146,6 +163,13 @@ class App:
         # Initialize Context Manager for AI
         self.context_manager = SmartContextManager()
 
+        # Initialize Hybrid Orchestration Runner
+        ai_data_dir = os.path.join(PROJECT_ROOT, "data")
+        os.makedirs(ai_data_dir, exist_ok=True)
+        self.hybrid_runner = HybridRunner(
+            self, self.ai, db_path=os.path.join(ai_data_dir, "ai_state.sqlite")
+        )
+
         init_mcp(self)
         self._mcp_thread = None
         self._mcp_server_instance = None
@@ -178,6 +202,60 @@ class App:
             host=host,
         )
 
+    def method_delete_logs(self, workspace_id: str, source_id: str | None = None) -> dict:
+        """Delete logs for a workspace or specific source."""
+        logger.info("RPC Dispatch: delete_logs (workspace=%s, source=%s)", workspace_id, source_id)
+        self.db.delete_logs(workspace_id, source_id)
+        return {"status": "success"}
+
+    def method_factory_reset(self) -> dict:
+        """Total wipe of all backend persistent state (DB, AI state, Drain clusters)."""
+        logger.warning("RPC Dispatch: factory_reset - PERFORMING TOTAL WIPE")
+
+        # 1. Stop all workers and threads
+        self.stop()
+
+        # 2. Close and reset the DB singleton
+        LogDatabase.reset()
+
+        # 3. Delete files
+        import shutil
+
+        data_dir = os.path.join(PROJECT_ROOT, "data")
+        db_path = os.path.join(data_dir, "loglens.duckdb")
+        ai_path = os.path.join(data_dir, "ai_state.sqlite")
+        drain_dir = os.path.join(data_dir, "drain")
+
+        files_to_delete = [db_path, f"{db_path}.wal", ai_path, f"{ai_path}-wal", f"{ai_path}-shm"]
+
+        for f in files_to_delete:
+            if os.path.exists(f):
+                try:
+                    os.remove(f)
+                    logger.info("Deleted: %s", f)
+                except Exception as e:
+                    logger.error("Failed to delete %s: %s", f, e)
+
+        if os.path.exists(drain_dir):
+            try:
+                shutil.rmtree(drain_dir)
+                logger.info("Deleted directory: %s", drain_dir)
+            except Exception as e:
+                logger.error("Failed to delete drain dir: %s", e)
+
+        # 4. Re-initialize
+        # Note: We don't fully re-init 'self' because we are in a dispatch loop.
+        # But we initialize a new DB instance so subsequent calls work.
+        self.db = LogDatabase(db_path)
+        self.parser = self.get_drain_parser()
+
+        # Re-start ingestion/anomalies if they were active
+        # (This is tricky since we just stopped them, but usually we'll want the app to reboot or just continue)
+        self.ingestion_server.start()
+        self.anomaly_detector.start()
+
+        return {"status": "ok", "message": "Backend reset complete. Restart recommended."}
+
     def _start_mcp_server(self):
         """Starts the MCP server in a background thread using FastMCP SSE."""
         if self._mcp_thread and self._mcp_thread.is_alive():
@@ -208,6 +286,12 @@ class App:
                 self._mcp_thread.join(timeout=2)
                 self._mcp_thread = None
 
+    async def stop_async(self):
+        """Async version of stop to handle async components."""
+        self.stop()
+        if hasattr(self, "hybrid_runner"):
+            await self.hybrid_runner.graph_manager.close()
+
     def stop(self):
         """Gracefully shut down all background components."""
         logger.info("Sidecar: Shutting down background workers...")
@@ -231,8 +315,10 @@ class App:
         logger.info("Sidecar: Background workers stopped.")
 
     async def dispatch(self, req: JSONRPCRequest) -> JSONRPCResponse:
+        logger.info("RPC Dispatch: %s", req.method)
         try:
             method_name = f"method_{req.method}"
+
             if not hasattr(self, method_name):
                 return JSONRPCResponse(
                     id=req.id, error={"code": -32601, "message": f"Method not found: {req.method}"}
@@ -273,6 +359,8 @@ class App:
                 "delete_log_stream": DeleteLogStreamRequest,
                 "generate_facet_regex": GenerateExtractionRegexRequest,
                 "export_logs": ExportLogsRequest,
+                "delete_logs": DeleteLogsRequest,
+                "factory_reset": None,
             }
 
             handler = getattr(self, method_name)
@@ -802,7 +890,7 @@ class App:
         if key in self.tailers and self.tailers[key].running:
             return {"status": "already tailing"}
 
-        tailer = FileTailer(abs_path, workspace_id, self.parser)
+        tailer = FileTailer(abs_path, workspace_id, self.parser, self.db)
         self.tailers[key] = tailer
         tailer.start()
 
@@ -822,7 +910,10 @@ class App:
         if key in self.tailers and self.tailers[key].running:
             return {"status": "already tailing"}
 
-        tailer = SSHLoader(host, port, username, password, filepath, workspace_id, self.parser)
+        tailer = SSHLoader(
+            host, port, username, password, filepath, workspace_id, self.parser, self.db
+        )
+
         self.tailers[key] = tailer
         tailer.start()
 
@@ -960,8 +1051,12 @@ class App:
             batch_data.append(self._ingest_single_log(cursor, log, custom_rules=rules))
 
         if batch_data:
+            # ON CONFLICT DO NOTHING is a belt-and-suspenders guard for any
+            # legacy databases where the old shared log_id_seq may have left
+            # sequence state out of sync. With per-table sequences (db.py fix),
+            # genuine PK collisions are no longer possible in new databases.
             cursor.executemany(
-                "INSERT INTO logs (workspace_id, source_id, raw_text, timestamp, level, message, cluster_id, facets) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                "INSERT OR IGNORE INTO logs (workspace_id, source_id, raw_text, timestamp, level, message, cluster_id, facets) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
                 batch_data,
             )
             self.db.commit()
@@ -1035,6 +1130,11 @@ class App:
     async def method_list_ai_models(self) -> list[str]:
         """Fetch models available for the current AI provider."""
         return await self.ai.list_models()
+
+    async def method_test_ai_connection(self, **kwargs) -> dict:
+        """Verify credentials and connectivity for the current AI provider."""
+        _ = TestAiConnectionRequest(**kwargs)
+        return await self.ai.test_connection()
 
     def _prepare_ai_session(
         self, params: SendAiMessageRequest
@@ -1140,30 +1240,32 @@ class App:
         params = SendAiMessageRequest(**kwargs)
         session_id, provider_session_id, history = self._prepare_ai_session(params)
 
-        # 4. Call AI with provider-specific context
-        response_msg = await self.ai.chat(
-            history,
-            model=params.model,
+        # 4. Call Hybrid Runner for mission-based investigation
+        full_response = ""
+        async for chunk in self.hybrid_runner.run_investigation(
+            workspace_id=params.workspace_id,
             session_id=session_id,
-            provider_session_id=provider_session_id,
-        )
+            user_message=params.message,
+            history=[{"role": m.role, "content": m.content} for m in history[:-1]],
+            model=params.model,
+            reasoning=params.reasoning,
+        ):
+            full_response += chunk
 
         # 5. Extract A2UI if present (simple check for non-streaming mode)
         a2ui_payload = None
-        if A2UI_START in response_msg.content:
+        if A2UI_START in full_response:
             try:
-                parts = response_msg.content.split(A2UI_START)
+                parts = full_response.split(A2UI_START)
                 json_str = parts[1].split(A2UI_END)[0]
                 a2ui_payload = json.loads(json_str)
             except Exception:
                 pass
 
         # 6. Record Assistant Message
-        self._finalize_ai_session(
-            session_id, response_msg.content, response_msg.provider_session_id, a2ui_payload
-        )
+        self._finalize_ai_session(session_id, full_response, provider_session_id, a2ui_payload)
 
-        return {"session_id": session_id, "response": response_msg.content}
+        return {"session_id": session_id, "response": full_response}
 
     def method_get_ai_sessions(self, workspace_id: str) -> list:
         """Fetch all investigation sessions for a workspace."""
@@ -1573,17 +1675,19 @@ class App:
 
             await response.write(f"data: {json.dumps({'session_id': session_id})}\n\n".encode())
 
-            full_text = []
             extracted_a2ui = None
+            full_text = []
 
-            if hasattr(self.ai, "chat_stream"):
-                extracted_a2ui = await self._handle_chat_streaming(
-                    response, params, history, session_id, provider_session_id, full_text
-                )
-            else:
-                extracted_a2ui = await self._handle_chat_sync_fallback(
-                    response, params, history, session_id, provider_session_id, full_text
-                )
+            async for chunk in self.hybrid_runner.run_investigation(
+                workspace_id=params.workspace_id,
+                session_id=session_id,
+                user_message=params.message,
+                history=[{"role": m.role, "content": m.content} for m in history[:-1]],
+                model=params.model,
+                reasoning=params.reasoning,
+            ):
+                full_text.append(chunk)
+                await response.write(f"data: {json.dumps({'chunk': chunk})}\n\n".encode())
 
             final_text = "".join(full_text)
             # Last resort extraction if stream failed to catch it
@@ -1776,18 +1880,17 @@ class App:
                 cursor.execute(query, (k, val))
 
     def _check_ai_provider_reload(self, settings: dict, workspace_id: str | None):
-        ai_keys = {
-            "ai_provider",
-            "ai_api_key",
-            "ai_ollama_host",
-            "ai_openai_host",
-            "ai_gemini_url",
-            "ai_model",
-            "ai_system_prompt",
-        }
+        ai_keys = ["ai_provider", "ai_api_key", "ai_model", "ai_ollama_host", "ai_openai_host"]
         if not workspace_id and any(k in settings for k in ai_keys):
             current_settings = self.method_get_settings()
             self.ai = self._init_ai_provider(current_settings)
+
+            # CRITICAL FIX: Also re-initialize the hybrid runner with the new provider instance!
+            ai_data_dir = os.path.join(PROJECT_ROOT, "data")
+            self.hybrid_runner = HybridRunner(
+                self, self.ai, db_path=os.path.join(ai_data_dir, "ai_state.sqlite")
+            )
+            logger.info("AI Provider and HybridRunner re-initialized with new settings.")
 
     async def _handle_chat_streaming(
         self,
@@ -1811,6 +1914,15 @@ class App:
         ):
             full_text.append(chunk)
 
+            # --- Reasoning/Thinking Mode Handling ---
+            # We parse reasoning blocks on the fly if possible,
+            # though regex on chunks is tricky. For now, we normalize and send.
+            normalized_chunk = parse_reasoning_blocks(chunk)
+
+            # Detect if we are inside a thought block
+            # (Simplistic implementation for streaming: if chunk has <think> but not </think>)
+            # For better UX, we just pass the normalized chunk.
+
             # A2UI Transition Detection
             if A2UI_START in chunk and not is_collecting_a2ui:
                 is_collecting_a2ui = True
@@ -1828,7 +1940,8 @@ class App:
                     )
                 is_collecting_a2ui = False
 
-            await response.write(f"data: {json.dumps({'chunk': chunk})}\n\n".encode())
+            # Send chunk to UI. The UI components (ReasoningBlock) will handle <think> tags.
+            await response.write(f"data: {json.dumps({'chunk': normalized_chunk})}\n\n".encode())
 
         return extracted_a2ui
 
@@ -1872,11 +1985,11 @@ class App:
             return None
 
 
-def on_cleanup(server_app):
+async def on_cleanup(server_app):
     """Lifecycle hook to clean up background workers when aiohttp stops."""
     app = server_app.get("sidecar_app")
     if app:
-        app.stop()
+        await app.stop_async()
     LogDatabase.reset()
 
 
@@ -2003,12 +2116,10 @@ async def run_stdio_async(db_path=DEFAULT_DB, start_http=False, http_port=5000):
                     ),
                     flush=True,
                 )
-    except KeyboardInterrupt:
-        pass
-    except EOFError:
+    except (KeyboardInterrupt, EOFError, asyncio.CancelledError):
         pass
     finally:
-        app.stop()
+        await app.stop_async()
         LogDatabase.reset()
         logger.info("Sidecar: Cleanly exited.")
 

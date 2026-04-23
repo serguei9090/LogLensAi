@@ -14,8 +14,11 @@ import {
   ArrowDown,
   ArrowUp,
   ArrowUpDown,
+  Download,
+  FileUp,
   Minus,
   Plus,
+  Rocket,
   Settings2,
   Sparkles,
   StickyNote,
@@ -49,6 +52,7 @@ interface VirtualLogTableProps {
   readonly sortBy: string;
   readonly sortOrder: "asc" | "desc";
   readonly anomalousClusters?: Set<string>;
+  readonly onImport?: () => void;
 }
 
 export function VirtualLogTable({
@@ -61,6 +65,7 @@ export function VirtualLogTable({
   sortBy,
   sortOrder,
   anomalousClusters,
+  onImport,
 }: VirtualLogTableProps) {
   const parentRef = useRef<HTMLDivElement>(null);
   const [expandedRow, setExpandedRow] = useState<number | null>(null);
@@ -326,115 +331,151 @@ export function VirtualLogTable({
         aria-label="Log Table"
         tabIndex={-1}
       >
-        <div
-          style={{
-            height: `${rowVirtualizer.getTotalSize()}px`,
-            width: "100%",
-            position: "relative",
-          }}
-        >
-          <table className="w-full text-left text-sm whitespace-nowrap table-fixed border-separate border-spacing-0">
-            <thead className="sticky top-0 bg-bg-surface border-b border-border z-10 text-text-muted text-[10px] font-bold uppercase tracking-widest h-10 select-none">
-              <tr>
-                <th
-                  className="w-[12px] p-0 transition-colors group/select-all"
-                  title={selectedLogIds.length === logs.length ? "Deselect All" : "Select All"}
-                >
-                  <button
-                    type="button"
-                    className="w-full h-10 flex items-center justify-center hover:bg-white/5 outline-none focus-visible:bg-white/10"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      if (selectedLogIds.length === logs.length) {
-                        clearSelection();
-                      } else {
-                        setSelectedLogIds(logs.map((l) => l.id));
+        {logs.length === 0 ? (
+          <div className="absolute inset-0 flex flex-col items-center justify-center p-8 text-center animate-in fade-in zoom-in-95 duration-500">
+            <div className="relative mb-6">
+              <div className="absolute -inset-4 bg-primary/10 rounded-full blur-2xl animate-pulse" />
+              <div className="relative bg-bg-surface border border-border shadow-2xl rounded-2xl p-6">
+                <FileUp className="size-12 text-primary" />
+              </div>
+            </div>
+            <h3 className="text-xl font-bold text-text-primary">No logs detected</h3>
+            <p className="text-sm text-text-muted mt-2 max-w-[280px] leading-relaxed">
+              This workspace is currently empty. Connect a data source or upload a log file to begin
+              analysis.
+            </p>
+            <Button
+              onClick={onImport}
+              className="mt-8 px-8 py-6 rounded-2xl bg-primary hover:bg-primary-hover text-white font-bold shadow-xl shadow-primary/20 transition-all active:scale-95 group"
+            >
+              <Rocket className="size-5 mr-2 group-hover:animate-bounce" />
+              Import First Log
+            </Button>
+            <div className="mt-12 flex items-center gap-6 text-[10px] font-bold uppercase tracking-widest text-text-muted/30">
+              <div className="flex items-center gap-1.5">
+                <Download className="size-3" /> local files
+              </div>
+              <div className="w-1 h-1 rounded-full bg-current" />
+              <div className="flex items-center gap-1.5">
+                <Rocket className="size-3" /> live streams
+              </div>
+              <div className="w-1 h-1 rounded-full bg-current" />
+              <div className="flex items-center gap-1.5">
+                <Sparkles className="size-3" /> ssh tailing
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div
+            style={{
+              height: `${rowVirtualizer.getTotalSize()}px`,
+              width: "100%",
+              position: "relative",
+            }}
+          >
+            <table className="w-full text-left text-sm whitespace-nowrap table-fixed border-separate border-spacing-0">
+              <thead className="sticky top-0 bg-bg-surface border-b border-border z-10 text-text-muted text-[10px] font-bold uppercase tracking-widest h-10 select-none">
+                <tr>
+                  <th
+                    className="w-[12px] p-0 transition-colors group/select-all"
+                    title={selectedLogIds.length === logs.length ? "Deselect All" : "Select All"}
+                  >
+                    <button
+                      type="button"
+                      className="w-full h-10 flex items-center justify-center hover:bg-white/5 outline-none focus-visible:bg-white/10"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (selectedLogIds.length === logs.length) {
+                          clearSelection();
+                        } else {
+                          setSelectedLogIds(logs.map((l) => l.id));
+                        }
+                      }}
+                      aria-label={
+                        selectedLogIds.length === logs.length ? "Deselect All" : "Select All"
                       }
-                    }}
-                    aria-label={
-                      selectedLogIds.length === logs.length ? "Deselect All" : "Select All"
-                    }
-                  >
-                    <div
-                      className={cn(
-                        "w-1 h-4 rounded-full transition-all",
-                        selectedLogIds.length === logs.length
-                          ? "bg-emerald-500"
-                          : "bg-white/10 group-hover/select-all:bg-white/30",
-                      )}
-                    />
-                  </button>
-                </th>
-                <th className="w-[60px] p-0 text-center" aria-sort={getAriaSort("id")}>
-                  <button
-                    type="button"
-                    className="w-full h-10 px-3 flex items-center justify-center gap-1.5 hover:text-text-primary transition-colors focus-visible:bg-primary/5 outline-none"
-                    onClick={() => onSort("id")}
-                  >
-                    ID {renderSortIcon("id")}
-                  </button>
-                </th>
-                <th className="w-[180px] p-0 text-left" aria-sort={getAriaSort("timestamp")}>
-                  <button
-                    type="button"
-                    className="w-full h-10 px-3 flex items-center gap-1.5 hover:text-text-primary transition-colors focus-visible:bg-primary/5 outline-none"
-                    onClick={() => onSort("timestamp")}
-                  >
-                    Timestamp {renderSortIcon("timestamp")}
-                  </button>
-                </th>
-                <th className="w-[90px] p-0 text-left" aria-sort={getAriaSort("level")}>
-                  <button
-                    type="button"
-                    className="w-full h-10 px-3 flex items-center gap-1.5 hover:text-text-primary transition-colors focus-visible:bg-primary/5 outline-none"
-                    onClick={() => onSort("level")}
-                  >
-                    Level {renderSortIcon("level")}
-                  </button>
-                </th>
-                <th className="px-3 py-1">Message</th>
-                <th className="w-[110px] p-0 text-center" aria-sort={getAriaSort("cluster_id")}>
-                  <button
-                    type="button"
-                    className="w-full h-10 px-3 flex items-center justify-center gap-1.5 hover:text-text-primary transition-colors focus-visible:bg-primary/5 outline-none"
-                    onClick={() => onSort("cluster_id")}
-                  >
-                    Cluster {renderSortIcon("cluster_id")}
-                  </button>
-                </th>
-                <th className="w-[100px] p-0 text-center">
-                  <div className="w-full h-10 px-3 flex items-center justify-center gap-1.5">
-                    Actions
-                  </div>
-                </th>
-              </tr>
-            </thead>
-            <tbody className="font-mono text-[12px] relative z-0">
-              {rowVirtualizer.getVirtualItems().map((virtualRow) => {
-                const log = logs[virtualRow.index];
-                const isExpanded = expandedRow === log.id;
-                const isSelected = selectedLogIds.includes(log.id);
+                    >
+                      <div
+                        className={cn(
+                          "w-1 h-4 rounded-full transition-all",
+                          selectedLogIds.length === logs.length
+                            ? "bg-emerald-500"
+                            : "bg-white/10 group-hover/select-all:bg-white/30",
+                        )}
+                      />
+                    </button>
+                  </th>
+                  <th className="w-[60px] p-0 text-center" aria-sort={getAriaSort("id")}>
+                    <button
+                      type="button"
+                      className="w-full h-10 px-3 flex items-center justify-center gap-1.5 hover:text-text-primary transition-colors focus-visible:bg-primary/5 outline-none"
+                      onClick={() => onSort("id")}
+                    >
+                      ID {renderSortIcon("id")}
+                    </button>
+                  </th>
+                  <th className="w-[180px] p-0 text-left" aria-sort={getAriaSort("timestamp")}>
+                    <button
+                      type="button"
+                      className="w-full h-10 px-3 flex items-center gap-1.5 hover:text-text-primary transition-colors focus-visible:bg-primary/5 outline-none"
+                      onClick={() => onSort("timestamp")}
+                    >
+                      Timestamp {renderSortIcon("timestamp")}
+                    </button>
+                  </th>
+                  <th className="w-[90px] p-0 text-left" aria-sort={getAriaSort("level")}>
+                    <button
+                      type="button"
+                      className="w-full h-10 px-3 flex items-center gap-1.5 hover:text-text-primary transition-colors focus-visible:bg-primary/5 outline-none"
+                      onClick={() => onSort("level")}
+                    >
+                      Level {renderSortIcon("level")}
+                    </button>
+                  </th>
+                  <th className="px-3 py-1">Message</th>
+                  <th className="w-[110px] p-0 text-center" aria-sort={getAriaSort("cluster_id")}>
+                    <button
+                      type="button"
+                      className="w-full h-10 px-3 flex items-center justify-center gap-1.5 hover:text-text-primary transition-colors focus-visible:bg-primary/5 outline-none"
+                      onClick={() => onSort("cluster_id")}
+                    >
+                      Cluster {renderSortIcon("cluster_id")}
+                    </button>
+                  </th>
+                  <th className="w-[100px] p-0 text-center">
+                    <div className="w-full h-10 px-3 flex items-center justify-center gap-1.5">
+                      Actions
+                    </div>
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="font-mono text-[12px] relative z-0">
+                {rowVirtualizer.getVirtualItems().map((virtualRow) => {
+                  const log = logs[virtualRow.index];
+                  const isExpanded = expandedRow === log.id;
+                  const isSelected = selectedLogIds.includes(log.id);
 
-                return (
-                  <LogTableRow
-                    key={virtualRow.key}
-                    log={log}
-                    content={getHighlightedElements(log.message, highlights)}
-                    virtualRow={virtualRow}
-                    isExpanded={isExpanded}
-                    isSelected={isSelected}
-                    measureElement={rowVirtualizer.measureElement}
-                    onSelect={handleSelectRow}
-                    onToggleView={handleToggleView}
-                    onAnalyzeCluster={onAnalyzeCluster}
-                    anomalousClusters={anomalousClusters}
-                    logSessionMap={logSessionMap}
-                  />
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+                  return (
+                    <LogTableRow
+                      key={virtualRow.key}
+                      log={log}
+                      content={getHighlightedElements(log.message, highlights)}
+                      virtualRow={virtualRow}
+                      isExpanded={isExpanded}
+                      isSelected={isSelected}
+                      measureElement={rowVirtualizer.measureElement}
+                      onSelect={handleSelectRow}
+                      onToggleView={handleToggleView}
+                      onAnalyzeCluster={onAnalyzeCluster}
+                      anomalousClusters={anomalousClusters}
+                      logSessionMap={logSessionMap}
+                    />
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
 
         {expandedRow !== null && (
           <div

@@ -14,16 +14,16 @@ def validate_skill(skill_path):
     skill_path = Path(skill_path)
 
     # Check SKILL.md exists
-    skill_md = skill_path / 'SKILL.md'
+    skill_md = skill_path / "SKILL.md"
     if not skill_md.exists():
         return False, "SKILL.md not found"
 
     # Read and validate frontmatter
     content = skill_md.read_text()
-    if not content.startswith('---'):
+    if not content.startswith("---"):
         return False, "No YAML frontmatter found"
 
-    match = re.match(r'^---\n(.*?)\n---', content, re.DOTALL)
+    match = re.match(r"^---\n(.*?)\n---", content, re.DOTALL)
     if not match:
         return False, "Invalid frontmatter format"
 
@@ -37,18 +37,19 @@ def validate_skill(skill_path):
         return False, f"Invalid YAML in frontmatter: {e}"
 
     # Required fields
-    if 'name' not in frontmatter:
+    if "name" not in frontmatter:
         return False, "Missing 'name' in frontmatter"
-    if 'description' not in frontmatter:
+    if "description" not in frontmatter:
         return False, "Missing 'description' in frontmatter"
 
     return True, "Skill is valid!"
+
 
 if __name__ == "__main__":
     if len(sys.argv) != 2:
         print("Usage: python quick_validate.py <skill_directory>")
         sys.exit(1)
-    
+
     valid, message = validate_skill(sys.argv[1])
     print(message)
     sys.exit(0 if valid else 1)

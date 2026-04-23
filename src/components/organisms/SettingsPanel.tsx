@@ -21,6 +21,8 @@ import {
   ChevronDown,
   ChevronRight,
   Cpu,
+  Eye,
+  EyeOff,
   FolderOpen,
   Layers,
   Network,
@@ -169,7 +171,8 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
   const [isToolsExpanded, setIsToolsExpanded] = useState(false);
   const [isSkillModalOpen, setIsSkillModalOpen] = useState(false);
   const [isResetPatternsModalOpen, setIsResetPatternsModalOpen] = useState(false);
-  const { activeWorkspaceId } = useWorkspaceStore();
+  const [isFactoryResetModalOpen, setIsFactoryResetModalOpen] = useState(false);
+  const { activeWorkspaceId, reset: resetWorkspaces } = useWorkspaceStore();
   const { updateSettings } = useSettingsStore();
 
   const update = <K extends keyof AppSettings>(key: K, value: AppSettings[K], immediate = true) => {
@@ -201,6 +204,27 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
     }
   };
 
+  const handleFactoryReset = async () => {
+    try {
+      // 1. Backend Wipe
+      await callSidecar({ method: "factory_reset", params: {} });
+
+      // 2. Frontend Wipe
+      resetWorkspaces();
+      localStorage.clear(); // Nuclear option for all persisted stores
+
+      toast.success("Factory reset complete. Application will restart.");
+
+      // 3. Forced Reload
+      setTimeout(() => {
+        window.location.reload();
+      }, 1500);
+    } catch (error) {
+      console.error("Factory reset failed:", error);
+      toast.error("Factory reset failed. Manual cleanup may be required.");
+    }
+  };
+
   const handleResetPatterns = async () => {
     try {
       await callSidecar({
@@ -220,6 +244,33 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
   const handleResetMasks = () => {
     update("drain_masks", defaultSettings.drain_masks);
     toast.success("Variable masking reset to standard heuristics");
+  };
+
+  const [showApiKey, setShowApiKey] = useState(false);
+  const [isTestingConnection, setIsTestingConnection] = useState(false);
+
+  const handleTestConnection = async () => {
+    // Ensure current settings are saved before testing
+    await onSave(settings);
+
+    setIsTestingConnection(true);
+    try {
+      const res = await callSidecar<{ status: string; message: string }>({
+        method: "test_ai_connection",
+        params: {},
+      });
+      if (res.status === "success") {
+        toast.success(res.message);
+      } else if (res.status === "warning") {
+        toast.warning(res.message);
+      } else {
+        toast.error(res.message);
+      }
+    } catch (error) {
+      toast.error("Failed to test connection");
+    } finally {
+      setIsTestingConnection(false);
+    }
   };
 
   // Load settings on mount
@@ -406,10 +457,19 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
           <button
             type="button"
             onClick={() => setIsResetModalOpen(true)}
+            className="flex items-center gap-2 px-4 py-3 text-text-muted hover:text-amber-400 hover:bg-amber-500/5 rounded-2xl text-[11px] font-bold uppercase transition-all border border-transparent hover:border-amber-500/10 group"
+          >
+            <RotateCcw className="size-4 shrink-0 opacity-50 group-hover:opacity-100" />
+            Reset Settings
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setIsFactoryResetModalOpen(true)}
             className="flex items-center gap-2 px-4 py-3 text-text-muted hover:text-red-400 hover:bg-red-500/5 rounded-2xl text-[11px] font-bold uppercase transition-all border border-transparent hover:border-red-500/10 group"
           >
             <Trash2 className="size-4 shrink-0 opacity-50 group-hover:opacity-100" />
-            Reset to Defaults
+            Factory Reset
           </button>
         </div>
       </aside>
@@ -459,7 +519,17 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
 
                 {settings.ai_provider === "gemini-cli" && (
                   <div className="space-y-2 animate-in fade-in slide-in-from-left-2 duration-300">
-                    <SectionLabel htmlFor="ai_gemini_url">A2A Server URL</SectionLabel>
+                    <div className="flex items-center justify-between">
+                      <SectionLabel htmlFor="ai_gemini_url">A2A Server URL</SectionLabel>
+                      <button
+                        type="button"
+                        onClick={handleTestConnection}
+                        disabled={isTestingConnection}
+                        className="text-[9px] uppercase tracking-tighter font-bold text-primary hover:text-primary-light transition-colors disabled:opacity-30"
+                      >
+                        {isTestingConnection ? "Testing..." : "Test Connection"}
+                      </button>
+                    </div>
                     <SettingInput
                       id="ai_gemini_url"
                       type="url"
@@ -474,7 +544,17 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
 
                 {settings.ai_provider === "ollama" && (
                   <div className="space-y-2 animate-in fade-in slide-in-from-left-2 duration-300">
-                    <SectionLabel htmlFor="ai_ollama_host">Ollama Server Host</SectionLabel>
+                    <div className="flex items-center justify-between">
+                      <SectionLabel htmlFor="ai_ollama_host">Ollama Server Host</SectionLabel>
+                      <button
+                        type="button"
+                        onClick={handleTestConnection}
+                        disabled={isTestingConnection}
+                        className="text-[9px] uppercase tracking-tighter font-bold text-primary hover:text-primary-light transition-colors disabled:opacity-30"
+                      >
+                        {isTestingConnection ? "Testing..." : "Test Connection"}
+                      </button>
+                    </div>
                     <SettingInput
                       id="ai_ollama_host"
                       type="url"
@@ -492,15 +572,39 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
                 {(settings.ai_provider === "ai-studio" ||
                   settings.ai_provider === "openai-compatible") && (
                   <div className="space-y-2 animate-in fade-in slide-in-from-left-2 duration-300">
-                    <SectionLabel htmlFor="ai_api_key">Secret API Key</SectionLabel>
-                    <SettingInput
-                      id="ai_api_key"
-                      type="password"
-                      value={settings.ai_api_key}
-                      onChange={(e) => update("ai_api_key", e.target.value, false)}
-                      onBlur={() => onSave(settings)}
-                      placeholder="Encrypted: sk-••••••••••••••••"
-                    />
+                    <div className="flex items-center justify-between">
+                      <SectionLabel htmlFor="ai_api_key">Secret API Key</SectionLabel>
+                      <button
+                        type="button"
+                        onClick={handleTestConnection}
+                        disabled={isTestingConnection || !settings.ai_api_key}
+                        className="text-[9px] uppercase tracking-tighter font-bold text-primary hover:text-primary-light transition-colors disabled:opacity-30"
+                      >
+                        {isTestingConnection ? "Testing..." : "Test Connection"}
+                      </button>
+                    </div>
+                    <div className="relative group/key">
+                      <SettingInput
+                        id="ai_api_key"
+                        type={showApiKey ? "text" : "password"}
+                        value={settings.ai_api_key}
+                        onChange={(e) => update("ai_api_key", e.target.value, false)}
+                        onBlur={() => onSave(settings)}
+                        placeholder="Encrypted: sk-••••••••••••••••"
+                        className="pr-10"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowApiKey(!showApiKey)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-text-muted hover:text-text-primary transition-colors p-1"
+                      >
+                        {showApiKey ? (
+                          <EyeOff className="size-3.5" />
+                        ) : (
+                          <Eye className="size-3.5" />
+                        )}
+                      </button>
+                    </div>
                     <p className="text-[10px] text-text-muted/50 px-1">
                       Keys are stored securely in your local configuration.
                     </p>
@@ -1259,6 +1363,47 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
               onClick={handleResetPatterns}
             >
               Clear Patterns
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      {/* Factory Reset Confirmation Modal */}
+      <Dialog open={isFactoryResetModalOpen} onOpenChange={setIsFactoryResetModalOpen}>
+        <DialogContent className="sm:max-w-[425px] bg-bg-base border-border">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-bold text-red-500">
+              Total Factory Reset?
+            </DialogTitle>
+            <DialogDescription className="text-zinc-400 pt-2">
+              This is a <span className="text-red-400 font-bold underline">Nuclear Option</span>.
+              <br />
+              <br />
+              It will permanently delete:
+              <ul className="list-disc list-inside mt-2 space-y-1 text-xs">
+                <li>All Workspace and Source definitions</li>
+                <li>All Log databases and Pattern caches</li>
+                <li>All AI Chat History and Learned Memory</li>
+                <li>All Global and Workspace Settings</li>
+              </ul>
+              <br />
+              <span className="text-red-400 font-bold uppercase text-[10px]">
+                Warning: This action is irreversible. The app will be wiped and reloaded.
+              </span>
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button
+              variant="outline"
+              className="bg-transparent border-zinc-700 hover:bg-zinc-800 text-zinc-300"
+              onClick={() => setIsFactoryResetModalOpen(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              className="bg-red-600 hover:bg-red-700 text-white border-none"
+              onClick={handleFactoryReset}
+            >
+              Wipe Everything
             </Button>
           </DialogFooter>
         </DialogContent>

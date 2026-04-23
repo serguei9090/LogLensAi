@@ -1,0 +1,68 @@
+﻿Loaded config from .env
+Using API Key: AIza...d2Ps
+
+--- 1. Listing Available Models ---
+Found 55 models:
+ - ID: models/gemini-2.5-flash        | Display: Gemini 2.5 Flash
+ - ID: models/gemini-2.5-pro          | Display: Gemini 2.5 Pro
+ - ID: models/gemini-2.0-flash        | Display: Gemini 2.0 Flash
+ - ID: models/gemini-2.0-flash-001    | Display: Gemini 2.0 Flash 001
+ - ID: models/gemini-2.0-flash-lite-001 | Display: Gemini 2.0 Flash-Lite 001
+ - ID: models/gemini-2.0-flash-lite   | Display: Gemini 2.0 Flash-Lite
+ - ID: models/gemini-2.5-flash-preview-tts | Display: Gemini 2.5 Flash Preview TTS
+ - ID: models/gemini-2.5-pro-preview-tts | Display: Gemini 2.5 Pro Preview TTS
+ - ID: models/gemma-3-1b-it           | Display: Gemma 3 1B
+ - ID: models/gemma-3-4b-it           | Display: Gemma 3 4B
+ - ID: models/gemma-3-12b-it          | Display: Gemma 3 12B
+ - ID: models/gemma-3-27b-it          | Display: Gemma 3 27B
+ - ID: models/gemma-3n-e4b-it         | Display: Gemma 3n E4B
+ - ID: models/gemma-3n-e2b-it         | Display: Gemma 3n E2B
+ - ID: models/gemma-4-26b-a4b-it      | Display: Gemma 4 26B A4B IT
+ - ID: models/gemma-4-31b-it          | Display: Gemma 4 31B IT
+ - ID: models/gemini-flash-latest     | Display: Gemini Flash Latest
+ - ID: models/gemini-flash-lite-latest | Display: Gemini Flash-Lite Latest
+ - ID: models/gemini-pro-latest       | Display: Gemini Pro Latest
+ - ID: models/gemini-2.5-flash-lite   | Display: Gemini 2.5 Flash-Lite
+ - ID: models/gemini-2.5-flash-image  | Display: Nano Banana
+ - ID: models/gemini-3-pro-preview    | Display: Gemini 3 Pro Preview
+ - ID: models/gemini-3-flash-preview  | Display: Gemini 3 Flash Preview
+ - ID: models/gemini-3.1-pro-preview  | Display: Gemini 3.1 Pro Preview
+ - ID: models/gemini-3.1-pro-preview-customtools | Display: Gemini 3.1 Pro Preview Custom Tools
+ - ID: models/gemini-3.1-flash-lite-preview | Display: Gemini 3.1 Flash Lite Preview
+ - ID: models/gemini-3-pro-image-preview | Display: Nano Banana Pro
+ - ID: models/nano-banana-pro-preview | Display: Nano Banana Pro
+ - ID: models/gemini-3.1-flash-image-preview | Display: Nano Banana 2
+ - ID: models/lyria-3-clip-preview    | Display: Lyria 3 Clip Preview
+ - ID: models/lyria-3-pro-preview     | Display: Lyria 3 Pro Preview
+ - ID: models/gemini-3.1-flash-tts-preview | Display: Gemini 3.1 Flash TTS Preview
+ - ID: models/gemini-robotics-er-1.5-preview | Display: Gemini Robotics-ER 1.5 Preview
+ - ID: models/gemini-robotics-er-1.6-preview | Display: Gemini Robotics-ER 1.6 Preview
+ - ID: models/gemini-2.5-computer-use-preview-10-2025 | Display: Gemini 2.5 Computer Use Preview 10-2025
+ - ID: models/deep-research-max-preview-04-2026 | Display: Deep Research Max Preview (Apr-21-2026)
+ - ID: models/deep-research-preview-04-2026 | Display: Deep Research Preview (Apr-21-2026)
+ - ID: models/deep-research-pro-preview-12-2025 | Display: Deep Research Pro Preview (Dec-12-2025)
+ - ID: models/gemini-embedding-001    | Display: Gemini Embedding 001
+ - ID: models/gemini-embedding-2-preview | Display: Gemini Embedding 2 Preview
+ - ID: models/gemini-embedding-2      | Display: Gemini Embedding 2
+ - ID: models/aqa                     | Display: Model that performs Attributed Question Answering.
+ - ID: models/imagen-4.0-generate-001 | Display: Imagen 4
+ - ID: models/imagen-4.0-ultra-generate-001 | Display: Imagen 4 Ultra
+ - ID: models/imagen-4.0-fast-generate-001 | Display: Imagen 4 Fast
+ - ID: models/veo-2.0-generate-001    | Display: Veo 2
+ - ID: models/veo-3.0-generate-001    | Display: Veo 3
+ - ID: models/veo-3.0-fast-generate-001 | Display: Veo 3 fast
+ - ID: models/veo-3.1-generate-preview | Display: Veo 3.1
+ - ID: models/veo-3.1-fast-generate-preview | Display: Veo 3.1 fast
+ - ID: models/veo-3.1-lite-generate-preview | Display: Veo 3.1 lite
+ - ID: models/gemini-2.5-flash-native-audio-latest | Display: Gemini 2.5 Flash Native Audio Latest
+ - ID: models/gemini-2.5-flash-native-audio-preview-09-2025 | Display: Gemini 2.5 Flash Native Audio Preview 09-2025
+ - ID: models/gemini-2.5-flash-native-audio-preview-12-2025 | Display: Gemini 2.5 Flash Native Audio Preview 12-2025
+ - ID: models/gemini-3.1-flash-live-preview | Display: Gemini 3.1 Flash Live Preview
+
+--- 2. Connectivity Ping (gemini-1.5-flash) ---
+Ping failed for 'gemini-1.5-flash': 404 NOT_FOUND. {'error': {'code': 404, 'message': 'models/gemini-1.5-flash is not found for API version v1beta, or is not supported for generateContent. Call ListModels to see the list of available models and their supported methods.', 'status': 'NOT_FOUND'}}
+
+--- 3. Name Normalization Check ---
+AI Studio models often come with 'models/' prefix.
+LogLensAi handles this by stripping the prefix internally.
+Example: 'models/gemini-2.0-flash' -> 'gemini-2.0-flash'

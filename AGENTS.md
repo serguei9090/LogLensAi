@@ -28,7 +28,7 @@ The **only active modules** are:
 ## 🏗️ Tech Stack
 - **Frontend**: React 19, TypeScript, Vite, Zustand, TanStack Virtual, shadcn/ui
 - **Communication**: JSON-RPC 2.0 — HTTP on port 5000 in dev, stdin/stdout in prod
-- **Backend Sidecar**: Python 3.12, DuckDB, Drain3, aiohttp
+- **Backend Sidecar**: Python 3.12, DuckDB, Drain3, aiohttp, LangGraph, PydanticAI
 - **Desktop Shell**: Tauri v2 (Rust)
 - **Package Manager**: Bun
 - **Linter/Formatter**: Biome (TS/JS), Ruff (Python)
@@ -54,6 +54,9 @@ The **only active modules** are:
 | Sidecar | aiohttp-cors | `>=0.7.0` |
 | Sidecar | paramiko | `>=3.5.0` |
 | Sidecar | pydantic | `>=2.10.0` |
+| Sidecar | pydantic-ai | `>=0.0.14` |
+| Sidecar | langgraph | `>=0.2.66` |
+| Sidecar | aiosqlite | `>=0.20.0` |
 | Sidecar | ruff | `>=0.9.0` |
 
 
@@ -81,7 +84,13 @@ sidecar/
     parser.py       ← Drain3 log parsing
     tailer.py       ← FileTailer background thread
     ssh_loader.py   ← SSH remote tailing
-    ai.py           ← Gemini CLI integration
+    ai/
+      __init__.py   ← AI Provider Factory
+      base.py       ← AI Base Classes
+      graph.py      ← LangGraph State Machine
+      runner.py     ← Hybrid ADK Runner
+      tools.py      ← PydanticAI Tool Registry
+      reasoning.py  ← Universal Reasoning Parser
 ```
 
 ## 🎨 Design System

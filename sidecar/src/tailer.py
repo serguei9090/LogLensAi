@@ -2,20 +2,19 @@ import os
 import threading
 import time
 
-from db import Database
 from metadata_extractor import extract_log_metadata
 from parser import DrainParser
 
 
 class FileTailer:
-    def __init__(self, filepath, workspace_id, parser: DrainParser):
+    def __init__(self, filepath, workspace_id, parser: DrainParser, db):
         # Normalize to forward slashes for consistent source_id across OS
         self.filepath = os.path.abspath(filepath).replace("\\", "/")
         self.workspace_id = workspace_id
         self.parser = parser
         self.running = False
         self.thread = None
-        self.db = Database()
+        self.db = db
 
     def start(self):
         if self.running:

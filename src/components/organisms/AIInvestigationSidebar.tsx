@@ -40,7 +40,16 @@ import { TypingIndicator } from "../atoms/TypingIndicator";
 import type { FilterEntry } from "../molecules/FilterBuilder";
 
 /** Raw channel markers emitted by Gemma4 models that should never appear in UI. */
-const CHANNEL_TAGS = ["<|channel>thought", "<|channel>text", "<channel|>", "<|think|>"] as const;
+const CHANNEL_TAGS = [
+  "<|channel>thought",
+  "<|channel|>thought",
+  "<|channel>text",
+  "<|channel|>text",
+  "<channel|>",
+  "<|think|>",
+  "<|thought|>",
+  "<|text|>",
+] as const;
 
 /** Strip all known raw channel markers from a string. */
 function stripChannelTags(text: string): string {
@@ -67,8 +76,21 @@ export function parseThinking(content: string): {
     return { thinking: null, response: "", isStreamingThink: false };
   }
 
-  const startTags = ["<think>", "<|channel>thought"];
-  const endTags = ["</think>", "<|channel>text", "<channel|>"];
+  const startTags = [
+    "<think>",
+    "<|channel>thought",
+    "<|channel|>thought",
+    "<|thought|>",
+    "[reasoning]",
+  ];
+  const endTags = [
+    "</think>",
+    "<|channel>text",
+    "<|channel|>text",
+    "<channel|>",
+    "<|text|>",
+    "[/reasoning]",
+  ];
 
   // 1. Find the FIRST start tag
   let firstStartIdx = -1;
@@ -95,6 +117,7 @@ export function parseThinking(content: string): {
 
   // 3. Phase: Terminal (Found transition)
   if (firstEndIdx !== -1) {
+    const prefix = firstStartIdx !== -1 ? content.substring(0, firstStartIdx) : "";
     let thinking = "";
     if (firstStartIdx !== -1) {
       thinking = content.substring(firstStartIdx + startTagLength, firstEndIdx);
@@ -102,7 +125,7 @@ export function parseThinking(content: string): {
       thinking = content.substring(0, firstEndIdx);
     }
 
-    let response = content.substring(firstEndIdx + endTagLength);
+    let response = prefix + content.substring(firstEndIdx + endTagLength);
 
     // Clean all tags from both thinking and response to prevent technical leakage
     thinking = stripChannelTags(thinking);

@@ -2,6 +2,27 @@
 
 All notable changes to the LogLensAi project will be documented in this file.
 
+## [Phase 5.1] - AI Reasoning Stabilization & Provider Hardening (2026-04-23)
+
+### Added
+- **Reasoning Toggle End-to-End Flow**:
+    - Connected the frontend "Reasoning" toggle to the backend AI logic, ensuring user preference is respected by the LangGraph orchestration.
+    - Updated `SendAiMessageRequest` Pydantic model in `models.py` to include the `reasoning` flag.
+    - Updated `api.py` and `runner.py` to propagate the `reasoning` preference from the API request to the AI providers.
+
+### Refactored
+- **Centralized Thinking Logic**: 
+    - Refactored all thinking detection and parsing into a unified `sidecar/src/ai/thinking_parser.py` module, ensuring DRY compliance across providers.
+    - Expanded the model registry in `thinking_parser.py` to support Gemini Thinking, Claude 3.7, DeepSeek R1, and OpenAI o-series.
+- **AI Studio Reasoning Extraction**: Updated `AIStudioProvider` to correctly extract thinking content from `part.text` (where Google ADK stores thoughts) instead of relying on the legacy `part.thought` boolean.
+
+### Fixed
+- **Forced Thinking Suppression**: 
+    - Updated `AIStudioProvider` to skip `<|think|>` token injection for Gemma models when reasoning is disabled.
+    - Updated `OllamaProvider` to conditionally include the `REASONING_DIRECTIVE`, preventing forced reasoning phases when the user has toggled them off in the UI.
+- **AI Studio Type Error**: Fixed `TypeError: can only concatenate str (not "bool") to str` by ensuring proper type casting during thinking content extraction.
+- **AI Chat Double Emission**: Refined LangGraph node emission logic in `HybridRunner` to prevent duplicate message chunks from the final answer node.
+
 ## [Phase 5] - Desktop Integration & UI Polish (2026-04-21)
 
 ### Added

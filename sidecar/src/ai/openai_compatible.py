@@ -129,3 +129,22 @@ class OpenAICompatibleProvider(AIProvider):
             return json.loads(res.choices[0].message.content)
         except Exception as e:
             return {"summary": "Analysis failed", "root_cause": str(e), "recommended_actions": []}
+
+    async def test_connection(self) -> dict:
+        """Verify the OpenAI compatible connection."""
+        if not self._client:
+            return {"status": "error", "message": "API key or host not configured."}
+        try:
+            # Simple list_models call
+            models = await self.list_models()
+            if models:
+                return {
+                    "status": "success",
+                    "message": f"Connected! Found {len(models)} models.",
+                }
+            return {
+                "status": "error",
+                "message": "Connected but no models found. Check your API base URL.",
+            }
+        except Exception as e:
+            return {"status": "error", "message": f"Connection failed: {str(e)}"}

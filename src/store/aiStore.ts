@@ -1,4 +1,5 @@
 import { SIDECAR_BASE_URL, callSidecar } from "@/lib/hooks/useSidecarBridge";
+import { toast } from "sonner";
 import { create } from "zustand";
 
 export interface AiMessage {
@@ -80,7 +81,9 @@ export const useAiStore = create<AiStore>((set, get) => ({
       });
       set({ sessions });
     } catch (err) {
-      set({ error: (err as Error).message });
+      const msg = (err as Error).message;
+      set({ error: msg });
+      toast.error("Failed to fetch sessions", { description: msg });
     }
   },
 
@@ -104,7 +107,9 @@ export const useAiStore = create<AiStore>((set, get) => ({
       });
       await get().fetchSessions(workspaceId);
     } catch (err) {
-      set({ error: (err as Error).message });
+      const msg = (err as Error).message;
+      set({ error: msg });
+      toast.error("Failed to rename session", { description: msg });
     }
   },
 
@@ -120,7 +125,9 @@ export const useAiStore = create<AiStore>((set, get) => ({
       await get().fetchSessions(workspaceId);
       await get().fetchMapping(workspaceId);
     } catch (err) {
-      set({ error: (err as Error).message });
+      const msg = (err as Error).message;
+      set({ error: msg });
+      toast.error("Failed to delete session", { description: msg });
     }
   },
 
@@ -133,7 +140,9 @@ export const useAiStore = create<AiStore>((set, get) => ({
       });
       set({ messages, isLoading: false });
     } catch (err) {
-      set({ error: (err as Error).message, isLoading: false });
+      const msg = (err as Error).message;
+      set({ error: msg, isLoading: false });
+      toast.error("Error", { description: msg });
     }
   },
 

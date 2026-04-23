@@ -385,3 +385,36 @@ class GeminiCLIProvider(AIProvider):
 
         except Exception as e:
             return {"summary": "Analysis failed", "root_cause": str(e), "recommended_actions": []}
+
+    async def test_connection(self) -> dict:
+        """Verify the Gemini CLI connectivity (A2A Hot Mode)."""
+        try:
+            async with (
+                aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=5)) as session,
+                session.get(f"{self.host}/tasks") as resp,
+            ):
+                if resp.status == 200:
+                    return {"status": "success", "message": "Gemini A2A Server is active."}
+                return {
+                    "status": "error",
+                    "message": f"A2A Server returned status {resp.status}",
+                }
+        except Exception:
+            # Fallback to cold mode check
+            try:
+                import subprocess
+
+                res = subprocess.run(
+                    ["gemini", "--version"], capture_output=True, text=True, check=False
+                )
+                if res.returncode == 0:
+                    return {
+                        "status": "warning",
+                        "message": "A2A Server offline, but gemini-cli is available locally (Cold Mode).",
+                    }
+                return {
+                    "status": "error",
+                    "message": "Gemini CLI not found and A2A Server unreachable.",
+                }
+            except Exception as e:
+                return {"status": "error", "message": f"Gemini CLI connectivity failed: {str(e)}"}

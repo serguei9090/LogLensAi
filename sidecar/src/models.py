@@ -179,6 +179,10 @@ class ExportLogsRequest(BaseModel):
     end_time: str | None = None
 
 
+class TestAiConnectionRequest(BaseModel):
+    workspace_id: str | None = None
+
+
 # AI Models
 class SendAiMessageRequest(BaseModel):
     workspace_id: str
@@ -239,3 +243,8 @@ class GenerateExtractionRegexRequest(BaseModel):
     log_line: str
     selected_text: str
     workspace_id: str | None = None
+
+
+class DeleteLogsRequest(BaseModel):
+    workspace_id: str
+    source_id: str | None = None

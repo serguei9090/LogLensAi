@@ -1,8 +1,18 @@
 from .ai_studio import AIStudioProvider
 from .base import AIChatMessage, AIProvider
 from .gemini_cli import GeminiCLIProvider
+from .graph import GraphManager
 from .ollama import OllamaProvider
 from .openai_compatible import OpenAICompatibleProvider
+from .runner import HybridRunner
+from .thinking_parser import (
+    ThinkingMode,
+    ThinkingStreamParser,
+    clean_thinking_markers,
+    detect_thinking_mode,
+    parse_completed_response,
+)
+from .tools import ToolRegistry
 
 __all__ = [
     "AIChatMessage",
@@ -12,6 +22,14 @@ __all__ = [
     "OllamaProvider",
     "OpenAICompatibleProvider",
     "AIProviderFactory",
+    "HybridRunner",
+    "GraphManager",
+    "ToolRegistry",
+    "ThinkingMode",
+    "ThinkingStreamParser",
+    "detect_thinking_mode",
+    "clean_thinking_markers",
+    "parse_completed_response",
 ]
 
 
@@ -20,6 +38,9 @@ class AIProviderFactory:
     def get_provider(provider_name: str, **kwargs) -> AIProvider:
         api_key = kwargs.get("api_key", "")
         system_prompt = kwargs.get("system_prompt", "")
+
+        # Use model name exactly as provided (e.g. models/gemma-4-31b-it)
+        model = kwargs.get("model", "")
 
         # --- A2UI v0.9 Protocol Injection ---
         a2ui_instructions = """
@@ -46,24 +67,24 @@ Action Details:
             return AIStudioProvider(
                 api_key=api_key,
                 system_prompt=system_prompt,
-                model=kwargs.get("model", "gemini-2.5-flash"),
+                model=model or "gemini-2.5-flash",
             )
         elif provider_name == "ollama":
             return OllamaProvider(
                 host=kwargs.get("host", "http://localhost:11434"),
                 system_prompt=system_prompt,
-                model=kwargs.get("model", "gemma4:e2b"),
+                model=model or "gemma4:e2b",
             )
         elif provider_name == "openai-compatible" or provider_name == "openai":
             return OpenAICompatibleProvider(
                 api_key=api_key,
                 system_prompt=system_prompt,
                 host=kwargs.get("host", "https://api.openai.com/v1"),
-                model=kwargs.get("model", "gpt-4o"),
+                model=model or "gpt-4o",
             )
         else:
             return GeminiCLIProvider(
                 host=kwargs.get("host", "http://localhost:22436"),
                 system_prompt=system_prompt,
-                model=kwargs.get("model"),
+                model=model,
             )

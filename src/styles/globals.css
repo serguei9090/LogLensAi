@@ -150,3 +150,41 @@
 .animate-pulse-slow {
   animation: pulse-slow 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
+
+/* Sonner / Toast Premium Styling */
+.cn-toast {
+  background: var(--bg-surface-bright) !important;
+  color: var(--text-primary) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: var(--radius-md) !important;
+  box-shadow: 0 12px 32px -8px rgba(0, 0, 0, 0.5) !important;
+  padding: 12px 16px !important;
+  font-family: var(--font-sans) !important;
+}
+
+.cn-toast [data-description] {
+  color: var(--text-secondary) !important;
+  font-size: 13px !important;
+  margin-top: 4px !important;
+}
+
+.cn-toast [data-icon] {
+  margin-right: 12px !important;
+  flex-shrink: 0 !important;
+}
+
+.cn-toast[data-type="error"] [data-icon] {
+  color: var(--error) !important;
+}
+
+.cn-toast[data-type="success"] [data-icon] {
+  color: var(--primary) !important;
+}
+
+.cn-toast[data-type="warning"] [data-icon] {
+  color: var(--warning) !important;
+}
+
+.cn-toast[data-type="info"] [data-icon] {
+  color: var(--info) !important;
+}
