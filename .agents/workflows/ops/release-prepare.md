@@ -3,7 +3,7 @@ name: release-prepare
 description: Preparing a new release (Build, Version, Changelog, Tag). Use when the user asks to "Release" or "Tag" a version.
 ---
 
-Assume Role: Git Smith (@git)
+> **Assume Role:** @git
 
 # Release Preparation Protocol
 
@@ -51,7 +51,7 @@ Safely prepare the repo for deployment by validating the build, bumping the vers
 ```
 
 ## 🚨 Mandatory Quality Standards
-- **Assume Role Header**: Every file you create or edit MUST start with an `Assume Role: <Persona> (@handle)` header.
+- **Assume Role Header**: Every file you create or edit MUST start with a `> **Assume Role:** @handle` header.
 - **Semantic Commenting**: 
   - Every function MUST include a purpose, the architectural rationale, and a `Ref:` to the relevant spec file.
   - Every non-trivial variable MUST have an inline comment explaining **WHY** it exists.

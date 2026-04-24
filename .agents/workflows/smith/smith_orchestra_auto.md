@@ -2,7 +2,7 @@
 description: "SmithOrchestra (Auto) - True Autonomous Software Factory. Executes the entire SDLC in a single uninterrupted turn."
 ---
 
-Assume Role: PM Smith (@pm)
+> **Assume Role:** @pm
 # SmithOrchestra (Auto) - True Autonomous Software Factory
 // turbo-all
 
@@ -14,7 +14,7 @@ Execute a complete, end-to-end software development cycle autonomously. You will
 ---
 
 ### Phase 1: Context Discovery & Product Management
-**Assume Role:** PM Smith (@pm)
+> **Assume Role:** @pm
 **Mindset:** Meticulous, context-aware, spec-driven. Never guess; always verify the existing architecture.
 **Execution:**
 1. **Analyze Prompt:** Read the user's request.
@@ -25,7 +25,7 @@ Execute a complete, end-to-end software development cycle autonomously. You will
 ---
 
 ### Phase 2: Implementation & Coding
-**Assume Role:** Coder Smith (@backend / @frontend)
+> **Assume Role:** @backend / @frontend
 **Mindset:** DRY, SOLID principles, security-first, atomic design.
 **Execution:**
 1. **Implementation:** Use `write_to_file` and `replace_file_content` to implement the specs written by PM Smith.
@@ -37,7 +37,7 @@ Execute a complete, end-to-end software development cycle autonomously. You will
 ---
 
 ### Phase 3: Linting & Formatting
-**Assume Role:** Lint Smith (@lint)
+> **Assume Role:** @lint
 **Mindset:** Unforgiving, format-obsessed. Zero warnings allowed.
 **Execution:**
 1. **Check:** Run the project's linter via `run_command` (e.g., `uv run ruff check` or `bunx biome check`).
@@ -47,7 +47,7 @@ Execute a complete, end-to-end software development cycle autonomously. You will
 ---
 
 ### Phase 4: Testing
-**Assume Role:** Test Smith (@test)
+> **Assume Role:** @test
 **Mindset:** Edge-case focused, behavior-driven.
 **Execution:**
 1. **Run Tests:** Execute unit tests via `run_command`.
@@ -57,7 +57,7 @@ Execute a complete, end-to-end software development cycle autonomously. You will
 ---
 
 ### Phase 5: Documentation
-**Assume Role:** Docs Smith (@docs)
+> **Assume Role:** @docs
 **Mindset:** Clear, concise, developer-focused.
 **Execution:**
 1. **Dependency Audit:** If new libraries were added, update `Architecture.md` or `README.md`.
@@ -67,7 +67,7 @@ Execute a complete, end-to-end software development cycle autonomously. You will
 ---
 
 ### Phase 6: Final Architectural Audit
-**Assume Role:** Audit Smith (@audit)
+> **Assume Role:** @audit
 **Mindset:** Parity-obsessed, logic-gap discoverer.
 **Execution:**
 1. **API Parity:** Verify any new backend methods are in `API_SPEC.md`.
@@ -78,7 +78,7 @@ Execute a complete, end-to-end software development cycle autonomously. You will
 ---
 
 ### Phase 7: Handoff & State Synchronization
-**Assume Role:** Orchestra Hub (@scribe)
+> **Assume Role:** @scribe
 **Mindset:** Organized, garbage-collecting.
 **Execution:**
 1. **Resume Update:** Overwrite `docs/WikiFlow/handoff_resume.md`. Set Status to `Success`. List EXACT file paths under `Actionable Artifacts`.
@@ -87,7 +87,7 @@ Execute a complete, end-to-end software development cycle autonomously. You will
 ---
 
 ### Phase 8: Version Control
-**Assume Role:** Git Smith (@git)
+> **Assume Role:** @git
 **Mindset:** Conventional Commits, traceability.
 **Execution:**
 1. **Stage & Commit:** Run `git add .` and `git commit -m "feat/fix: <descriptive message>"` via `run_command`.

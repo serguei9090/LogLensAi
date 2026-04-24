@@ -3,7 +3,7 @@ command: /jules-loop
 description: Automated Vibe-to-Code Cycle
 ---
 
-Assume Role: Git Smith (@git)
+> **Assume Role:** @git
 // turbo-all
 ## Execution Logic
 1. **Spec Extraction**: Read the active task in `docs/track/TODO.md` and its detailed spec in `docs/track/specs/<ID>.md`.
@@ -15,7 +15,7 @@ Assume Role: Git Smith (@git)
 7. **Reporting & Merge**: Generate a report detailing changes. Finalize with `git commit -m "jules-complete: [task-id]"` and log success in `docs/track/JULES.md` and `telemetry.csv`.
 
 ## 🚨 Mandatory Quality Standards
-- **Assume Role Header**: Every file you create or edit MUST start with an `Assume Role: <Persona> (@handle)` header.
+- **Assume Role Header**: Every file you create or edit MUST start with a `> **Assume Role:** @handle` header.
 - **Semantic Commenting**: 
   - Every function MUST include a purpose, the architectural rationale, and a `Ref:` to the relevant spec file.
   - Every non-trivial variable MUST have an inline comment explaining **WHY** it exists.

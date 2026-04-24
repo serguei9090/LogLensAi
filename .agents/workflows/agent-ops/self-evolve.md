@@ -3,14 +3,14 @@ command: /self-evolve
 description: Autonomous 4-phase framework growth (Audit, Architect, Optimize, Expand).
 ---
 
-Assume Role: Orchestra Hub (@scribe)
+> **Assume Role:** @scribe
 
 # /self-evolve: Strategic Growth Workflow
 
 This workflow represents the highest-level meta-process for the Antigravity framework. It evolves the system across four phases.
 
 ## Phase 1: Contextual Audit & Critique
-**Assume Role:** Audit Smith (@audit)
+> **Assume Role:** @audit
 // turbo
 1. **List Assets**: Use `list_dir` recursively on `.agents/` and `.gemini/`.
 2. **Review Logs & Telemetry**: Examine `docs/track/TODO.md` and `docs/track/telemetry.csv` for patterns in task failures, token friction, or slow executions.
@@ -37,7 +37,7 @@ This workflow represents the highest-level meta-process for the Antigravity fram
 3. **Persist the Optimization**: Log the results of the evolution session back into `docs/track/telemetry.csv` using the `telemetry-logger` skill.
 
 ## 🚨 Mandatory Quality Standards
-- **Assume Role Header**: Every file you create or edit MUST start with an `Assume Role: <Persona> (@handle)` header.
+- **Assume Role Header**: Every file you create or edit MUST start with a `> **Assume Role:** @handle` header.
 - **Semantic Commenting**: 
   - Every function MUST include a purpose, the architectural rationale, and a `Ref:` to the relevant spec file.
   - Every non-trivial variable MUST have an inline comment explaining **WHY** it exists.

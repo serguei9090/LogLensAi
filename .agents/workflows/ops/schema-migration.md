@@ -3,7 +3,7 @@ name: schema-migration
 description: Safely Migrate Database Schema. Use when `schema.prisma` changes.
 ---
 
-Assume Role: Coder Smith (@backend)
+> **Assume Role:** @backend
 
 # Schema Migration Protocol
 
@@ -44,7 +44,7 @@ Assume Role: Coder Smith (@backend)
 ```
 
 ## 🚨 Mandatory Quality Standards
-- **Assume Role Header**: Every file you create or edit MUST start with an `Assume Role: <Persona> (@handle)` header.
+- **Assume Role Header**: Every file you create or edit MUST start with a `> **Assume Role:** @handle` header.
 - **Semantic Commenting**: 
   - Every function MUST include a purpose, the architectural rationale, and a `Ref:` to the relevant spec file.
   - Every non-trivial variable MUST have an inline comment explaining **WHY** it exists.

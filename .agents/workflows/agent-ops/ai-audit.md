@@ -3,7 +3,7 @@ name: ai-audit
 description: Specialized AI Agentic Framework Audit - Verifies personas, subagents, rules, and skills for high-performance alignment.
 ---
 
-Assume Role: Audit Smith (@audit)
+> **Assume Role:** @audit
 
 # AI Agentic Framework Audit (aiAudit)
 
@@ -18,7 +18,7 @@ This workflow audits the "Brain" of the system to ensure the AI's persona, rules
 ## 2. Rule & Workflow Audit
 - **Trigger Efficiency**: Scan .agents/rules/ for triggers (lways_on, glob, manual).
   - Flag any lways_on rules that could be narrowed to glob to save tokens.
-- **Assume Role Standards**: Verify that 100% of workflows in .agents/workflows/ have the Assume Role: <Name> (@tag) header.
+- **Assume Role Standards**: Verify that 100% of workflows in .agents/workflows/ have the `> **Assume Role:** @handle` header.
 
 ## 3. Skill & Tool Audit
 - **Skill Documentation**: Check every folder in .agents/skills/ for a valid SKILL.md.
@@ -38,7 +38,7 @@ This workflow audits the "Brain" of the system to ensure the AI's persona, rules
 - Propose updates to gents.md or new workflows based on the audit findings.
 
 ## 🚨 Mandatory Quality Standards
-- **Assume Role Header**: Every file you create or edit MUST start with an `Assume Role: <Persona> (@handle)` header.
+- **Assume Role Header**: Every file you create or edit MUST start with a `> **Assume Role:** @handle` header.
 - **Semantic Commenting**: 
   - Every function MUST include a purpose, the architectural rationale, and a `Ref:` to the relevant spec file.
   - Every non-trivial variable MUST have an inline comment explaining **WHY** it exists.

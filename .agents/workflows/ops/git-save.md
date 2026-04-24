@@ -3,7 +3,7 @@ command: /git-save
 description: Universal Git Snapshot Workflow for Humans and Agents
 ---
 
-Assume Role: Git Smith (@git)
+> **Assume Role:** @git
 
 # Universal Git Snapshot Protocol
 
@@ -32,7 +32,7 @@ Example Command for AI execution:
 - **Pre-execution**: Before executing step 3, prompt the user with the proposed commit message if you are unsure of the scope.
 
 ## 🚨 Mandatory Quality Standards
-- **Assume Role Header**: Every file you create or edit MUST start with an `Assume Role: <Persona> (@handle)` header.
+- **Assume Role Header**: Every file you create or edit MUST start with a `> **Assume Role:** @handle` header.
 - **Semantic Commenting**: 
   - Every function MUST include a purpose, the architectural rationale, and a `Ref:` to the relevant spec file.
   - Every non-trivial variable MUST have an inline comment explaining **WHY** it exists.

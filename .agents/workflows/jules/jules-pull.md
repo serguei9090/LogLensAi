@@ -2,7 +2,7 @@
 description: Pull, apply, sync, and validate a completed Jules session.
 ---
 
-Assume Role: Git Smith (@git)
+> **Assume Role:** @git
 # 📥 /jules-pull: Pull and Apply Jules Session
 
 This workflow automates the retrieval, application, and environment syncing of a finished Jules implementation cycle.
@@ -34,7 +34,7 @@ This workflow automates the retrieval, application, and environment syncing of a
 1. Notify the user that the session has been successfully integrated and synchronized.
 
 ## 🚨 Mandatory Quality Standards
-- **Assume Role Header**: Every file you create or edit MUST start with an `Assume Role: <Persona> (@handle)` header.
+- **Assume Role Header**: Every file you create or edit MUST start with a `> **Assume Role:** @handle` header.
 - **Semantic Commenting**: 
   - Every function MUST include a purpose, the architectural rationale, and a `Ref:` to the relevant spec file.
   - Every non-trivial variable MUST have an inline comment explaining **WHY** it exists.

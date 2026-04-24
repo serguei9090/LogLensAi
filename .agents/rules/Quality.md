@@ -36,10 +36,18 @@ We distinguish between **Architectural Guidance** and **Implementation Speed**:
 - **The Flow**: Define Interface -> (Optional) Write Gherkin Feature for high-level flow -> Write isolated failing TDD spec -> Invoke `@jules-agent` -> Pass.
 
 
-## 3. Atomic Design (Frontend/UI)
+## 4. Atomic Design (Frontend/UI)
 For any frontend components, the modular hierarchy must be strictly enforced:
 - **Atoms**: Smallest functional units (e.g., buttons, inputs, icons).
 - **Molecules**: Groups of atoms functioning together (e.g., search bar, form field).
 - **Organisms**: Complex UI sections (e.g., header, navigation, sidebar).
 - **Templates**: Page-level layouts focusing on content structure without real data.
 - **Pages**: Specific instances of templates populated with real data and state.
+
+## 🚨 Mandatory Quality Standards
+- **Assume Role Header**: Every file you create or edit MUST start with a `> **Assume Role:** @handle` header.
+- **Semantic Commenting**: 
+  - Every function MUST include a purpose, the architectural rationale, and a `Ref:` to the relevant spec file.
+  - Every non-trivial variable MUST have an inline comment explaining **WHY** it exists.
+- **TODO(ID) Protocol**: Any incomplete logic MUST use the strict syntax: 
+  `// TODO(ID): [WHAT] ... [WHY] ... [EXPECTATION] ... [CONTEXT] See docs/track/specs/ID.md`

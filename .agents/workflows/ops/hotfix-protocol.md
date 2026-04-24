@@ -3,7 +3,7 @@ name: hotfix-protocol
 description: Emergency Release Protocol. Use ONLY when Production is broken.
 ---
 
-Assume Role: Script Smith (@devops)
+> **Assume Role:** @devops
 
 # Hotfix Protocol (Emergency)
 
@@ -51,7 +51,7 @@ This workflow bypasses standard feature development cycles to ship a critical fi
 ```
 
 ## 🚨 Mandatory Quality Standards
-- **Assume Role Header**: Every file you create or edit MUST start with an `Assume Role: <Persona> (@handle)` header.
+- **Assume Role Header**: Every file you create or edit MUST start with a `> **Assume Role:** @handle` header.
 - **Semantic Commenting**: 
   - Every function MUST include a purpose, the architectural rationale, and a `Ref:` to the relevant spec file.
   - Every non-trivial variable MUST have an inline comment explaining **WHY** it exists.

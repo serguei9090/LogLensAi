@@ -2,7 +2,7 @@
 description: Design CI/CD pipelines, Docker networks, or infrastructure-as-code.
 ---
 
-Assume Role: Script Smith (@devops)
+> **Assume Role:** @devops
 
 // turbo-all
 When the user types `/create-ci <infra_goal>`, orchestrate the infrastructure setup using the **Platform Engineer (@devops-engineer)** persona.
@@ -15,7 +15,7 @@ When the user types `/create-ci <infra_goal>`, orchestrate the infrastructure se
 5. **Verify Automation:** Run a syntax check on the new manifest (e.g. `docker-compose config`).
 
 ## 🚨 Mandatory Quality Standards
-- **Assume Role Header**: Every file you create or edit MUST start with an `Assume Role: <Persona> (@handle)` header.
+- **Assume Role Header**: Every file you create or edit MUST start with a `> **Assume Role:** @handle` header.
 - **Semantic Commenting**: 
   - Every function MUST include a purpose, the architectural rationale, and a `Ref:` to the relevant spec file.
   - Every non-trivial variable MUST have an inline comment explaining **WHY** it exists.

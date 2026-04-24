@@ -3,7 +3,7 @@ name: dependency-update
 description: Check for outdated dependencies and propose updates. Use for maintenance tasks.
 ---
 
-Assume Role: Script Smith (@devops)
+> **Assume Role:** @devops
 
 # Dependency Health Protocol
 
@@ -37,7 +37,7 @@ Keep the software supply chain fresh to avoid "Code Rot".
 ```
 
 ## 🚨 Mandatory Quality Standards
-- **Assume Role Header**: Every file you create or edit MUST start with an `Assume Role: <Persona> (@handle)` header.
+- **Assume Role Header**: Every file you create or edit MUST start with a `> **Assume Role:** @handle` header.
 - **Semantic Commenting**: 
   - Every function MUST include a purpose, the architectural rationale, and a `Ref:` to the relevant spec file.
   - Every non-trivial variable MUST have an inline comment explaining **WHY** it exists.

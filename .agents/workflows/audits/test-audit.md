@@ -3,7 +3,7 @@ name: test-audit
 description: Run unit tests and coverage for this repository and write a summary audit to audits/test_audit.md. Use when the user asks to execute tests/coverage and produce or refresh the test audit.
 ---
 
-Assume Role: QA Smith (@qa)
+> **Assume Role:** @qa
 
 # Test Coverage Audit
 
@@ -55,7 +55,7 @@ Notes:
 ```
 
 ## 🚨 Mandatory Quality Standards
-- **Assume Role Header**: Every file you create or edit MUST start with an `Assume Role: <Persona> (@handle)` header.
+- **Assume Role Header**: Every file you create or edit MUST start with a `> **Assume Role:** @handle` header.
 - **Semantic Commenting**: 
   - Every function MUST include a purpose, the architectural rationale, and a `Ref:` to the relevant spec file.
   - Every non-trivial variable MUST have an inline comment explaining **WHY** it exists.
