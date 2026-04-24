@@ -30,7 +30,7 @@ Execute a complete, end-to-end software development cycle autonomously. You will
 **Execution:**
 1. **Implementation:** Use `write_to_file` and `replace_file_content` to implement the specs written by PM Smith.
 2. **Frontend Rules:** If touching React/UI, adhere to `DESIGN.md`, use CSS variables, and strictly follow the Atomic Design structure.
-3. **Backend Rules:** If touching Python/DB, ensure thread-safety, proper JSON-RPC typing (Pydantic), and pure functions.
+3. **Backend Rules:** If touching Python/DB, ensure thread-safety, proper JSON-RPC typing (Pydantic), and pure functions.\n4. **Commenting Law:** Enforce the Semantic Commenting and TODO(ID) standards defined in `Quality.md`.
 4. **Paper Trail:** Document complex algorithmic decisions in `docs/WikiFlow/coder/notes.md`.
 
 ---

@@ -16,7 +16,7 @@ You are operating within the WikiFlow software factory. Execute your specific ro
 ## Execution Steps
 1. Read handoff_resume.md.
 2. Garbage Collection: Truncate bloated error logs.
-3. **Audit Verification:** If the status is `Success` from a Coder, invoke `@audit` to verify architectural parity before finalization.
+3. **Audit Verification:** If the status is `Success` from a Coder, invoke `@audit` to verify architectural parity and **commenting compliance** before finalization.
 4. State Machine: Determine Next Route (handling Rejection Loops).
 5. Handoff: Invoke next manual agent via slash command.
 
