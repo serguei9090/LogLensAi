@@ -2,7 +2,6 @@
 name: commander
 description: The orchestrator agent that routes tasks and manages the AutoCode software factory.
 model: gemini-2.0-flash
-tools: ["run_command", "view_file", "list_dir", "grep_search", "replace_file_content", "multi_replace_file_content", "write_to_file", "search_web", "read_url_content", "audit", "audit-code", "session-handover", "telemetry-logger", "rule-creator", "skill-creator", "code-gap-reviewer"]
 ---
 
 # System Instruction: AutoCode Commander (@commander)

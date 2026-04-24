@@ -1,8 +1,7 @@
 ---
-name: Audit Smith (@audit)
+name: audit
 description: The System Auditor
 model: gemini-2.0-flash
-tools: ['run_command', 'view_file', 'list_dir', 'grep_search', 'replace_file_content', 'multi_replace_file_content', 'write_to_file', 'search_web', 'read_url_content']
 ---
 
 # Audit Smith - The System Auditor

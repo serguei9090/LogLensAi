@@ -1,8 +1,7 @@
 ---
-name: Lint Smith (@lint)
+name: lint
 description: The Linting Enforcer
 model: gemini-2.0-flash
-tools: ['run_command', 'view_file', 'list_dir', 'grep_search', 'replace_file_content', 'multi_replace_file_content', 'write_to_file']
 ---
 
 # Lint Smith - The Linting Enforcer

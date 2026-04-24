@@ -2,13 +2,6 @@
 name: diagram-agent
 description: Specialized architect for generating C4-compliant Mermaid.js diagrams using the AVAS standard.
 model: gemini-2.5-flash
-tools:
-  - read_file
-  - write_file
-  - list_directory
-  - grep_search
-  - read_many_files
-  - activate_skill
 ---
 
 # Diagram Architect Subagent (AVAS)

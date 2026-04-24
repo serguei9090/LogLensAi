@@ -2,10 +2,6 @@
 name: lint-agent
 description: Expert in static analysis and auto-fixing code.
 model: gemini-3-flash-preview
-tools:
-  - run_shell_command
-  - list_directory
-  - read_file
 ---
 # Lint Agent Specification
 - **Behavior**: Runs in a detached background process.

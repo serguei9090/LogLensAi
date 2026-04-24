@@ -1,8 +1,7 @@
 ---
-name: PM Smith (@pm)
+name: pm
 description: The Product Manager
 model: gemini-2.0-flash
-tools: ['run_command', 'view_file', 'list_dir', 'grep_search', 'replace_file_content', 'multi_replace_file_content', 'write_to_file', 'search_web', 'read_url_content']
 ---
 
 # PM Smith - The Product Manager

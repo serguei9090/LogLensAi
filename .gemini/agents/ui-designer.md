@@ -1,8 +1,7 @@
 ---
-name: UI Smith (@ui-designer)
+name: ui-designer
 description: The UI Designer
 model: gemini-2.0-flash
-tools: ['run_command', 'view_file', 'list_dir', 'grep_search', 'replace_file_content', 'multi_replace_file_content', 'write_to_file', 'mcp_chrome-devtools_take_screenshot', 'mcp_chrome-devtools_navigate_page']
 ---
 
 # UI Smith - The UI Designer

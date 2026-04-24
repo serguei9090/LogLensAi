@@ -1,8 +1,7 @@
 ---
-name: API Smith (@api-specialist)
+name: api-specialist
 description: The API Specialist
 model: gemini-2.0-flash
-tools: ['run_command', 'view_file', 'list_dir', 'grep_search', 'replace_file_content', 'multi_replace_file_content', 'write_to_file']
 ---
 
 # API Smith - The API Specialist

@@ -167,6 +167,138 @@ function ModelSelector({
   );
 }
 
+/**
+ * Safely parse a raw settings string value that may be JSON or a
+ * Python repr-style string (single quotes, True/False/None).
+ *
+ * Ref: docs/Documentation/architecture/gemini.md — Sidecar serialization rules
+ * @param raw - Raw string value from the sidecar settings store
+ * @returns Parsed value, or null if unparseable
+ */
+function safeParse(raw: string | null): unknown {
+  if (!raw) {
+    return null;
+  }
+  try {
+    return JSON.parse(raw);
+  } catch (_e) {
+    // Fallback: handle Python repr strings (single quotes, True/False/None)
+    try {
+      const jsonified = raw
+        .replaceAll("'", '"')
+        .replaceAll("True", "true")
+        .replaceAll("False", "false")
+        .replaceAll("None", "null");
+      return JSON.parse(jsonified);
+    } catch {
+      // Swallow silently — caller handles the null case
+      return null;
+    }
+  }
+}
+
+/**
+ * Returns a short human-readable label for the active AI provider.
+ * Extracted from JSX to eliminate nested ternary (Biome complexity rule).
+ *
+ * Ref: docs/Documentation/design/ui-components.md — Status Banner
+ */
+function getProviderLabel(provider: string): string {
+  if (provider === "gemini-cli") {
+    return "Gemini CLI Integrated";
+  }
+  if (provider === "ollama") {
+    return "Local Inference";
+  }
+  if (provider === "ai-studio") {
+    return "Google Cloud Native";
+  }
+  return "Universal API";
+}
+
+/**
+ * Returns a descriptive sentence for the active AI provider.
+ * Extracted from JSX to eliminate nested ternary (Biome complexity rule).
+ *
+ * Ref: docs/Documentation/design/ui-components.md — Status Banner
+ */
+function getProviderDescription(provider: string): string {
+  if (provider === "gemini-cli") {
+    return "Runs purely on your local hardware via the configured gemini-cli. Zero data egress to third-party APIs beyond the model provider.";
+  }
+  if (provider === "ollama") {
+    return "Ensure Ollama is running and desired model is pulled locally.";
+  }
+  if (provider === "ai-studio") {
+    return "Connect directly to Google's model infrastructure via API Key.";
+  }
+  return "Supports Azure, Groq, Perplexity, or any OpenAI-compatible proxy.";
+}
+
+/**
+ * Maps a flat record of raw sidecar setting strings into a typed AppSettings object.
+ * Hoisted to module scope to reduce SettingsPanel's cognitive complexity below the 15-point
+ * Biome threshold. Relies on the module-level `safeParse` for JSON fields.
+ *
+ * Ref: docs/Documentation/architecture/gemini.md — Sidecar serialization rules
+ * @param remoteSettings - Raw key/value pairs from the `get_settings` JSON-RPC method
+ * @param prev - Previous AppSettings to spread as base (preserves fields not in remote)
+ * @returns Fully typed AppSettings object
+ */
+function parseRemote(remoteSettings: Record<string, string>, prev: AppSettings): AppSettings {
+  const next = {
+    ...prev,
+    ...remoteSettings,
+    drain_similarity_threshold: Number.parseFloat(
+      remoteSettings.drain_similarity_threshold || "0.4",
+    ),
+    drain_max_children: Number.parseInt(remoteSettings.drain_max_children || "100", 10),
+    drain_max_clusters: Number.parseInt(remoteSettings.drain_max_clusters || "1000", 10),
+    mcp_server_enabled: remoteSettings.mcp_server_enabled?.toLowerCase() === "true",
+    ai_tool_search: remoteSettings.ai_tool_search?.toLowerCase() !== "false",
+    ai_tool_memory: remoteSettings.ai_tool_memory?.toLowerCase() !== "false",
+    ingestion_syslog_enabled: remoteSettings.ingestion_syslog_enabled?.toLowerCase() !== "false",
+    ingestion_syslog_port: Number.parseInt(remoteSettings.ingestion_syslog_port || "514", 10),
+    ingestion_http_enabled: remoteSettings.ingestion_http_enabled?.toLowerCase() !== "false",
+    ingestion_http_port: Number.parseInt(remoteSettings.ingestion_http_port || "5002", 10),
+    drain_masks: (() => {
+      const parsed = safeParse(remoteSettings.drain_masks);
+      return Array.isArray(parsed) ? parsed : defaultSettings.drain_masks;
+    })(),
+    facet_extractions: (() => {
+      const parsed = safeParse(remoteSettings.facet_extractions);
+      return Array.isArray(parsed) ? parsed : [];
+    })(),
+    ui_command_palette_shortcut: (() => {
+      const raw = remoteSettings.ui_command_palette_shortcut;
+      if (!raw) {
+        return defaultSettings.ui_command_palette_shortcut;
+      }
+
+      const parsed = safeParse(raw);
+      if (parsed && typeof parsed === "object" && "key" in parsed) {
+        return parsed as KeyboardShortcut;
+      }
+      // Legacy support: if it's just a single character string
+      if (typeof raw === "string" && raw.length === 1) {
+        return { key: raw, ctrl: true };
+      }
+      return defaultSettings.ui_command_palette_shortcut;
+    })(),
+  };
+
+  if (Array.isArray(next.drain_masks)) {
+    next.drain_masks = next.drain_masks.filter((m) => m.label.trim() || m.pattern.trim());
+    if (next.drain_masks.length === 0) {
+      next.drain_masks = defaultSettings.drain_masks;
+    }
+  }
+  if (Array.isArray(next.facet_extractions)) {
+    next.facet_extractions = next.facet_extractions.filter((f) => f.name.trim() || f.regex.trim());
+  }
+  return next;
+}
+
 function ShortcutCapture({
   value,
   onChange,
@@ -208,12 +340,13 @@ function ShortcutCapture({
       }
     };
 
-    window.addEventListener("keydown", handleKeyDown, true);
-    return () => window.removeEventListener("keydown", handleKeyDown, true);
+    globalThis.addEventListener("keydown", handleKeyDown, true);
+    return () => globalThis.removeEventListener("keydown", handleKeyDown, true);
   }, [isRecording, onChange]);
 
   const displayShortcut = () => {
-    if (!value || !value.key) {
+    // Use optional chain — value or value.key may be undefined during legacy migration
+    if (!value?.key) {
       return "None";
     }
     const parts = [];
@@ -316,9 +449,9 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
 
       toast.success("Factory reset complete. Application will restart.");
 
-      // 3. Forced Reload
-      setTimeout(() => {
-        window.location.reload();
+      // 3. Forced Reload — use globalThis for Biome compatibility
+      globalThis.setTimeout(() => {
+        globalThis.location.reload();
       }, 1500);
     } catch (error) {
       console.error("Factory reset failed:", error);
@@ -351,8 +484,9 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
   const [isTestingConnection, setIsTestingConnection] = useState(false);
 
   const handleTestConnection = async () => {
-    // Ensure current settings are saved before testing
-    await onSave(settings);
+    // Ensure current settings are saved before testing.
+    // onSave returns void, so no await needed — calling synchronously is correct.
+    onSave(settings);
 
     setIsTestingConnection(true);
     try {
@@ -368,6 +502,8 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
         toast.error(res.message);
       }
     } catch (error) {
+      // Log the full error for debug traceability, then surface a user-friendly toast
+      console.error("Failed to test AI connection:", error);
       toast.error("Failed to test connection");
     } finally {
       setIsTestingConnection(false);
@@ -376,90 +512,8 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
 
   // Load settings on mount
   useEffect(() => {
-    const safeParse = (raw: string | null) => {
-      if (!raw) {
-        return null;
-      }
-      try {
-        // Try standard JSON first
-        return JSON.parse(raw);
-      } catch (_e) {
-        // Fallback for Python repr strings (single quotes, True/False/None)
-        try {
-          const jsonified = raw
-            .replaceAll("'", '"')
-            .replaceAll("True", "true")
-            .replaceAll("False", "false")
-            .replaceAll("None", "null");
-          return JSON.parse(jsonified);
-        } catch {
-          return null;
-        }
-      }
-    };
-
-    const parseRemote = (
-      remoteSettings: Record<string, string>,
-      prev: AppSettings,
-    ): AppSettings => {
-      const next = {
-        ...prev,
-        ...remoteSettings,
-        drain_similarity_threshold: Number.parseFloat(
-          remoteSettings.drain_similarity_threshold || "0.4",
-        ),
-        drain_max_children: Number.parseInt(remoteSettings.drain_max_children || "100", 10),
-        drain_max_clusters: Number.parseInt(remoteSettings.drain_max_clusters || "1000", 10),
-        mcp_server_enabled: remoteSettings.mcp_server_enabled?.toLowerCase() === "true",
-        ai_tool_search: remoteSettings.ai_tool_search?.toLowerCase() !== "false",
-        ai_tool_memory: remoteSettings.ai_tool_memory?.toLowerCase() !== "false",
-        ingestion_syslog_enabled:
-          remoteSettings.ingestion_syslog_enabled?.toLowerCase() !== "false",
-        ingestion_syslog_port: Number.parseInt(remoteSettings.ingestion_syslog_port || "514", 10),
-        ingestion_http_enabled: remoteSettings.ingestion_http_enabled?.toLowerCase() !== "false",
-        ingestion_http_port: Number.parseInt(remoteSettings.ingestion_http_port || "5002", 10),
-        drain_masks: (() => {
-          const parsed = safeParse(remoteSettings.drain_masks);
-          return Array.isArray(parsed) ? parsed : defaultSettings.drain_masks;
-        })(),
-        facet_extractions: (() => {
-          const parsed = safeParse(remoteSettings.facet_extractions);
-          return Array.isArray(parsed) ? parsed : [];
-        })(),
-        ui_command_palette_shortcut: (() => {
-          const raw = remoteSettings.ui_command_palette_shortcut;
-          if (!raw) {
-            return defaultSettings.ui_command_palette_shortcut;
-          }
-
-          const parsed = safeParse(raw);
-          if (parsed && typeof parsed === "object" && "key" in parsed) {
-            return parsed as KeyboardShortcut;
-          }
-
-          // Legacy support: if it's just a single character string
-          if (typeof raw === "string" && raw.length === 1) {
-            return { key: raw, ctrl: true };
-          }
-
-          return defaultSettings.ui_command_palette_shortcut;
-        })(),
-      };
-
-      if (Array.isArray(next.drain_masks)) {
-        next.drain_masks = next.drain_masks.filter((m) => m.label.trim() || m.pattern.trim());
-        if (next.drain_masks.length === 0) {
-          next.drain_masks = defaultSettings.drain_masks;
-        }
-      }
-      if (Array.isArray(next.facet_extractions)) {
-        next.facet_extractions = next.facet_extractions.filter(
-          (f) => f.name.trim() || f.regex.trim(),
-        );
-      }
-      return next;
-    };
-
+    // parseRemote is defined at module scope to reduce cognitive complexity
+    // of this component function (Biome complexity rule).
     const loadSettings = async () => {
       try {
         const remoteSettings = await callSidecar<Record<string, string>>({
@@ -790,22 +844,10 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
                 </div>
                 <div>
                   <p className="text-[11px] font-bold text-primary uppercase tracking-wider">
-                    {settings.ai_provider === "gemini-cli"
-                      ? "Gemini CLI Integrated"
-                      : settings.ai_provider === "ollama"
-                        ? "Local Inference"
-                        : settings.ai_provider === "ai-studio"
-                          ? "Google Cloud Native"
-                          : "Universal API"}
+                    {getProviderLabel(settings.ai_provider)}
                   </p>
                   <p className="text-[10px] text-text-muted">
-                    {settings.ai_provider === "gemini-cli"
-                      ? "Runs purely on your local hardware via the configured gemini-cli. Zero data egress to third-party APIs beyond the model provider."
-                      : settings.ai_provider === "ollama"
-                        ? "Ensure Ollama is running and desired model is pulled locally."
-                        : settings.ai_provider === "ai-studio"
-                          ? "Connect directly to Google's model infrastructure via API Key."
-                          : "Supports Azure, Groq, Perplexity, or any OpenAI-compatible proxy."}
+                    {getProviderDescription(settings.ai_provider)}
                   </p>
                 </div>
               </div>
