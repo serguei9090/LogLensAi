@@ -12,7 +12,12 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { callSidecar } from "@/lib/hooks/useSidecarBridge";
 import { cn } from "@/lib/utils";
-import { type AppSettings, defaultSettings, useSettingsStore } from "@/store/settingsStore";
+import {
+  type AppSettings,
+  type KeyboardShortcut,
+  defaultSettings,
+  useSettingsStore,
+} from "@/store/settingsStore";
 import { useWorkspaceStore } from "@/store/workspaceStore";
 import {
   Activity,
@@ -720,7 +725,8 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
                       </button>
                     </div>
                     <p className="text-[10px] text-text-muted/50 px-1">
-                      Keys are stored securely in your local configuration.
+                      Keys are stored securely locally. Optional for some local engines (e.g., LM
+                      Studio).
                     </p>
                   </div>
                 )}
@@ -767,10 +773,11 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
                       value={settings.ai_openai_host}
                       onChange={(e) => update("ai_openai_host", e.target.value, false)}
                       onBlur={() => onSave(settings)}
-                      placeholder="https://api.openai.com/v1"
+                      placeholder="http://localhost:1234/v1 or https://api.groq.com/openai/v1"
                     />
                     <p className="text-[10px] text-text-muted/50 px-1">
-                      Protocol & host for the OpenAI-standard endpoint.
+                      Protocol & host for the OpenAI-compatible endpoint (e.g., LM Studio, Groq,
+                      vLLM).
                     </p>
                   </div>
                 )}
