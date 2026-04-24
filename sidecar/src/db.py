@@ -562,8 +562,16 @@ class LogDatabase:
         """Resolve priority and custom facet keys from settings."""
         cursor = self.get_cursor()
         keys = [
-            "ip", "uuid", "user_id", "host", "thread",
-            "logger", "status", "method", "level", "email",
+            "ip",
+            "uuid",
+            "user_id",
+            "host",
+            "thread",
+            "logger",
+            "status",
+            "method",
+            "level",
+            "email",
         ]
 
         def _append_rules(json_str: str | None):
@@ -591,7 +599,9 @@ class LogDatabase:
 
         return keys
 
-    def _get_facet_aggregations(self, workspace_id: str, keys: list[str], source_ids: list = None) -> dict:
+    def _get_facet_aggregations(
+        self, workspace_id: str, keys: list[str], source_ids: list = None
+    ) -> dict:
         """Query top 10 unique values for each facet key."""
         cursor = self.get_cursor()
         results = {}
@@ -697,16 +707,10 @@ class LogDatabase:
         cursor = self.get_cursor()
 
         # 1. Promote child folders to root (NULL parent)
-        cursor.execute(
-            "UPDATE folders SET parent_id = NULL WHERE parent_id = ?",
-            (folder_id,)
-        )
+        cursor.execute("UPDATE folders SET parent_id = NULL WHERE parent_id = ?", (folder_id,))
 
         # 2. Promote log sources in this folder to root
-        cursor.execute(
-            "UPDATE log_sources SET folder_id = NULL WHERE folder_id = ?",
-            (folder_id,)
-        )
+        cursor.execute("UPDATE log_sources SET folder_id = NULL WHERE folder_id = ?", (folder_id,))
 
         # 3. Delete the folder itself
         cursor.execute("DELETE FROM folders WHERE id = ?", (folder_id,))

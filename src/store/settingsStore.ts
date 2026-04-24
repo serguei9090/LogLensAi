@@ -1,6 +1,14 @@
 import { callSidecar } from "@/lib/hooks/useSidecarBridge";
 import { create } from "zustand";
 
+export interface KeyboardShortcut {
+  key: string;
+  ctrl?: boolean;
+  alt?: boolean;
+  shift?: boolean;
+  meta?: boolean;
+}
+
 export interface AppSettings {
   ai_provider: string;
   ai_model: string;
@@ -24,6 +32,7 @@ export interface AppSettings {
   ingestion_http_enabled: boolean;
   ingestion_http_port: number;
   facet_extractions: Array<{ name: string; regex: string; group: number; enabled: boolean }>;
+  ui_command_palette_shortcut: KeyboardShortcut;
 }
 
 export const defaultSettings: AppSettings = {
@@ -61,6 +70,7 @@ export const defaultSettings: AppSettings = {
   ingestion_http_enabled: true,
   ingestion_http_port: 5002,
   facet_extractions: [],
+  ui_command_palette_shortcut: { key: "k", ctrl: true },
 };
 
 interface SettingsStore {

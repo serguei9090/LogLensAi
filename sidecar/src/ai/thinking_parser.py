@@ -343,7 +343,7 @@ class ThinkingStreamParser:
             return []
 
         # CHANNEL_MARKERS mode — full stateful processing for content stream
-        return self._feed_channel_markers(content, None)
+        return self._feed_channel_markers(content)
 
     def flush(self) -> list[str]:
         """Return any remaining buffered content and close open tags.
@@ -376,18 +376,11 @@ class ThinkingStreamParser:
     def _feed_channel_markers(
         self,
         content: str,
-        native_thinking: str | None,
     ) -> list[str]:
         """Stateful processing for Gemma 4 channel-marker streams."""
         chunks: list[str] = []
 
-        # 1. Native pre-extracted thinking field (Ollama server did the work)
-        if native_thinking:
-            chunks.extend(self._handle_native_thinking(native_thinking))
-            # When native_thinking is present the content is expected to be ""
-            return chunks
-
-        # 2. Empty token — may indicate stream end
+        # 1. Empty token — may indicate stream end
         if not content:
             return chunks
 
@@ -426,6 +419,8 @@ class ThinkingStreamParser:
             self._phase == _Phase.THOUGHT
             and token.strip()
             and not any(m in token for m in ALL_THOUGHT_MARKERS)
+            # IMPORTANT: Do not close if this token looks like a partial marker!
+            and not any(m.startswith(token) for m in ALL_TEXT_MARKERS + ALL_THOUGHT_MARKERS)
         ):
             chunks: list[str] = []
             if self._emitted_think:

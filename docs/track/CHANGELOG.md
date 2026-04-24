@@ -2,6 +2,19 @@
 
 All notable changes to the LogLensAi project will be documented in this file.
 
+## [Phase 6.1] - Advanced Shortcut Customization & UX Stabilization (2026-04-23)
+
+### Added
+- **Multi-Key Shortcut Customization**:
+    - Implemented a structured `KeyboardShortcut` object in `settingsStore.ts` to support combinations of Ctrl, Alt, Shift, and Win/Cmd.
+    - Added a robust `ShortcutCapture` component in the `SettingsPanel` with a recording mode for easy rebinding.
+    - Enhanced the `useKeyboardShortcuts` hook for precise exact-match filtering of modifier keys.
+
+### Fixed
+- **App Mounting Regression**: Resolved `ReferenceError: useSettingsStore is not defined` in `App.tsx` by restoring the missing import.
+- **Settings Panel Crash**: Fixed `TypeError: Cannot read properties of undefined (reading 'toUpperCase')` by implementing robust legacy-to-object parsing for shortcut settings.
+- **UX Hardening**: Added defensive checks to `displayShortcut` to prevent application crashes on malformed configuration data.
+
 ## [Phase 6] - Project Health & Testing Stabilization (2026-04-23)
 
 ### Added

@@ -44,8 +44,12 @@ def test_syslog_ingestion(app):
     message = "2023-10-01 12:00:00 [ERROR] Syslog test message"
     sock.sendto(message.encode(), ("127.0.0.1", app.test_syslog_port))
 
-    # Wait for ingestion
-    time.sleep(1.5)
+    # Wait for ingestion with retries
+    for _ in range(5):
+        time.sleep(1.0)
+        logs = app.method_get_logs(workspace_id="default")
+        if logs["total"] >= 1:
+            break
 
     # Check DB
     logs = app.method_get_logs(workspace_id="default")

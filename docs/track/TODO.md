@@ -223,7 +223,7 @@
 
 - [x] **DASH-001**: Dashboard page (placeholder nav item)
   - **Detail**: `docs/TODOC/DASH-001.md`
-- [x] **KEYBIND-001**: Keyboard shortcuts (⌘K command palette)
+- [x] **KEYBIND-001**: Keyboard shortcuts (⌘K palette) — VERIFIED (Implemented custom rebinding UI)
 
 ---
 

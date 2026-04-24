@@ -61,10 +61,11 @@ class DrainParser:
 
     def get_clusters(self):
         with self.lock:
-            return self.miner.drain.clusters
+            # Return list of clusters for easier consumption
+            return list(self.miner.drain.clusters)
 
     def save(self):
         """Forces a state save if persistence is enabled."""
         if self.persistence:
             with self.lock:
-                self.miner.save_state()
+                self.miner.save_state("Manual save")

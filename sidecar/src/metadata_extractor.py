@@ -134,8 +134,18 @@ def _extract_kv_facets(raw_line: str, facets: dict):
     """Extracts general key=value pairs."""
     kv_matches = re.finditer(r"\b(\w+)=([\w\-\.@]+)\b", raw_line)
     reserved = {
-        "timestamp", "level", "id", "ip", "uuid", "email",
-        "host", "thread", "logger", "method", "status", "user_id"
+        "timestamp",
+        "level",
+        "id",
+        "ip",
+        "uuid",
+        "email",
+        "host",
+        "thread",
+        "logger",
+        "method",
+        "status",
+        "user_id",
     }
     for m in kv_matches:
         key, val = m.groups()

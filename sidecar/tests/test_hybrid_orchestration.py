@@ -127,6 +127,20 @@ async def test_graph_manager_nodes():
     # Test router
     assert manager._should_continue(new_state) == "continue"
 
+    # Test final answer node
+    state["next_node"] = "final_answer"
+    final_state = manager._node_final_answer(state)
+    assert final_state == state
+    assert manager._should_continue(final_state) == "end"
+
+    # Test tool execution node
+    tool_state = await manager._node_tool_execution(state)
+    assert tool_state == state
+
+    # Test lifecycle
+    await manager.close()
+    assert manager.memory is None
+
 
 @pytest.mark.asyncio
 async def test_tool_registry_additional_tools():
@@ -144,6 +158,34 @@ async def test_tool_registry_additional_tools():
     # Test get_facets
     facet_res = await registry.get_facets(ctx, "ws1")
     assert "ips" in facet_res
+
+    # Test get_hierarchy
+    app.method_get_hierarchy.return_value = {"root": {}}
+    hier_res = await registry.get_hierarchy(ctx, "ws1")
+    assert "root" in hier_res
+
+
+@pytest.mark.asyncio
+async def test_tool_registry_errors_extended():
+    app = MagicMock()
+    app.method_search_memory.side_effect = Exception("Mem error")
+    app.method_get_metadata_facets.side_effect = Exception("Facet error")
+    app.method_get_hierarchy.side_effect = Exception("Hier error")
+
+    registry = ToolRegistry(app)
+    ctx = MagicMock()
+
+    # Test search_memory error
+    res1 = await registry.search_memory(ctx, "ws1", "q")
+    assert "error" in res1[0]
+
+    # Test get_facets error
+    res2 = await registry.get_facets(ctx, "ws1")
+    assert "error" in res2
+
+    # Test get_hierarchy error
+    res3 = await registry.get_hierarchy(ctx, "ws1")
+    assert "error" in res3
 
 
 @pytest.mark.asyncio

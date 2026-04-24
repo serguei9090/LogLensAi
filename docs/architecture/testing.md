@@ -42,13 +42,16 @@ Expert in test automation, code coverage, and regression prevention. Focuses on 
 | `method_update_settings` | ✅ `test_api_methods.py` | ✅ | Ready |
 | `AIProvider (Logic)` | ✅ `test_ai_providers.py` | ❌ | Ready (Providers) |
 | `Metadata Extraction` | ✅ `test_metadata.py` | ❌ | Ready |
-| `HybridRunner (Logic)` | ❌ | ❌ | Coverage Gap |
-| `GraphManager (Logic)` | ❌ | ❌ | Coverage Gap |
-| `ToolRegistry (Logic)` | ❌ | ❌ | Coverage Gap |
-| `ReasoningParser (Logic)`| ❌ | ❌ | Coverage Gap |
+| `HybridRunner (Logic)` | ✅ `test_hybrid_orchestration.py` | ❌ | Ready |
+| `GraphManager (Logic)` | ✅ `test_hybrid_orchestration.py` | ❌ | Ready |
+| `ToolRegistry (Logic)` | ✅ `test_hybrid_orchestration.py` | ❌ | Ready |
+| `ReasoningParser (Logic)`| ✅ `test_thinking_parser.py` | ❌ | Ready |
 | `method_get_health` | ✅ `test_tailing.py` | ❌ | Ready |
 | `method_start_tail` | ✅ `test_tailing.py` | ❌ | Ready |
 | `method_stop_tail` | ✅ `test_tailing.py` | ❌ | Ready |
+| `AIStudioProvider` | ✅ `test_ai_studio.py` | ❌ | Ready |
+| `OpenAICompatibleProvider` | ✅ `test_openai_provider.py` | ❌ | Ready |
+| `SSHLoader` | ✅ `test_ssh.py` | ❌ | Ready |
 
 ## 📊 Coverage Matrix (Frontend React)
 
@@ -61,13 +64,12 @@ Expert in test automation, code coverage, and regression prevention. Focuses on 
 | `LogToolbar` | ❌ | ❌ | Coverage Gap |
 | `useSidecarBridge` | ❌ | ❌ | Coverage Gap |
 
-## 📊 Coverage Summary (2026-04-22)
-- **Total Backend Coverage**: 55%
-- **AI Module Coverage**: 40%
+## 📊 Coverage Summary (2026-04-23)
+- **Total Backend Coverage**: 68%
+- **AI Module Coverage**: 98%
 - **Target**: 80%+
 
 ## 🎯 Target Tasks
-- **Hybrid Orchestration Tests**: Implement unit tests for `runner.py`, `graph.py`, `tools.py`, and `reasoning.py`.
 - **VirtualLogTable Tests**: Ensuring virtualization doesn't break log interactivity.
 
 ## 🧬 Rule-Doc Mapping

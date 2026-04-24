@@ -8,7 +8,7 @@ payload_hierarchy = {
     "jsonrpc": "2.0",
     "id": 1,
     "method": "get_hierarchy",
-    "params": {"workspace_id": "ws-1"}
+    "params": {"workspace_id": "ws-1"},
 }
 
 payload_create = {
@@ -19,8 +19,8 @@ payload_create = {
         "workspace_id": "ws-1",
         "name": "Test Source",
         "type": "local",
-        "path": "C:\\temp\\test.log"
-    }
+        "path": "C:\\temp\\test.log",
+    },
 }
 
 try:
@@ -28,7 +28,7 @@ try:
     response = requests.post(url, json=payload_hierarchy)
     print(f"Status: {response.status_code}")
     print(f"Body: {json.dumps(response.json(), indent=2)}")
-    
+
     print("\nTesting create_log_source...")
     response_create = requests.post(url, json=payload_create)
     print(f"Status: {response_create.status_code}")

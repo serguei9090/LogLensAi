@@ -50,7 +50,6 @@ class HybridRunner:
 
         config = {"configurable": {"thread_id": session_id}}
 
-
         # Execute the graph and stream steps.
         # We only emit from the `reasoning` node — `final_answer` returns the
         # unchanged state and would cause a duplicate emission (Bug fix: double response).

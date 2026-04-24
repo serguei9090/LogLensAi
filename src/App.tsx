@@ -6,6 +6,7 @@ import { AppLayout } from "@/components/templates/AppLayout";
 import { Toaster } from "@/components/ui/sonner";
 import { useKeyboardShortcuts } from "@/lib/hooks/useKeyboardShortcuts";
 import { useAiStore } from "@/store/aiStore";
+import { useSettingsStore } from "@/store/settingsStore";
 import { useUIStore } from "@/store/uiStore";
 import { useWorkspaceStore } from "@/store/workspaceStore";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -23,8 +24,14 @@ export default function App() {
   } = useWorkspaceStore();
   const { toggleSidebar, toggleFacetSidebar } = useUIStore();
   const { setSidebarOpen: setAiSidebarOpen } = useAiStore();
+  const { settings, fetchSettings } = useSettingsStore();
   const [activeNav, setActiveNav] = useState<NavTab>("investigation");
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
+
+  // Load settings on mount
+  useEffect(() => {
+    fetchSettings();
+  }, [fetchSettings]);
 
   // Guard against StrictMode double-fire adding two default workspaces
   const seededRef = useRef(false);
@@ -48,8 +55,7 @@ export default function App() {
   // Register Global Shortcuts
   useKeyboardShortcuts([
     {
-      key: "k",
-      ctrl: true,
+      ...settings.ui_command_palette_shortcut,
       description: "Open Command Palette",
       handler: () => setCommandPaletteOpen(true),
     },

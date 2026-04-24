@@ -107,6 +107,9 @@ class TestCleanThinkingMarkers:
             result = clean_thinking_markers(f"{marker} content")
             assert marker not in result
 
+    def test_handles_none_input(self):
+        assert clean_thinking_markers(None) == ""
+
 
 # ---------------------------------------------------------------------------
 # parse_completed_response
@@ -288,3 +291,70 @@ class TestThinkingStreamParserChannelMarkers:
         assert "user" in think_content
         assert "asking" in think_content
         assert "The answer is X" in result
+
+    def test_text_preceding_thought(self):
+        """Content arriving before the first thought marker is correctly emitted."""
+        parser = ThinkingStreamParser(ThinkingMode.CHANNEL_MARKERS)
+        out: list[str] = []
+        out.extend(parser.feed(content="Prefix text "))
+        out.extend(parser.feed(content="<|channel>thought I am thinking"))
+        out.extend(parser.flush())
+        result = "".join(out)
+        assert result.startswith("Prefix text ")
+        assert THINK_OPEN in result
+        assert "I am thinking" in result
+
+    def test_partial_text_marker_detection(self):
+        """Verify partial markers for text transition are buffered."""
+        parser = ThinkingStreamParser(ThinkingMode.CHANNEL_MARKERS)
+        out: list[str] = []
+        out.extend(parser.feed(content="<|channel>thought I am thinking"))
+        # Partial text marker "<|channel>t"
+        out.extend(parser.feed(content="<|channel>t"))
+        assert THINK_CLOSE not in "".join(out)
+        # Complete it
+        out.extend(parser.feed(content="ext and here is the answer"))
+        out.extend(parser.flush())
+        result = "".join(out)
+        assert THINK_CLOSE in result
+        assert "here is the answer" in result
+
+    def test_feed_empty_content(self):
+        """Feeding empty content results in no emission."""
+        parser = ThinkingStreamParser(ThinkingMode.CHANNEL_MARKERS)
+        assert parser.feed(content="") == []
+        assert parser.feed(content=None) == []
+
+    def test_combined_text_and_marker(self):
+        """A single token containing both text and a marker is correctly split."""
+        parser = ThinkingStreamParser(ThinkingMode.CHANNEL_MARKERS)
+        # Token starts with text, ends with marker
+        chunks = parser.feed(content="Pre-text<|channel>thought")
+        assert "Pre-text" in chunks
+        assert THINK_OPEN in chunks
+
+    def test_flush_partial_marker(self):
+        """Flushing a partial marker at the end of the stream emits it as plain text."""
+        parser = ThinkingStreamParser(ThinkingMode.CHANNEL_MARKERS)
+        # Buffer a partial marker
+        parser.feed(content="Partial <|chan")
+        chunks = parser.flush()
+        assert "Partial <|chan" in "".join(chunks)
+
+    def test_none_mode_parse_completed(self):
+        """NONE mode in parse_completed_response strips markers."""
+        assert parse_completed_response("<|thought|>hidden", ThinkingMode.NONE) == "hidden"
+
+    def test_standard_tags_parse_completed(self):
+        """STANDARD_TAGS mode in parse_completed_response returns raw."""
+        assert parse_completed_response("raw content", ThinkingMode.STANDARD_TAGS) == "raw content"
+
+    def test_instant_transition_in_single_token(self):
+        """A single token containing both thought-start and text-start is handled."""
+        parser = ThinkingStreamParser(ThinkingMode.CHANNEL_MARKERS)
+        chunks = parser.feed(content="<|channel>thought brief reasoning <|channel>text answer")
+        result = "".join(chunks)
+        assert result.startswith(THINK_OPEN)
+        assert "brief reasoning" in result
+        assert THINK_CLOSE in result
+        assert "answer" in result
