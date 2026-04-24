@@ -15,6 +15,7 @@ All notable changes to the LogLensAi project will be documented in this file.
 - **Semantic Commenting Standards**:
     - Mandated `Ref: <spec>` links in function docstrings for better architectural traceability.
     - Enforced a strict `// TODO(ID): [WHAT] [WHY] [EXPECTATION] [CONTEXT]` syntax to link code to spec files.
+- **Workflow Role Alignment**: Standardized all 44+ workflow files with formal `@handle` persona headers and injected mandatory quality standards blocks.
 
 ### Refactored
 - **Skill Modularization**: Refactored all flat markdown skills in `.agents/skills/` into modular folders with standard `SKILL.md` files.
