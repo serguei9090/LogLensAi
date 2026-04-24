@@ -2,6 +2,24 @@
 
 All notable changes to the LogLensAi project will be documented in this file.
 
+## [Phase 6.2] - Agentic Framework Standardization & Audit Protocol (2026-04-24)
+
+### Added
+- **Audit Smith (@audit) Persona**: 
+    - Formally established the "Master of Architectural Compliance" role in `agents.md`.
+    - Added 11+ missing subagent profiles in `.gemini/agents/` to ensure full persona-to-execution parity.
+- **Unified Audit Infrastructure**:
+    - Centralized all oversight workflows into a new `.agents/workflows/audits/` directory.
+    - Transitioned nomenclature from generic "Reports" to active "Audits" (e.g., `project-audit.md`, `quality-audit.md`).
+    - Implemented `ai-audit.md` for specialized framework health checks.
+- **Semantic Commenting Standards**:
+    - Mandated `Ref: <spec>` links in function docstrings for better architectural traceability.
+    - Enforced a strict `// TODO(ID): [WHAT] [WHY] [EXPECTATION] [CONTEXT]` syntax to link code to spec files.
+
+### Refactored
+- **Skill Modularization**: Refactored all flat markdown skills in `.agents/skills/` into modular folders with standard `SKILL.md` files.
+- **Orchestrator Synchronization**: Updated `commander.md` with the latest model (gemini-2.0-flash), enriched toolkits (audit, telemetry), and aligned instructions with the WikiFlow state machine.
+
 ## [Phase 6.1] - Advanced Shortcut Customization & UX Stabilization (2026-04-23)
 
 ### Added
@@ -133,6 +151,7 @@ All notable changes to the LogLensAi project will be documented in this file.
 ### Fixed
 - **Module Shadowing Regression**: Deleted stale `ai.py` that was conflicting with the `src.ai` package and causing sidecar crashes (Code 255).
 - **Code Debt**: Consolidated redundant `get_drain_parser` definitions and cleaned up unused imports in the test suite.
+
 
 ### Added
 - **AI Copilot Skills & Memory**:

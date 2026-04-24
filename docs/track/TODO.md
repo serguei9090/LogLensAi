@@ -40,7 +40,7 @@
 - [x] **ORK-003**: Permanent "Orchestrate" button in `LogToolbar` (violet accent)
 - [x] **ORK-004**: Extended `LogSource.type` with `"fusion"`
 - [x] **ORK-005**: Fixed OrchestratorHub self-close bug
-- [x] **ORK-006**: Rebuilt `docs/design/theme.md` as full Design System Reference
+- [x] **ORK-006**: Rebuilt `docs/Documentation/design/theme.md` as full Design System Reference
 - [x] **ORK-007**: Toast position moved to `top-center`
 - [x] **PARS-001**: `CustomParserModal` UI — Highlight-to-Parse engine
 - [x] **ORK-BE-001**: Sidecar — Add `fusion_id` support to configs
@@ -81,65 +81,65 @@
 
 - [x] **FIX-FE-003**: Restore Trash2 Icon in History (Regression from UI refactor)
   - **Files**: `src/components/organisms/AIInvestigationSidebar.tsx`
-  - **Detail**: `docs/TODOC/FIX-FE-003.md`
+  - **Detail**: `docs/track/specs/FIX-FE-003.md`
 - [x] **FIX-BE-001**: Missing 'os' Import in Ollama Provider (Regression from ENV stabilization)
   - **Files**: `sidecar/src/ai/ollama.py`
-  - **Detail**: `docs/TODOC/FIX-BE-001.md`
+  - **Detail**: `docs/track/specs/FIX-BE-001.md`
 - [x] **FIX-CORE-001**: Restore AIChatMessage Export (Regression from lint cleanup)
   - **Files**: `sidecar/src/ai/__init__.py`
-  - **Detail**: `docs/TODOC/FIX-CORE-001.md`
+  - **Detail**: `docs/track/specs/FIX-CORE-001.md`
 - [x] **FIX-AI-001**: AI Persistence & Context Strategy (Commit transactions + Multi-turn history)
   - **Files**: `sidecar/src/api.py`, `sidecar/src/ai/ai_studio.py`
-  - **Detail**: `docs/TODOC/FIX-AI-001.md`
+  - **Detail**: `docs/track/specs/FIX-AI-001.md`
 - [x] **FIX-AI-002**: Standardized AI History & Universal Auto-Healing (Context Injection)
   - **Files**: `sidecar/src/api.py`, `sidecar/src/ai/gemini_cli.py`, `sidecar/src/ai/ai_studio.py`
-  - **Detail**: `docs/TODOC/FIX-AI-002.md`
+  - **Detail**: `docs/track/specs/FIX-AI-002.md`
 - [x] **FIX-FE-001**: Sidebar Button Nesting & Sync (Fix component recursion + Initial fetch)
   - **Files**: `src/components/organisms/AIInvestigationSidebar.tsx`, `src/store/aiStore.ts`
 - [x] **FIX-UX-004**: Context-Aware AI Hub (Highlight session logs + VS Code style history + Renaming)
   - **Files**: `src/components/organisms/AIInvestigationSidebar.tsx`, `src/components/organisms/VirtualLogTable.tsx`, `sidecar/src/api.py`, `src/store/aiStore.ts`
-  - **Detail**: `docs/TODOC/FIX-UX-004.md`
+  - **Detail**: `docs/track/specs/FIX-UX-004.md`
 - [x] **FIX-UX-006**: Chat Scroll & Context Persistence (Auto-Scroll to Last Answer)
   - **Files**: `src/components/organisms/AIInvestigationSidebar.tsx`
-  - **Detail**: `docs/TODOC/FIX-UX-006.md`
+  - **Detail**: `docs/track/specs/FIX-UX-006.md`
 - [x] **FIX-UX-005**: Async LLM Provider Stability (Non-blocking CLI execution)
   - **Files**: `sidecar/src/ai/gemini_cli.py`
-  - **Detail**: `docs/TODOC/FIX-UX-005.md`
+  - **Detail**: `docs/track/specs/FIX-UX-005.md`
 - [x] **FIX-FE-002**: Sidebar Accessibility & Type Safety (Standard native buttons + Readonly props)
   - **Files**: `src/components/organisms/Sidebar.tsx`, `src/components/organisms/AIInvestigationSidebar.tsx`
-  - **Detail**: `docs/TODOC/FIX-FE-002.md`
+  - **Detail**: `docs/track/specs/FIX-FE-002.md`
 - [x] **FIX-LOG-001**: General Code Quality & Linting Overhaul (Biome/Ruff fixes)
   - **Files**: `src/components/pages/InvestigationPage.tsx`, `sidecar/src/ai.py`, `src/components/organisms/SettingsPanel.tsx`, etc.
-  - **Detail**: `docs/TODOC/FIX_LOG_001.md`
+  - **Detail**: `docs/track/specs/FIX_LOG_001.md`
 - [x] **FIX-CLEAN-001**: Technical Debt Remediation (React Keys, Hooks, A11y)
   - **Files**: `src/components/atoms/MarkdownContent.tsx`, `src/components/organisms/CustomParserModal.tsx`, etc.
-  - **Detail**: `docs/TODOC/FIX-CLEAN-001.md`
+  - **Detail**: `docs/track/specs/FIX-CLEAN-001.md`
 - [x] **FIX-LINT-001**: Biome Zero-Tolerance UI Compliance (Orchestrator and TimeShiftModal)
   - **Files**: `src/components/organisms/OrchestratorHub.tsx`, `src/components/organisms/TimeShiftModal.tsx`
-  - **Detail**: `docs/TODOC/FIX-LINT-001.md`
+  - **Detail**: `docs/track/specs/FIX-LINT-001.md`
 - [x] **FIX-LINT-002**: TimeShiftModal Biome Compliance (Nested JSX, Empty Catch Blocks)
   - **Files**: `src/components/organisms/TimeShiftModal.tsx`
-  - **Detail**: `docs/TODOC/FIX-LINT-002.md`
+  - **Detail**: `docs/track/specs/FIX-LINT-002.md`
 - [x] **FIX-CORE-002**: Temporal Offset Model Sync (Fixed 422 Dict/List Mismatch)
   - **Files**: `sidecar/src/api.py`
-  - **Detail**: `docs/TODOC/FIX-CORE-002.md`
+  - **Detail**: `docs/track/specs/FIX-CORE-002.md`
 - [x] **FIX-CORE-003**: SQL Aliasing Regression (Fixed l.l.field Binder Error)
   - **Files**: `sidecar/src/api.py`
-  - **Detail**: `docs/TODOC/FIX-CORE-003.md`
+  - **Detail**: `docs/track/specs/FIX-CORE-003.md`
 - [x] **FIX-UI-002**: Missing 'Layers' Import in LogToolbar (Regression from Engine Settings implementation)
   - **Files**: `src/components/organisms/LogToolbar.tsx`
-  - **Detail**: `docs/TODOC/FIX-UI-002.md`
+  - **Detail**: `docs/track/specs/FIX-UI-002.md`
 - [x] **FIX-D3-001**: Workspace Engine Settings Persistence & UI Polish (Force sync + Padding fix)
   - **Files**: `src/components/organisms/WorkspaceEngineSettings.tsx`
-  - **Detail**: `docs/TODOC/FIX-D3-001.md`
-- [x] **STABILITY-001**: [FIX-STABILITY-001](i:/01-Master_Code/Apps/LogLensAi/docs/TODOC/FIX-STABILITY-001.md) - Global IDE Resolution (DONE)
+  - **Detail**: `docs/track/specs/FIX-D3-001.md`
+- [x] **STABILITY-001**: [FIX-STABILITY-001](i:/01-Master_Code/Apps/LogLensAi/docs/track/specs/FIX-STABILITY-001.md) - Global IDE Resolution (DONE)
   - **Files**: `src/components/atoms/A2UIRenderer.tsx`, `src/components/organisms/AIInvestigationSidebar.tsx`, `src/components/organisms/WorkspaceEngineSettings.tsx`
 - [x] **FIX-RESET-001**: Unified Factory Reset & State Synchronization (Done)
   - **Files**: `sidecar/src/api.py`, `src/store/workspaceStore.ts`, `src/components/organisms/SettingsPanel.tsx`
-  - **Detail**: `docs/TODOC/FIX-RESET-001.md`
+  - **Detail**: `docs/track/specs/FIX-RESET-001.md`
 - [x] **FIX-UX-007**: AI Provider Polish & Dependency Alignment (DONE)
   - **Files**: `sidecar/pyproject.toml`, `src/components/organisms/SettingsPanel.tsx`
-  - **Detail**: `docs/TODOC/FIX-UX-007.md`
+  - **Detail**: `docs/track/specs/FIX-UX-007.md`
 
 ---
 
@@ -170,16 +170,16 @@
 - [x] **ipc_001**: Establish Tauri JSON-RPC Bridge (stdin/stdout process management)
 - [x] **ipc_002**: Type-Sync Auto-Generator (Pydantic to TypeScript pipeline)
 - [x] **ingestion_001**: Configurable Ingestion Listeners (Enable/Disable/Ports)
-  - **Detail**: `docs/TODOC/ingestion_001.md`
+  - **Detail**: `docs/track/specs/ingestion_001.md`
 - [x] **FACET-001**: Custom Regex Facet Extraction (Global & Workspace Rules)
-  - **Detail**: `docs/TODOC/FACET-001.md`
+  - **Detail**: `docs/track/specs/FACET-001.md`
 - [x] **ui_004**: Native File Picker & Search Molecules
  
 ## 🔵 Sprint 07 — Advanced UX & Intelligence (Active)
 
 ### P0 — UI Facets & Metadata
 - [x] **metadata_faceting_001**: Advanced Metadata Faceting (The "IP Sidebar")
-  - **Detail**: `docs/TODOC/metadata_faceting_001.md`
+  - **Detail**: `docs/track/specs/metadata_faceting_001.md`
   - **Status**: Implemented backend extraction, DuckDB JSON storage, and FacetSidebar UI.
 
 ---
@@ -197,11 +197,11 @@
 - [x] **AI-001**: Implement `analyze_cluster` calling the `gemini-cli`
 - [x] **AI-002**: Display AI explanation in Diagnostic Sidebar
 - [x] **FEAT-AI-TOOLS-001**: Advanced AI Copilot Tools & Memory (Search, Memory, Autocompletes)
-  - **Detail**: `docs/TODOC/FEAT_AI_TOOLS_001.md`
+  - **Detail**: `docs/track/specs/FEAT_AI_TOOLS_001.md`
 - [x] **FEAT-AI-TOOLS-002**: Copilot Context, Skills Manager & UX Polish
-  - **Detail**: `docs/TODOC/FEAT_AI_TOOLS_002.md`
+  - **Detail**: `docs/track/specs/FEAT_AI_TOOLS_002.md`
 - [x] **FEAT-AI-TOOLS-003**: AI Chat SSE Streaming Protocol (Real-time Token Streaming)
-  - **Detail**: `docs/TODOC/FEAT_AI_TOOLS_003.md`
+  - **Detail**: `docs/track/specs/FEAT_AI_TOOLS_003.md`
 
 ---
 
@@ -218,11 +218,11 @@
 ## 🔵 Sprint 08 — Final Verification (Done)
 
 - [x] **e2e_001**: Full-Stack E2E Integration Loop (Sidecar -> DuckDB -> UI Store)
-  - **Detail**: `docs/TODOC/e2e_001.md`
+  - **Detail**: `docs/track/specs/e2e_001.md`
 ## 🔵 Sprint 09 — Dashboard & Overview (Done)
 
 - [x] **DASH-001**: Dashboard page (placeholder nav item)
-  - **Detail**: `docs/TODOC/DASH-001.md`
+  - **Detail**: `docs/track/specs/DASH-001.md`
 - [x] **KEYBIND-001**: Keyboard shortcuts (⌘K palette) — VERIFIED (Implemented custom rebinding UI)
 
 ---
@@ -230,15 +230,15 @@
 ## 🔵 Sprint 10 — Strategic Audit Implementation (Done)
 
 - [x] **METADATA-001**: Advanced Metadata Faceting (Done)
-  - **Detail**: `docs/TODOC/metadata_faceting_001.md`
+  - **Detail**: `docs/track/specs/metadata_faceting_001.md`
 - [x] **LLQL-001**: LogLens Query Language Parser (Done)
-  - **Detail**: `docs/TODOC/LLQL_001.md`
+  - **Detail**: `docs/track/specs/LLQL_001.md`
 - [x] **INGEST-001**: Syslog & HTTP Ingestion Ports (Done)
-  - **Detail**: `docs/TODOC/ingestion_001.md`
+  - **Detail**: `docs/track/specs/ingestion_001.md`
 - [x] **AI-CONTEXT-001**: Smart Context Manager (Done)
-  - **Detail**: `docs/TODOC/AI-CONTEXT_001.md`
+  - **Detail**: `docs/track/specs/AI-CONTEXT_001.md`
 - [x] **ANOMALY-001**: Time-Series Anomaly Detection (Done)
-  - **Detail**: `docs/TODOC/ANALYSIS-004.md`
+  - **Detail**: `docs/track/specs/ANALYSIS-004.md`
 
 ---
 

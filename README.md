@@ -17,7 +17,7 @@ LogLensAi is a state-of-the-art diagnostic tool designed for high-velocity log i
 
 ## 🌪️ Autonomy & Vibecoding
 LogLensAi is developed using the **Jules-Cycle**:
-1. **Spec**: Define target behavior in `docs/TODOC/`.
+1. **Spec**: Define target behavior in `docs/track/TODOC/`.
 2. **Snapshot**: Atomic git commits of the specification.
 3. **Execution**: `@jules-agent` generates Pure TDD tests and implementation code.
 4. **Validation**: Auto-running unit tests and background autofix cycles.

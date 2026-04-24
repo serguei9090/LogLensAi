@@ -4,6 +4,7 @@ This document tracks identified bugs, root causes, and their permanent fixes to 
 
 | Date | Bug Description | Root Cause | Solution/Fix | Agent |
 | :--- | :--- | :--- | :--- | :--- |
+| 2026-04-24 | Agentic Framework Dissonance & Redundant Reports | Personas were defined in docs but not as subagent profiles; workflows used inconsistent "Report" naming; skills were unorganized. | Established `@audit` persona; global rename to `*-audit`; refactored skills to folders; generated 17 subagent profiles. | @audit |
 | 2026-04-16 | UI Parse Crash & Icon 404 | Duplicate `lucide-react` imports and absent Vite generic favicon | Cleared import duplication and added empty data URI favicon link to index.html | @antigravity |
 | 2026-03-24 | DuckDB WAL Lock | Improper `aiohttp` cleanup on Ctrl+C | Implemented `on_cleanup` hook to reset DB | @jules |
 | 2026-03-25 | Workspace Duplication | Frontend race condition on init | Added Zustand `isInitializing` flag | @engineer |
@@ -63,7 +64,7 @@ This document tracks identified bugs, root causes, and their permanent fixes to 
 | 2026-04-20 | Test Import Regressions | `ImportError` in `test_fusion.py` and `test_api_methods.py` after moving models to `models.py`. | Updated backend tests to import `FusionSourceConfig` and `IngestLogEntry` from `models.py` instead of `api.py`. | @antigravity |
 | 2026-04-20 | Database Lock in Tests | `test_tailing.py` was attempting to open the real `loglens.duckdb` file, which was locked by the running app. | Updated `api_app` fixture in `test_tailing.py` to use `db_path=":memory:"` for full isolation and safety. | @antigravity |
 | 2026-04-20 | Ingestion Test Desync | `test_ingestion_ports.py` failed due to outdated `source_id` expectations and incorrect routing URLs. | Aligned test expectations with `IngestionServer`'s new path-based routing and default `source_id` values ("syslog", "http-ingest"). | @antigravity |
-| 2026-04-20 | Architecture Documentation Drift | Features (EXPORT-001, Faceting) were implemented but not reflected in the architecture layers. | Performed a full sync of `docs/architecture/layers/` to reflect current JSON-RPC methods and store schemas. | @antigravity |
+| 2026-04-20 | Architecture Documentation Drift | Features (EXPORT-001, Faceting) were implemented but not reflected in the architecture layers. | Performed a full sync of `docs/Documentation/architecture/layers/` to reflect current JSON-RPC methods and store schemas. | @antigravity |
 | 2026-04-20 | Ollama High Cognitive Complexity | Monolithic `_process_stream_line` and `chat_stream` exceeded 15-point threshold (ruff C405) | Refactored into modular handlers (`_handle_native_thought`, `_apply_token_transitions`, `_format_messages`) | @antigravity |
 | 2026-04-20 | Log Selection A11y Violation | `onMouseUp` attached to non-interactive `section` container triggered lint error | Moved interaction to `useEffect` assigned listener on `ref`, optimized with `useCallback` | @antigravity |
 | 2026-04-20 | Silent JSON Parsing Exceptions | Silent `catch` blocks in settings parsing hindered observability of standard format failures | Added explicit `console.debug` logging to first-pass parse attempt before legacy rescue | @antigravity |

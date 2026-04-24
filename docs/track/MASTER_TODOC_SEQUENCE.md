@@ -1,6 +1,6 @@
 # Master Implementation Sequence - LogLensAi TODOC Clearance
 
-This document outlines the strategic order for clearing the `docs/TODOC/` backlog, prioritized by high-impact features, stability, and architectural dependencies.
+This document outlines the strategic order for clearing the `docs/track/specs/` backlog, prioritized by high-impact features, stability, and architectural dependencies.
 
 ## 🚦 SDLC State Machine Configuration
 - **Planner**: `@pm` (Commander)

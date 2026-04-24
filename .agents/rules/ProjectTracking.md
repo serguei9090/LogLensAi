@@ -16,7 +16,7 @@ At the start of every new session (detected via `model_decision` or the first us
 
 ## 2. Tracking Files (Index vs. Detail)
 - **`TODO.md` (The Index)**: High-level active roadmap. Tracks phases, status (`Backlog`, `In Progress`, `Done`), and high-level milestones. **Avoid massive walls of text here.**
-- **`docs/TODOC/task-xxx.md` (The Brain)**: Each complex task in `TODO.md` must have a dedicated detail file. This is where the actual "memory" lives—technical specs, chosen libraries, logic snippets, and implementation constraints.
+- **`docs/track/specs/task-xxx.md` (The Brain)**: Each complex task in `TODO.md` must have a dedicated detail file. This is where the actual "memory" lives—technical specs, chosen libraries, logic snippets, and implementation constraints.
 - **`FeaturesProposal.md`**: Deferred ideas and post-MVP enhancements.
 - **`CodeDebt.md`**: Technical debt, refactoring needs, and known bugs.
 - **`codegapreview.md`**: Architectural implementation gaps (Audit this using the `code-gap-reviewer` skill).

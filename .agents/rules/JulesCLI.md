@@ -22,7 +22,7 @@ When the user requests an implementation cycle, the agent MUST:
    ```
 3. **Launch**: Use PowerShell to cat the instructions into `jules new`:
    ```powershell
-   $prompt = Get-Content docs/jules_instruct.md -Raw ; $prompt | jules new
+   $prompt = Get-Content docs/Documentation/meta/jules_instruct.md -Raw ; $prompt | jules new
    ```
 4. **Register**: Capture and document the Session ID and URL in the chat for tracking.
 
@@ -46,8 +46,8 @@ jules teleport <ID>
 
 ## 5. Session Hygiene
 - **One Task, One Session**: Do not overload a single Jules session with disconnected tasks. Use the `TODO.md` to split work into atomic phases.
-- **Fail Fast**: If a session fails `Run and Snapshot` phase, investigate `docs/julesSetup.md` for runtime errors.
+- **Fail Fast**: If a session fails `Run and Snapshot` phase, investigate `docs/Documentation/meta/julesSetup.md` for runtime errors.
 
 ## 6. TODO Update Requirement
-- **Mandatory**: Every Jules instruction set (`docs/jules_instruct.md`) MUST include a specific step: "Update `docs/track/TODO.md` to reflect the completion of this task (mark with `[x]`)."
+- **Mandatory**: Every Jules instruction set (`docs/Documentation/meta/jules_instruct.md`) MUST include a specific step: "Update `docs/track/TODO.md` to reflect the completion of this task (mark with `[x]`)."
 - **Verification**: After pulling a Jules session, verify that the `TODO.md` has been updated correctly.

@@ -37,4 +37,4 @@ When the user requests a "Session Wrap-up" or "Handover," perform these steps:
 
 - **Be Atomic**: The "Next Atomic Step" should be small enough to execute in the first 5 minutes of the next session.
 - **Traceability**: Reference specific `TODO(ID)` identifiers from `docs/track/TODO.md`.
-- **Logic Snippets**: If a complex logic path was discovered but not yet implemented, include it in the "Contextual Memory" or a dedicated `docs/TODOC/` file.
+- **Logic Snippets**: If a complex logic path was discovered but not yet implemented, include it in the "Contextual Memory" or a dedicated `docs/track/specs/` file.

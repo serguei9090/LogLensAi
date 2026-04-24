@@ -6,20 +6,20 @@ Track all technical debt, known bugs, and refactoring needs here.
 
 ## Known Issues
 
-- [x] **HIER-DEBT-01: `delete_folder` cascade re-parenting**. Resolved by re-parenting children to root before parent deletion. See `docs/TODOC/FIX-HIER-001.md`.
+- [x] **HIER-DEBT-01: `delete_folder` cascade re-parenting**. Resolved by re-parenting children to root before parent deletion. See `docs/track/specs/FIX-HIER-001.md`.
 
 ## Refactoring Targets
 
-- [x] **COMPLEXITY-DEBT-01: `extract_log_metadata()` cyclomatic complexity 39**. Decomposed into focused sub-extractors. See `docs/TODOC/REFACTOR-META-001.md`.
-- [x] **COMPLEXITY-DEBT-02: `AIStudioProvider.chat_stream()` complexity 18**. Extracted helper functions. See `docs/TODOC/REFACTOR-AI-STUDIO-001.md`.
-- [x] **DEBUG-DEBT-01: `print()` statements in `openai_compatible.py`**. Replaced with `logger.debug()`. See `docs/TODOC/FIX-DEBT-001.md`.
+- [x] **COMPLEXITY-DEBT-01: `extract_log_metadata()` cyclomatic complexity 39**. Decomposed into focused sub-extractors. See `docs/track/specs/REFACTOR-META-001.md`.
+- [x] **COMPLEXITY-DEBT-02: `AIStudioProvider.chat_stream()` complexity 18**. Extracted helper functions. See `docs/track/specs/REFACTOR-AI-STUDIO-001.md`.
+- [x] **DEBUG-DEBT-01: `print()` statements in `openai_compatible.py`**. Replaced with `logger.debug()`. See `docs/track/specs/FIX-DEBT-001.md`.
 - [ ] **COMPLEXITY-DEBT-03: `ingestion.py:_run_http` complexity 14**. Needs decomposition of routing and validation logic.
 - [ ] **COMPLEXITY-DEBT-04: `query_parser.py:parse_primary` complexity 14**. Evaluate separating parsing logic by operator.
 - [ ] **OCP-DEBT-01: `api.py:194` hardcoded provider if-chains**. Open/Closed Principle violation; should use a dynamic factory or registry pattern.
 
 ## FUSION-DEBT
 
-- [ ] **FUSION-DEBT-01: Timezone Clock Drift Compensation**. Currently we only support manual offset. Future: automatic drift detection based on shared known events. See `docs/TODOC/FUSION-DEBT-01.md`.
+- [ ] **FUSION-DEBT-01: Timezone Clock Drift Compensation**. Currently we only support manual offset. Future: automatic drift detection based on shared known events. See `docs/track/specs/FUSION-DEBT-01.md`.
 
 ## AI-DEBT
 

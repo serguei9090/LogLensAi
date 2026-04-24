@@ -6,7 +6,7 @@ This session focused on clearing the final verification Phase, synchronizing arc
 ## 🏆 Major Successes
 - **Full-Stack E2E Pipeline**: Implemented `e2e_001` with both Backend (`test_full_pipeline.py`) and Frontend Integration (`InvestigationIntegration.test.ts`) tests.
 - **Dashboard Implementation**: Delivered `DASH-001` including backend metrics RPC and a professional Obsidian-style Dashboard page with severity charts and pattern rankings.
-- **Architecture Sync**: Performed a 100% documentation audit and sync, ensuring `docs/architecture/` correctly reflects current JSON-RPC methods and database schemas.
+- **Architecture Sync**: Performed a 100% documentation audit and sync, ensuring `docs/Documentation/architecture/` correctly reflects current JSON-RPC methods and database schemas.
 - **Zero-Debt State**: Resolved all major Biome and Ruff linting errors in the production codebase and synchronized Pydantic models to TypeScript types.
 
 ## 🛠️ Bugs Fixed / Tech Debt Paid

@@ -2,6 +2,8 @@
 description: The orchestrator agent that routes tasks and manages the AutoCode software factory.
 ---
 
+Assume Role: PM Smith (@pm)
+
 ---
 name: commander
 description: The orchestrator agent that routes tasks and manages the AutoCode software factory.

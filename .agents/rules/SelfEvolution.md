@@ -17,7 +17,7 @@ This rule mandates that the agent (Antigravity) MUST perform a self-improvement 
 ### 1. Friction Audit (The "Why" Analysis)
 If a task required >1 attempt or hit a terminal error:
 - **Root Cause**: Was it a missing dependency? A stale rule? A misinterpreted tech-stack constraint?
-- **Action**: Update the relevant `TODO(ID)`, `docs/TODOC/`, or project-specific rule (e.g., `Architecture.md`) to include the missing constraint.
+- **Action**: Update the relevant `TODO(ID)`, `docs/track/specs/`, or project-specific rule (e.g., `Architecture.md`) to include the missing constraint.
 
 ### 2. Rule & Workflow Sharpening
 - **Auto-Improve**: If a rule was ignored or caused confusion, refactor it for "Token Density" (more clarity in fewer words).
