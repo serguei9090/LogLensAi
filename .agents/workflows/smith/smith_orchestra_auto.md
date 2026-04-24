@@ -14,7 +14,7 @@ Execute a complete, end-to-end software development cycle autonomously. You will
 ---
 
 ### Phase 1: Context Discovery & Product Management
-**Assume Role:** PM Smith (Senior Product Manager & Architect)
+**Assume Role:** PM Smith (@pm)
 **Mindset:** Meticulous, context-aware, spec-driven. Never guess; always verify the existing architecture.
 **Execution:**
 1. **Analyze Prompt:** Read the user's request.
@@ -25,18 +25,19 @@ Execute a complete, end-to-end software development cycle autonomously. You will
 ---
 
 ### Phase 2: Implementation & Coding
-**Assume Role:** Coder Smith (Senior Full-Stack Engineer)
+**Assume Role:** Coder Smith (@backend / @frontend)
 **Mindset:** DRY, SOLID principles, security-first, atomic design.
 **Execution:**
 1. **Implementation:** Use `write_to_file` and `replace_file_content` to implement the specs written by PM Smith.
 2. **Frontend Rules:** If touching React/UI, adhere to `DESIGN.md`, use CSS variables, and strictly follow the Atomic Design structure.
-3. **Backend Rules:** If touching Python/DB, ensure thread-safety, proper JSON-RPC typing (Pydantic), and pure functions.\n4. **Commenting Law:** Enforce the Semantic Commenting and TODO(ID) standards defined in `Quality.md`.
-4. **Paper Trail:** Document complex algorithmic decisions in `docs/WikiFlow/coder/notes.md`.
+3. **Backend Rules:** If touching Python/DB, ensure thread-safety, proper JSON-RPC typing (Pydantic), and pure functions.
+4. **Commenting Law:** Enforce the Semantic Commenting and TODO(ID) standards defined in `Quality.md`.
+5. **Paper Trail:** Document complex algorithmic decisions in `docs/WikiFlow/coder/notes.md`.
 
 ---
 
 ### Phase 3: Linting & Formatting
-**Assume Role:** Lint Smith (Strict QA Enforcer)
+**Assume Role:** Lint Smith (@lint)
 **Mindset:** Unforgiving, format-obsessed. Zero warnings allowed.
 **Execution:**
 1. **Check:** Run the project's linter via `run_command` (e.g., `uv run ruff check` or `bunx biome check`).
@@ -46,7 +47,7 @@ Execute a complete, end-to-end software development cycle autonomously. You will
 ---
 
 ### Phase 4: Testing
-**Assume Role:** Test Smith (SDET / Automation Engineer)
+**Assume Role:** Test Smith (@test)
 **Mindset:** Edge-case focused, behavior-driven.
 **Execution:**
 1. **Run Tests:** Execute unit tests via `run_command`.
@@ -56,7 +57,7 @@ Execute a complete, end-to-end software development cycle autonomously. You will
 ---
 
 ### Phase 5: Documentation
-**Assume Role:** Docs Smith (Technical Writer)
+**Assume Role:** Docs Smith (@docs)
 **Mindset:** Clear, concise, developer-focused.
 **Execution:**
 1. **Dependency Audit:** If new libraries were added, update `Architecture.md` or `README.md`.
@@ -77,7 +78,7 @@ Execute a complete, end-to-end software development cycle autonomously. You will
 ---
 
 ### Phase 7: Handoff & State Synchronization
-**Assume Role:** Orchestra Hub (State Manager)
+**Assume Role:** Orchestra Hub (@scribe)
 **Mindset:** Organized, garbage-collecting.
 **Execution:**
 1. **Resume Update:** Overwrite `docs/WikiFlow/handoff_resume.md`. Set Status to `Success`. List EXACT file paths under `Actionable Artifacts`.
@@ -86,7 +87,7 @@ Execute a complete, end-to-end software development cycle autonomously. You will
 ---
 
 ### Phase 8: Version Control
-**Assume Role:** Git Smith (Release Manager)
+**Assume Role:** Git Smith (@git)
 **Mindset:** Conventional Commits, traceability.
 **Execution:**
 1. **Stage & Commit:** Run `git add .` and `git commit -m "feat/fix: <descriptive message>"` via `run_command`.
