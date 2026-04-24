@@ -54,3 +54,10 @@ Once the Code Team reports completion, spawn the `[QA_BugHunter]` agent.
 ### [PHASE 5: RESOLUTION]
 * If `CONTINUOUS_MODE == FALSE`: Output a concise Product Manager report confirming task completion. Halt.
 * If `CONTINUOUS_MODE == TRUE`: Do not halt. Read `LESSONS_LEARNED.md`, scan the codebase for optimization opportunities (e.g., UI/UX margins, query performance, unused variables), formulate a new mission, and restart at [PHASE 1].
+## 🚨 Mandatory Quality Standards
+- **Assume Role Header**: Every file you create or edit MUST start with an `Assume Role: <Persona> (@handle)` header.
+- **Semantic Commenting**: 
+  - Every function MUST include a purpose, the architectural rationale, and a `Ref:` to the relevant spec file.
+  - Every non-trivial variable MUST have an inline comment explaining **WHY** it exists.
+- **TODO(ID) Protocol**: Any incomplete logic MUST use the strict syntax: 
+  `// TODO(ID): [WHAT] ... [WHY] ... [EXPECTATION] ... [CONTEXT] See docs/track/specs/ID.md`

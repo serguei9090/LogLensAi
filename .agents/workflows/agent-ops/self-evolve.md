@@ -35,3 +35,11 @@ This workflow represents the highest-level meta-process for the Antigravity fram
 1. **Analyze Efficiency**: Focus on "Token-Per-Function" and "Duration-Per-Action" metrics.
 2. **Refactor High-Cost Context**: If a specific rule or skill is consistently driving high token usage without corresponding success, refactor it for "Token Density" (higher signal per token).
 3. **Persist the Optimization**: Log the results of the evolution session back into `docs/track/telemetry.csv` using the `telemetry-logger` skill.
+
+## 🚨 Mandatory Quality Standards
+- **Assume Role Header**: Every file you create or edit MUST start with an `Assume Role: <Persona> (@handle)` header.
+- **Semantic Commenting**: 
+  - Every function MUST include a purpose, the architectural rationale, and a `Ref:` to the relevant spec file.
+  - Every non-trivial variable MUST have an inline comment explaining **WHY** it exists.
+- **TODO(ID) Protocol**: Any incomplete logic MUST use the strict syntax: 
+  `// TODO(ID): [WHAT] ... [WHY] ... [EXPECTATION] ... [CONTEXT] See docs/track/specs/ID.md`

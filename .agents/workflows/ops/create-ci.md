@@ -13,3 +13,11 @@ When the user types `/create-ci <infra_goal>`, orchestrate the infrastructure se
 3. **The Approval Gate:** Pause and present the infrastructure plan. Ask: *"Should we target a specific cloud provider (e.g., GCP Cloud Run) or stick to local Docker orchestration?"*
 4. **Deploy Manifest:** If approved, save the configuration files to the correct directory (e.g., `.github/workflows/` or root).
 5. **Verify Automation:** Run a syntax check on the new manifest (e.g. `docker-compose config`).
+
+## 🚨 Mandatory Quality Standards
+- **Assume Role Header**: Every file you create or edit MUST start with an `Assume Role: <Persona> (@handle)` header.
+- **Semantic Commenting**: 
+  - Every function MUST include a purpose, the architectural rationale, and a `Ref:` to the relevant spec file.
+  - Every non-trivial variable MUST have an inline comment explaining **WHY** it exists.
+- **TODO(ID) Protocol**: Any incomplete logic MUST use the strict syntax: 
+  `// TODO(ID): [WHAT] ... [WHY] ... [EXPECTATION] ... [CONTEXT] See docs/track/specs/ID.md`

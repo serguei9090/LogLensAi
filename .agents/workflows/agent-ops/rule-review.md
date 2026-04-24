@@ -23,3 +23,11 @@ This workflow defines the procedure for auditing all rules in `.agents/rules/` t
      - Include: Rule Name, Evaluation (Good/Bad/Neutral), Action Taken (Updated/No Change).
 
 4. **Finalize**: Ensure the audit is saved and clearly summarizes the state of the project's behavioral standards.
+
+## 🚨 Mandatory Quality Standards
+- **Assume Role Header**: Every file you create or edit MUST start with an `Assume Role: <Persona> (@handle)` header.
+- **Semantic Commenting**: 
+  - Every function MUST include a purpose, the architectural rationale, and a `Ref:` to the relevant spec file.
+  - Every non-trivial variable MUST have an inline comment explaining **WHY** it exists.
+- **TODO(ID) Protocol**: Any incomplete logic MUST use the strict syntax: 
+  `// TODO(ID): [WHAT] ... [WHY] ... [EXPECTATION] ... [CONTEXT] See docs/track/specs/ID.md`

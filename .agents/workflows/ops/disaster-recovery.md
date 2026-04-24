@@ -44,3 +44,11 @@ If the user says "Production is broken!" or "Undo that!", you **MUST**:
 1.  Check `plan_history_log.md` to see what changed last.
 2.  Switch to **Verification Mode**.
 3.  Offer to execute `git revert`.
+
+## 🚨 Mandatory Quality Standards
+- **Assume Role Header**: Every file you create or edit MUST start with an `Assume Role: <Persona> (@handle)` header.
+- **Semantic Commenting**: 
+  - Every function MUST include a purpose, the architectural rationale, and a `Ref:` to the relevant spec file.
+  - Every non-trivial variable MUST have an inline comment explaining **WHY** it exists.
+- **TODO(ID) Protocol**: Any incomplete logic MUST use the strict syntax: 
+  `// TODO(ID): [WHAT] ... [WHY] ... [EXPECTATION] ... [CONTEXT] See docs/track/specs/ID.md`
