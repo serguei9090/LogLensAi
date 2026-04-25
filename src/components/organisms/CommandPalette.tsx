@@ -89,13 +89,13 @@ export function CommandPalette({ open, onOpenChange, onNavSelect }: CommandPalet
           {
             icon: RotateCcw,
             label: "Refresh Current Logs",
-            action: () => window.dispatchEvent(new CustomEvent("loglens:refresh-logs")),
+            action: () => globalThis.dispatchEvent(new CustomEvent("loglens:refresh-logs")),
             shortcut: "R",
           },
           {
             icon: XCircle,
             label: "Clear Filters & Search",
-            action: () => window.dispatchEvent(new CustomEvent("loglens:clear-filters")),
+            action: () => globalThis.dispatchEvent(new CustomEvent("loglens:clear-filters")),
             shortcut: "Esc",
           },
         ],
@@ -130,11 +130,11 @@ export function CommandPalette({ open, onOpenChange, onNavSelect }: CommandPalet
         <DialogHeader className="p-4 border-b border-zinc-800/40">
           <DialogTitle className="sr-only">Command Palette</DialogTitle>
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-zinc-500" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-text-muted" />
             <Input
               autoFocus
               placeholder="Type a command or search..."
-              className="bg-transparent border-none focus-visible:ring-0 pl-10 h-12 text-base text-zinc-200"
+              className="bg-transparent border-none focus-visible:ring-0 pl-10 h-12 text-base text-text-primary"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               onKeyDown={(e) => {
@@ -155,7 +155,7 @@ export function CommandPalette({ open, onOpenChange, onNavSelect }: CommandPalet
             <div className="p-2 space-y-4">
               {filteredGroups.map((group) => (
                 <div key={group.group}>
-                  <h3 className="px-3 mb-2 text-[10px] font-bold uppercase tracking-widest text-zinc-500">
+                  <h3 className="px-3 mb-2 text-[10px] font-bold uppercase tracking-widest text-text-muted">
                     {group.group}
                   </h3>
                   <div className="space-y-1">
@@ -163,12 +163,12 @@ export function CommandPalette({ open, onOpenChange, onNavSelect }: CommandPalet
                       <button
                         type="button"
                         key={item.label}
-                        className="w-full flex items-center justify-between p-2.5 rounded-lg transition-all cursor-pointer hover:bg-white/5 border border-transparent hover:border-zinc-800 focus-visible:bg-white/5 focus-visible:border-zinc-700 outline-none group"
+                        className="w-full flex items-center justify-between p-2.5 rounded-lg transition-all cursor-pointer hover:bg-bg-hover border border-transparent hover:border-border focus-visible:bg-bg-hover focus-visible:border-primary/30 outline-none group"
                         onClick={() => handleAction(item.action)}
                       >
                         <div className="flex items-center gap-3">
-                          <item.icon className="size-4 text-zinc-400 group-hover:text-emerald-400" />
-                          <span className="text-sm text-zinc-300 group-hover:text-zinc-100 font-medium">
+                          <item.icon className="size-4 text-text-secondary group-hover:text-primary" />
+                          <span className="text-sm text-text-secondary group-hover:text-text-primary font-medium">
                             {item.label}
                           </span>
                         </div>
@@ -177,7 +177,7 @@ export function CommandPalette({ open, onOpenChange, onNavSelect }: CommandPalet
                             {item.shortcut.split(" ").map((k) => (
                               <kbd
                                 key={k}
-                                className="px-1.5 py-0.5 rounded bg-zinc-900 border border-zinc-800 text-[10px] text-zinc-500 font-mono"
+                                className="px-1.5 py-0.5 rounded bg-bg-surface-bright border border-border text-[10px] text-text-primary font-mono shadow-sm"
                               >
                                 {k}
                               </kbd>
@@ -193,16 +193,24 @@ export function CommandPalette({ open, onOpenChange, onNavSelect }: CommandPalet
           )}
         </ScrollArea>
 
-        <div className="p-3 border-t border-zinc-800/40 bg-zinc-900/20 flex justify-between items-center text-[10px] text-zinc-500">
+        <div className="p-3 border-t border-border/40 bg-bg-surface/50 flex justify-between items-center text-[10px] text-text-muted">
           <div className="flex items-center gap-4">
             <span className="flex items-center gap-1.5">
-              <kbd className="px-1 rounded bg-zinc-800 border border-zinc-700">↵</kbd> select
+              <kbd className="px-1.5 rounded bg-bg-surface-bright border border-border text-text-primary">
+                ↵
+              </kbd>{" "}
+              select
             </span>
             <span className="flex items-center gap-1.5">
-              <kbd className="px-1 rounded bg-zinc-800 border border-zinc-700">↑↓</kbd> navigate
+              <kbd className="px-1.5 rounded bg-bg-surface-bright border border-border text-text-primary">
+                ↑↓
+              </kbd>{" "}
+              navigate
             </span>
           </div>
-          <span className="font-mono text-zinc-600">COMMAND PALETTE</span>
+          <span className="font-mono text-text-muted/60 uppercase tracking-widest">
+            Command Palette
+          </span>
         </div>
       </DialogContent>
     </Dialog>

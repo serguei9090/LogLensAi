@@ -94,7 +94,7 @@ export function SaveTemplateModal({
               placeholder="e.g. Production Error Analysis"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="bg-black/40 border-border/40 text-sm focus:ring-primary/20"
+              className="bg-bg-base/40 border-border/40 text-sm focus:ring-primary/20"
               autoFocus
             />
           </div>
@@ -128,7 +128,7 @@ export function SaveTemplateModal({
           <Button
             onClick={handleSave}
             disabled={isSaving || !name.trim()}
-            className="bg-primary text-black hover:bg-primary-hover font-bold text-xs h-10 px-8 shadow-lg shadow-primary/10"
+            className="bg-primary text-text-inverse hover:bg-primary-hover font-bold text-xs h-10 px-8 shadow-lg shadow-primary/10"
           >
             {isSaving ? "Saving..." : "Save Template"}
           </Button>

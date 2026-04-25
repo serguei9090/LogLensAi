@@ -15,19 +15,25 @@ interface Shortcut {
 export function useKeyboardShortcuts(shortcuts: Shortcut[]) {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      const isMac = navigator.platform.toUpperCase().indexOf("MAC") >= 0;
+      const platform = (navigator as any).platform || "";
+      const isMac = platform.toUpperCase().includes("MAC");
 
       for (const shortcut of shortcuts) {
+        if (!shortcut.key) {
+          continue;
+        }
+
         const keyMatch = e.key.toLowerCase() === shortcut.key.toLowerCase();
 
-        // On Mac, we often want Cmd to act as Ctrl, but since we are providing full
-        // customization, we should ideally match what the user recorded.
-        // However, to keep it intuitive for Mac users, we'll maintain the Meta/Ctrl mapping
-        // if ONLY one of them is specified, or just do exact matching if both are potentially used.
+        // On Mac, Command (metaKey) is often used instead of Control.
+        // We allow metaKey to match ctrl requirement on Mac if meta is not explicitly required.
+        const ctrlMatch = isMac
+          ? !!shortcut.ctrl === (e.ctrlKey || e.metaKey)
+          : !!shortcut.ctrl === e.ctrlKey;
 
-        // For simplicity and to follow the user's "any combination" request, we'll do exact matching.
-        const ctrlMatch = !!shortcut.ctrl === e.ctrlKey;
-        const metaMatch = !!shortcut.meta === e.metaKey;
+        const metaMatch = isMac
+          ? !!shortcut.meta === (e.ctrlKey && e.metaKey) // If both are required, both must be pressed
+          : !!shortcut.meta === e.metaKey;
         const altMatch = !!shortcut.alt === e.altKey;
         const shiftMatch = !!shortcut.shift === e.shiftKey;
 
@@ -39,7 +45,7 @@ export function useKeyboardShortcuts(shortcuts: Shortcut[]) {
       }
     };
 
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
+    globalThis.addEventListener("keydown", handleKeyDown);
+    return () => globalThis.removeEventListener("keydown", handleKeyDown);
   }, [shortcuts]);
 }

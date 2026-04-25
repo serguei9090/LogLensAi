@@ -42,6 +42,7 @@ export const SearchBar = forwardRef<HTMLInputElement, SearchBarProps>(
         <Input
           ref={ref}
           type="text"
+          autoComplete="off"
           placeholder={placeholder}
           value={localValue}
           onChange={(e) => setLocalValue(e.target.value)}

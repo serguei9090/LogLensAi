@@ -1,3 +1,21 @@
+# [2026-04-24] useKeyboardShortcuts.ts & settingsStore.ts — Shortcut Crash Fix
+
+**Role:** Coder Smith (@frontend)  
+**Trigger:** `Uncaught TypeError: Cannot read properties of undefined (reading 'toLowerCase')` in `useKeyboardShortcuts.ts`
+
+## Changes Applied
+| # | File | Change Applied |
+|---|---|---|
+| 1 | `src/lib/hooks/useKeyboardShortcuts.ts` | Added `if (!shortcut.key) continue` to prevent crash on undefined keys. |
+| 2 | `src/lib/hooks/useKeyboardShortcuts.ts` | Implemented Mac-specific modifier mapping (Cmd/Meta as Ctrl) to align with platform expectations and existing tests. |
+| 3 | `src/store/settingsStore.ts` | Explicitly parsed `ui_command_palette_shortcut` from backend JSON string to ensure object structure is maintained. |
+| 4 | `src/lib/hooks/__tests__/useKeyboardShortcuts.test.ts` | Mocked `navigator.platform` for Mac simulation test to ensure environment-independent pass. |
+| 5 | `src/lib/hooks/__tests__/useKeyboardShortcuts.test.ts` | Added crash regression test case for undefined shortcut keys. |
+
+## Verification
+- `bun run test src/lib/hooks/__tests__/useKeyboardShortcuts.test.ts` → **6 tests passed**
+- `bunx biome check src/lib/hooks/useKeyboardShortcuts.ts src/store/settingsStore.ts` → **0 warnings**
+
 # [2026-04-24] SettingsPanel.tsx — Biome Compliance Refactor
 
 **Role:** Coder Smith (@frontend)  

@@ -141,6 +141,12 @@ export const useSettingsStore = create<SettingsStore>((set) => ({
               const parsed = safeParse(remote.facet_extractions);
               return Array.isArray(parsed) ? parsed : [];
             })(),
+            ui_command_palette_shortcut: (() => {
+              const parsed = safeParse(remote.ui_command_palette_shortcut);
+              return parsed && typeof parsed === "object" && "key" in parsed
+                ? (parsed as KeyboardShortcut)
+                : defaultSettings.ui_command_palette_shortcut;
+            })(),
           },
         });
       }

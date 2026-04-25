@@ -37,6 +37,7 @@ describe("useKeyboardShortcuts", () => {
       },
     ];
 
+    vi.spyOn(navigator, "platform", "get").mockReturnValue("MacIntel");
     renderHook(() => useKeyboardShortcuts(shortcuts));
 
     const event = new KeyboardEvent("keydown", {
@@ -118,5 +119,33 @@ describe("useKeyboardShortcuts", () => {
     window.dispatchEvent(event);
 
     expect(event.preventDefault).toHaveBeenCalled();
+  });
+
+  it("should not crash when a shortcut has no key defined", () => {
+    const handler = vi.fn();
+    const shortcuts = [
+      {
+        description: "Invalid Shortcut",
+        handler,
+      } as any,
+      {
+        key: "k",
+        ctrl: true,
+        handler,
+        description: "Valid Shortcut",
+      },
+    ];
+
+    renderHook(() => useKeyboardShortcuts(shortcuts));
+
+    const event = new KeyboardEvent("keydown", {
+      key: "k",
+      ctrlKey: true,
+    });
+
+    // Should not throw
+    window.dispatchEvent(event);
+
+    expect(handler).toHaveBeenCalled();
   });
 });

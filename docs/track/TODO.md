@@ -6,15 +6,19 @@
 
 ---
 
-## 🔴 Audit Findings — Sprint 14 (Open)
+## 🔵 Bug Fixes (Active)
 
-*(All critical health and testing issues resolved)*
+*(All active critical bugs resolved)*
 
 ---
 
 ## ✅ Done
 
+- [x] **ACC-001**: Search Bar Accessibility & Theme Standardization (Remediated native autocomplete & hardcoded colors)
 - [x] **HEALTH-STABILIZATION**: Comprehensive health remediation (Done 2026-04-23)
+- [x] **shortcut_crash_001**: Fix Keyboard Shortcut Crash (P0) (Done 2026-04-24)
+  - [x] **Files**: `src/lib/hooks/useKeyboardShortcuts.ts`, `src/store/settingsStore.ts`
+  - [x] **Detail**: `docs/track/specs/shortcut_crash_001.md`
   - [x] **FIX-HIER-001**: `db.delete_folder()` cascade re-parenting fix (P0)
   - [x] **FIX-DEBT-001**: Structured logging in `openai_compatible.py` (Removed print debt)
   - [x] **REFACTOR-META-001**: Metadata extractor decomposition (Complexity 39 -> 8)

@@ -81,7 +81,7 @@ export const A2UIRenderer: React.FC<A2UIRendererProps> = ({ payload, onAction })
     const parsed = parseA2UIMarkup(rawPayload.raw);
     if (!parsed) {
       return (
-        <div className="text-[10px] text-zinc-500 italic opacity-50 p-2 border border-zinc-800 rounded bg-zinc-900/30">
+        <div className="text-[10px] text-text-muted italic opacity-80 p-3 border border-border/40 rounded-lg bg-bg-surface-bright/50">
           [Malformed A2UI Blueprint]
         </div>
       );
@@ -95,7 +95,7 @@ export const A2UIRenderer: React.FC<A2UIRendererProps> = ({ payload, onAction })
     switch (comp.type) {
       case "text":
         return (
-          <p key={index} className="text-zinc-300 text-[13px] leading-relaxed mb-2">
+          <p key={index} className="text-text-secondary text-[13px] leading-relaxed mb-2">
             {comp.text}
           </p>
         );
@@ -115,10 +115,10 @@ export const A2UIRenderer: React.FC<A2UIRendererProps> = ({ payload, onAction })
 
       case "card":
         return (
-          <Card key={index} className="bg-zinc-900/50 border-zinc-800/60 mb-4 overflow-hidden">
+          <Card key={index} className="bg-bg-surface/50 border-border/60 mb-4 overflow-hidden">
             {comp.label && (
-              <CardHeader className="py-3 px-4 border-b border-zinc-800/60">
-                <CardTitle className="text-[11px] font-bold text-zinc-100 uppercase tracking-widest">
+              <CardHeader className="py-3 px-4 border-b border-border/60">
+                <CardTitle className="text-[11px] font-bold text-text-primary uppercase tracking-widest">
                   {comp.label}
                 </CardTitle>
               </CardHeader>
