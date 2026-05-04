@@ -128,7 +128,7 @@ function ModelSelector({
     <div className="space-y-2">
       <div className="flex items-center justify-between">
         <SectionLabel htmlFor="ai_model_selector">Model</SectionLabel>
-        {["ollama", "ai-studio", "openai-compatible"].includes(provider) && (
+        {["ollama", "lmstudio", "ai-studio", "openai-compatible"].includes(provider) && (
           <button
             type="button"
             onClick={onRefresh}
@@ -213,6 +213,9 @@ function getProviderLabel(provider: string): string {
   if (provider === "ai-studio") {
     return "Google Cloud Native";
   }
+  if (provider === "lmstudio") {
+    return "Local App Inference";
+  }
   return "Universal API";
 }
 
@@ -231,6 +234,9 @@ function getProviderDescription(provider: string): string {
   }
   if (provider === "ai-studio") {
     return "Connect directly to Google's model infrastructure via API Key.";
+  }
+  if (provider === "lmstudio") {
+    return "LM Studio local server. Ensure the server is started in the LM Studio SDK tab.";
   }
   return "Supports Azure, Groq, Perplexity, or any OpenAI-compatible proxy.";
 }
@@ -547,7 +553,7 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
   // biome-ignore lint/correctness/useExhaustiveDependencies: Must re-fetch on these changes even if not directly used in the effect body
   useEffect(() => {
     // Trigger model pull when provider or connectivity settings change (with debounce)
-    const dynamicProviders = ["ollama", "openai-compatible", "ai-studio"];
+    const dynamicProviders = ["ollama", "lmstudio", "openai-compatible", "ai-studio"];
     if (dynamicProviders.includes(settings.ai_provider)) {
       const timer = setTimeout(() => {
         fetchModels();
@@ -559,6 +565,7 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
     settings.ai_provider,
     settings.ai_api_key,
     settings.ai_ollama_host,
+    settings.ai_lmstudio_host,
     settings.ai_openai_host,
   ]);
 
@@ -685,6 +692,7 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
                   >
                     <option value="gemini-cli">Gemini CLI</option>
                     <option value="ollama">Ollama</option>
+                    <option value="lmstudio">LM Studio</option>
                     <option value="ai-studio">Gemini AI Studio</option>
                     <option value="openai-compatible">OpenAI Compatible</option>
                   </SettingSelect>
@@ -738,6 +746,33 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
                     />
                     <p className="text-[10px] text-text-muted/50 px-1">
                       Local Ollama instance URL.
+                    </p>
+                  </div>
+                )}
+
+                {settings.ai_provider === "lmstudio" && (
+                  <div className="space-y-2 animate-in fade-in slide-in-from-left-2 duration-300">
+                    <div className="flex items-center justify-between">
+                      <SectionLabel htmlFor="ai_lmstudio_host">LM Studio Server Host</SectionLabel>
+                      <button
+                        type="button"
+                        onClick={handleTestConnection}
+                        disabled={isTestingConnection}
+                        className="text-[9px] uppercase tracking-tighter font-bold text-primary hover:text-primary-light transition-colors disabled:opacity-30"
+                      >
+                        {isTestingConnection ? "Testing..." : "Test Connection"}
+                      </button>
+                    </div>
+                    <SettingInput
+                      id="ai_lmstudio_host"
+                      type="url"
+                      value={settings.ai_lmstudio_host}
+                      onChange={(e) => update("ai_lmstudio_host", e.target.value, false)}
+                      onBlur={() => onSave(settings)}
+                      placeholder="http://localhost:1234/v1"
+                    />
+                    <p className="text-[10px] text-text-muted/50 px-1">
+                      Local LM Studio API URL (usually port 1234).
                     </p>
                   </div>
                 )}

@@ -6,9 +6,13 @@
 
 ---
 
-## 🔵 Bug Fixes (Active)
+## 🔵 Active Tasks
 
-*(All active critical bugs resolved)*
+- [x] **LogLensAi-jak**: Integrate LM Studio Provider ([spec](docs/track/specs/LogLensAi-jak.md))
+  - [x] **Files**: `src/store/settingsStore.ts`, `src/components/organisms/SettingsPanel.tsx`, `sidecar/src/ai/__init__.py`
+  - [x] **Detail**: `docs/track/specs/LogLensAi-jak.md`
+
+---
 
 ---
 

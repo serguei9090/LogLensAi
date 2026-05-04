@@ -1,5 +1,16 @@
 # LogLensAi: Lessons Learned & Post-Mortem Log
 
+## LM Studio Integration (2026-05-04)
+- **Problem**: Users wanted to use LM Studio as a local provider, which required custom host configuration and specific model listing logic.
+- **Solution**:
+    - Expanded `settingsStore.ts` and `SettingsPanel.tsx` to support `ai_lmstudio_host`.
+    - Integrated `lmstudio` as a flavor of `OpenAICompatibleProvider` in the backend factory.
+    - Updated `OpenAICompatibleProvider` to handle both `data` and `models` JSON keys from the `/models` endpoint.
+    - Standardized `OpenAICompatibleProvider` to always initialize the SDK client even if no API key is provided (using a dummy key for local endpoints).
+- **Lessons**:
+    - Mocks for `httpx` and `aiohttp` are different; always verify which library the production code uses before writing tests.
+    - Local providers (LM Studio, Ollama) often don't need API keys, but the OpenAI SDK might require a non-empty string.
+
 This document tracks identified bugs, root causes, and their permanent fixes to prevent regression and ensure faster resolution in future development cycles.
 
 | Date | Bug Description | Root Cause | Solution/Fix | Agent |

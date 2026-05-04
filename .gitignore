@@ -43,3 +43,12 @@ gemini_sessions/
 .dolt/
 *.db
 .beads-credential-key
+
+#codanna
+.codanna/
+/.codanna
+/.codanna/
+fastembed_cache
+.fastembed_cache
+/.fastembed_cache
+.fastembed_cache/

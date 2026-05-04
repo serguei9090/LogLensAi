@@ -17,6 +17,7 @@ export interface AppSettings {
   ai_gemini_url: string;
   ai_ollama_host: string;
   ai_openai_host: string;
+  ai_lmstudio_host: string;
   drain_similarity_threshold: number;
   drain_max_children: number;
   drain_max_clusters: number;
@@ -44,6 +45,7 @@ export const defaultSettings: AppSettings = {
   ai_gemini_url: "http://localhost:22436",
   ai_ollama_host: "http://localhost:11434",
   ai_openai_host: "https://api.openai.com/v1",
+  ai_lmstudio_host: "http://localhost:1234/v1",
   drain_similarity_threshold: 0.5,
   drain_max_children: 100,
   drain_max_clusters: 1000,

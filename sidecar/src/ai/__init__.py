@@ -50,6 +50,7 @@ class AIProviderFactory:
                 "openai-compatible": "ai_openai_host",
                 "openai": "ai_openai_host",
                 "ollama": "ai_ollama_host",
+                "lmstudio": "ai_lmstudio_host",
             }
             host = settings.get(host_map.get(provider_name, ""), "")
 
@@ -92,6 +93,13 @@ Action Details:
                 system_prompt=system_prompt,
                 host=host or "https://api.openai.com/v1",
                 model=model or "gpt-4o",
+            )
+        elif provider_name == "lmstudio":
+            return OpenAICompatibleProvider(
+                api_key=api_key,
+                system_prompt=system_prompt,
+                host=host or "http://localhost:1234/v1",
+                model=model,
             )
         else:
             return GeminiCLIProvider(
