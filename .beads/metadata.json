@@ -1,0 +1,7 @@
+{
+  "database": "dolt",
+  "backend": "dolt",
+  "dolt_mode": "embedded",
+  "dolt_database": "LogLensAi",
+  "project_id": "c1ae9d60-d538-4e85-a2ad-dadc57e43c7e"
+}
