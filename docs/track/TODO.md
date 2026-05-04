@@ -17,6 +17,7 @@
 ---
 
 ## ✅ Done
+- [x] **AI Provider Reasoning Fix**: Resolve TypeError for dynamic reasoning arguments.
 
 - [x] **ACC-001**: Search Bar Accessibility & Theme Standardization (Remediated native autocomplete & hardcoded colors)
 - [x] **HEALTH-STABILIZATION**: Comprehensive health remediation (Done 2026-04-23)

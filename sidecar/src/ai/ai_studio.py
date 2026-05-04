@@ -195,6 +195,7 @@ class AIStudioProvider(AIProvider):
         session_id: str | None = None,
         provider_session_id: str | None = None,
         reasoning: bool | None = True,
+        **kwargs,
     ) -> AIChatMessage:
         """Sends a message to Gemini via ADK Agent."""
         if not self.api_key:

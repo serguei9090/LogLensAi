@@ -30,8 +30,21 @@ class AIProvider(ABC):
         model: str | None = None,
         session_id: str | None = None,
         provider_session_id: str | None = None,
+        **kwargs,
     ) -> AIChatMessage:
         """Execute a chat session with memory/context."""
+        pass
+
+    @abstractmethod
+    async def chat_stream(
+        self,
+        messages: list[AIChatMessage],
+        model: str | None = None,
+        session_id: str | None = None,
+        provider_session_id: str | None = None,
+        **kwargs,
+    ):
+        """Streaming version of chat."""
         pass
 
     @abstractmethod

@@ -98,6 +98,7 @@ class OllamaProvider(AIProvider):
         session_id: str | None = None,
         provider_session_id: str | None = None,
         reasoning: bool | None = True,
+        **kwargs,
     ) -> AIChatMessage:
         """Sends a message to Ollama (non-streaming)."""
         target_model = model or self.model or DEFAULT_OLLAMA_MODEL
@@ -144,8 +145,9 @@ class OllamaProvider(AIProvider):
         self,
         messages: list[AIChatMessage],
         model: str | None = None,
-        reasoning: bool | None = True,
         session_id: str | None = None,
+        provider_session_id: str | None = None,
+        reasoning: bool | None = True,
         **kwargs,
     ):
         """Streams response using Ollama's /api/chat endpoint.

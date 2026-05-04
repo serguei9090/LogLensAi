@@ -52,3 +52,6 @@ fastembed_cache
 .fastembed_cache
 /.fastembed_cache
 .fastembed_cache/
+
+#data
+data/

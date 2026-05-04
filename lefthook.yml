@@ -9,5 +9,8 @@ pre-commit:
 
 post-commit:
   commands:
+    codanna-index:
+      # Use git diff-tree to get files from the commit just created
+      run: uv run python scripts/codanna/index.py $(git diff-tree --no-commit-id --name-only -r HEAD)
     doc-agent:
       run: powershell -Command "Start-Process powershell -ArgumentList '-NoProfile -Command \"gemini -y -p \"\"Run @doc-agent to update docs/track/ and TODOC based on the recent commit changes to maintain living specs.\"\"\"' -NoNewWindow"

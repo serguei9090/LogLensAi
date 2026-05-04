@@ -70,6 +70,7 @@ class OpenAICompatibleProvider(AIProvider):
         model: str | None = None,
         session_id: str | None = None,
         provider_session_id: str | None = None,
+        **kwargs,
     ) -> AIChatMessage:
         """Execute a chat session."""
         if not self._client:
@@ -89,7 +90,14 @@ class OpenAICompatibleProvider(AIProvider):
         except Exception as e:
             return AIChatMessage(role="assistant", content=f"OpenAI Compatible Error: {str(e)}")
 
-    async def chat_stream(self, messages: list[AIChatMessage], model: str | None = None, **kwargs):
+    async def chat_stream(
+        self,
+        messages: list[AIChatMessage],
+        model: str | None = None,
+        session_id: str | None = None,
+        provider_session_id: str | None = None,
+        **kwargs,
+    ):
         """Streaming chat."""
         if not self._client:
             yield "Error: OpenAI Provider not configured."

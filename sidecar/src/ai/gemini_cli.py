@@ -92,6 +92,7 @@ class GeminiCLIProvider(AIProvider):
         model: str | None = None,
         session_id: str | None = None,
         provider_session_id: str | None = None,
+        **kwargs,
     ) -> AIChatMessage:
         """Execute chat using A2A Hot Mode if available, falling back to Cold Mode."""
         if not session_id:
