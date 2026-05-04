@@ -10,7 +10,7 @@
     * Native-specific: `*.native.tsx` / `*.native.ts` (if RN API dependent).
 
 ## 2. Workflow (Extension Protocol)
-1.  **Is it a Style/Value?** -> Check **tokens**.
+1.  **Is it a Style/Value?** -> Check **`DESIGN.md`**.
 2.  **Is it Stateful Logic (UI)?** -> Check **hooks**.
 3.  **Is it Pure Logic?** -> Check **utils**.
 4.  **Does it fetch data?** -> **Move to Page/Core**.

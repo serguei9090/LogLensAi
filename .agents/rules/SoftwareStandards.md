@@ -97,3 +97,13 @@ When an AI subagent refactors logic or alters a component path, it is **strictly
 - **Serialization Safety**: JSON-RPC methods in the sidecar MUST NEVER return native Python `datetime` objects. All timestamps and dates must be explicitly stringified (e.g., `str(dt)`) before returning to the `aiohttp` handler to prevent JSON serialization `TypeErrors`.
 - **Hydration & DOM Nesting**: Interactive elements (Buttons, Anchors, etc.) MUST NEVER be nested within each other. In lists or sidebars, use `div` with `role="button"` and `tabIndex` for the outer container to permit inner interactive buttons without violating React hydration rules.
 - **Provider Lifecycle Parity**: When updating settings that affect backend state (e.g., `ai_model`, `ai_provider`), the `App` constructor or update handler MUST explicitly re-initialize the corresponding provider to reflect the new user preference immediately.
+
+## 9. UI/UX Governance & DESIGN.md-First Law
+To ensure premium, high-fidelity interfaces and maintain architectural parity between design and code:
+
+- **Rule 1: DESIGN.md is Ground Truth**: DESIGN.md is the absolute Source of Truth for all UI elements. Any change to colors, spacing, typography, or components MUST be documented in DESIGN.md BEFORE code implementation.
+- **Rule 2: Spec-Driven Change**: When a UI change is requested, the @ui-designer MUST first propose a diff for DESIGN.md. Implementation only begins once the spec is approved.
+- **Rule 3: Token-Only Styling**: Hardcoded values (hex colors, pixel sizes) are strictly forbidden in components. All styles MUST reference Design Tokens defined in DESIGN.md (e.g., var(--primary)).
+- **Rule 4: Mandatory Audit**: Every UI implementation MUST be verified by the @ui-auditor against DESIGN.md. Any deviation triggers an immediate rejection.
+- **Rule 5: Atomic Design Hierarchy**: Components MUST be organized and documented according to the Atoms -> Molecules -> Organisms hierarchy.
+- **Rule 6: Premium Defaults**: Interfaces MUST prioritize premium aesthetics (Glow, Glassmorphism, Smooth Transitions) as defined in the high-end-visual-design skill.

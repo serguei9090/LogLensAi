@@ -10,8 +10,8 @@
     *   Micro (Hover/Click)? -> `Instant` (100ms).
     *   Auxiliary (Tooltip)? -> `Fast` (200ms).
     *   Navigation (Modal)? -> `Deliberate` (400ms).
-2.  **Select Meaning:** Don't just pick a speed, pick the Semantic Token.
-3.  **Apply:** Use CSS Variable or Framer Variant.
+2.  **Select Meaning:** Don't just pick a speed, pick the Semantic Token from **`DESIGN.md`**.
+3.  **Apply:** Use CSS Variable or Framer Variant via the `animate` skill.
 
 ## 3. Tokens (Strict)
 | Token | Duration | Use Case |

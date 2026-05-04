@@ -2,7 +2,7 @@
 
 ## 1. Core Principles (Invariants)
 * **Presentation Only:** `packages/ui` NEVER imports `packages/core`. No business logic, no API calls, no persistence. Data enters via props.
-* **Token Truth:** Source of Truth is **Style Dictionary (JSON)**. Generated output is Read-Only.
+* **Token Truth:** The technical Source of Truth is **Style Dictionary (JSON)**, but the **Architectural Source of Truth** is **`DESIGN.md`**. Any change to design tokens MUST be updated in `DESIGN.md` before being propagated to JSON/CSS.
 * **Public API:** Deep imports prohibited (e.g., `import X from 'ui/atoms/X'`). Import only from root: `@{scope}/ui`.
 * **Platform Split:**
     * Web/Desktop: `*.tsx` (No React Native imports).
@@ -19,7 +19,8 @@
 
 ## 3. Atomic Hierarchy (packages/ui)
 **2.0 Tokens** (`/tokens`):
-    *   `src/**/*.json`: **Source of Truth** (Raw Design Values).
+    *   `DESIGN.md`: **Architectural Source of Truth**.
+    *   `src/**/*.json`: Intermediate Source (Raw Design Values).
     *   `dist/`: **Generated** (TS/CSS outputs via Style Dictionary).
 **2.1 Atoms** (`/atoms`): Smallest blocks (Button, Icon). No external margins. Props in/UI out.
 **2.2 Molecules** (`/molecules`): Compositions of atoms (SearchInput). No business logic.

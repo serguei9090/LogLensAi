@@ -8,18 +8,18 @@ To ensure visual consistency and protect the "Premium Design System," the agent 
 
 ## 1. The Proposal Phase
 Before writing a single line of UI code, the agent MUST:
-1. **Analyze the request** against `docs/Documentation/design/theme.md` and `docs/Documentation/design/ui-components.md`.
+1. **Analyze the request** against **`DESIGN.md`** (The absolute architectural Source of Truth).
 2. **Consult the `shadcn` skill**: Check for existing components and documentation using `bunx --bun shadcn@latest docs <component>`.
-3. **Draft a visual proposal** in the chat, including:
+3. **Draft a visual proposal** in the chat (or update `DESIGN.md` in Plan Mode), including:
    - **Reasoning**: Why the change is needed.
-   - **Visual Specs**: What colors, spacing, and radius will be used (must map to existing tokens).
+   - **Visual Specs**: What colors, spacing, and radius will be used (must map to existing tokens in `DESIGN.md`).
    - **shadcn Choice**: Which shadcn primitives will be used or modified.
 4. **Explicitly Ask for Approval**: "Do you approve this UI change proposal?"
 
 ## 2. Adoption Policy
-- **DO NOT** implement UI changes "on the fly" without a dedicated approval message.
-- **DO NOT** reinvent the wheel. If a shadcn component exists (see `docs/Documentation/design/ui-components.md`), USE IT.
-- **DO NOT** deviate from the tokens defined in `docs/Documentation/design/theme.md` unless the user explicitly requests a theme overhaul.
+- **DO NOT** implement UI changes "on the fly" without a dedicated approval message and a corresponding `DESIGN.md` update.
+- **DO NOT** reinvent the wheel. If a shadcn component exists, USE IT.
+- **DO NOT** deviate from the tokens defined in **`DESIGN.md`** unless the user explicitly requests a theme overhaul.
 
 ## 3. Implementation (Post-Approval)
 Only after the user provides an affirmative response (e.g., "Yes," "Approved," "Go ahead"), the agent may proceed to:
