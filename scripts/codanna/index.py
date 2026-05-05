@@ -29,6 +29,18 @@ def _run(cmd: list[str], label: str) -> int:
 def main() -> None:
     staged: list[str] = sys.argv[1:]
 
+    if "--latest" in staged:
+        try:
+            cmd = ["git", "diff-tree", "--no-commit-id", "--name-only", "-r", "HEAD"]
+            result = subprocess.check_output(cmd, encoding="utf-8")
+            staged = [f.strip() for f in result.splitlines() if f.strip()]
+            if not staged:
+                print("  [!] No files found in the latest commit.")
+                sys.exit(0)
+        except Exception as e:
+            print(f"  [✗] Failed to get files from git: {e}")
+            sys.exit(1)
+
     if not staged:
         # No args → full re-index of both code and docs
         print("\n[codanna:index] Full re-index (no staged files provided)")
