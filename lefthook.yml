@@ -9,7 +9,7 @@ pre-commit:
 
 post-commit:
   commands:
-    codanna-index:
-      run: powershell -NoProfile -Command "uv run python scripts/codanna/index.py (git diff-tree --no-commit-id --name-only -r HEAD)"
-    doc-agent:
-      run: powershell -NoProfile -Command "$files = git diff-tree --no-commit-id --name-only -r HEAD | Out-String; if ($files.Trim()) { gemini -y -p \"Run @doc-agent to update docs/track/ and TODOC based on these changed files: `n$files\" }"
+    # Unified cross-platform hook via Python
+    # Works on Windows, Linux, and macOS
+    sync:
+      run: uv run python scripts/hooks/post_commit.py --task all
