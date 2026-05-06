@@ -1,7 +1,9 @@
+from unittest.mock import MagicMock, patch
+
 import pytest
-from unittest.mock import AsyncMock, patch, MagicMock
 from ai import AIProviderFactory
 from ai.openai_compatible import OpenAICompatibleProvider
+
 
 @pytest.mark.asyncio
 async def test_factory_lmstudio_resolution():

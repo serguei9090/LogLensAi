@@ -7,6 +7,9 @@ description: Expert architect skill for generating C4-compliant Mermaid.js diagr
 
 This skill implements the **Agentic Visual Architecture Standard (AVAS)** to transform complex codebases into intuitive visual patterns.
 
+## 🎯 Automation Hooks
+- **`/auto-improve` Integration**: This skill is a mandatory component of the `/auto-improve` cycle. When structural changes are detected, this skill MUST be invoked to maintain architectural parity between the rules and the visual maps.
+
 ## 1. The Visualization Stack (C4 Selection)
 When triggered, select the appropriate zoom level:
 - **Level 1 (Context)**: System boundaries and external dependencies.

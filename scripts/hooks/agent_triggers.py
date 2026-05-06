@@ -115,7 +115,7 @@ def main():
 
             trigger_agent(agent_config, files, log_file)
 
-    print(f"Agent tasks triggered. Check scripts/hooks/logs/agent_triggers.log for status.")
+    print("Agent tasks triggered. Check scripts/hooks/logs/agent_triggers.log for status.")
 
 if __name__ == "__main__":
     main()

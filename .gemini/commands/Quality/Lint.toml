@@ -1,0 +1,4 @@
+description = "Detects the project stack and runs the appropriate linting and formatting tools to fix codebase issues."
+prompt = """
+Please detect the tech stack of this project (e.g., Python, JS/TS, Dart) by checking configuration files like package.json, pyproject.toml, or pubspec.yaml. Identify the linting and formatting tools available in the project. If no tools are defined, let me know. If tools are available, execute them to lint and fix the codebase, then summarize the results. {{args}}
+"""

@@ -6,6 +6,7 @@ pre-commit:
     ruff:
       glob: "*.py"
       run: uv run ruff check {staged_files}
+      fail_on_error: true
 
 post-commit:
   commands:
@@ -14,6 +15,3 @@ post-commit:
     codanna-index:
       # Use --latest to get files from the commit just created
       run: uv run python scripts/codanna/index.py --latest
-    # Orchestrate Gemini subagents in the background
-    sync-agents:
-      run: uv run python scripts/hooks/agent_triggers.py

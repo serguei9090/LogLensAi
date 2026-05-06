@@ -1,38 +1,34 @@
-# ProDoc: The Living Knowledge Engine (v2)
+# Project Documentation Standard
 
-## 1. Core Principles (Invariants)
-*   **Living Graph:** Documentation must be treated as code. If it lies, it dies.
-*   **Staleness Protocol:** If `git log` shows >50 changes since last `relations.md` update, Agent MUST regenerate it.
-*   **No Read-All:** Agents must rely on `ProDoc` context, not full directory scans (Token efficiency).
+Repository documentation lives under `docs/`.
 
-## 2. Workflow (The Update Cycle)
-1.  **Trigger:** Significant Refactor OR New Feature.
-2.  **Audit:** Read `tech-stack.md` and `relations.md`.
-3.  **Update:** 
-    *   Add new Libraries to `tech-stack.md`.
-    *   Add new Edges (Dependencies) to `relations.md`.
-4.  **Verify:** Does the Graph match the Code?
+## Core Principles
 
-## 3. Directory Structure (Strict)
-*   **Root:** `ProDoc/`.
-*   **Vision:** `ProDoc/documentation/product.md` (Why we are building).
-*   **Graph:** `ProDoc/relations/relations.md` (How it works).
-*   **Stack:** `ProDoc/tech-stack.md` (What we use).
+- Documentation is part of the codebase and must change with the behavior it describes.
+- Architecture docs must be verified against code.
+- Task docs support Beads; they do not replace Beads.
 
-## 4. Forbidden Patterns (Strict)
-1.  **Ghost Docs:** Documenting features that were deleted.
-2.  **Secret Knowledge:** "Everyone knows X" logic not written in `product-guidelines.md`.
-3.  **Wiki Rot:** Using external Wikis (Confluence/Notion) for Architecture. It MUST be in Repo.
+## Canonical Locations
 
-## 5. Golden Example (The Tech Stack)
-```markdown
-# Technology Stack
-## Core
-- **Language:** TypeScript 5.x
-- **Framework:** Next.js 14 (App Router)
-- **State:** Zustand
+| Content | Location |
+| --- | --- |
+| Active specs | `docs/track/specs/` |
+| Handoff | `docs/track/handoff.md` |
+| Lessons | `docs/track/LessonsLearned.md` or `bd remember` |
+| Architecture overview | `docs/architecture/` |
+| Layer notes | `docs/architecture/layers/` |
+| Design system | `DESIGN.md` |
+| User setup | `README.md` |
 
-## Decisions
-- **Why Zustand?** Redux is too verbose for this team size.
-- **Why Tailwind?** Speed of iteration over semantic purity.
-```
+## Update Triggers
+
+- New feature or changed user behavior.
+- API, database, architecture, deployment, or state-management change.
+- New setup command or operational workflow.
+- Test strategy or release process change.
+
+## Forbidden Patterns
+
+- Documenting features that do not exist.
+- Leaving old paths or commands after moving files.
+- Using external-only docs as the source of truth for repo architecture.

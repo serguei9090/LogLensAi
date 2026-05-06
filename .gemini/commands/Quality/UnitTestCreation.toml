@@ -1,0 +1,9 @@
+description = "Audits test coverage, generates missing unit tests, and updates the test inventory."
+prompt = """
+Please help improve the unit test coverage for the project.
+1. Run the appropriate test coverage tools for the project stack to identify gaps.
+2. Write unit tests for missing coverage areas.
+3. Update the test inventory file at `docs/track/unitestList.md` with the newly created tests (Format: `| File | Test Name | Target Function | Status |`).
+
+Target/Args: {{args}}
+"""

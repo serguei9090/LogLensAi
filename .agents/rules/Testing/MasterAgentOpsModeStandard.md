@@ -1,33 +1,23 @@
-# Master Agent Ops Modes (v2)
+# Testing And Documentation Modes
 
-## 1. Core Principles (Invariants)
-*   **Mode Awareness:** Agent must explicitly state which mode it is in (`Construction` or `Retrofit`) before acting.
-*   **Construction:** Start with TDD (Red/Green). New Features.
-*   **Retrofit:** Start with Documentation (Gherkin "As-Is"). Legacy Code.
+Select one mode before changing tests or documentation. The mode controls what must be proven.
 
-## 2. Workflow (Mode Select)
-1.  **Analyze Request:**
-    *   "Add new feature..." -> **MODE A**.
-    *   "Add tests to existing..." -> **MODE B**.
-2.  **Acknowledge:** "I am entering MODE A: Construction."
-3.  **Execute Protocol:** Load the specific rules for that mode.
+| Mode | Use when | Required proof |
+| --- | --- | --- |
+| Construction | adding new behavior | test expected behavior, then implement or verify implementation |
+| Bugfix | fixing broken behavior | reproduce or lock the failure when practical, then verify the fix |
+| Retrofit | stabilizing legacy code | document current behavior, add characterization coverage, then refactor |
+| Docs-only | updating docs without code change | verify docs against code, commands, or official sources |
 
-## 3. Modes Defined
-| Mode | Goal | Protocol |
-| :--- | :--- | :--- |
-| **A: Construction** | Build from scratch. | `TestingStandardv2.md` |
-| **B: Retrofit** | Safe Refactor. | `ProtocolRetrofittingStandardv2.md` |
+## Beads Link
 
-## 4. Forbidden Patterns (Strict)
-1.  **Mode Drift:** Switching from writing tests (Retrofit) to fixing bugs (Construction) inside the same step.
-2.  **Blind Access:** Failing to read the corresponding Standard file after selecting a mode.
+- Full SDLC testing work must reference an active bead.
+- If a missing test is discovered but not addressed, create or update a bead for it.
+- Do not use a standalone markdown checklist to track testing work.
 
-## 5. Golden Example (System Instruction)
-```text
-SYSTEM: You have 2 Modes.
-1. CONSTRUCTION: For new code. Logic: Write Test -> Write Code.
-2. RETROFIT: For legacy code. Logic: Document Reality -> Lock with Test.
+## Mode Rules
 
-User: "Fix the old login page."
-Agent: "Acknowledged. Entering MODE B (Retrofit). I will first write a failing test to document the bug."
-```
+1. Choose the mode based on the requested outcome, not personal preference.
+2. Run the smallest meaningful test first.
+3. Broaden verification when the changed surface is shared, user-facing, security-sensitive, or release-critical.
+4. Record skipped or unavailable tests in the final summary or handoff.

@@ -1,0 +1,5 @@
+
+--- Agent Trigger Launcher: 2026-05-04 20:54:13.461898 ---
+Commit Files: ['TODO.md', 'docs/track/post_commit_hook.md', 'lefthook.yml', 'scripts/codanna/index.py', 'scripts/hooks/agent_triggers.py', 'scripts/hooks/logs/post_commit.log', 'scripts/hooks/post_commit.py']
+[2026-05-04 20:54:13.462101] Backgrounding @doc-agent...
+[Agent doc-agent Start] 

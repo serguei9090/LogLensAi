@@ -1,9 +1,0 @@
-description = "Generates a comprehensive, dated project health audit covering code quality, unit test coverage, DRY/SOLID compliance, gap analysis, tested-functionality inventory, and proposed next steps & new features. Output is saved to audits/project-audit-<DATE>.md. Also updates related tracking documents (TODO.md, LessonsLearned.md, CodeDebt.md) in a single pass."
-prompt = """
-Assume Role: Orchestra Hub (@scribe)
-
-Execute the project-audit workflow:
-@.agents/workflows/audits/project-audit.md
-
-Additional context/instructions: {{args}}
-"""

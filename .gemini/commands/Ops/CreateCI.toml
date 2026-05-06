@@ -1,0 +1,9 @@
+description = "Generates standard CI/CD pipelines or Docker configurations for the project."
+prompt = """
+Please help me design the infrastructure or CI/CD pipeline for this project. 
+1. Review the tech stack of the project.
+2. Based on the target environment provided in my request, generate the standard configuration files (e.g., GitHub Actions `.github/workflows/main.yml` or `docker-compose.yml`).
+3. Ensure any required secrets/variables are properly templated or referenced.
+
+Requirements: {{args}}
+"""

@@ -1,39 +1,25 @@
-# Protocol: Retrofitting BDD/TDD (v2)
+# Retrofit Testing Protocol
 
-## 1. Core Principles (Invariants)
-*   **Lock-In First:** Document "Reality" (Current Behavior) before improving it.
-*   **No Logic Change:** Do not refactor code in Phase 1. Only add `data-testid` attributes.
-*   **Green Before Red:** The test MUST pass against the legacy code (proving it captures the current state) before you write new features.
+Use this when changing legacy or poorly covered code where behavior must be preserved.
 
-## 2. Workflow (The Retrofit Cycle)
-1.  **Analyze:** Read legacy component code.
-2.  **Reverse Engineer:** Write `.feature` file describing current behavior (even bugs).
-3.  **Harden:** Add `data-testid` to the legacy component to make it testable to avoid reliance on brittle class names.
-4.  **Lock:** Write Glue Code (`steps.tsx`) and ensure it Passes Green.
-5.  **Refactor (Optional):** NOW you are safe to improve logic.
+## Workflow
 
-## 3. Directory & Naming
-*   **Attributes:** `data-testid="section-name"`.
-*   **Tests:** `tests/legacy/[feature].feature`.
+1. Read the current code and user-facing behavior.
+2. Document the observed behavior in the active spec or handoff.
+3. Add characterization coverage when practical.
+4. Make the smallest safe refactor or fix.
+5. Run the characterization test plus any focused tests for the changed behavior.
+6. Update docs if the documented behavior intentionally changes.
 
-## 4. Forbidden Patterns (Strict)
-1.  **Improvements in Phase 1:** "I fixed a bug while writing the test." **NO.** Document the bug first.
-2.  **Brittle Selectors:** `document.querySelector('.div > span')`. Use `getByTestId`.
-3.  **Mocking Everything:** Mocking internal state instead of testing interactions.
+## UI Retrofit
 
-## 5. Golden Example (Hardening)
-```tsx
-// BEFORE (Untestable Legacy)
-<button className="btn-primary" onClick={submit}>
-  <span>Submit</span>
-</button>
+- Prefer user-visible queries over brittle selectors.
+- Add `data-testid` only when accessible selectors are impractical.
+- Do not change visual behavior while only trying to make a component testable.
 
-// AFTER (Hardened)
-<button 
-  data-testid="submit-payment-btn" // Added ID
-  className="btn-primary" 
-  onClick={submit}
->
-  <span>Submit</span>
-</button>
-```
+## Forbidden Patterns
+
+- Refactoring first and testing later.
+- Updating tests to match accidental behavior without noting the decision.
+- Mocking the code under test so heavily that the test no longer checks behavior.
+

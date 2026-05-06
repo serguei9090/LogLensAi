@@ -1,0 +1,7 @@
+description = "Analyzes requirements and generates a structured Bead issue via the tracker."
+prompt = """
+Please draft a new task based on my requirements and create it using the issue tracker.
+1. Analyze my request: `{{args}}`.
+2. Format the task into a structured Bead definition (Title, Priority, Type, Description, Acceptance Criteria).
+3. Create the issue using the `tracker_create_task` tool or the `bd create` command.
+"""

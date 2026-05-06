@@ -1,24 +1,35 @@
-# Testing Standards (Global)
+# Testing Standard
 
-## 1. Core Principles (Invariants)
-*   **Behavior Over Implementation:** Test *what* it does (User flows), not *how* it does it (Internal state).
-*   **The "Pyramid":**
-    1.  **Unit (Speed):** `Vitest`. Test pure logic, utils, and isolated components. Mock all network/IO.
-    2.  **Integration/E2E (Reality):** `Playwright`. Test full user flows in real browser context.
-*   **Zero Flake:** Tests must be deterministic. If a test is flaky, fix it immediately or delete it.
+## Core Principles
 
-## 2. File Standards
-*   Unit Tests: `src/**/__tests__/*.test.tsx` or `src/**/*.test.tsx`.
-*   E2E Tests: `tests/e2e/*.spec.ts`.
-*   Setup: `src/setupTests.ts` (Global mocks, MSW server).
+- Test behavior, not implementation details.
+- Match test scope to risk.
+- Keep tests deterministic.
+- Prefer focused verification during development, then broaden before closing high-risk beads.
 
-## 3. Mocking Rules (Strict)
-*   **Network:** ALWAYS mock network requests in Unit tests using `MSW` (Mock Service Worker). NEVER hit real APIs in `Vitest`.
-*   **Hooks:** DO NOT mock custom hooks unless they interact with native modules or external side-effects (e.g. `useWindowSize`, `useAuth`).
-*   **Date:** Freeze time with `vi.setSystemTime` for date-dependent logic.
+## Test Selection
 
-## 4. Forbidden Patterns (Strict)
-1.  **Implementation Testing:** `expect(component.state().foo).toBe('bar')`. (Use `screen.getByText` or `userEvent`).
-2.  **Snapshot Abuse:** No massive full-page snapshots. They are brittle and ignored during review.
-3.  **Sleeps:** `await new Promise(r => setTimeout(r, 1000))`. USE `waitFor` or `findBy`.
-4.  **Conditionals:** No `if` statements inside tests. Tests must be linear flows.
+| Change type | Preferred verification |
+| --- | --- |
+| Pure function or utility | unit test |
+| API or data contract | contract/unit test plus serialization check |
+| Database query | focused integration or repository-level test |
+| React component | component test with user-visible queries |
+| End-to-end user flow | browser/E2E test |
+| Docs/setup command | run command help or dry-run when safe |
+
+## Bugfix Rule
+
+When practical, reproduce the bug with a failing test or minimal script before fixing it. If reproduction is too expensive, document the reason and run the closest focused verification.
+
+## Mocking Rules
+
+- Mock network and external services in unit tests.
+- Do not mock the behavior being tested.
+- Freeze time for date-sensitive tests.
+- Avoid sleeps; use wait helpers or polling APIs from the test framework.
+
+## Documentation Link
+
+When a test defines or changes expected behavior, update the related spec, README, architecture doc, or handoff if future agents need that context.
+

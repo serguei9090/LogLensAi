@@ -1,0 +1,9 @@
+description = "Audits and updates project dependencies safely."
+prompt = """
+Please audit the project's dependencies and propose updates.
+1. Run the stack-specific audit command (e.g., `npm audit`, `pip list --outdated`, etc.).
+2. Analyze the output to identify any breaking changes or security vulnerabilities.
+3. Propose a clear list of updates for me to review before making any modifications.
+
+Context: {{args}}
+"""
