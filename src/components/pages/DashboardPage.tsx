@@ -39,12 +39,14 @@ export default function DashboardPage() {
   const [selectedSourceId, setSelectedSourceId] = useState<string>("all");
   const [timeRange, setTimeRange] = useState<TimeRange>({ start: "", end: "" });
 
-  // Sync selectedWorkspaceId with activeWorkspace on initial load if none selected
+  // Sync selectedWorkspaceId with activeWorkspace on initial load
   useEffect(() => {
-    if (activeWorkspace && selectedWorkspaceId === "all" && stats === null) {
+    if (activeWorkspace && selectedWorkspaceId === "all") {
       setSelectedWorkspaceId(activeWorkspace.id);
+    } else if (!activeWorkspace && workspaces.length > 0 && selectedWorkspaceId === "all") {
+      setSelectedWorkspaceId(workspaces[0].id);
     }
-  }, [activeWorkspace, selectedWorkspaceId, stats]);
+  }, [activeWorkspace, workspaces, selectedWorkspaceId]);
 
   const fetchStats = useCallback(async () => {
     setLoading(true);
@@ -128,11 +130,10 @@ export default function DashboardPage() {
               setSelectedWorkspaceId(v);
               setSelectedSourceId("all"); // Reset source when workspace changes
             }}>
-              <SelectTrigger className="w-[180px] h-8 text-xs bg-bg-base/50">
-                <SelectValue placeholder="Workspace" />
+              <SelectTrigger className="w-[180px] h-8 text-[11px] bg-bg-base/40 border-white/5 hover:border-white/10 transition-all font-medium">
+                <SelectValue placeholder="Select Workspace" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">Global (All)</SelectItem>
                 {workspaces.map(w => (
                   <SelectItem key={w.id} value={w.id}>{w.name}</SelectItem>
                 ))}
@@ -144,11 +145,11 @@ export default function DashboardPage() {
               onValueChange={setSelectedSourceId}
               disabled={selectedWorkspaceId === "all"}
             >
-              <SelectTrigger className="w-[180px] h-8 text-xs bg-bg-base/50">
+              <SelectTrigger className="w-[180px] h-8 text-[11px] bg-bg-base/40 border-white/5 hover:border-white/10 transition-all font-medium">
                 <SelectValue placeholder="Log Source" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">Select All Logs</SelectItem>
+                <SelectItem value="all">Entire Workspace</SelectItem>
                 {sources.map(s => (
                   <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
                 ))}
@@ -179,30 +180,30 @@ export default function DashboardPage() {
             className="space-y-10"
           >
             {/* Grid Layout */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               <StatCard
-                icon={<Database className="h-5 w-5 text-blue-400" />}
-                label="Total Logs"
+                icon={<Database className="h-4 w-4 text-primary" />}
+                label="Total Index"
                 value={stats?.total_logs.toLocaleString() ?? "0"}
-                subValue={selectedWorkspaceId === "all" ? "Global Index" : "Filtered Scope"}
+                subValue="Records in context"
               />
               <StatCard
-                icon={<Layers className="h-5 w-5 text-violet-400" />}
+                icon={<Layers className="h-4 w-4 text-accent-violet" />}
                 label="Patterns"
                 value={stats?.total_clusters.toLocaleString() ?? "0"}
                 subValue="Drain3 Templates"
               />
               <StatCard
-                icon={<Activity className="h-5 w-5 text-emerald-400" />}
-                label="Active Streams"
+                icon={<Activity className="h-4 w-4 text-primary" />}
+                label="Live Streams"
                 value={stats?.active_tailers.toString() ?? "0"}
-                subValue="Live Ingestion"
+                subValue="Active ingestion"
               />
               <StatCard
-                icon={<Cpu className="h-5 w-5 text-amber-400" />}
-                label="Workspaces"
+                icon={<Database className="h-4 w-4 text-info" />}
+                label="Catalogs"
                 value={stats?.workspace_count.toString() ?? "0"}
-                subValue="Isolated Contexts"
+                subValue="Active workspace"
               />
             </div>
 
@@ -318,21 +319,25 @@ function StatCard({
 }) {
   return (
     <motion.div
-      initial={{ opacity: 0, y: 20 }}
+      initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
-      className="bg-bg-surface/50 border border-border rounded-xl p-6 relative overflow-hidden group hover:border-primary-green/30 transition-all hover:shadow-lg hover:shadow-primary-green/5"
+      className="bg-bg-surface/40 border border-white/5 rounded-xl p-4 relative overflow-hidden group hover:border-primary/20 transition-all hover:bg-bg-surface/60"
     >
-      <div className="flex justify-between items-start mb-4">
-        <div className="p-2.5 rounded-xl bg-bg-elevated border border-border group-hover:border-primary-green/20 transition-colors shadow-inner">
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex-1">
+          <p className="text-[10px] font-bold uppercase tracking-wider text-text-muted mb-1">{label}</p>
+          <h3 className="text-xl font-mono font-bold text-text-primary tracking-tight">{value}</h3>
+          <p className="text-[9px] text-text-muted mt-1 font-medium opacity-60 group-hover:opacity-100 transition-opacity uppercase tracking-tighter">
+            {subValue}
+          </p>
+        </div>
+        <div className="p-2 rounded-lg bg-bg-base/50 border border-white/5 group-hover:border-primary/10 transition-colors">
           {icon}
         </div>
       </div>
-      <p className="text-xs font-bold uppercase tracking-widest text-text-muted mb-1.5">{label}</p>
-      <h3 className="text-3xl font-mono font-bold text-text-base mb-1 tracking-tight">{value}</h3>
-      <p className="text-[10px] text-text-muted font-medium opacity-70 group-hover:opacity-100 transition-opacity">{subValue}</p>
       
-      {/* Decorative gradient */}
-      <div className="absolute top-0 right-0 h-24 w-24 bg-gradient-to-br from-primary-green/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+      {/* Subtle accent line */}
+      <div className="absolute bottom-0 left-0 h-0.5 w-0 bg-primary group-hover:w-full transition-all duration-500 opacity-30" />
     </motion.div>
   );
 }
