@@ -20,6 +20,7 @@ from ingestion import IngestionServer
 from mcp_server import init_mcp, mcp_server
 from metadata_extractor import extract_log_metadata
 from models import (
+    AnalyzeClusterRequest,
     CreateLogSourceRequest,
     CreateLogStreamRequest,
     DeleteLogSourceRequest,
@@ -1172,19 +1173,20 @@ class App:
             {"id": c.cluster_id, "template": c.get_template(), "size": c.size} for c in clusters
         ]
 
-    async def method_analyze_cluster(self, cluster_id: str, workspace_id: str) -> dict:
+    async def method_analyze_cluster(self, **kwargs) -> dict:
+        params = AnalyzeClusterRequest(**kwargs)
         cursor = self.db.get_cursor()
 
         cursor.execute(
-            "SELECT raw_text FROM logs WHERE workspace_id = ? AND cluster_id = ? LIMIT 20",
-            (workspace_id, cluster_id),
+            "SELECT raw_text FROM logs WHERE workspace_id = ? AND cluster_id = ? LIMIT ?",
+            (params.workspace_id, params.cluster_id, params.sample_size),
         )
         samples = [row[0] for row in cursor.fetchall()]
 
         clusters = self.parser.get_clusters()
         template = ""
         for c in clusters:
-            if str(c.cluster_id) == str(cluster_id):
+            if str(c.cluster_id) == str(params.cluster_id):
                 template = c.get_template()
                 break
 

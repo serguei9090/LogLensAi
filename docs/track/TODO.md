@@ -1,6 +1,6 @@
 # LogLensAi - TODO
 
-> Last updated: 2026-05-06
+> Last audited: 2026-05-06 — see [audit-2026-05-06.md](audits/audit-2026-05-06.md)
 > Source of truth for all sprint work. All Jules sessions must be anchored to items here.
 
 ---
@@ -8,7 +8,9 @@
 ## 🔵 Active Tasks
 
 - [ ] **LLQL-Verification**: Audit `docs/track/LLQL_Professional_Spec.md` against current implementation in `sidecar/src/`.
-- [ ] **Skill-Reference-Correction**: Search and replace `smth-doc` with `smith-doc` in all documentation files.
+- [ ] **fix_tests_001**: Fix `TailSwitch` test and `OpenAI` initialization failure.
+- [ ] **refactor_ai_factory_001**: Refactor `AIProviderFactory` to registry pattern.
+- [ ] **api_cleanup_001**: Implement input validation model for `analyze_cluster`.
 
 ---
 

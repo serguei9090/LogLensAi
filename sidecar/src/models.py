@@ -250,6 +250,12 @@ class TestAiConnectionRequest(BaseModel):
     workspace_id: str | None = None
 
 
+class AnalyzeClusterRequest(BaseModel):
+    cluster_id: str
+    workspace_id: str
+    sample_size: int = 20
+
+
 # AI Models
 class SendAiMessageRequest(BaseModel):
     workspace_id: str

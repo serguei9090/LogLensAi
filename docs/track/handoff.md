@@ -1,21 +1,23 @@
-# Session Handoff: 2026-03-29 16:50
+# Session Handoff: 2026-05-06
 
 ## 1. Last Action
-- **UI Refinement**: Completed the hide-on-toolbar logic for filters and highlights. Both are now managed exclusively in their respective dropdown menus, keeping the `LogToolbar` extremely compact.
-- **State Isolation**: Successfully refactored `investigationStore.ts` to implement `FEA-002-ISO`. This isolates filters, highlights, search queries, and logs per logical source ID (tab). When a user switches tabs, `InvestigationPage` triggers `syncActiveSource`, which swaps the entire view context.
+- **Health Stabilization (LogLensAi-63t)**: Completed the remediation of audit-identified issues.
+    - **Performance**: Implemented a 10s rules cache in `FileTailer` to prevent DB thrashing during high-speed log ingestion.
+    - **API Hardening**: Introduced `AnalyzeClusterRequest` Pydantic model and exposed `sample_size` parameter to the frontend (defaulting to 20, replacing the hardcoded limit).
+    - **Refactoring**: Performed a light SRP refactor in `api.py` by delegating parameter validation to dedicated models.
+    - **Cleanup**: Resolved `TODO(think_parser_001)` in `thinking_parser.py` and improved documentation.
 
 ## 2. Current Blockers
-- **None**: All reported UI state issues (hidden logs due to TZ offsets and state bleeding between files) have been resolved.
-- **Performance**: The current source-switching mechanism is purely in-memory. If the user has 50+ sources with huge log arrays, memory usage inside the zustand store should be monitored.
+- **Test Regressions**: There are still two P0 test failures identified in the audit (`TailSwitch.test.tsx` and `test_openai_provider.py`) that need resolution. These are tracked as `fix_tests_001` in `TODO.md`.
 
 ## 3. Contextual Memory
-- **Nominal vs UTC**: We explicitly moved away from `toISOString()` in `TimeRangePicker.tsx`, opting for a local `yyyy-MM-ddTHH:mm:ss` (nominal) format. This ensures that a "00:00:00" selection on the calendar matches the exact string in the database without offset shifts.
-- **InvestigationStore Architecture**: The store now keeps a `Record<string, SourceState>` map. The top-level state is always "The Active Source's State". Swapping is done via `syncActiveSource`.
-- **Lint Reminders**: Cleaned up various SonarQube `readonly` and "unused variable" warnings during the refactor.
+- **Rules Caching**: The `FileTailer` cache is instance-level and expires after 10 seconds. This provides a balance between ingestion speed and the ability for users to update extraction rules without restarting the tailer.
+- **API Parity**: Ensure that any UI changes to the cluster analysis feature now pass the `sample_size` parameter if the user wants more than the default 20 samples.
 
 ## 4. Next Atomic Step
-- **MCP Scoping**: The user mentioned "working here for mcp". The next task is to scope out the new MCP requirements and initialize any necessary server/skill folders using the `rule-creator` or `skill-creator`.
-- **Verify Tailing**: Confirm that `syncActiveSource` doesn't inadvertently affect the `isTailing` status (currently `isTailing` is still a shared global in the store—check if it should also be isolated).
+- **Fix Tests**: Address the `fix_tests_001` task in `TODO.md` to restore full green status to the CI pipeline.
+- **AI Factory Refactor**: Implement `refactor_ai_factory_001` to replace the `if-elif` chain in `AIProviderFactory` with a registry pattern.
 
 ---
-**Project State**: [v2.2-Isolated-Final] - Ready for MCP Engineering.
+**Project State**: [v2.3-Stabilized] - Audit remediation complete.
+**Bead ID**: LogLensAi-63t (Completed)

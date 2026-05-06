@@ -50,32 +50,8 @@ class FileTailer:
         if not line:
             return
 
-        # 1. Fetch custom extraction rules (TODO: Cache these)
-        custom_rules = []
-        try:
-            cursor = self.db.get_cursor()
-            # Fetch global rules
-            cursor.execute("SELECT value FROM settings WHERE key = 'facet_extractions'")
-            global_row = cursor.fetchone()
-            if global_row and global_row[0]:
-                import json
-
-                rules = json.loads(global_row[0])
-                custom_rules.extend(rules if isinstance(rules, list) else [])
-
-            # Fetch workspace-specific rules
-            cursor.execute(
-                "SELECT value FROM workspace_settings WHERE workspace_id = ? AND key = 'facet_extractions'",
-                (self.workspace_id,),
-            )
-            ws_row = cursor.fetchone()
-            if ws_row and ws_row[0]:
-                import json
-
-                rules = json.loads(ws_row[0])
-                custom_rules.extend(rules if isinstance(rules, list) else [])
-        except Exception:
-            pass
+        # 1. Fetch custom extraction rules (Cached)
+        custom_rules = self._get_rules()
 
         # 2. Shared Metadata Extraction (Regex/Parser logic)
         # Use source_id for extraction context if needed
@@ -117,3 +93,43 @@ class FileTailer:
                 facets_json,
             ),
         )
+
+    def _get_rules(self) -> list:
+        now = time.time()
+        # Initialize instance cache if not exists
+        if not hasattr(self, "_rules_cache"):
+            self._rules_cache = None
+            self._rules_expiry = 0
+
+        if self._rules_cache is not None and now < self._rules_expiry:
+            return self._rules_cache
+
+        custom_rules = []
+        try:
+            cursor = self.db.get_cursor()
+            # Fetch global rules
+            cursor.execute("SELECT value FROM settings WHERE key = 'facet_extractions'")
+            global_row = cursor.fetchone()
+            if global_row and global_row[0]:
+                import json
+
+                rules = json.loads(global_row[0])
+                custom_rules.extend(rules if isinstance(rules, list) else [])
+
+            # Fetch workspace-specific rules
+            cursor.execute(
+                "SELECT value FROM workspace_settings WHERE workspace_id = ? AND key = 'facet_extractions'",
+                (self.workspace_id,),
+            )
+            ws_row = cursor.fetchone()
+            if ws_row and ws_row[0]:
+                import json
+
+                rules = json.loads(ws_row[0])
+                custom_rules.extend(rules if isinstance(rules, list) else [])
+        except Exception:
+            pass
+
+        self._rules_cache = custom_rules
+        self._rules_expiry = now + 10  # Cache for 10 seconds
+        return custom_rules

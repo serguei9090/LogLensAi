@@ -1,5 +1,5 @@
 """
-Unified Thinking / Reasoning Stream Parser — TODO(think_parser_001)
+Unified Thinking / Reasoning Stream Parser
 
 Single source of truth for extracting and normalising AI "thinking" content
 across every provider (Ollama, AI Studio, OpenAI-compatible).

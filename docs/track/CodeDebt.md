@@ -2,7 +2,7 @@
 
 Track all technical debt, known bugs, and refactoring needs here.
 
-> 📊 Last audited: 2026-04-23 — Full analysis in [project-report-2026-04-23.md](../project-report-2026-04-23.md) § 4
+> 📊 Last audited: 2026-05-06 — Full analysis in [audit-2026-05-06.md](audits/audit-2026-05-06.md) § 4
 
 ## Known Issues
 
