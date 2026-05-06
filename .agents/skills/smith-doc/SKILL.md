@@ -1,5 +1,5 @@
 ---
-name: smth-doc
+name: smith-doc
 description: Documentation synchronization skill for keeping repository docs current with recent code changes. Use when asked to update docs from last edited files, audit documentation after commits, compare docs against changes since the last documented commit, maintain docs/track/documentation-sync.md, or produce documentation handoff notes after implementation work.
 ---
 
@@ -40,7 +40,7 @@ If the marker file is missing, create it after the first successful sync. Use th
 
 ## Workflow
 
-1. **Discover range:** Run `python .agents/skills/smth-doc/scripts/doc_delta.py --summary` from the repository root.
+1. **Discover range:** Run `python .agents/skills/smith-doc/scripts/doc_delta.py --summary` from the repository root.
 2. **Classify changes:** Group changed files by docs impact:
    - architecture/API/database/deployment/state/testing,
    - user setup or README,

@@ -1,0 +1,170 @@
+# Changelog
+
+All notable changes to the LogLensAi project will be documented in this file.
+
+## [Phase 6.2] - Agentic Framework Standardization & Audit Protocol (2026-04-24)
+
+### Added
+- **Audit Smith (@audit) Persona**: 
+    - Formally established the "Master of Architectural Compliance" role in `agents.md`.
+    - Added 11+ missing subagent profiles in `.gemini/agents/` to ensure full persona-to-execution parity.
+- **Unified Audit Infrastructure**:
+    - Centralized all oversight workflows into a new `.agents/workflows/audits/` directory.
+    - Transitioned nomenclature from generic "Reports" to active "Audits" (e.g., `project-audit.md`, `quality-audit.md`).
+    - Implemented `ai-audit.md` for specialized framework health checks.
+- **Semantic Commenting Standards**:
+    - Mandated `Ref: <spec>` links in function docstrings for better architectural traceability.
+    - Enforced a strict `// TODO(ID): [WHAT] [WHY] [EXPECTATION] [CONTEXT]` syntax to link code to spec files.
+- **Workflow Role Alignment**: Standardized all 44+ workflow files with formal `@handle` persona headers and injected mandatory quality standards blocks.
+
+### Refactored
+- **Skill Modularization**: Refactored all flat markdown skills in `.agents/skills/` into modular folders with standard `SKILL.md` files.
+- **Orchestrator Synchronization**: Updated `commander.md` with the latest model (gemini-2.0-flash), enriched toolkits (audit, telemetry), and aligned instructions with the WikiFlow state machine.
+
+## [Phase 6.1] - Advanced Shortcut Customization & UX Stabilization (2026-04-23)
+
+### Added
+- **Multi-Key Shortcut Customization**:
+    - Implemented a structured `KeyboardShortcut` object in `settingsStore.ts` to support combinations of Ctrl, Alt, Shift, and Win/Cmd.
+    - Added a robust `ShortcutCapture` component in the `SettingsPanel` with a recording mode for easy rebinding.
+    - Enhanced the `useKeyboardShortcuts` hook for precise exact-match filtering of modifier keys.
+
+### Fixed
+- **App Mounting Regression**: Resolved `ReferenceError: useSettingsStore is not defined` in `App.tsx` by restoring the missing import.
+- **Settings Panel Crash**: Fixed `TypeError: Cannot read properties of undefined (reading 'toUpperCase')` by implementing robust legacy-to-object parsing for shortcut settings.
+- **UX Hardening**: Added defensive checks to `displayShortcut` to prevent application crashes on malformed configuration data.
+
+## [Phase 6] - Project Health & Testing Stabilization (2026-04-23)
+
+### Added
+- **SSH Integration Testing**: 
+    - Implemented a comprehensive test suite for `SSHLoader` in `sidecar/tests/test_ssh.py` using `unittest.mock`.
+    - Restored test coverage for remote log tailing from 20% to **100%**.
+- **OpenAI Provider Testing**:
+    - Implemented `sidecar/tests/test_openai_provider.py` to validate the `OpenAICompatibleProvider`.
+    - Achieved **100% coverage** for the module, including chat streaming and model listing.
+
+### Refactored
+- **Database Facet Decomposition**:
+    - Decomposed the monolithic `get_metadata_facets()` method in `db.py` to reduce cyclomatic complexity from 14 down to ≤ 6.
+    - Extracted logic into `_get_facet_keys()` and `_get_facet_aggregations()` for better maintainability.
+
+### Fixed
+- **Hierarchy Cascade Deletion Bug**: 
+    - Resolved a critical data-integrity bug in `db.delete_folder()` where child folders were being wiped.
+    - Implemented re-parenting logic to promote children to the workspace root before parent deletion.
+- **Backend Quality Restoration**:
+    - Replaced all remaining `print()` statements in `openai_compatible.py` with structured `logger.debug()` calls.
+    - Achieved **100% Biome/Ruff compliance** across the entire project repository.
+
+## [Phase 5.1] - AI Reasoning Stabilization & Provider Hardening (2026-04-23)
+
+### Added
+- **Reasoning Toggle End-to-End Flow**:
+    - Connected the frontend "Reasoning" toggle to the backend AI logic, ensuring user preference is respected by the LangGraph orchestration.
+    - Updated `SendAiMessageRequest` Pydantic model in `models.py` to include the `reasoning` flag.
+    - Updated `api.py` and `runner.py` to propagate the `reasoning` preference from the API request to the AI providers.
+
+### Refactored
+- **Centralized Thinking Logic**: 
+    - Refactored all thinking detection and parsing into a unified `sidecar/src/ai/thinking_parser.py` module, ensuring DRY compliance across providers.
+    - Expanded the model registry in `thinking_parser.py` to support Gemini Thinking, Claude 3.7, DeepSeek R1, and OpenAI o-series.
+- **AI Studio Reasoning Extraction**: Updated `AIStudioProvider` to correctly extract thinking content from `part.text` (where Google ADK stores thoughts) instead of relying on the legacy `part.thought` boolean.
+
+### Fixed
+- **Forced Thinking Suppression**: 
+    - Updated `AIStudioProvider` to skip `<|think|>` token injection for Gemma models when reasoning is disabled.
+    - Updated `OllamaProvider` to conditionally include the `REASONING_DIRECTIVE`, preventing forced reasoning phases when the user has toggled them off in the UI.
+- **AI Studio Type Error**: Fixed `TypeError: can only concatenate str (not "bool") to str` by ensuring proper type casting during thinking content extraction.
+- **AI Chat Double Emission**: Refined LangGraph node emission logic in `HybridRunner` to prevent duplicate message chunks from the final answer node.
+
+## [Phase 5] - Desktop Integration & UI Polish (2026-04-21)
+
+### Added
+- **Discovery Template Management**: 
+    - Replaced the static `Bookmark` button in `LogToolbar.tsx` with a `DropdownMenu` using the `LayoutTemplate` icon.
+    - Implemented a new `LoadTemplateModal.tsx` organism to allow users to fetch, apply, and delete saved filter/highlight configurations from the sidecar.
+
+### Refactored
+- **High-Density UI Atomic Migration**: Standardized the LogLensAi interface toward a high-density "Engine Precision" aesthetic.
+    - **Modal Spacing Standard**: Updated `ImportFeedModal`, `CustomParserModal`, and `WorkspaceEngineSettings` headers and footers to a compact `px-8 / py-6` padding system, reducing visual noise.
+    - **Button Atom Integration**: Replaced legacy raw `<button>` elements with the project's `Button` atom across management modals to ensure consistent hover states, glows, and rhythmic spacing.
+- **AI Studio Model Compatibility**: Updated `AIStudioProvider` to automatically strip the `models/` prefix from model strings, ensuring compatibility with Google ADK 2.0 `LLMRegistry` and preventing misinterpretation of model names as external providers.
+- **Enhanced Sidecar Tracing**: Implemented a prominent startup banner on `stderr` and added detailed initialization logging for AI providers to improve debug visibility in the console.
+- **SmartContextManager Refactor**: Migrated log context preparation to a stateful `SmartContextManager` with improved filtering and token-aware summarization logic.
+
+### Fixed
+- **Sidecar Stdout Pollution**: Replaced all `print()` statements in `db.py`, `query_parser.py`, and `api.py` with structured `logging`. This resolves the `SyntaxError: Unexpected token 'D'` error caused by plain-text logs corrupting the JSON-RPC stdout stream.
+- **Tauri Dev Rebuild Loop**: Migrated Drain3 persistence state to use absolute project-root paths. This prevents the Tauri dev watcher from triggering recursive rebuilds when the sidecar writes state files inside the `src-tauri` directory.
+- **Ingestion Modal UX**: Integrated `NativeFilePicker` into `ImportFeedModal` to streamline local file path selection.
+- **Orchestrator Stability**: Refined state management in `OrchestratorHub` and `Sidebar` to prevent hydration mismatches during workspace transitions.
+- **Performance Optimization**: Improved `VirtualLogTable` rendering performance for high-volume log streams.
+
+## [Phase 4.2] - Core Hardening & Complexity Reduction (2026-04-20)
+
+### Refactored
+- **Ollama Stream Processor**: Modularized the monolithic `_process_stream_line` and `chat_stream` functions in `sidecar/src/ai/ollama.py` to reduce cognitive complexity below the 15-point threshold.
+- **Log Selection Refactor**: Moved the `onMouseUp` event listener in `CustomParserModal.tsx` to a hook-based `useEffect` assigned listener to satisfy JSX accessibility requirements.
+
+### Fixed
+- **JSON Parse Obsolescence**: Hardened exception handling in `WorkspaceEngineSettings.tsx` and `settingsStore.ts` by adding explicit debug logging to the standard parse attempt before falling back to legacy recovery.
+- **QA Compliance**: Resolved all outstanding Biome and Ruff regressions, including statement block formatting and `handleMouseUp` hook dependency optimization.
+
+## [Phase 4] - Ingestion Stabilization & Multi-Stream Routing (2026-04-19)
+
+### Added
+- **Multi-Stream Ingestion Routing**: Implemented path-based routing (`/ingest/{workspace_id}/{collection_name}`) for the HTTP API, allowing granular isolation of log streams within a single workspace.
+- **Workspace-Aware Ingestion UI**: Updated the `ImportFeedModal` to dynamically generate and display correctly formatted ingestion URLs based on the active workspace and chosen collection label.
+- **Dynamic Port Feedback**: Unified real-time port feedback across the UI (toasts and instructions) using standard settings store values.
+
+### Fixed
+- **Variable Masking Engine Hardening**: Resolved critical sidecar startup crashes and frontend `TypeError` mapping errors caused by malformed or double-encoded `drain_masks` settings.
+- **Defensive Multi-Stage Parsing**: Implemented robust JSON-RPC settings decoding in the sidecar and store-level sanitization in React to handle serialization edge cases.
+- **Quality Audit**: Performed a complete repository-wide lint and format pass (Biome + Ruff), resolving all remaining quality violations in the ingestion and settings components.
+
+## [Phase 4.1] - Core Stability & Sidecar Restoration (2026-04-19, Partial)
+
+### Fixed
+- **Sidecar Lifecycle Restoration**: Restored `sidecar/main.py` entry point which was previously empty, preventing the backend from starting in development mode.
+- **Connection Reliability**: Resolved "Failed to fetch" errors by ensuring the sidecar binds to port 5000 and correctly resolves the `src` package.
+- **Stability Audit**: Completed the final verification for `FIX-STABILITY-001`, resolving type safety regressions and ensuring full JSON-RPC parity between React and Python.
+
+## [Unreleased] - 2026-04-18
+
+### Fixed
+- **Workspace Engine Persistence**: Resolved a regression where engine configuration overrides failed to persist by implementing a forced sync-on-open in `WorkspaceEngineSettings.tsx`.
+- **Sidecar Startup Stability**: Fixed a `ModuleNotFoundError` by correctly bootstrapping `sys.path` in `sidecar/main.py` to include the `src` directory, ensuring internal imports resolve correctly when run from the root.
+- **UI/UX Padding**: Standardized `DialogFooter` padding in settings modals to ensure consistent and professional spacing for action buttons.
+- **Redundant UI Pruning**: Removed redundant "Workspace Engine Settings" entry points from the AI Sidebar and LogToolbar, centralizing all engine-level overrides within the Orchestrator Hub.
+- **Global Stability & Type Safety**: Hardened types for A2UI components, ensured all `FilterEntry` objects have mandatory unique IDs, optimized regex performance, and completed a project-wide Biome quality audit.
+
+## [Unreleased] - 2026-04-17
+
+### Added
+- **A2UI v0.9 (Agent-to-User Interface) Integration**:
+    - Integrated `@a2ui/react` and `google-adk` to enable generative UI widgets within the AI Sidebar.
+    - Implemented `A2UIRenderer.tsx` with support for both JSON and token-efficient Markup formats.
+    - Added decorative UI tag stripping in `AIInvestigationSidebar.tsx` for a clean conversational experience.
+- **Port Resolution & Stability**:
+    - Centralized sidecar URL resolution in `useSidecarBridge.ts` to enforce port 5000 and prevent 4001 ghost routing.
+    - Implemented explicit debug logging for sidecar endpoint detection.
+
+### Fixed
+- **Module Shadowing Regression**: Deleted stale `ai.py` that was conflicting with the `src.ai` package and causing sidecar crashes (Code 255).
+- **Code Debt**: Consolidated redundant `get_drain_parser` definitions and cleaned up unused imports in the test suite.
+
+
+### Added
+- **AI Copilot Skills & Memory**:
+    - Implemented `/` slash command autocomplete system in the AI Sidebar for quick access to tools (`/search`, `/save`, `/query`, `/analyze`, `/anomalies`).
+    - Added "Workspace Global Context" toggle in the Orchestrator Hub to enable AI context ingestion across the entire workspace.
+    - Introduced "Skills & Memory" toggles in the Settings Panel to enable/disable specific AI tools (Log Search, Associative Memory).
+- **Backend Memory Subsystem**:
+    - Added `ai_memory` table to DuckDB schema for persistent storage of log patterns and resolutions.
+    - Implemented `save_memory` and `search_memory` RPC methods and exposed them as MCP tools for autonomous AI agent invocation.
+- **Enhanced Reasoning UI**:
+    - Refactored `ThinkingBlock.tsx` with a refined vertical violet border design and streamlined typography to distinguish reasoning from output.
+
+### Fixed
+- Improved JSON-RPC serialisation consistency for memory-related data models.
+- Resolved Biome linting issues in Orchestration and Chat components.
