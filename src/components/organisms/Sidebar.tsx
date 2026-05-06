@@ -159,7 +159,7 @@ export function Sidebar({
                   <div
                     className={cn(
                       "group w-full flex items-center px-1 py-1 text-[13px] rounded-md transition-all text-left outline-none overflow-hidden",
-                      activeWorkspaceId === ws.id && activeNav !== "settings"
+                      activeWorkspaceId === ws.id && activeNav === "investigation"
                         ? "bg-primary/10 border border-primary/20"
                         : "hover:bg-bg-hover",
                       sidebarCollapsed && "justify-center",
@@ -170,10 +170,13 @@ export function Sidebar({
                       onClick={() => {
                         onWorkspaceSelect(ws.id);
                         setActiveFolder(ws.id, null);
+                        onNavSelect("investigation");
                       }}
                       className={cn(
                         "flex flex-1 items-center px-2 py-1.5 rounded transition-all text-left outline-none overflow-hidden border-none bg-transparent cursor-pointer",
-                        activeWorkspaceId === ws.id && activeNav !== "settings" && !activeFolderId
+                        activeWorkspaceId === ws.id &&
+                          activeNav === "investigation" &&
+                          !activeFolderId
                           ? "text-primary font-medium"
                           : "text-text-secondary group-hover:text-text-primary",
                         sidebarCollapsed && "justify-center px-0",
@@ -182,7 +185,7 @@ export function Sidebar({
                       <Database
                         className={cn(
                           "h-4 w-4 shrink-0 transition-colors",
-                          activeWorkspaceId === ws.id && activeNav !== "settings"
+                          activeWorkspaceId === ws.id && activeNav === "investigation"
                             ? "text-primary"
                             : "text-text-muted",
                         )}
@@ -271,6 +274,8 @@ export function Sidebar({
                           workspaceId={ws.id}
                           activeSourceId={ws.activeSourceId}
                           activeFolderId={ws.activeFolderId}
+                          isNavActive={activeNav === "investigation"}
+                          onNavSelect={onNavSelect}
                         />
                       </div>
                     )}
@@ -418,11 +423,15 @@ function HierarchyTree({
   workspaceId,
   activeSourceId,
   activeFolderId,
+  isNavActive,
+  onNavSelect,
 }: {
   node: any;
   workspaceId: string;
   activeSourceId: string | null;
   activeFolderId: string | null;
+  isNavActive: boolean;
+  onNavSelect: (nav: NavTab) => void;
 }) {
   const {
     setActiveSource,
@@ -487,6 +496,8 @@ function HierarchyTree({
                 workspaceId={workspaceId}
                 activeSourceId={activeSourceId}
                 activeFolderId={activeFolderId}
+                isNavActive={isNavActive}
+                onNavSelect={onNavSelect}
               />
             ))}
             {node.sources?.map((source: any) => (
@@ -497,8 +508,11 @@ function HierarchyTree({
               >
                 <SourceItem
                   source={source}
-                  active={activeSourceId === source.id}
-                  onClick={() => setActiveSource(workspaceId, source.id)}
+                  active={isNavActive && activeSourceId === source.id}
+                  onClick={() => {
+                    setActiveSource(workspaceId, source.id);
+                    onNavSelect("investigation");
+                  }}
                   onDelete={() =>
                     setDeleteTarget({ id: source.id, type: "source", name: source.name })
                   }
@@ -600,16 +614,19 @@ function HierarchyTree({
             </button>
             <button
               type="button"
-              onClick={() => setActiveFolder(workspaceId, node.id)}
+              onClick={() => {
+                setActiveFolder(workspaceId, node.id);
+                onNavSelect("investigation");
+              }}
               className={cn(
                 "flex items-center gap-1.5 flex-1 overflow-hidden transition-colors",
-                activeFolderId === node.id ? "text-primary font-medium" : "",
+                isNavActive && activeFolderId === node.id ? "text-primary font-medium" : "",
               )}
             >
               <Folder
                 className={cn(
                   "h-3.5 w-3.5 shrink-0",
-                  activeFolderId === node.id ? "text-primary" : "text-primary/70",
+                  isNavActive && activeFolderId === node.id ? "text-primary" : "text-primary/70",
                 )}
               />
               <span className="truncate flex-1 min-w-0 text-left">{node.name}</span>
@@ -646,14 +663,19 @@ function HierarchyTree({
               workspaceId={workspaceId}
               activeSourceId={activeSourceId}
               activeFolderId={activeFolderId}
+              isNavActive={isNavActive}
+              onNavSelect={onNavSelect}
             />
           ))}
           {node.sources?.map((source: any) => (
             <DraggableItem key={source.id} id={source.id} disabled={renamingSourceId === source.id}>
               <SourceItem
                 source={source}
-                active={activeSourceId === source.id}
-                onClick={() => setActiveSource(workspaceId, source.id)}
+                active={isNavActive && activeSourceId === source.id}
+                onClick={() => {
+                  setActiveSource(workspaceId, source.id);
+                  onNavSelect("investigation");
+                }}
                 onDelete={() =>
                   setDeleteTarget({ id: source.id, type: "source", name: source.name })
                 }
