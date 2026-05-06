@@ -13,6 +13,7 @@
 ---
 
 ## ✅ Done
+- [x] **DASH-002**: Advanced Dashboard with AI Toggle and Workspace Filtering. (Done 2026-05-06)
 - [x] Archive legacy CHANGELOG.md (2026-05-06).
 - [x] **refactor_ai_factory_001**: Refactor `AIProviderFactory` to registry pattern. (Done 2026-05-06)
 - [x] **api_cleanup_001**: Implement input validation model for `analyze_cluster`. (Done 2026-05-06)

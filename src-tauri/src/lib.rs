@@ -9,6 +9,7 @@ pub fn run() {
   tauri::Builder::default()
     .plugin(tauri_plugin_shell::init())
     .plugin(tauri_plugin_dialog::init())
+    .plugin(tauri_plugin_mcp_bridge::init())
     .manage(SidecarManager::new())
     .invoke_handler(tauri::generate_handler![bridge::dispatch_sidecar])
     .setup(|app| {
