@@ -71,6 +71,8 @@ from tailer import FileTailer
 
 A2UI_START = "[[A2UI]]"
 A2UI_END = "[[/A2UI]]"
+AI_STATE_DB = "ai_state.sqlite"
+SQL_AND_JOIN = " AND "
 
 # --- Professional Logging Setup ---
 SIDE_CAR_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -176,7 +178,7 @@ class App:
         ai_data_dir = os.path.join(PROJECT_ROOT, "data")
         os.makedirs(ai_data_dir, exist_ok=True)
         self.hybrid_runner = HybridRunner(
-            self, self.ai, db_path=os.path.join(ai_data_dir, "ai_state.sqlite")
+            self, self.ai, db_path=os.path.join(ai_data_dir, AI_STATE_DB)
         )
 
         init_mcp(self)
@@ -221,7 +223,7 @@ class App:
 
         data_dir = os.path.join(PROJECT_ROOT, "data")
         db_path = os.path.join(data_dir, "loglens.duckdb")
-        ai_path = os.path.join(data_dir, "ai_state.sqlite")
+        ai_path = os.path.join(data_dir, AI_STATE_DB)
         drain_dir = os.path.join(data_dir, "drain")
 
         files_to_delete = [db_path, f"{db_path}.wal", ai_path, f"{ai_path}-wal", f"{ai_path}-shm"]
@@ -484,7 +486,7 @@ class App:
             where_clauses.append("l.timestamp <= ?")
             params.append(end_time)
 
-        return " AND ".join(where_clauses), params
+        return SQL_AND_JOIN.join(where_clauses), params
 
     def _get_logs_internal(
         self,
@@ -615,7 +617,7 @@ class App:
             where_clauses.append("timestamp <= ?")
             sql_params.append(norm_end)
 
-        return " AND ".join(where_clauses), sql_params
+        return SQL_AND_JOIN.join(where_clauses), sql_params
 
     def _apply_temporal_offsets(self, workspace_id: str, logs: list[dict]):
         """Apply global temporal offsets to a list of logs."""
@@ -1852,47 +1854,66 @@ class App:
             "tailer_keys": active_tailers,
         }
 
-    def method_get_dashboard_stats(self, workspace_id: str | None = None) -> dict:
-        """Fetch high-level metrics for the Dashboard view."""
+    def method_get_dashboard_stats(
+        self,
+        workspace_id: str | None = None,
+        source_id: str | None = None,
+        start_time: str | None = None,
+        end_time: str | None = None,
+    ) -> dict:
+        """Fetch high-level metrics for the Dashboard view with advanced filtering."""
         cursor = self.db.get_cursor()
 
-        # 1. Total Logs
+        where_clauses = []
+        params = []
         if workspace_id:
-            cursor.execute("SELECT COUNT(*) FROM logs WHERE workspace_id = ?", (workspace_id,))
-        else:
-            cursor.execute("SELECT COUNT(*) FROM logs")
+            where_clauses.append("l.workspace_id = ?")
+            params.append(workspace_id)
+        if source_id:
+            where_clauses.append("l.source_id = ?")
+            params.append(source_id)
+        if start_time:
+            norm_start = start_time.replace("T", " ").split(".")[0].replace("Z", "")
+            where_clauses.append("l.timestamp >= ?")
+            params.append(norm_start)
+        if end_time:
+            norm_end = end_time.replace("T", " ").split(".")[0].replace("Z", "")
+            where_clauses.append("l.timestamp <= ?")
+            params.append(norm_end)
+
+        where_sql = " WHERE " + SQL_AND_JOIN.join(where_clauses) if where_clauses else ""
+
+        # 1. Total Logs (Filtered)
+        cursor.execute(f"SELECT COUNT(*) FROM logs l{where_sql}", params)
         total_logs = cursor.fetchone()[0]
 
-        # 2. Level breakdown
-        if workspace_id:
-            cursor.execute(
-                "SELECT level, COUNT(*) FROM logs WHERE workspace_id = ? GROUP BY level",
-                (workspace_id,),
-            )
-        else:
-            cursor.execute("SELECT level, COUNT(*) FROM logs GROUP BY level")
+        # 2. Level breakdown (Filtered)
+        cursor.execute(f"SELECT l.level, COUNT(*) FROM logs l{where_sql} GROUP BY l.level", params)
         level_counts = {row[0]: row[1] for row in cursor.fetchall()}
 
-        # 3. Cluster count
-        if workspace_id:
-            cursor.execute("SELECT COUNT(*) FROM clusters WHERE workspace_id = ?", (workspace_id,))
-        else:
-            cursor.execute("SELECT COUNT(*) FROM clusters")
+        # 3. Cluster count (Filtered)
+        cursor.execute(f"SELECT COUNT(DISTINCT l.cluster_id) FROM logs l{where_sql}", params)
         total_clusters = cursor.fetchone()[0]
 
-        # 4. Top Clusters (by frequency)
-        if workspace_id:
-            cursor.execute(
-                "SELECT template, count FROM clusters WHERE workspace_id = ? ORDER BY count DESC LIMIT 5",
-                (workspace_id,),
-            )
-        else:
-            cursor.execute(
-                "SELECT template, SUM(count) as total FROM clusters GROUP BY template ORDER BY total DESC LIMIT 5"
-            )
+        # 4. Top 10 Clusters (Filtered)
+        # We join with the clusters table to get the template string.
+        # Fallback to 'Pattern {ID}' if not found in cluster cache.
+        cluster_where = f"{where_sql} AND l.cluster_id IS NOT NULL" if where_sql else " WHERE l.cluster_id IS NOT NULL"
+        cluster_query = f"""
+            SELECT 
+                COALESCE(c.template, 'Pattern ' || l.cluster_id) as template,
+                COUNT(*) as count
+            FROM logs l
+            LEFT JOIN clusters c ON l.workspace_id = c.workspace_id AND l.cluster_id = c.cluster_id
+            {cluster_where}
+            GROUP BY template, l.cluster_id
+            ORDER BY count DESC
+            LIMIT 10
+        """
+        cursor.execute(cluster_query, params)
         top_clusters = [{"template": row[0], "count": row[1]} for row in cursor.fetchall()]
 
-        # 5. Workspace count
+        # 5. Global Metrics
         cursor.execute("SELECT COUNT(DISTINCT workspace_id) FROM logs")
         workspace_count = cursor.fetchone()[0]
 
@@ -1953,7 +1974,7 @@ class App:
             # CRITICAL FIX: Also re-initialize the hybrid runner with the new provider instance!
             ai_data_dir = os.path.join(PROJECT_ROOT, "data")
             self.hybrid_runner = HybridRunner(
-                self, self.ai, db_path=os.path.join(ai_data_dir, "ai_state.sqlite")
+                self, self.ai, db_path=os.path.join(ai_data_dir, AI_STATE_DB)
             )
             logger.info("AI Provider and HybridRunner re-initialized with new settings.")
 

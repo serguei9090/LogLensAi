@@ -217,6 +217,9 @@ class GetAnomaliesRequest(BaseModel):
 
 class GetDashboardStatsRequest(BaseModel):
     workspace_id: str | None = None
+    source_id: str | None = None
+    start_time: str | None = None
+    end_time: str | None = None
 
 
 class GetLogDistributionRequest(BaseModel):

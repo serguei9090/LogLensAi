@@ -7,7 +7,7 @@ description: Specialized skill for executing code changes, writing specification
 <objective>Every phase MUST run under an explicit persona loaded from this skill's persona library.</objective>
 <rules>
 1. **Use Phase Persona:** Use the single `@role` listed in the current phase's **Assume Role** line.
-2. **Load Definition:** Before executing phase steps, read the matching file from `references/personas/`.
+2. **Load Definition:** Before executing phase steps, read the matching file from `.agents/skills/smith-code/references/personas/`.
 3. **Load Persona Rules:** Read the persona's required rules before acting. Conditional rules are loaded only when their trigger matches the task.
 4. **Assume Exactly:** Follow the persona's mindset, responsibilities, constraints, handoff rules, required rules, and expertise laws for the duration of that phase.
 5. **Implementation Exception:** Only `phase_1` may select from multiple personas. Choose the best implementation persona for the task, then read that persona file before editing.
@@ -15,13 +15,13 @@ description: Specialized skill for executing code changes, writing specification
 7. **No Missing Persona:** If the matching persona file is absent, stop the phase and report the missing file instead of inventing the role.
 </rules>
 <persona_map>
-- `@api-specialist` -> `references/personas/p_api-specialist.md`
-- `@backend` -> `references/personas/p_backend.md`
-- `@docs` -> `references/personas/p_docs.md`
-- `@frontend` -> `references/personas/p_frontend.md`
-- `@git` -> `references/personas/p_git.md`
-- `@pm` -> `references/personas/p_pm.md`
-- `@ui-designer` -> `references/personas/p_ui-designer.md`
+- `@api-specialist` -> `.agents/skills/smith-code/references/personas/p_api-specialist.md`
+- `@backend` -> `.agents/skills/smith-code/references/personas/p_backend.md`
+- `@docs` -> `.agents/skills/smith-code/references/personas/p_docs.md`
+- `@frontend` -> `.agents/skills/smith-code/references/personas/p_frontend.md`
+- `@git` -> `.agents/skills/smith-code/references/personas/p_git.md`
+- `@pm` -> `.agents/skills/smith-code/references/personas/p_pm.md`
+- `@ui-designer` -> `.agents/skills/smith-code/references/personas/p_ui-designer.md`
 </persona_map>
 </persona_activation>
 
@@ -54,7 +54,7 @@ description: Specialized skill for executing code changes, writing specification
 <objective>Handle small, low-risk edits without the full bd/spec/handoff workflow.</objective>
 **Assume Role:** `@backend` | `@frontend` | `@ui-designer` | `@api-specialist` | `@docs`
 <steps>
-1. **Activate Persona:** Select the best-fit persona for the edit, read its matching file from `references/personas/`, then read its required rules.
+1. **Activate Persona:** Select the best-fit persona for the edit, read its matching file from `.agents/skills/smith-code/references/personas/`, then read its required rules.
 2. **Inspect Context:** Read the relevant files and search only as much as needed to avoid guessing.
 3. **Make Focused Edit:** Change only the files required for the requested fix.
 4. **Focused Verification:** Run the smallest useful check available for the touched surface, such as syntax check, unit test, linter, or markdown inspection.
@@ -67,7 +67,7 @@ description: Specialized skill for executing code changes, writing specification
 <objective>Collect facts and write implementation specification.</objective>
 **Assume Role:** `@pm`
 <steps>
-1. **Activate Persona:** Read `references/personas/p_pm.md` and its required rules before executing any other step.
+1. **Activate Persona:** Read `.agents/skills/smith-code/references/personas/p_pm.md` and its required rules before executing any other step.
 2. **Check Open Tasks:** Execute `bd ready` to check for currently open tasks related to the request.
 3. **Context Gathering:**
    - *If you have context for the file to be edited:*
@@ -86,7 +86,7 @@ description: Specialized skill for executing code changes, writing specification
 5. **Issue & Spec Creation:**
    - Create a new `bd` issue.
    - Write the implementation spec to `docs/track/specs/<bead_id>.md`.
-     - *Note:* All `.md` files MUST be generated or copied from templates located in `references/templates/`.
+     - *Note:* All `.md` files MUST be generated or copied from templates located in `.agents/skills/smith-code/references/templates/`.
    - Execute `bd comment <issue_id> <path_to_bead_id.md>` to link the spec to the issue for future reference.
 </steps>
 </phase_0>
@@ -95,7 +95,7 @@ description: Specialized skill for executing code changes, writing specification
 <objective>Code implementation and inline documentation.</objective>
 **Assume Role:** `@backend` | `@frontend` | `@ui-designer` | `@api-specialist`
 <steps>
-1. **Activate Persona:** Select the best-fit implementation role, then read its matching file from `references/personas/` and its required rules before editing code.
+1. **Activate Persona:** Select the best-fit implementation role, then read its matching file from `.agents/skills/smith-code/references/personas/` and its required rules before editing code.
 2. **Execute Coding:** Implement the required changes.
 3. **Micro-decisions:** Immediately save any micro-decisions or mid-task discoveries using `bd remember`.
 4. **Complex Logic:** Document complex logic decisions in `docs/WikiFlow/coder/notes.md`.
@@ -106,12 +106,12 @@ description: Specialized skill for executing code changes, writing specification
 <objective>Wrap-up, knowledge storage, and handoff.</objective>
 **Assume Role:** `@docs`
 <steps>
-1. **Activate Persona:** Read `references/personas/p_docs.md` and its required rules before updating documentation or memory.
+1. **Activate Persona:** Read `.agents/skills/smith-code/references/personas/p_docs.md` and its required rules before updating documentation or memory.
 2. **Knowledge Storage:** Store technical decisions and lessons learned.
    - If a new rule, project constraint, or physical fact was discovered, run: `bd remember "RULE [Feature]: [Fact]"`.
 3. **Update Lessons Learned:** Document a detailed technical summary of the "Why" and the "How" in `docs/track/LessonsLearned.md`.
 4. **State Update:** Update the bead status by running `bd update <id> --status completed`.
-5. **Handoff Manifest:** Generate or update `docs/track/handoff.md`. Ensure the Status references the active `bd` issue ID and current branch state.
+5. **Handoff Manifest:** Generate or update `docs/track/handoff.md`. Ensure the Status .agents/skills/smith-code the active `bd` issue ID and current branch state.
 </steps>
 </phase_2>
 
@@ -119,7 +119,7 @@ description: Specialized skill for executing code changes, writing specification
 <objective>Version control commit.</objective>
 **Assume Role:** `@git`
 <steps>
-1. **Activate Persona:** Read `references/personas/p_git.md` and its required rules before verification or commit work.
+1. **Activate Persona:** Read `.agents/skills/smith-code/references/personas/p_git.md` and its required rules before verification or commit work.
 2. **Verification:** Verify all required artifacts (specs, handoff manifest, updated lessons) are present.
 3. **Atomic Commit:** Use the `bd` context to construct a meaningful commit message referencing `<BEAD_ID>` and commit the changes via git.
 </steps>
@@ -127,13 +127,13 @@ description: Specialized skill for executing code changes, writing specification
 
 <checklist>
 - [ ] Did you choose `<lightweight_path>` or full SDLC using `<task_sizing>`?
-- [ ] Did you select a phase role and read its matching file from `references/personas/` before acting?
+- [ ] Did you select a phase role and read its matching file from `.agents/skills/smith-code/references/personas/` before acting?
 - [ ] Did you read the selected persona's required rules before acting?
 - [ ] Did you use `bd ready` to check for open tasks?
 - [ ] Did you execute `impact.py` during context gathering (Mandatory)?
 - [ ] Did you reach 95%+ confidence and use `mcp sequentialthinking` to summarize?
 - [ ] Did you create a `bd` issue and link it using `bd comment`?
-- [ ] Was the implementation spec saved to `docs/track/specs/<bead_id>.md` using a template from `references/templates/`?
+- [ ] Was the implementation spec saved to `docs/track/specs/<bead_id>.md` using a template from `.agents/skills/smith-code/references/templates/`?
 - [ ] Were micro-decisions stored via `bd remember`?
 - [ ] Was complex logic documented in `docs/WikiFlow/coder/notes.md`?
 - [ ] Were new rules/facts recorded via `bd remember "RULE [Feature]: [Fact]"`?

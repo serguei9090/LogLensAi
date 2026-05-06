@@ -34,6 +34,30 @@ __all__ = [
 
 
 class AIProviderFactory:
+    _PROVIDER_MAP = {
+        "ai-studio": AIStudioProvider,
+        "ollama": OllamaProvider,
+        "openai-compatible": OpenAICompatibleProvider,
+        "openai": OpenAICompatibleProvider,
+        "lmstudio": OpenAICompatibleProvider,
+        "gemini-cli": GeminiCLIProvider,
+    }
+
+    _DEFAULT_MODELS = {
+        "ai-studio": "gemini-2.5-flash",
+        "ollama": "gemma4:e2b",
+        "openai": "gpt-4o",
+        "openai-compatible": "gpt-4o",
+    }
+
+    _DEFAULT_HOSTS = {
+        "ollama": "http://localhost:11434",
+        "openai": "https://api.openai.com/v1",
+        "openai-compatible": "https://api.openai.com/v1",
+        "lmstudio": "http://localhost:1234/v1",
+        "gemini-cli": "http://localhost:22436",
+    }
+
     @staticmethod
     def get_provider(provider_name: str, **kwargs) -> AIProvider:
         api_key = kwargs.get("api_key", "")
@@ -41,8 +65,7 @@ class AIProviderFactory:
         model = kwargs.get("model", "")
         settings = kwargs.get("settings", {})
 
-        # --- Host Resolution Logic (OCP) ---
-        # If host is not explicitly provided, resolve from settings keys
+        # --- Host Resolution Logic ---
         host = kwargs.get("host")
         if not host and settings:
             host_map = {
@@ -75,35 +98,26 @@ Action Details:
         if "A2UI" not in system_prompt:
             system_prompt = f"{system_prompt}\n\n{a2ui_instructions}"
 
-        if provider_name == "ai-studio":
+        # --- Provider Instantiation ---
+        provider_class = AIProviderFactory._PROVIDER_MAP.get(provider_name, GeminiCLIProvider)
+        default_model = AIProviderFactory._DEFAULT_MODELS.get(provider_name, "")
+        default_host = AIProviderFactory._DEFAULT_HOSTS.get(provider_name, "")
+
+        if provider_class == AIStudioProvider:
             return AIStudioProvider(
                 api_key=api_key,
                 system_prompt=system_prompt,
-                model=model or "gemini-2.5-flash",
+                model=model or default_model,
             )
-        elif provider_name == "ollama":
-            return OllamaProvider(
-                host=host or "http://localhost:11434",
-                system_prompt=system_prompt,
-                model=model or "gemma4:e2b",
-            )
-        elif provider_name == "openai-compatible" or provider_name == "openai":
-            return OpenAICompatibleProvider(
-                api_key=api_key,
-                system_prompt=system_prompt,
-                host=host or "https://api.openai.com/v1",
-                model=model or "gpt-4o",
-            )
-        elif provider_name == "lmstudio":
-            return OpenAICompatibleProvider(
-                api_key=api_key,
-                system_prompt=system_prompt,
-                host=host or "http://localhost:1234/v1",
-                model=model,
-            )
-        else:
-            return GeminiCLIProvider(
-                host=host or "http://localhost:22436",
-                system_prompt=system_prompt,
-                model=model,
-            )
+        
+        # All others support 'host'
+        return provider_class(
+            api_key=api_key,
+            system_prompt=system_prompt,
+            host=host or default_host,
+            model=model or default_model,
+        ) if provider_class == OpenAICompatibleProvider else provider_class(
+            host=host or default_host,
+            system_prompt=system_prompt,
+            model=model or default_model,
+        )

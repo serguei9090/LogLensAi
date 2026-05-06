@@ -18,6 +18,10 @@
 - **Fix Tests**: Address the `fix_tests_001` task in `TODO.md` to restore full green status to the CI pipeline.
 - **AI Factory Refactor**: Implement `refactor_ai_factory_001` to replace the `if-elif` chain in `AIProviderFactory` with a registry pattern.
 
+- **Code Quality (Lightweight)**: Addressed IDE-flagged issues.
+    - **Refactoring**: Converted `AIProviderFactory` to a registry pattern to reduce cognitive complexity and fulfill OCP.
+    - **De-duplication**: Replaced hardcoded literals in `api.py` with constants (`AI_STATE_DB`, `SQL_AND_JOIN`).
+
 ---
-**Project State**: [v2.3-Stabilized] - Audit remediation complete.
+**Project State**: [v2.4-Quality-Hardened] - Quality debt reduced.
 **Bead ID**: LogLensAi-63t (Completed)
