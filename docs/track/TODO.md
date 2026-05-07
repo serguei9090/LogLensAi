@@ -7,8 +7,8 @@
 
 ## 🔵 Active Tasks
 
+- [ ] **LogLensAi-pdt**: Fix Clustering Job Stalls and Deadlock (P1).
 - [ ] **LLQL-Verification**: Audit `docs/track/LLQL_Professional_Spec.md` against current implementation in `sidecar/src/`.
-- [ ] **fix_tests_001**: Fix `TailSwitch` test and `OpenAI` initialization failure.
 
 ---
 

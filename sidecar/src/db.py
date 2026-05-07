@@ -84,7 +84,19 @@ class LogDatabase:
                 raw_text     TEXT,
                 has_comment  BOOLEAN DEFAULT FALSE,
                 comment      TEXT,
-                facets       JSON
+                facets       JSON,
+                processed    BOOLEAN DEFAULT FALSE
+            );
+
+            CREATE TABLE IF NOT EXISTS ingestion_jobs (
+                id           INTEGER PRIMARY KEY DEFAULT nextval('settings_templates_id_seq'),
+                workspace_id TEXT,
+                status       TEXT DEFAULT 'pending', -- pending, processing, completed, failed
+                total_lines  INTEGER DEFAULT 0,
+                processed_lines INTEGER DEFAULT 0,
+                last_log_id  INTEGER DEFAULT NULL,
+                created_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
 
             CREATE TABLE IF NOT EXISTS settings (
@@ -217,7 +229,30 @@ class LogDatabase:
         self._migrate_fusion_time_shift(cursor)
         self._migrate_log_columns(cursor)
         self._migrate_log_facets(cursor)
+        self._migrate_ingestion_columns(cursor)
         self._migrate_indexes(cursor)
+
+    def _migrate_ingestion_columns(self, cursor):
+        """Adds columns required for asynchronous ingestion and clustering."""
+        cursor.execute(
+            "SELECT count(*) FROM information_schema.columns WHERE table_name = 'logs' AND column_name = 'processed'"
+        )
+        if cursor.fetchone()[0] == 0:
+            logger.info("[DB] Migration: Adding 'processed' column to 'logs' table...")
+            # STAB-004: Drop dependent indexes before altering table to avoid DependencyException
+            try:
+                # We drop all common logs indexes to be safe
+                cursor.execute("DROP INDEX IF EXISTS idx_logs_workspace_id")
+                cursor.execute("DROP INDEX IF EXISTS idx_logs_source_id")
+                cursor.execute("DROP INDEX IF EXISTS idx_logs_timestamp")
+                cursor.execute("DROP INDEX IF EXISTS idx_logs_cluster_id")
+                
+                cursor.execute("ALTER TABLE logs ADD COLUMN processed BOOLEAN DEFAULT FALSE")
+            except Exception as e:
+                logger.error(f"[DB] Migration Error (logs.processed): {e}")
+
+        # Ensure performance index for the worker
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_logs_processed ON logs (processed)")
 
     def _migrate_indexes(self, cursor):
         """Ensure all performance indexes exist on legacy databases."""

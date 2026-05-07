@@ -68,6 +68,7 @@ from parser import DrainParser
 from pydantic import ValidationError
 from ssh_loader import SSHLoader
 from tailer import FileTailer
+from workers.clustering import ClusteringWorker
 
 A2UI_START = "[[A2UI]]"
 A2UI_END = "[[/A2UI]]"
@@ -173,6 +174,10 @@ class App:
 
         # Initialize Context Manager for AI
         self.context_manager = SmartContextManager()
+
+        # Initialize Clustering Worker
+        self.clustering_worker = ClusteringWorker(self)
+        self.clustering_worker.start()
 
         # Initialize Hybrid Orchestration Runner
         ai_data_dir = os.path.join(PROJECT_ROOT, "data")
@@ -1015,26 +1020,10 @@ class App:
         raw_message = metadata["message"]
         message = log.get("message") or raw_message
 
-        # 2. Pattern Clustering (Drain3)
-        try:
-            parser = self.get_drain_parser(workspace_id)
-            res = parser.parse(message)
-            cluster_id = str(res["cluster_id"])
-            template = res["template"]
-        except Exception:
-            cluster_id = "unknown"
-            template = message
-
-        # 3. Persistence (Sync Stats table)
-        cursor.execute(
-            """
-            INSERT INTO clusters (workspace_id, cluster_id, template, count) 
-            VALUES (?, ?, ?, 1)
-            ON CONFLICT (workspace_id, cluster_id) 
-            DO UPDATE SET count = count + 1, template = excluded.template
-        """,
-            (workspace_id, cluster_id, template),
-        )
+        # 2. Pattern Clustering (Drain3) - ASYNC REMOVAL
+        # We no longer process Drain3 here. We leave cluster_id as NULL
+        # and let the background worker handle it.
+        cluster_id = None
 
         facets = log.get("facets") or metadata.get("facets", {})
         facets_json = json.dumps(facets) if facets else None
@@ -1048,6 +1037,7 @@ class App:
             message,
             cluster_id,
             facets_json,
+            False,  # processed = FALSE
         ]
 
     def method_ingest_logs(self, logs: list[IngestLogEntry]) -> dict:
@@ -1060,6 +1050,7 @@ class App:
 
         # Optimization: Fetch and cache rules for all involved workspaces
         rules_cache = {}
+        workspace_ids = list(set(log.get("workspace_id") for log in log_dicts))
 
         # Get global rules once
         global_rules = []
@@ -1077,18 +1068,63 @@ class App:
             rules = self._get_facet_rules_for_workspace(cursor, ws_id, rules_cache, global_rules)
             batch_data.append(self._ingest_single_log(cursor, log, custom_rules=rules))
 
+        job_id = None
         if batch_data:
-            # ON CONFLICT DO NOTHING is a belt-and-suspenders guard for any
-            # legacy databases where the old shared log_id_seq may have left
-            # sequence state out of sync. With per-table sequences (db.py fix),
-            # genuine PK collisions are no longer possible in new databases.
+            # 1. Create Ingestion Job Record
+            for ws_id in workspace_ids:
+                total_ws_lines = len([b for b in batch_data if b[0] == ws_id])
+                cursor.execute(
+                    "INSERT INTO ingestion_jobs (workspace_id, status, total_lines) VALUES (?, 'pending', ?) RETURNING id",
+                    (ws_id, total_ws_lines),
+                )
+                res = cursor.fetchone()
+                job_id = res[0] if res else None
+
+            # 2. Bulk Insert Logs
             cursor.executemany(
-                "INSERT OR IGNORE INTO logs (workspace_id, source_id, raw_text, timestamp, level, message, cluster_id, facets) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                "INSERT OR IGNORE INTO logs (workspace_id, source_id, raw_text, timestamp, level, message, cluster_id, facets, processed) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 batch_data,
             )
             self.db.commit()
 
-        return {"status": "ok", "count": len(batch_data)}
+        return {"status": "ok", "count": len(batch_data), "job_id": job_id}
+
+    def method_cleanup_ingestion_jobs(self, workspace_id: str) -> dict:
+        """Removes stalled ingestion jobs with no progress."""
+        cursor = self.db.get_cursor()
+        # Delete jobs that are 'pending' but have 0 processed lines and are older than 30 mins
+        # Or jobs that are explicitly marked 'failed'
+        cursor.execute(
+            "DELETE FROM ingestion_jobs WHERE workspace_id = ? AND processed_lines = 0 AND (status = 'failed' OR created_at < ?)",
+            (workspace_id, (datetime.now() - timedelta(minutes=30)).strftime("%Y-%m-%d %H:%M:%S")),
+        )
+        count = cursor.rowcount
+        self.db.commit()
+        logger.info("[Cleanup] Purged %d stalled ingestion jobs for %s", count, workspace_id)
+        return {"status": "success", "purged_count": count}
+
+    def method_get_ingestion_jobs(self, workspace_id: str | None = None) -> list:
+        """Fetch active or recent ingestion jobs for status tracking."""
+        cursor = self.db.get_cursor()
+        query = "SELECT id, workspace_id, status, total_lines, processed_lines, created_at, updated_at FROM ingestion_jobs"
+        params = []
+        if workspace_id:
+            query += " WHERE workspace_id = ?"
+            params.append(workspace_id)
+        query += " ORDER BY created_at DESC LIMIT 10"
+        cursor.execute(query, params)
+        return [
+            {
+                "id": r[0],
+                "workspace_id": r[1],
+                "status": r[2],
+                "total_lines": r[3],
+                "processed_lines": r[4],
+                "created_at": r[5].isoformat() if hasattr(r[5], "isoformat") else str(r[5]),
+                "updated_at": r[6].isoformat() if hasattr(r[6], "isoformat") else str(r[6]),
+            }
+            for r in cursor.fetchall()
+        ]
 
     def method_get_metadata_facets(self, **kwargs) -> dict:
         """Return the top unique metadata facets across all logs in a workspace."""
@@ -1926,11 +1962,130 @@ class App:
             cursor.execute("SELECT COUNT(DISTINCT workspace_id) FROM logs")
         workspace_count = cursor.fetchone()[0]
 
+        # 6. Time Series (Log Volume & Severity over time)
+        # Determine bucket size based on time range (default to 5m if no range)
+        bucket_format = '%Y-%m-%d %H:%M:00' # Default 1m buckets
+        
+        # Simple heuristic: if range > 24h, use 1h buckets. If > 7d, use 1d.
+        # For now, let's keep it consistent at 1m or 5m for high-velocity feel.
+        ts_query = f"""
+            SELECT 
+                strftime('{bucket_format}', l.timestamp::TIMESTAMP) as bucket,
+                l.level,
+                COUNT(*) as count
+            FROM logs l
+            {where_sql}
+            GROUP BY bucket, l.level
+            ORDER BY bucket ASC
+        """
+        cursor.execute(ts_query, params)
+        ts_raw = cursor.fetchall()
+        
+        # Pivot results: { "2024...": { "INFO": 10, "ERROR": 2 }, ... }
+        ts_pivot = {}
+        for bucket, level, count in ts_raw:
+            if bucket not in ts_pivot:
+                ts_pivot[bucket] = {"timestamp": bucket}
+            ts_pivot[bucket][level] = count
+        
+        time_series = list(ts_pivot.values())
+
+        # 7. Top Error Clusters (Filtered for critical levels)
+        error_where = f"{where_sql} AND l.level IN ('ERROR', 'FATAL', 'CRITICAL') AND l.cluster_id IS NOT NULL" if where_sql else " WHERE l.level IN ('ERROR', 'FATAL', 'CRITICAL') AND l.cluster_id IS NOT NULL"
+        error_cluster_query = f"""
+            SELECT 
+                COALESCE(c.template, 'Pattern ' || l.cluster_id) as template,
+                COUNT(*) as count
+            FROM logs l
+            LEFT JOIN clusters c ON l.workspace_id = c.workspace_id AND l.cluster_id = c.cluster_id
+            {error_where}
+            GROUP BY template, l.cluster_id
+            ORDER BY count DESC
+            LIMIT 5
+        """
+        cursor.execute(error_cluster_query, params)
+        top_error_clusters = [{"template": row[0], "count": row[1]} for row in cursor.fetchall()]
+
+        # 8. Pattern Drift (New clusters in this window)
+        # Assuming clusters table has a 'created_at' column. 
+        # If not, we approximate by checking the first log timestamp for each cluster in this window.
+        # For now, let's just count unique clusters in the window vs total.
+        new_patterns_count = 0
+        try:
+            # Check if clusters table has created_at
+            cursor.execute("SELECT count(*) FROM information_schema.columns WHERE table_name = 'clusters' AND column_name = 'created_at'")
+            has_created_at = cursor.fetchone()[0] > 0
+            
+            if has_created_at:
+                # Actual new clusters
+                drift_where = " WHERE created_at >= ?" if start_time else ""
+                drift_params = [norm_start] if start_time else []
+                cursor.execute(f"SELECT COUNT(*) FROM clusters{drift_where}", drift_params)
+                new_patterns_count = cursor.fetchone()[0]
+        except:
+            pass
+
+        # 9. Source Heatmap (Log counts per source per bucket)
+        source_heatmap = []
+        try:
+            sh_query = f"""
+                SELECT 
+                    strftime('{bucket_format}', l.timestamp::TIMESTAMP) as bucket,
+                    l.source_id,
+                    s.name as source_name,
+                    COUNT(*) as count
+                FROM logs l
+                LEFT JOIN log_sources s ON l.source_id = s.id
+                {where_sql}
+                GROUP BY bucket, l.source_id, s.name
+                ORDER BY bucket ASC
+            """
+            cursor.execute(sh_query, params)
+            sh_raw = cursor.fetchall()
+            source_heatmap = [
+                {"timestamp": r[0], "source_id": r[1], "source_name": r[2], "count": r[3]} 
+                for r in sh_raw
+            ]
+        except:
+            pass
+
+        # 10. Latest AI Insight Snippet
+        latest_insight = None
+        try:
+            insight_query = """
+                SELECT m.content 
+                FROM ai_messages m
+                JOIN ai_sessions s ON m.session_id = s.session_id
+                WHERE m.role = 'assistant'
+            """
+            insight_params = []
+            if workspace_id:
+                insight_query += " AND s.workspace_id = ?"
+                insight_params.append(workspace_id)
+            
+            insight_query += " ORDER BY m.timestamp DESC LIMIT 1"
+            cursor.execute(insight_query, insight_params)
+            row = cursor.fetchone()
+            if row:
+                # Basic snippet: first 150 chars or first line
+                content = row[0].strip()
+                # Remove reasoning blocks for snippet
+                import re
+                clean_content = re.sub(r'<think>.*?</think>', '', content, flags=re.DOTALL).strip()
+                latest_insight = (clean_content[:150] + "...") if len(clean_content) > 150 else clean_content
+        except:
+            pass
+
         return {
             "total_logs": total_logs,
             "total_clusters": total_clusters,
             "level_counts": level_counts,
             "top_clusters": top_clusters,
+            "top_error_clusters": top_error_clusters,
+            "time_series": time_series,
+            "source_heatmap": source_heatmap,
+            "latest_ai_insight": latest_insight,
+            "new_patterns_count": new_patterns_count,
             "workspace_count": workspace_count,
             "active_tailers": len([k for k, t in self.tailers.items() if t.running]),
         }

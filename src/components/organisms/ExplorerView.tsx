@@ -1,7 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { DraggableItem, DroppableArea } from "@/lib/dnd-wrappers";
-import { cn } from "@/lib/utils";
-import type { HierarchyNode, LogSource } from "@/store/workspaceStore";
+import type { HierarchyNode } from "@/store/workspaceStore";
 import { FileText, Folder, MoreVertical, Plus } from "lucide-react";
 
 interface ExplorerViewProps {
@@ -67,7 +66,7 @@ export function ExplorerView({
             New Folder
           </Button>
           <Button
-            variant="primary"
+            variant="default"
             size="sm"
             onClick={onImportOpen}
             className="rounded-full px-5 h-9 font-bold"

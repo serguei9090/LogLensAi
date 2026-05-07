@@ -87,11 +87,6 @@ interface WorkspaceStore {
 
 // ─── Helper ────────────────────────────────────────────────────────────────────
 
-/** Generates a short, collision-resistant ID without external deps */
-function uid() {
-  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
-}
-
 // ─── Store ────────────────────────────────────────────────────────────────────
 
 export const useWorkspaceStore = create<WorkspaceStore>()(

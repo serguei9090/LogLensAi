@@ -13,6 +13,7 @@ description: Specialized skill for executing code changes, writing specification
 5. **Implementation Exception:** Only `phase_1` may select from multiple personas. Choose the best implementation persona for the task, then read that persona file before editing.
 6. **Switch Deliberately:** When moving to a new phase or a better-fit implementation role, read the new persona file and its required rules before continuing.
 7. **No Missing Persona:** If the matching persona file is absent, stop the phase and report the missing file instead of inventing the role.
+8. **Anti-Hallucination:** You are strictly forbidden from summarizing or assuming a persona's definition based on its name. You MUST read the actual persona file content to 'Activate' it.
 </rules>
 <persona_map>
 - `@api-specialist` -> `.agents/skills/smith-code/references/personas/p_api-specialist.md`
@@ -70,14 +71,16 @@ description: Specialized skill for executing code changes, writing specification
 1. **Activate Persona:** Read `.agents/skills/smith-code/references/personas/p_pm.md` and its required rules before executing any other step.
 2. **Check Open Tasks:** Execute `bd ready` to check for currently open tasks related to the request.
 3. **Context Gathering:**
-   - *If you have context for the file to be edited:*
-     - Run `docs_search.py` to search indexed `docs/` for relevant codebase info.
-     - Run `codanna search`.
-     - Run `impact.py` (**MANDATORY**).
-     - Decide whether to run `callers.py` and `calls.py` based on the impact results (Optional, Model Defined).
-   - *If you lack context:*
-     - List files in the relevant folder.
-     - Ask Codanna to determine what will be impacted by the potential changes.
+   - **Prioritize Tools:** Prioritize `impact.py` over `read_file`. Use `read_file` only to inspect the specific lines flagged by `impact.py`.
+   - **Execution:**
+     - *If you have context for the file to be edited:*
+       - Run `docs_search.py` to search indexed `docs/` for relevant codebase info.
+       - Run `codanna search`.
+       - Run `impact.py` (**MANDATORY**).
+       - Decide whether to run `callers.py` and `calls.py` based on the impact results (Optional, Model Defined).
+     - *If you lack context:*
+       - List files in the relevant folder.
+       - Ask Codanna to determine what will be impacted by the potential changes.
 4. **Sequential Thinking:** Once you have gathered 95%+ confidence in your understanding, use the **mcp sequentialthinking** tool to:
    - Organize and summarize the task and request.
    - Identify which files will be edited.
@@ -128,8 +131,10 @@ description: Specialized skill for executing code changes, writing specification
 <checklist>
 - [ ] Did you choose `<lightweight_path>` or full SDLC using `<task_sizing>`?
 - [ ] Did you select a phase role and read its matching file from `.agents/skills/smith-code/references/personas/` before acting?
+- [ ] **Anti-Hallucination:** Did you read the actual persona file content instead of assuming or summarizing its role?
 - [ ] Did you read the selected persona's required rules before acting?
 - [ ] Did you use `bd ready` to check for open tasks?
+- [ ] **Tool Priority:** Did you prioritize `impact.py` over `read_file` during context gathering?
 - [ ] Did you execute `impact.py` during context gathering (Mandatory)?
 - [ ] Did you reach 95%+ confidence and use `mcp sequentialthinking` to summarize?
 - [ ] Did you create a `bd` issue and link it using `bd comment`?

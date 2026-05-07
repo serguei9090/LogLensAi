@@ -6,8 +6,8 @@ Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -like "*sidecar/ma
 $ports = @(5000, 5001, 514)
 foreach ($port in $ports) {
     $pids = Get-NetTCPConnection -LocalPort $port -ErrorAction SilentlyContinue | Select-Object -ExpandProperty OwningProcess
-    foreach ($pid in $pids) {
-        Stop-Process -Id $pid -Force -ErrorAction SilentlyContinue
+    foreach ($p in $pids) {
+        Stop-Process -Id $p -Force -ErrorAction SilentlyContinue
     }
 }
 

@@ -11,17 +11,51 @@ import { callSidecar } from "@/lib/hooks/useSidecarBridge";
 import { selectActiveWorkspace, useWorkspaceStore } from "@/store/workspaceStore";
 import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
-import { Activity, AlertCircle, BarChart3, Cpu, Database, Layers, RefreshCcw, Sparkles } from "lucide-react";
+import { 
+  Activity, 
+  AlertCircle, 
+  BarChart3, 
+  Database, 
+  Layers, 
+  RefreshCcw, 
+  Sparkles,
+  TrendingUp,
+  AlertTriangle,
+  History
+} from "lucide-react";
 import type React from "react";
 import { useCallback, useEffect, useState, useMemo } from "react";
+import { 
+  AreaChart, 
+  Area, 
+  XAxis, 
+  YAxis, 
+  CartesianGrid, 
+  Tooltip, 
+  ResponsiveContainer
+} from 'recharts';
 
 interface DashboardStats {
   total_logs: number;
   total_clusters: number;
   level_counts: Record<string, number>;
   top_clusters: { template: string; count: number }[];
+  top_error_clusters: { template: string; count: number }[];
+  time_series: any[];
+  source_heatmap: { timestamp: string; source_id: string; source_name: string; count: number }[];
+  latest_ai_insight: string | null;
+  new_patterns_count: number;
   workspace_count: number;
   active_tailers: number;
+}
+
+interface IngestionJob {
+  id: number;
+  workspace_id: string;
+  status: 'pending' | 'processing' | 'completed' | 'failed';
+  total_lines: number;
+  processed_lines: number;
+  created_at: string;
 }
 
 export default function DashboardPage() {
@@ -31,6 +65,7 @@ export default function DashboardPage() {
   
   // Local State
   const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [ingestionJobs, setIngestionJobs] = useState<IngestionJob[]>([]);
   const [loading, setLoading] = useState(true);
   const [mode, setMode] = useState<DashboardMode>("static");
   
@@ -72,6 +107,27 @@ export default function DashboardPage() {
   useEffect(() => {
     fetchStats();
   }, [fetchStats]);
+
+  // Polling for Ingestion Jobs
+  const fetchJobs = useCallback(async () => {
+    try {
+      const res = await callSidecar<IngestionJob[]>({
+        method: "get_ingestion_jobs",
+        params: { 
+          workspace_id: selectedWorkspaceId === "all" ? undefined : selectedWorkspaceId,
+        },
+      });
+      setIngestionJobs(res || []);
+    } catch (e) {
+      console.error("Failed to fetch ingestion jobs", e);
+    }
+  }, [selectedWorkspaceId]);
+
+  useEffect(() => {
+    const timer = setInterval(fetchJobs, 3000);
+    fetchJobs(); // Initial fetch
+    return () => clearInterval(timer);
+  }, [fetchJobs]);
 
   // Derived Options
   const currentWorkspace = useMemo(() => 
@@ -128,7 +184,7 @@ export default function DashboardPage() {
             <span className="text-[10px] font-bold uppercase tracking-widest text-text-muted ml-2">Context:</span>
             
             <Select value={selectedWorkspaceId} onValueChange={(v) => {
-              setSelectedWorkspaceId(v);
+              setSelectedWorkspaceId(v || "all");
               setSelectedSourceId("all"); // Reset source when workspace changes
             }}>
               <SelectTrigger className="w-[180px] h-8 text-[11px] bg-bg-base/40 border-white/5 hover:border-white/10 transition-all font-medium">
@@ -145,7 +201,7 @@ export default function DashboardPage() {
 
             <Select 
               value={selectedSourceId} 
-              onValueChange={setSelectedSourceId}
+              onValueChange={(v) => setSelectedSourceId(v || "all")}
               disabled={selectedWorkspaceId === "all"}
             >
               <SelectTrigger className="w-[180px] h-8 text-[11px] bg-bg-base/40 border-white/5 hover:border-white/10 transition-all font-medium">
@@ -184,8 +240,75 @@ export default function DashboardPage() {
             exit={{ opacity: 0, x: 10 }}
             className="space-y-10"
           >
-            {/* Grid Layout */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            {/* Processing HUD (Ingestion Jobs) */}
+            {ingestionJobs.some(j => j.status === 'processing' || j.status === 'pending') && (
+              <div className="space-y-3">
+                <div className="flex items-center gap-2 mb-2">
+                  <RefreshCcw className="size-3 text-primary-green animate-spin" />
+                  <span className="text-[10px] font-bold uppercase tracking-widest text-text-muted">Background Processing</span>
+                </div>
+                {ingestionJobs
+                  .filter(j => j.status === 'processing' || j.status === 'pending')
+                  .map(job => (
+                    <motion.div 
+                      key={job.id}
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: 'auto' }}
+                      className="bg-bg-surface/40 border border-border/50 rounded-xl p-4 backdrop-blur-sm"
+                    >
+                      <div className="flex justify-between items-center mb-2">
+                        <div className="flex items-center gap-3">
+                          <span className="text-[10px] font-mono text-primary-green bg-primary-green/10 px-1.5 py-0.5 rounded uppercase font-bold">Job #{job.id}</span>
+                          <span className="text-[11px] font-medium text-text-primary uppercase tracking-tight">Clustering Patterns...</span>
+                        </div>
+                        <span className="text-[10px] font-mono text-text-muted">
+                          {job.processed_lines.toLocaleString()} / {job.total_lines.toLocaleString()} lines
+                        </span>
+                      </div>
+                      <div className="h-1.5 bg-bg-base/50 rounded-full overflow-hidden border border-white/5">
+                        <motion.div 
+                          className="h-full bg-primary-green shadow-[0_0_10px_rgba(16,185,129,0.4)]"
+                          initial={{ width: 0 }}
+                          animate={{ width: `${(job.processed_lines / job.total_lines) * 100}%` }}
+                          transition={{ type: "spring", stiffness: 50 }}
+                        />
+                      </div>
+                    </motion.div>
+                  ))}
+              </div>
+            )}
+
+            {/* AI Insight Snippet (Proactive) */}
+            {stats?.latest_ai_insight && (
+              <motion.section 
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="bg-primary-green/5 border border-primary-green/20 rounded-2xl p-6 backdrop-blur-md relative overflow-hidden group"
+              >
+                <div className="flex items-start justify-between gap-6 relative z-10">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-3">
+                      <Sparkles className="size-4 text-primary-green animate-pulse" />
+                      <span className="text-[10px] font-bold uppercase tracking-widest text-primary-green">Latest AI Observation</span>
+                    </div>
+                    <p className="text-sm font-mono text-text-primary leading-relaxed italic">
+                      "{stats.latest_ai_insight}"
+                    </p>
+                  </div>
+                  <button 
+                    onClick={() => setMode("ai")}
+                    className="shrink-0 px-4 py-2 bg-primary-green text-bg-base text-[10px] font-bold uppercase tracking-widest rounded-lg hover:bg-primary-green/90 transition-all hover:scale-105 shadow-[0_0_15px_rgba(16,185,129,0.3)]"
+                  >
+                    Deep Dive
+                  </button>
+                </div>
+                {/* Decorative Background Glow */}
+                <div className="absolute -top-20 -right-20 size-64 bg-primary-green/10 rounded-full blur-[80px] pointer-events-none" />
+              </motion.section>
+            )}
+
+            {/* Stat Cards Grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
               <StatCard
                 icon={<Database className="h-4 w-4 text-primary" />}
                 label="Total Index"
@@ -208,20 +331,79 @@ export default function DashboardPage() {
                 icon={<Database className="h-4 w-4 text-info" />}
                 label="Catalogs"
                 value={stats?.workspace_count.toString() ?? "0"}
-                subValue="Active workspace"
+                subValue="Active workspaces"
+              />
+              <StatCard
+                icon={<TrendingUp className="h-4 w-4 text-primary-green" />}
+                label="Drift"
+                value={stats?.new_patterns_count.toString() ?? "0"}
+                subValue="New Patterns"
+                trend={stats?.new_patterns_count && stats.new_patterns_count > 0 ? "up" : "stable"}
               />
             </div>
 
+            {/* Main Charts Row */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-              {/* Level Breakdown */}
-              <section className="lg:col-span-1 bg-bg-surface/50 border border-border rounded-xl p-6 backdrop-blur-sm relative overflow-hidden">
+               {/* Ingestion Timeline */}
+               <section className="lg:col-span-2 bg-bg-surface/50 border border-border rounded-xl p-6 backdrop-blur-sm relative overflow-hidden h-[300px] flex flex-col">
+                <div className="flex items-center justify-between mb-4">
+                   <div className="flex items-center gap-2">
+                    <History className="h-4 w-4 text-primary-green" />
+                    <h2 className="text-xs font-bold uppercase tracking-widest text-text-muted">
+                      Ingestion Volume
+                    </h2>
+                  </div>
+                </div>
+                <div className="flex-1 w-full min-h-0">
+                  {stats && stats.time_series.length > 0 ? (
+                    <ResponsiveContainer width="100%" height="100%">
+                      <AreaChart data={stats.time_series}>
+                        <defs>
+                          <linearGradient id="colorIngest" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="5%" stopColor="#10b981" stopOpacity={0.3}/>
+                            <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
+                          </linearGradient>
+                        </defs>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(255,255,255,0.05)" />
+                        <XAxis 
+                          dataKey="timestamp" 
+                          axisLine={false} 
+                          tickLine={false} 
+                          tick={{fontSize: 9, fill: 'rgba(255,255,255,0.4)', fontFamily: 'JetBrains Mono'}}
+                          minTickGap={30}
+                          tickFormatter={(val) => val.split(' ')[1]}
+                        />
+                        <YAxis 
+                           axisLine={false} 
+                           tickLine={false} 
+                           tick={{fontSize: 9, fill: 'rgba(255,255,255,0.4)', fontFamily: 'JetBrains Mono'}}
+                        />
+                        <Tooltip 
+                          contentStyle={{ backgroundColor: '#111', border: '1px solid #333', fontSize: '10px', fontFamily: 'JetBrains Mono' }}
+                          itemStyle={{ color: '#10b981' }}
+                        />
+                        <Area type="monotone" dataKey="INFO" stackId="1" stroke="#10b981" fillOpacity={1} fill="url(#colorIngest)" />
+                        <Area type="monotone" dataKey="WARN" stackId="1" stroke="#f59e0b" fill="#f59e0b" fillOpacity={0.1} />
+                        <Area type="monotone" dataKey="ERROR" stackId="1" stroke="#ef4444" fill="#ef4444" fillOpacity={0.1} />
+                      </AreaChart>
+                    </ResponsiveContainer>
+                  ) : (
+                    <div className="h-full flex items-center justify-center text-[10px] font-mono text-text-muted uppercase tracking-widest">
+                      No Time Data
+                    </div>
+                  )}
+                </div>
+              </section>
+
+              {/* Severity Summary */}
+              <section className="lg:col-span-1 bg-bg-surface/50 border border-border rounded-xl p-6 backdrop-blur-sm relative overflow-hidden flex flex-col">
                 <div className="flex items-center gap-2 mb-6">
                   <BarChart3 className="h-4 w-4 text-primary-green" />
                   <h2 className="text-xs font-bold uppercase tracking-widest text-text-muted">
                     Severity Distribution
                   </h2>
                 </div>
-                <div className="space-y-4 relative z-10">
+                <div className="space-y-4 relative z-10 overflow-y-auto pr-2 custom-scrollbar">
                   {stats && Object.keys(stats.level_counts).length > 0 ? (
                     Object.entries(stats.level_counts)
                       .sort((a, b) => b[1] - a[1])
@@ -230,58 +412,106 @@ export default function DashboardPage() {
                       ))
                   ) : (
                     <div className="py-10 text-center text-[10px] font-mono text-text-muted uppercase tracking-widest">
-                      No Data in Window
+                      No Data
                     </div>
                   )}
                 </div>
-                {/* Subtle Background Icon */}
-                <BarChart3 className="absolute -bottom-4 -right-4 size-32 text-text-muted/5 opacity-5 pointer-events-none" />
+              </section>
+            </div>
+
+            {/* Patterns Row */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+              {/* Critical Clusters */}
+              <section className="bg-bg-surface/50 border border-border rounded-xl p-6 backdrop-blur-sm relative overflow-hidden">
+                <div className="flex items-center gap-2 mb-6">
+                  <AlertTriangle className="h-4 w-4 text-red-500" />
+                  <h2 className="text-xs font-bold uppercase tracking-widest text-text-muted">
+                    Top Error Clusters
+                  </h2>
+                </div>
+                <div className="space-y-2 relative z-10">
+                  {stats && stats.top_error_clusters.length > 0 ? (
+                    stats.top_error_clusters.map((c, i) => (
+                      <ClusterRow key={i} index={i} template={c.template} count={c.count} total={stats.total_logs} type="error" />
+                    ))
+                  ) : (
+                    <div className="py-20 text-center text-[10px] font-mono text-text-muted uppercase tracking-widest">
+                      No Errors Detected
+                    </div>
+                  )}
+                </div>
               </section>
 
-              {/* Top Clusters */}
-              <section className="lg:col-span-2 bg-bg-surface/50 border border-border rounded-xl p-6 backdrop-blur-sm relative overflow-hidden">
+              {/* General Clusters */}
+              <section className="bg-bg-surface/50 border border-border rounded-xl p-6 backdrop-blur-sm relative overflow-hidden">
                 <div className="flex items-center gap-2 mb-6">
                   <AlertCircle className="h-4 w-4 text-violet-400" />
                   <h2 className="text-xs font-bold uppercase tracking-widest text-text-muted">
-                    Top 10 Noise Generators
+                    Top Noise Generators
                   </h2>
                 </div>
                 <div className="space-y-2 relative z-10">
                   {stats && stats.top_clusters.length > 0 ? (
                     stats.top_clusters.map((c, i) => (
-                      <div
-                        key={i}
-                        className="group flex items-start gap-4 p-3 rounded-lg hover:bg-bg-elevated transition-all border border-transparent hover:border-border/50 bg-bg-base/30"
-                      >
-                        <span className="text-[10px] font-mono text-text-muted py-1 w-6">#{i + 1}</span>
-                        <div className="flex-1 overflow-hidden">
-                          <p className="text-[11px] font-mono text-text-base truncate mb-1.5 leading-relaxed group-hover:text-primary-green transition-colors">
-                            {c.template}
-                          </p>
-                          <div className="flex items-center gap-3">
-                            <div className="h-1 bg-violet-500/10 rounded-full flex-1 overflow-hidden border border-white/5">
-                              <motion.div
-                                initial={{ width: 0 }}
-                                animate={{ width: `${(c.count / stats.total_logs) * 100}%` }}
-                                className="h-full bg-violet-500 rounded-full shadow-[0_0_8px_rgba(139,92,246,0.3)]"
-                              />
-                            </div>
-                            <span className="text-[10px] font-mono text-text-muted shrink-0 w-16 text-right">
-                              {c.count.toLocaleString()} hits
-                            </span>
-                          </div>
-                        </div>
-                      </div>
+                      <ClusterRow key={i} index={i} template={c.template} count={c.count} total={stats.total_logs} type="noise" />
                     ))
                   ) : (
                     <div className="py-20 text-center text-[10px] font-mono text-text-muted uppercase tracking-widest">
-                      No Clusters Detected
+                      No Clusters
                     </div>
                   )}
                 </div>
-                <AlertCircle className="absolute -bottom-4 -right-4 size-32 text-text-muted/5 opacity-5 pointer-events-none" />
               </section>
             </div>
+
+            {/* Source Heatmap Row */}
+            <section className="bg-bg-surface/50 border border-border rounded-xl p-6 backdrop-blur-sm relative overflow-hidden">
+              <div className="flex items-center gap-2 mb-6">
+                <Activity className="h-4 w-4 text-primary" />
+                <h2 className="text-xs font-bold uppercase tracking-widest text-text-muted">
+                  Source Activity Heatmap
+                </h2>
+              </div>
+              
+              <div className="relative z-10">
+                {stats && stats.source_heatmap.length > 0 ? (
+                  <div className="flex flex-col gap-4">
+                    {/* Unique sources */}
+                    {Array.from(new Set(stats.source_heatmap.map(d => d.source_name))).map(sourceName => {
+                       const sourceData = stats.source_heatmap.filter(d => d.source_name === sourceName);
+                       const maxCount = Math.max(...sourceData.map(d => d.count));
+                       
+                       return (
+                        <div key={sourceName} className="flex items-center gap-4">
+                          <span className="text-[10px] font-mono text-text-muted w-32 truncate">{sourceName}</span>
+                          <div className="flex-1 flex gap-1 h-4">
+                            {sourceData.slice(-50).map((d, i) => {
+                               const intensity = maxCount > 0 ? d.count / maxCount : 0;
+                               return (
+                                 <div 
+                                   key={i} 
+                                   className="h-full flex-1 rounded-sm border border-white/5 transition-all hover:scale-110"
+                                   style={{ 
+                                     backgroundColor: `rgba(16, 185, 129, ${0.1 + intensity * 0.9})`,
+                                     minWidth: '4px'
+                                   }}
+                                   title={`${d.timestamp}: ${d.count} logs`}
+                                 />
+                               );
+                            })}
+                          </div>
+                        </div>
+                       );
+                    })}
+                  </div>
+                ) : (
+                  <div className="py-20 text-center text-[10px] font-mono text-text-muted uppercase tracking-widest">
+                    Insufficient Source Data
+                  </div>
+                )}
+              </div>
+              <Activity className="absolute -bottom-4 -right-4 size-32 text-text-muted/5 opacity-5 pointer-events-none" />
+            </section>
           </motion.div>
         ) : (
           <motion.div
@@ -316,11 +546,13 @@ function StatCard({
   label,
   value,
   subValue,
+  trend
 }: {
   icon: React.ReactNode;
   label: string;
   value: string;
   subValue: string;
+  trend?: "up" | "down" | "stable";
 }) {
   return (
     <motion.div
@@ -331,7 +563,17 @@ function StatCard({
       <div className="flex items-start justify-between gap-3">
         <div className="flex-1">
           <p className="text-[10px] font-bold uppercase tracking-wider text-text-muted mb-1">{label}</p>
-          <h3 className="text-xl font-mono font-bold text-text-primary tracking-tight">{value}</h3>
+          <div className="flex items-baseline gap-2">
+            <h3 className="text-xl font-mono font-bold text-text-primary tracking-tight">{value}</h3>
+            {trend && (
+              <span className={cn(
+                "text-[10px] font-bold",
+                trend === "up" ? "text-red-400" : trend === "down" ? "text-green-400" : "text-text-muted opacity-40"
+              )}>
+                {trend === "up" ? "↑" : trend === "down" ? "↓" : "•"}
+              </span>
+            )}
+          </div>
           <p className="text-[9px] text-text-muted mt-1 font-medium opacity-60 group-hover:opacity-100 transition-opacity uppercase tracking-tighter">
             {subValue}
           </p>
@@ -377,6 +619,43 @@ function LevelBar({ level, count, total }: { level: string; count: number; total
           transition={{ duration: 1, ease: "easeOut" }}
           className={`h-full ${color} rounded-full`}
         />
+      </div>
+    </div>
+  );
+}
+
+function ClusterRow({ index, template, count, total, type }: { 
+  index: number; 
+  template: string; 
+  count: number; 
+  total: number;
+  type: "error" | "noise"
+}) {
+  const barColor = type === "error" ? "bg-red-500" : "bg-violet-500";
+  const glow = type === "error" ? "shadow-[0_0_8px_rgba(239,68,68,0.3)]" : "shadow-[0_0_8px_rgba(139,92,246,0.3)]";
+
+  return (
+    <div className="group flex items-start gap-4 p-3 rounded-lg hover:bg-bg-elevated transition-all border border-transparent hover:border-border/50 bg-bg-base/30">
+      <span className="text-[10px] font-mono text-text-muted py-1 w-6">#{index + 1}</span>
+      <div className="flex-1 overflow-hidden">
+        <p className={cn(
+          "text-[11px] font-mono text-text-base truncate mb-1.5 leading-relaxed group-hover:text-primary-green transition-colors",
+          type === "error" && "text-red-400/90"
+        )}>
+          {template}
+        </p>
+        <div className="flex items-center gap-3">
+          <div className="h-1 bg-white/5 rounded-full flex-1 overflow-hidden border border-white/5">
+            <motion.div
+              initial={{ width: 0 }}
+              animate={{ width: `${(count / total) * 100}%` }}
+              className={cn("h-full rounded-full", barColor, glow)}
+            />
+          </div>
+          <span className="text-[10px] font-mono text-text-muted shrink-0 w-16 text-right">
+            {count.toLocaleString()} hits
+          </span>
+        </div>
       </div>
     </div>
   );
