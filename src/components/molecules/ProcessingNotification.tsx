@@ -54,8 +54,8 @@ export function ProcessingNotification() {
               <Sparkles className="size-2 text-primary-green absolute -top-1 -right-1 animate-pulse" />
             </div>
             <div>
-              <h4 className="text-[10px] font-bold uppercase tracking-widest text-text-primary">Clustering Logs</h4>
-              <p className="text-[9px] text-text-muted font-mono">{activeJobs.length} active {activeJobs.length === 1 ? 'job' : 'jobs'}</p>
+              <h4 className="text-[10px] font-bold uppercase tracking-widest text-text-primary">Drain3 Pattern Mining</h4>
+              <p className="text-[9px] text-text-muted font-mono">{activeJobs.length} active Drain3 {activeJobs.length === 1 ? 'task' : 'tasks'}</p>
             </div>
             <div className="ml-auto text-right">
               <span className="text-xs font-mono font-bold text-primary-green">{percent}%</span>
@@ -76,7 +76,7 @@ export function ProcessingNotification() {
                {totalProcessed.toLocaleString()} / {totalLines.toLocaleString()}
              </span>
              <span className="text-[8px] font-bold text-primary-green opacity-0 group-hover:opacity-100 transition-opacity">
-               Background
+               Mining Patterns
              </span>
           </div>
 

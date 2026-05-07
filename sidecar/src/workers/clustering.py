@@ -1,9 +1,10 @@
 import logging
 import threading
 import time
-import json
 from typing import Any
 from datetime import datetime
+from metadata_extractor import extract_log_metadata
+import json
 
 logger = logging.getLogger("ClusteringWorker")
 
@@ -55,7 +56,7 @@ class ClusteringWorker:
         # 1. Fetch a batch of unprocessed logs
         # We process logs in order of ID to maintain sequence
         cursor.execute(
-            "SELECT id, workspace_id, message, raw_text FROM logs WHERE processed = FALSE ORDER BY id ASC LIMIT ?",
+            "SELECT id, workspace_id, source_id, raw_text, facets FROM logs WHERE processed = FALSE ORDER BY id ASC LIMIT ?",
             (self.batch_size,)
         )
         batch = cursor.fetchall()
@@ -65,35 +66,59 @@ class ClusteringWorker:
 
         logger.info(f"[Worker] Processing batch of {len(batch)} logs...")
         
-        updates = []
-        cluster_increments = {} # (ws_id, cluster_id, template) -> count
+        # Caches for this batch
+        rules_cache = {}
+        global_rules = self._get_global_rules(cursor)
 
-        for log_id, ws_id, message, raw_text in batch:
+        updates = []
+        cluster_increments = {}  # (ws_id, cluster_id, template) -> count
+
+        for log_id, ws_id, source_id, raw_text, facets_json in batch:
             try:
-                # Fallback to raw_text if message is missing
-                msg_to_parse = message or raw_text or ""
+                # 2. Rich Metadata Extraction (Regex parsing)
+                existing_facets = json.loads(facets_json) if facets_json else {}
+                rules = self.app._get_facet_rules_for_workspace(cursor, ws_id, rules_cache, global_rules)
                 
-                # 2. Get Drain3 result
+                meta = extract_log_metadata(ws_id, source_id, raw_text, custom_rules=rules)
+                
+                # Merge heuristic facets with existing ones
+                meta["facets"].update(existing_facets)
+                
+                timestamp = meta["timestamp"]
+                level = meta["level"]
+                message = meta["message"]
+                facets = json.dumps(meta["facets"])
+
+                # 3. Get Drain3 result (Pattern Mining)
                 parser = self.app.get_drain_parser(ws_id)
-                res = parser.parse(msg_to_parse)
+                res = parser.parse(message)
                 cluster_id = str(res["cluster_id"])
                 template = res["template"]
                 
-                updates.append((cluster_id, log_id))
+                updates.append((timestamp, level, message, facets, cluster_id, log_id))
                 
                 # Aggregate cluster counts to minimize DB writes
                 key = (ws_id, cluster_id, template)
                 cluster_increments[key] = cluster_increments.get(key, 0) + 1
                 
             except Exception as e:
-                logger.error(f"[Worker] Failed to cluster log {log_id}: {e}")
-                # Mark as processed anyway to avoid stuck logs, but with 'unknown' cluster
-                updates.append(("unknown", log_id))
+                logger.error(f"[Worker] Failed to process log {log_id}: {e}")
+                # Mark as processed with fallback to raw info
+                updates.append((None, "ERROR", raw_text, facets_json, "unknown", log_id))
 
-        # 3. Update logs table in bulk
+        # 4. Update logs table in bulk
         if updates:
             cursor.executemany(
-                "UPDATE logs SET cluster_id = ?, processed = TRUE WHERE id = ?",
+                """
+                UPDATE logs 
+                SET timestamp = COALESCE(?, timestamp), 
+                    level = ?, 
+                    message = ?, 
+                    facets = ?, 
+                    cluster_id = ?, 
+                    processed = TRUE 
+                WHERE id = ?
+                """,
                 updates
             )
 
@@ -171,3 +196,15 @@ class ClusteringWorker:
             self.db.commit()
         except Exception as e:
             logger.error(f"[Worker] Job status sync failed: {e}")
+
+    def _get_global_rules(self, cursor: Any) -> list:
+        """Helper to fetch global extraction rules."""
+        cursor.execute("SELECT value FROM settings WHERE key = 'facet_extractions'")
+        gr = cursor.fetchone()
+        if gr and gr[0]:
+            try:
+                parsed = json.loads(gr[0])
+                return parsed if isinstance(parsed, list) else []
+            except Exception:
+                pass
+        return []

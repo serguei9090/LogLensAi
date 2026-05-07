@@ -373,11 +373,11 @@ export function VirtualLogTable({
               position: "relative",
             }}
           >
-            <table className="w-full text-left text-sm whitespace-nowrap table-fixed border-separate border-spacing-0">
-              <thead className="sticky top-0 bg-bg-surface border-b border-border z-10 text-text-muted text-[10px] font-bold uppercase tracking-widest h-10 select-none">
-                <tr>
+            <table className="w-full text-left text-sm border-separate border-spacing-0 block">
+              <thead className="sticky top-0 bg-bg-surface border-b border-border z-10 text-text-muted text-[10px] font-bold uppercase tracking-widest h-10 select-none block">
+                <tr className="grid grid-cols-[12px_60px_180px_90px_1fr_110px_100px] w-full items-center">
                   <th
-                    className="w-[12px] p-0 transition-colors group/select-all"
+                    className="p-0 transition-colors group/select-all"
                     title={selectedLogIds.length === logs.length ? "Deselect All" : "Select All"}
                   >
                     <button
@@ -405,7 +405,7 @@ export function VirtualLogTable({
                       />
                     </button>
                   </th>
-                  <th className="w-[60px] p-0 text-center" aria-sort={getAriaSort("id")}>
+                  <th className="p-0 text-center flex items-center justify-center">
                     <button
                       type="button"
                       className="w-full h-10 px-3 flex items-center justify-center gap-1.5 hover:text-text-primary transition-colors focus-visible:bg-primary/5 outline-none"
@@ -414,7 +414,7 @@ export function VirtualLogTable({
                       ID {renderSortIcon("id")}
                     </button>
                   </th>
-                  <th className="w-[180px] p-0 text-left" aria-sort={getAriaSort("timestamp")}>
+                  <th className="p-0 text-left flex items-center">
                     <button
                       type="button"
                       className="w-full h-10 px-3 flex items-center gap-1.5 hover:text-text-primary transition-colors focus-visible:bg-primary/5 outline-none"
@@ -423,7 +423,7 @@ export function VirtualLogTable({
                       Timestamp {renderSortIcon("timestamp")}
                     </button>
                   </th>
-                  <th className="w-[90px] p-0 text-left" aria-sort={getAriaSort("level")}>
+                  <th className="p-0 text-left flex items-center">
                     <button
                       type="button"
                       className="w-full h-10 px-3 flex items-center gap-1.5 hover:text-text-primary transition-colors focus-visible:bg-primary/5 outline-none"
@@ -432,8 +432,10 @@ export function VirtualLogTable({
                       Level {renderSortIcon("level")}
                     </button>
                   </th>
-                  <th className="px-3 py-1">Message</th>
-                  <th className="w-[110px] p-0 text-center" aria-sort={getAriaSort("cluster_id")}>
+                  <th className="p-0 text-left min-w-0 flex items-center">
+                    <div className="px-3 py-1 text-left w-full">Message</div>
+                  </th>
+                  <th className="p-0 text-center flex items-center justify-center">
                     <button
                       type="button"
                       className="w-full h-10 px-3 flex items-center justify-center gap-1.5 hover:text-text-primary transition-colors focus-visible:bg-primary/5 outline-none"
@@ -442,14 +444,14 @@ export function VirtualLogTable({
                       Cluster {renderSortIcon("cluster_id")}
                     </button>
                   </th>
-                  <th className="w-[100px] p-0 text-center">
+                  <th className="p-0 text-center flex items-center justify-center">
                     <div className="w-full h-10 px-3 flex items-center justify-center gap-1.5">
                       Actions
                     </div>
                   </th>
                 </tr>
               </thead>
-              <tbody className="font-mono text-[12px] relative z-0">
+              <tbody className="font-mono text-[12px] relative z-0 block">
                 {rowVirtualizer.getVirtualItems().map((virtualRow) => {
                   const log = logs[virtualRow.index];
                   const isExpanded = expandedRow === log.id;
@@ -757,9 +759,9 @@ function LogTableRow({
       aria-controls={isExpanded ? `row-details-${log.id}` : undefined}
       className={cn(
         "group cursor-pointer transition-all border-b border-border/40 outline-none focus-visible:bg-bg-hover focus-visible:ring-1 focus-visible:ring-primary/30 relative",
+        "grid grid-cols-[12px_60px_180px_90px_1fr_110px_100px] items-stretch",
         getRowLevelStyles(log.level),
-        isSelected && "bg-emerald-500/[0.04] !border-l-emerald-500",
-        !isSelected && "border-l-transparent",
+        isSelected && "bg-emerald-500/[0.04]",
         isExpanded && "bg-bg-hover ring-1 ring-primary/20 z-10",
       )}
       style={{
@@ -768,8 +770,6 @@ function LogTableRow({
         left: 0,
         width: "100%",
         transform: `translateY(${virtualRow.start}px)`,
-        borderLeftWidth: "3px",
-        borderLeftStyle: "solid",
       }}
       onClick={(e) => onSelect(log.id, e)}
       onKeyDown={(e) => {
@@ -779,19 +779,28 @@ function LogTableRow({
         }
       }}
     >
-      <td className="w-[60px] px-3 py-2 text-center text-text-muted/50 select-none group-hover:text-text-secondary align-top font-bold">
+      <td className="p-0 relative select-none flex items-center justify-center">
+        <div className="w-full h-full flex items-center justify-center min-h-[32px]">
+          {isSelected && (
+            <div className="absolute inset-y-1.5 left-0 w-1 bg-emerald-500 rounded-r-full shadow-[0_0_8px_rgba(16,185,129,0.4)]" />
+          )}
+        </div>
+      </td>
+      <td className="px-3 py-2 text-center text-text-muted/50 select-none group-hover:text-text-secondary align-top font-bold">
         {log.id}
       </td>
-      <td className="w-[180px] px-3 py-2 text-text-secondary/70 align-top opacity-80">
+      <td className="px-3 py-2 text-text-secondary/70 align-top opacity-80 whitespace-nowrap overflow-hidden text-ellipsis">
         {log.timestamp}
       </td>
-      <td className="w-[90px] px-3 py-2 align-top">
+      <td className="px-3 py-2 align-top flex items-start">
         <LogLevelBadge level={log.level} className="scale-75 origin-left" />
       </td>
-      <td className="px-3 py-2 text-text-primary/90 overflow-hidden align-top whitespace-normal break-words leading-relaxed">
-        {content}
+      <td className="px-3 py-2 text-text-primary/90 align-top whitespace-normal break-words leading-relaxed min-w-0">
+        <div className="max-w-full overflow-hidden">
+          {content}
+        </div>
       </td>
-      <td className="w-[110px] px-3 py-2 text-center align-top border-x border-border/5">
+      <td className="px-3 py-2 text-center align-top flex flex-col items-center justify-start">
         {log.cluster_id ? (
           <div
             className={cn(
@@ -825,7 +834,7 @@ function LogTableRow({
           <span className="opacity-10">—</span>
         )}
       </td>
-      <td className="w-[100px] px-3 py-2 text-center relative align-top">
+      <td className="px-3 py-2 text-center relative align-top flex items-start justify-center">
         <div className="flex items-center justify-center gap-1">
           <IconButton
             icon={

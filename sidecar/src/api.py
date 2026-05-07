@@ -47,6 +47,7 @@ from models import (
     GetWorkspaceSourcesRequest,
     IngestLogEntry,
     IngestLogsRequest,
+    IngestLocalFileRequest,
     JSONRPCRequest,
     JSONRPCResponse,
     ReadFileRequest,
@@ -343,6 +344,7 @@ class App:
                 "start_ssh_tail": StartSSHTailRequest,
                 "stop_tail": StartTailRequest,
                 "ingest_logs": IngestLogsRequest,
+                "ingest_local_file": IngestLocalFileRequest,
                 "read_file": ReadFileRequest,
                 "update_log_comment": UpdateCommentRequest,
                 "get_workspace_sources": GetWorkspaceSourcesRequest,
@@ -384,17 +386,28 @@ class App:
 
             # Perform Pydantic validation if a model is defined
             model = models.get(req.method)
+            import asyncio
             import inspect
+
+            # Methods that handle large payloads and must not block the event loop
+            OFFLOAD_TO_THREAD = {"ingest_logs", "ingest_local_file", "export_logs"}
 
             if model:
                 try:
-                    params_model = model(**req.params)
-                    # Unroll the model into keyword arguments for the handler
-                    res = handler(**params_model.model_dump())
-                    if inspect.iscoroutine(res):
-                        result = await res
+                    if req.method in OFFLOAD_TO_THREAD:
+                        # Offload validation + execution for large-payload methods
+                        def _run_offloaded():
+                            params_model = model(**req.params)
+                            return handler(**params_model.model_dump())
+                        result = await asyncio.to_thread(_run_offloaded)
                     else:
-                        result = res
+                        params_model = model(**req.params)
+                        kwargs = params_model.model_dump()
+                        res = handler(**kwargs)
+                        if inspect.iscoroutine(res):
+                            result = await res
+                        else:
+                            result = res
                 except ValidationError as ve:
                     return JSONRPCResponse(
                         id=req.id,
@@ -1045,32 +1058,28 @@ class App:
         ]
 
     def method_ingest_logs(self, logs: list[IngestLogEntry]) -> dict:
-        """High-speed batch ingestion of log entries with pattern clustering"""
+        """High-speed batch ingestion of log entries (Deferred Processing)"""
         cursor = self.db.get_cursor()
         batch_data = []
 
         # Map logs to dict if they are models
         log_dicts = [log.model_dump() if hasattr(log, "model_dump") else log for log in logs]
-
-        # Optimization: Fetch and cache rules for all involved workspaces
-        rules_cache = {}
         workspace_ids = list(set(log.get("workspace_id") for log in log_dicts))
 
-        # Get global rules once
-        global_rules = []
-        cursor.execute("SELECT value FROM settings WHERE key = 'facet_extractions'")
-        gr = cursor.fetchone()
-        if gr and gr[0]:
-            try:
-                parsed = json.loads(gr[0])
-                global_rules = parsed if isinstance(parsed, list) else []
-            except Exception:
-                pass
-
         for log in log_dicts:
-            ws_id = log.get("workspace_id")
-            rules = self._get_facet_rules_for_workspace(cursor, ws_id, rules_cache, global_rules)
-            batch_data.append(self._ingest_single_log(cursor, log, custom_rules=rules))
+            # Lean ingestion: we save raw text and basic metadata.
+            # Rich extraction (Regex) and Clustering (Drain3) are deferred to the background worker.
+            batch_data.append([
+                log.get("workspace_id"),
+                log.get("source_id", "manual"),
+                log.get("raw_text", ""),
+                log.get("timestamp") or datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                log.get("level") or "INFO",
+                log.get("message") or "",
+                None, # cluster_id
+                json.dumps(log.get("facets", {})),
+                False, # processed = FALSE
+            ])
 
         job_id = None
         if batch_data:
@@ -1092,6 +1101,24 @@ class App:
             self.db.commit()
 
         return {"status": "ok", "count": len(batch_data), "job_id": job_id}
+
+    def method_ingest_local_file(self, workspace_id: str, source_id: str, filepath: str) -> dict:
+        """Optimized ingestion: sidecar reads directly from disk to bypass the JSON bridge."""
+        if not os.path.exists(filepath):
+            raise FileNotFoundError(f"File not found: {filepath}")
+
+        # Basic parser to extract lines
+        lines = []
+        with open(filepath, "r", encoding="utf-8", errors="replace") as f:
+            for line in f:
+                if line.strip():
+                    lines.append({
+                        "workspace_id": workspace_id,
+                        "source_id": source_id,
+                        "raw_text": line.strip(),
+                    })
+        
+        return self.method_ingest_logs(logs=lines)
 
     def method_cleanup_ingestion_jobs(self, workspace_id: str) -> dict:
         """Removes stalled ingestion jobs with no progress."""

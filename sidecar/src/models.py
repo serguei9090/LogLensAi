@@ -139,6 +139,12 @@ class IngestLogsRequest(BaseModel):
     logs: list[IngestLogEntry]
 
 
+class IngestLocalFileRequest(BaseModel):
+    workspace_id: str
+    source_id: str
+    filepath: str
+
+
 class UpdateCommentRequest(BaseModel):
     log_id: int
     comment: str

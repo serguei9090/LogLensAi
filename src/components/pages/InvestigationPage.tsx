@@ -277,26 +277,21 @@ export function InvestigationPage() {
     setActiveSource(activeWorkspaceId, newSource.id);
 
     try {
-      toast.loading("Reading file content…", { id: "ingest" });
-      const content = await callSidecar<string>({
-        method: "read_file",
-        params: { filepath: normalizedPath },
+      toast.loading("Ingesting log stream...", { id: "ingest", description: "Loading data into database..." });
+      
+      const result = await callSidecar<{ status: string, count: number }>({
+        method: "ingest_local_file",
+        params: { 
+          filepath: normalizedPath,
+          workspace_id: activeWorkspaceId,
+          source_id: newSource.id
+        },
       });
-      const entries = parseManualLogs(content).map((e) => ({
-        ...e,
-        workspace_id: activeWorkspaceId,
-        source_id: newSource.id,
-      }));
 
-      if (entries.length > 0) {
-        toast.loading("Clustering patterns (Drain3)…", {
+      if (result.count > 0) {
+        toast.success(`${result.count} lines imported`, {
           id: "ingest",
-          description: `Processing ${entries.length} log lines through pattern mining`,
-        });
-        await callSidecar({ method: "ingest_logs", params: { logs: entries } });
-        toast.success(`${entries.length} entries loaded & clustered`, {
-          id: "ingest",
-          description: "Drain3 pattern mining complete",
+          description: "Drain3 pattern mining running in background.",
         });
       } else {
         toast.dismiss("ingest");
@@ -387,14 +382,12 @@ export function InvestigationPage() {
       return;
     }
     try {
-      toast.loading("Clustering patterns (Drain3)…", {
-        id: "ingest",
-        description: `Processing ${entries.length} log lines through pattern mining`,
-      });
+      // Lean INSERT — fast because Drain3/metadata are deferred to background worker
       await callSidecar({ method: "ingest_logs", params: { logs: entries } });
-      toast.success(`${entries.length} entries loaded & clustered`, {
+      
+      toast.success(`${entries.length} lines imported`, {
         id: "ingest",
-        description: "Drain3 pattern mining complete",
+        description: "Drain3 pattern mining running in background.",
       });
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Manual ingestion failed.", {
