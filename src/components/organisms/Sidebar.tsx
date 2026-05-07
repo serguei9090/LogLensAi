@@ -159,7 +159,7 @@ export function Sidebar({
                   <div
                     className={cn(
                       "group w-full flex items-center px-1 py-1 text-[13px] rounded-md transition-all text-left outline-none overflow-hidden",
-                      activeWorkspaceId === ws.id && activeNav === "investigation"
+                      activeNav === "investigation" && activeWorkspaceId === ws.id
                         ? "bg-primary/10 border border-primary/20"
                         : "hover:bg-bg-hover",
                       sidebarCollapsed && "justify-center",
@@ -174,8 +174,8 @@ export function Sidebar({
                       }}
                       className={cn(
                         "flex flex-1 items-center px-2 py-1.5 rounded transition-all text-left outline-none overflow-hidden border-none bg-transparent cursor-pointer",
-                        activeWorkspaceId === ws.id &&
-                          activeNav === "investigation" &&
+                        activeNav === "investigation" &&
+                          activeWorkspaceId === ws.id &&
                           !activeFolderId
                           ? "text-primary font-medium"
                           : "text-text-secondary group-hover:text-text-primary",
@@ -185,7 +185,7 @@ export function Sidebar({
                       <Database
                         className={cn(
                           "h-4 w-4 shrink-0 transition-colors",
-                          activeWorkspaceId === ws.id && activeNav === "investigation"
+                          activeNav === "investigation" && activeWorkspaceId === ws.id
                             ? "text-primary"
                             : "text-text-muted",
                         )}

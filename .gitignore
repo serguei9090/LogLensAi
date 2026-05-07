@@ -56,3 +56,6 @@ fastembed_cache
 #data
 data/
 
+debug_*
+final_debug*
+/scripts/logs/**

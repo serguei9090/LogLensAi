@@ -58,6 +58,7 @@ export default function DashboardPage() {
           source_id: selectedSourceId === "all" ? undefined : selectedSourceId,
           start_time: timeRange.start || undefined,
           end_time: timeRange.end || undefined,
+          active_workspace_ids: workspaces.map(w => w.id),
         },
       });
       setStats(res);
@@ -131,7 +132,9 @@ export default function DashboardPage() {
               setSelectedSourceId("all"); // Reset source when workspace changes
             }}>
               <SelectTrigger className="w-[180px] h-8 text-[11px] bg-bg-base/40 border-white/5 hover:border-white/10 transition-all font-medium">
-                <SelectValue placeholder="Select Workspace" />
+                <SelectValue placeholder="Select Workspace">
+                  {workspaces.find(w => w.id === selectedWorkspaceId)?.name}
+                </SelectValue>
               </SelectTrigger>
               <SelectContent>
                 {workspaces.map(w => (
@@ -146,7 +149,9 @@ export default function DashboardPage() {
               disabled={selectedWorkspaceId === "all"}
             >
               <SelectTrigger className="w-[180px] h-8 text-[11px] bg-bg-base/40 border-white/5 hover:border-white/10 transition-all font-medium">
-                <SelectValue placeholder="Log Source" />
+                <SelectValue placeholder="Log Source">
+                  {selectedSourceId === "all" ? "Entire Workspace" : sources.find(s => s.id === selectedSourceId)?.name}
+                </SelectValue>
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Entire Workspace</SelectItem>

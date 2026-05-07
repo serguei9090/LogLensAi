@@ -1860,6 +1860,7 @@ class App:
         source_id: str | None = None,
         start_time: str | None = None,
         end_time: str | None = None,
+        active_workspace_ids: list[str] | None = None,
     ) -> dict:
         """Fetch high-level metrics for the Dashboard view with advanced filtering."""
         cursor = self.db.get_cursor()
@@ -1880,6 +1881,10 @@ class App:
             norm_end = end_time.replace("T", " ").split(".")[0].replace("Z", "")
             where_clauses.append("l.timestamp <= ?")
             params.append(norm_end)
+        if active_workspace_ids:
+            placeholders = ", ".join(["?"] * len(active_workspace_ids))
+            where_clauses.append(f"l.workspace_id IN ({placeholders})")
+            params.extend(active_workspace_ids)
 
         where_sql = " WHERE " + SQL_AND_JOIN.join(where_clauses) if where_clauses else ""
 
@@ -1914,7 +1919,11 @@ class App:
         top_clusters = [{"template": row[0], "count": row[1]} for row in cursor.fetchall()]
 
         # 5. Global Metrics
-        cursor.execute("SELECT COUNT(DISTINCT workspace_id) FROM logs")
+        if active_workspace_ids:
+            placeholders = ", ".join(["?"] * len(active_workspace_ids))
+            cursor.execute(f"SELECT COUNT(DISTINCT workspace_id) FROM logs WHERE workspace_id IN ({placeholders})", active_workspace_ids)
+        else:
+            cursor.execute("SELECT COUNT(DISTINCT workspace_id) FROM logs")
         workspace_count = cursor.fetchone()[0]
 
         return {
@@ -1924,6 +1933,32 @@ class App:
             "top_clusters": top_clusters,
             "workspace_count": workspace_count,
             "active_tailers": len([k for k, t in self.tailers.items() if t.running]),
+        }
+
+    def method_purge_inactive_workspaces(self, active_workspace_ids: list[str]) -> dict:
+        """Permanently delete logs and clusters from workspaces not in the active list."""
+        if not active_workspace_ids:
+            return {"status": "error", "message": "Active workspace list cannot be empty for purge"}
+
+        cursor = self.db.get_cursor()
+        placeholders = ", ".join(["?"] * len(active_workspace_ids))
+
+        # Delete logs
+        cursor.execute(f"DELETE FROM logs WHERE workspace_id NOT IN ({placeholders})", active_workspace_ids)
+        logs_deleted = cursor.rowcount
+
+        # Delete clusters
+        cursor.execute(f"DELETE FROM clusters WHERE workspace_id NOT IN ({placeholders})", active_workspace_ids)
+        clusters_deleted = cursor.rowcount
+
+        # Delete workspace settings
+        cursor.execute(f"DELETE FROM workspace_settings WHERE workspace_id NOT IN ({placeholders})", active_workspace_ids)
+
+        return {
+            "status": "ok",
+            "logs_deleted": logs_deleted,
+            "clusters_deleted": clusters_deleted,
+            "message": f"Purged data for inactive workspaces. {logs_deleted} logs removed."
         }
 
     # --- Private Helpers for Complexity Reduction ---

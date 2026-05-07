@@ -220,6 +220,7 @@ class GetDashboardStatsRequest(BaseModel):
     source_id: str | None = None
     start_time: str | None = None
     end_time: str | None = None
+    active_workspace_ids: list[str] | None = None
 
 
 class GetLogDistributionRequest(BaseModel):
@@ -324,3 +325,7 @@ class GenerateExtractionRegexRequest(BaseModel):
 class DeleteLogsRequest(BaseModel):
     workspace_id: str
     source_id: str | None = None
+
+
+class PurgeInactiveWorkspacesRequest(BaseModel):
+    active_workspace_ids: list[str]

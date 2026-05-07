@@ -50,7 +50,10 @@ export default function App() {
 
   const handleNavSelect = useCallback((nav: NavTab) => {
     setActiveNav(nav);
-  }, []);
+    if (nav !== "investigation") {
+      setActive(null);
+    }
+  }, [setActive]);
 
   // Register Global Shortcuts
   useKeyboardShortcuts([
