@@ -27,7 +27,10 @@ def wipe_logs(force=False):
             "log_sources",
             "clusters",
             "log_streams",
-            "anomalies"
+            "anomalies",
+            "ingestion_jobs",
+            "ai_messages",
+            "ai_sessions"
         ]
 
         print(f"[Wipe] Cleaning database at {DB_PATH}...")

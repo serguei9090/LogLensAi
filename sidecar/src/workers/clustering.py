@@ -42,7 +42,8 @@ class ClusteringWorker:
             try:
                 processed_count = self._process_batch()
                 if processed_count == 0:
-                    # No work, sleep for a bit
+                    # STAB-005: Periodic sync to handle ingestion jobs stuck by duplicate suppression
+                    self._sync_job_statuses()
                     time.sleep(self.interval)
             except Exception as e:
                 logger.error(f"[Worker] Error in clustering cycle: {e}")
@@ -109,26 +110,64 @@ class ClusteringWorker:
             )
 
         # 5. Update Ingestion Job Status (Checkpointing)
-        # We find jobs that might be affected by this batch. 
-        # For simplicity, we update any job for the workspaces we just touched.
         affected_workspaces = list(set(ws_id for ws_id, _, _ in cluster_increments.keys()))
         for ws_id in affected_workspaces:
-            # Update jobs for this workspace that are not completed/failed
+            # BUG-002 Resolution: Use explicit parameter for comparison to avoid stale subquery value
+            cursor.execute(
+                "SELECT COUNT(*) FROM logs WHERE workspace_id = ? AND processed = TRUE", 
+                (ws_id,)
+            )
+            processed_now = cursor.fetchone()[0]
+
             cursor.execute(
                 """
                 UPDATE ingestion_jobs 
-                SET processed_lines = (
-                    SELECT COUNT(*) FROM logs WHERE workspace_id = ? AND processed = TRUE
-                ),
+                SET processed_lines = ?,
                 status = CASE 
-                    WHEN processed_lines >= total_lines THEN 'completed' 
+                    WHEN ? >= total_lines THEN 'completed' 
                     ELSE 'processing' 
                 END,
                 updated_at = CURRENT_TIMESTAMP
                 WHERE workspace_id = ? AND status IN ('pending', 'processing')
                 """,
-                (ws_id, ws_id)
+                (processed_now, processed_now, ws_id)
             )
 
         self.db.commit()
         return len(batch)
+
+    def _sync_job_statuses(self):
+        """
+        Forcefully syncs ingestion job statuses when the worker is idle.
+        Resolves cases where total_lines > actual_lines due to duplicate suppression.
+        """
+        try:
+            cursor = self.db.get_cursor()
+            # Find workspaces with active jobs
+            cursor.execute("SELECT DISTINCT workspace_id FROM ingestion_jobs WHERE status IN ('pending', 'processing')")
+            workspaces = [row[0] for row in cursor.fetchall()]
+            
+            for ws_id in workspaces:
+                # If there are no more unprocessed logs for this workspace, mark all jobs as completed
+                cursor.execute("SELECT COUNT(*) FROM logs WHERE workspace_id = ? AND processed = FALSE", (ws_id,))
+                unprocessed = cursor.fetchone()[0]
+                
+                if unprocessed == 0:
+                    # All currently existing logs for this workspace are processed
+                    # We sync the processed_lines and mark as completed
+                    cursor.execute("SELECT COUNT(*) FROM logs WHERE workspace_id = ? AND processed = TRUE", (ws_id,))
+                    processed_now = cursor.fetchone()[0]
+                    
+                    cursor.execute(
+                        """
+                        UPDATE ingestion_jobs 
+                        SET processed_lines = ?,
+                            status = 'completed',
+                            updated_at = CURRENT_TIMESTAMP
+                        WHERE workspace_id = ? AND status IN ('pending', 'processing')
+                        """,
+                        (processed_now, ws_id)
+                    )
+            self.db.commit()
+        except Exception as e:
+            logger.error(f"[Worker] Job status sync failed: {e}")

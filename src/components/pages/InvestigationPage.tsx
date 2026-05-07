@@ -274,6 +274,8 @@ export function InvestigationPage() {
       folderId,
     );
 
+    setActiveSource(activeWorkspaceId, newSource.id);
+
     try {
       toast.loading("Reading file content…", { id: "ingest" });
       const content = await callSidecar<string>({
@@ -337,6 +339,7 @@ export function InvestigationPage() {
       },
       folderId,
     );
+    setActiveSource(activeWorkspaceId, newSource.id);
     if (!tail) {
       toast.info("Non-tail SSH import is not yet supported. Enable Live Stream.");
       return;
@@ -372,6 +375,7 @@ export function InvestigationPage() {
       },
       folderId,
     );
+    setActiveSource(activeWorkspaceId, newSource.id);
 
     const entries = parseManualLogs(rawText).map((e) => ({
       ...e,

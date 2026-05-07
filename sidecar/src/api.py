@@ -314,7 +314,11 @@ class App:
             tailer.stop()
         self.tailers = {}
 
-        # 4. MCP Server
+        # 4. Clustering Worker
+        if hasattr(self, "clustering_worker"):
+            self.clustering_worker.stop()
+
+        # 5. MCP Server
         self._stop_mcp_server()
 
         logger.info("Sidecar: Background workers stopped.")
