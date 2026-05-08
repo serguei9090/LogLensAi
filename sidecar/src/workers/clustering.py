@@ -135,12 +135,12 @@ class ClusteringWorker:
             )
 
         # 5. Update Ingestion Job Status (Checkpointing)
-        affected_workspaces = list(set(ws_id for ws_id, _, _ in cluster_increments.keys()))
-        for ws_id in affected_workspaces:
-            # BUG-002 Resolution: Use explicit parameter for comparison to avoid stale subquery value
+        affected_sources = list(set((ws_id, src_id) for _, ws_id, src_id, _, _ in batch))
+        for ws_id, src_id in affected_sources:
+            # Get processed count for this specific source
             cursor.execute(
-                "SELECT COUNT(*) FROM logs WHERE workspace_id = ? AND processed = TRUE", 
-                (ws_id,)
+                "SELECT COUNT(*) FROM logs WHERE workspace_id = ? AND source_id = ? AND processed = TRUE", 
+                (ws_id, src_id)
             )
             processed_now = cursor.fetchone()[0]
 
@@ -153,9 +153,9 @@ class ClusteringWorker:
                     ELSE 'processing' 
                 END,
                 updated_at = CURRENT_TIMESTAMP
-                WHERE workspace_id = ? AND status IN ('pending', 'processing')
+                WHERE workspace_id = ? AND source_id = ? AND status IN ('pending', 'processing')
                 """,
-                (processed_now, processed_now, ws_id)
+                (processed_now, processed_now, ws_id, src_id)
             )
 
         self.db.commit()
@@ -168,19 +168,17 @@ class ClusteringWorker:
         """
         try:
             cursor = self.db.get_cursor()
-            # Find workspaces with active jobs
-            cursor.execute("SELECT DISTINCT workspace_id FROM ingestion_jobs WHERE status IN ('pending', 'processing')")
-            workspaces = [row[0] for row in cursor.fetchall()]
+            # Find active jobs and their sources
+            cursor.execute("SELECT workspace_id, source_id FROM ingestion_jobs WHERE status IN ('pending', 'processing')")
+            active_jobs = cursor.fetchall()
             
-            for ws_id in workspaces:
-                # If there are no more unprocessed logs for this workspace, mark all jobs as completed
-                cursor.execute("SELECT COUNT(*) FROM logs WHERE workspace_id = ? AND processed = FALSE", (ws_id,))
+            for ws_id, src_id in active_jobs:
+                # If there are no more unprocessed logs for this source, mark job as completed
+                cursor.execute("SELECT COUNT(*) FROM logs WHERE workspace_id = ? AND source_id = ? AND processed = FALSE", (ws_id, src_id))
                 unprocessed = cursor.fetchone()[0]
                 
                 if unprocessed == 0:
-                    # All currently existing logs for this workspace are processed
-                    # We sync the processed_lines and mark as completed
-                    cursor.execute("SELECT COUNT(*) FROM logs WHERE workspace_id = ? AND processed = TRUE", (ws_id,))
+                    cursor.execute("SELECT COUNT(*) FROM logs WHERE workspace_id = ? AND source_id = ? AND processed = TRUE", (ws_id, src_id))
                     processed_now = cursor.fetchone()[0]
                     
                     cursor.execute(
@@ -189,9 +187,9 @@ class ClusteringWorker:
                         SET processed_lines = ?,
                             status = 'completed',
                             updated_at = CURRENT_TIMESTAMP
-                        WHERE workspace_id = ? AND status IN ('pending', 'processing')
+                        WHERE workspace_id = ? AND source_id = ? AND status IN ('pending', 'processing')
                         """,
-                        (processed_now, ws_id)
+                        (processed_now, ws_id, src_id)
                     )
             self.db.commit()
         except Exception as e:

@@ -229,6 +229,10 @@ class GetDashboardStatsRequest(BaseModel):
     active_workspace_ids: list[str] | None = None
 
 
+class GetIngestionJobsRequest(BaseModel):
+    workspace_id: str | None = None
+
+
 class GetLogDistributionRequest(BaseModel):
     workspace_id: str
     fusion_id: str | None = None

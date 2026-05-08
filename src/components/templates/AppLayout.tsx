@@ -1,7 +1,6 @@
 import type { NavTab } from "@/App";
 import { type DiagnosticData, DiagnosticSidebar } from "@/components/organisms/DiagnosticSidebar";
 import { Sidebar } from "@/components/organisms/Sidebar";
-import { ProcessingNotification } from "@/components/molecules/ProcessingNotification";
 import type { Workspace } from "@/store/workspaceStore";
 import { useWorkspaceStore } from "@/store/workspaceStore";
 import {
@@ -84,7 +83,6 @@ export function AppLayout({
         />
         <main className="flex-1 flex flex-col min-w-0 relative h-full bg-bg-base">
           {children}
-          <ProcessingNotification />
         </main>
         <DiagnosticSidebar
           open={diagnosticOpen}

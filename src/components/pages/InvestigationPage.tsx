@@ -9,6 +9,7 @@ import { VirtualLogTable } from "@/components/organisms/VirtualLogTable";
 import { WorkspaceEngineSettings } from "@/components/organisms/WorkspaceEngineSettings";
 import { InvestigationLayout } from "@/components/templates/InvestigationLayout";
 import { useKeyboardShortcuts } from "@/lib/hooks/useKeyboardShortcuts";
+import { useIngestionStatus } from "@/lib/hooks/useIngestionStatus";
 import { callSidecar } from "@/lib/hooks/useSidecarBridge";
 import { useAiStore } from "@/store/aiStore";
 import { useInvestigationStore } from "@/store/investigationStore";
@@ -110,11 +111,32 @@ export function InvestigationPage() {
   // Anomalies state
   const [anomalousClusters, setAnomalousClusters] = useState<Set<string>>(new Set());
 
-  // Search Bar Ref
-  const searchRef = useRef<HTMLInputElement>(null);
+  // Ingestion status & notifications
+  const { lastJob, jobs } = useIngestionStatus(activeWorkspaceId ?? "");
+  const prevJobStatus = useRef<string | null>(null);
+  const lastJobId = useRef<number | null>(null);
 
-  // Memoized non-fusion sources
-  const nonFusionSources = useMemo(() => sources.filter((s) => s.type !== "fusion"), [sources]);
+  // Ingestion transition state - tracks which source we just triggered ingestion for
+  const [transitioningSourceId, setTransitioningSourceId] = useState<string | null>(null);
+
+  // Clear transitioning state once a job for that source is detected
+  useEffect(() => {
+    if (jobs.some(j => j.source_id === transitioningSourceId && (j.status === 'processing' || j.status === 'pending'))) {
+      setTransitioningSourceId(null);
+    }
+  }, [jobs, transitioningSourceId]);
+
+  // Find the active job for the CURRENTLY SELECTED source
+  const activeJobForSource = useMemo(() => {
+    const job = jobs.find(j => j.source_id === activeSourceId && (j.status === 'processing' || j.status === 'pending'));
+    // If we have an active job, we should also consider it "transitioning" to show the loading screen immediately
+    return job || null;
+  }, [jobs, activeSourceId]);
+
+  // Combined loading state for the table
+  const isSourceLoading = useMemo(() => {
+    return transitioningSourceId === activeSourceId || !!activeJobForSource;
+  }, [transitioningSourceId, activeSourceId, activeJobForSource]);
 
   // ── Log fetching ──────────────────────────────────────────────────────────
 
@@ -131,12 +153,15 @@ export function InvestigationPage() {
       return;
     }
 
+    const currentSourceRef = activeSourceId;
     try {
       if (showAnomalies) {
         const anomRes = await callSidecar<{ anomalies: { cluster_id: string }[] }>({
           method: "get_anomalies",
           params: { workspace_id: activeWorkspaceId },
+          silent: true,
         });
+        if (currentSourceRef !== activeSourceId) return;
         setAnomalousClusters(new Set(anomRes.anomalies.map((a) => a.cluster_id)));
       } else {
         setAnomalousClusters(new Set());
@@ -166,7 +191,10 @@ export function InvestigationPage() {
           start_time: timeRange.start || undefined,
           end_time: timeRange.end || undefined,
         },
+        silent: true,
       });
+
+      if (currentSourceRef !== activeSourceId) return;
       setLogs(result.logs ?? [], result.total ?? 0);
 
       const facetRes = await callSidecar<Record<string, { value: string; count: number }[]>>({
@@ -175,7 +203,10 @@ export function InvestigationPage() {
           workspace_id: activeWorkspaceId,
           source_ids: activeSrc && !isFusion ? [activeSrc.id] : undefined,
         },
+        silent: true,
       });
+      
+      if (currentSourceRef !== activeSourceId) return;
       setAvailableFacets(facetRes);
       setIsConnected(true);
     } catch (e) {
@@ -196,11 +227,52 @@ export function InvestigationPage() {
     timeRange,
   ]);
 
+  // Orchestrator Hub state
+
   useEffect(() => {
     fetchLogs();
     const interval = setInterval(fetchLogs, 2500);
     return () => clearInterval(interval);
   }, [fetchLogs]);
+
+  // Search Bar Ref
+  const searchRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (!lastJob) {
+      // If we had an active job that disappeared without reaching 'completed' or 'failed'
+      // (e.g. workspace switch), we might want to clear the toast.
+      // But typically, sonner toasts should have a timeout or be manually dismissible.
+      return;
+    }
+
+    // Initialize refs on first job discovery to avoid "phantom" toasts for old jobs
+    if (lastJobId.current === null) {
+      lastJobId.current = lastJob.id;
+      prevJobStatus.current = lastJob.status;
+      return;
+    }
+
+    // Only trigger if it's a new job or a status transition for the same job
+    if (lastJob.id !== lastJobId.current || lastJob.status !== prevJobStatus.current) {
+      if (lastJob.status === "completed") {
+        toast.success("Ingestion complete", {
+          id: "ingest",
+          description: `Processed ${lastJob.total_lines.toLocaleString()} lines.`,
+        });
+        fetchLogs();
+      } else if (lastJob.status === "failed") {
+        toast.error("Ingestion failed", { id: "ingest", description: "Check sidecar logs for details." });
+      }
+
+      lastJobId.current = lastJob.id;
+      prevJobStatus.current = lastJob.status;
+    }
+  }, [lastJob, fetchLogs]);
+
+  // Memoized non-fusion sources
+  const nonFusionSources = useMemo(() => sources.filter((s) => s.type !== "fusion"), [sources]);
+
 
   // ── Event Listeners ────────────────────────────────────────────────────────
 
@@ -277,9 +349,10 @@ export function InvestigationPage() {
     setActiveSource(activeWorkspaceId, newSource.id);
 
     try {
-      toast.loading("Ingesting log stream...", { id: "ingest", description: "Loading data into database..." });
+      setTransitioningSourceId(newSource.id);
+      setLogs([], 0); // Clear current logs immediately
       
-      const result = await callSidecar<{ status: string, count: number }>({
+      await callSidecar({
         method: "ingest_local_file",
         params: { 
           filepath: normalizedPath,
@@ -287,15 +360,6 @@ export function InvestigationPage() {
           source_id: newSource.id
         },
       });
-
-      if (result.count > 0) {
-        toast.success(`${result.count} lines imported`, {
-          id: "ingest",
-          description: "Drain3 pattern mining running in background.",
-        });
-      } else {
-        toast.dismiss("ingest");
-      }
 
       if (tail) {
         await callSidecar({
@@ -311,6 +375,7 @@ export function InvestigationPage() {
         toast.success(`Live monitoring active for ${path}`);
       }
     } catch (e: unknown) {
+      setTransitioningSourceId(null);
       toast.error(e instanceof Error ? e.message : "Failed to import file.", { id: "ingest" });
     }
   };
@@ -340,18 +405,20 @@ export function InvestigationPage() {
       return;
     }
     try {
-      await callSidecar({
-        method: "start_ssh_tail",
-        params: {
-          host,
-          port,
-          username: user,
-          password: pass,
-          filepath: path,
-          workspace_id: activeWorkspaceId,
-          source_id: newSource.id,
-        },
+      setTransitioningSourceId(newSource.id);
+      // Clear logs immediately
+      setLogs([], 0);
+
+      await callSidecar<{ status: string }>("start_ssh_tail", {
+        host,
+        port,
+        username: user,
+        password: pass,
+        filepath: path,
+        workspace_id: activeWorkspaceId,
+        folder_id: folderId,
       });
+
       setTailingSourceIds((prev) => new Set(prev).add(newSource.id));
       setTailing(true);
       toast.success(`SSH tailing started for ${connectionPath}`);
@@ -382,14 +449,12 @@ export function InvestigationPage() {
       return;
     }
     try {
+      setTransitioningSourceId(newSource.id);
+      setLogs([], 0);
       // Lean INSERT — fast because Drain3/metadata are deferred to background worker
       await callSidecar({ method: "ingest_logs", params: { logs: entries } });
-      
-      toast.success(`${entries.length} lines imported`, {
-        id: "ingest",
-        description: "Drain3 pattern mining running in background.",
-      });
     } catch (error) {
+      setTransitioningSourceId(null);
       toast.error(error instanceof Error ? error.message : "Manual ingestion failed.", {
         id: "ingest",
       });
@@ -403,8 +468,6 @@ export function InvestigationPage() {
   ) => {
     const { settings } = useSettingsStore.getState();
     try {
-      toast.loading(`Initializing live collection: ${name}...`, { id: "live-ingest" });
-
       const promises = [];
       if (types.syslog) {
         promises.push(
@@ -657,6 +720,8 @@ export function InvestigationPage() {
             sortOrder={sortOrder}
             onSort={handleSort}
             anomalousClusters={anomalousClusters}
+            activeJob={activeJobForSource}
+            isTransitioning={isSourceLoading}
             onAddComment={(id, comment) => {
               const has_comment = comment.trim().length > 0;
               const originalLog = logs.find((l) => l.id === id);

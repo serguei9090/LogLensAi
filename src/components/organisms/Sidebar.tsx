@@ -164,35 +164,42 @@ export function Sidebar({
                       sidebarCollapsed && "justify-center",
                     )}
                   >
-                    <button
-                      type="button"
-                      onClick={() => {
-                        onWorkspaceSelect(ws.id);
-                        setActiveFolder(ws.id, null);
-                        onNavSelect("investigation");
-                      }}
-                      className={cn(
-                        "flex flex-1 items-center px-2 py-1.5 rounded transition-all text-left outline-none overflow-hidden border-none bg-transparent cursor-pointer",
-                        activeNav === "investigation" &&
-                          activeWorkspaceId === ws.id &&
-                          !activeFolderId
-                          ? "text-primary font-medium"
-                          : "text-text-secondary group-hover:text-text-primary",
-                        sidebarCollapsed && "justify-center px-0",
-                      )}
-                    >
-                      <Database
+                    <div className="flex flex-1 items-center overflow-hidden">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          onWorkspaceSelect(ws.id);
+                          setActiveFolder(ws.id, null);
+                          onNavSelect("investigation");
+                        }}
                         className={cn(
-                          "h-4 w-4 shrink-0 transition-colors",
-                          activeNav === "investigation" && activeWorkspaceId === ws.id
-                            ? "text-primary"
-                            : "text-text-muted",
+                          "flex flex-1 items-center px-2 py-1.5 rounded transition-all text-left outline-none overflow-hidden border-none bg-transparent cursor-pointer",
+                          activeNav === "investigation" &&
+                            activeWorkspaceId === ws.id &&
+                            !activeFolderId
+                            ? "text-primary font-medium"
+                            : "text-text-secondary group-hover:text-text-primary",
+                          sidebarCollapsed && "justify-center px-0",
                         )}
-                      />
-                      {!sidebarCollapsed && (
-                        <span className="flex-1 truncate ml-3 font-medium">{ws.name}</span>
-                      )}
-                    </button>
+                      >
+                        <div className="relative flex items-center justify-center">
+                          <Database
+                            className={cn(
+                              "h-4 w-4 shrink-0 transition-colors",
+                              activeNav === "investigation" && activeWorkspaceId === ws.id
+                                ? "text-primary"
+                                : "text-text-muted",
+                            )}
+                          />
+                          {activeWorkspaceId === ws.id && isHierarchyLoading && (
+                            <div className="absolute -inset-1 bg-primary/20 rounded-full animate-ping opacity-50" />
+                          )}
+                        </div>
+                        {!sidebarCollapsed && (
+                          <span className="flex-1 truncate ml-3 font-medium">{ws.name}</span>
+                        )}
+                      </button>
+                    </div>
                     {!sidebarCollapsed && (
                       <div className="hidden group-hover:flex items-center gap-1 shrink-0 pr-1">
                         <button
@@ -599,11 +606,12 @@ function HierarchyTree({
             />
           </div>
         ) : (
-          <div className="group flex items-center gap-1.5 px-2 py-1 text-[12px] text-text-secondary hover:text-text-primary hover:bg-bg-hover rounded cursor-pointer transition-colors">
+          <div className="group flex items-center gap-1 px-2 py-1 text-[12px] text-text-secondary hover:text-text-primary hover:bg-bg-hover rounded transition-colors">
             <button
               type="button"
               onClick={() => setIsExpanded(!isExpanded)}
-              className="p-1 hover:bg-white/5 rounded transition-colors"
+              className="p-1 hover:bg-white/5 rounded transition-colors shrink-0"
+              aria-label={isExpanded ? "Collapse Folder" : "Expand Folder"}
             >
               {isExpanded ? (
                 <ChevronDown className="h-3 w-3" />
@@ -618,7 +626,7 @@ function HierarchyTree({
                 onNavSelect("investigation");
               }}
               className={cn(
-                "flex items-center gap-1.5 flex-1 overflow-hidden transition-colors",
+                "flex items-center gap-1.5 flex-1 overflow-hidden transition-colors py-1 cursor-pointer text-left",
                 isNavActive && activeFolderId === node.id ? "text-primary font-medium" : "",
               )}
             >
@@ -628,7 +636,7 @@ function HierarchyTree({
                   isNavActive && activeFolderId === node.id ? "text-primary" : "text-primary/70",
                 )}
               />
-              <span className="truncate flex-1 min-w-0 text-left">{node.name}</span>
+              <span className="truncate flex-1 min-w-0">{node.name}</span>
             </button>
             <div className="hidden group-hover:flex items-center gap-0.5 shrink-0">
               <button
@@ -761,67 +769,46 @@ function SourceItem({
   }
 
   return (
-    <div
-      // biome-ignore lint/a11y/useSemanticElements: Nested buttons required
-      role="button"
-      tabIndex={0}
-      className={cn(
-        "group w-full flex items-center gap-2 px-2 py-1.5 text-[12px] rounded transition-all text-left outline-none border-none bg-transparent cursor-pointer",
-        active
-          ? "text-primary font-medium bg-primary/5 shadow-[inset_1px_0_0_0_currentColor]"
-          : "text-text-muted hover:text-text-secondary hover:bg-bg-hover",
-      )}
-      onClick={onClick}
-      onKeyDown={(e) => {
-        if (e.key === "Enter" || e.key === " ") {
-          e.preventDefault();
-          onClick();
-        }
-      }}
-    >
-      <FileText
-        className={cn("h-3.5 w-3.5 shrink-0", active ? "text-primary" : "text-text-muted/60")}
-      />
-      <span className="truncate flex-1 min-w-0">{source.name}</span>
-      <div className="hidden group-hover:flex items-center gap-0.5 shrink-0">
-        <div
-          // biome-ignore lint/a11y/useSemanticElements: Nested buttons required
-          role="button"
-          tabIndex={0}
+    <div className="group flex items-center px-1 py-0.5">
+      <button
+        type="button"
+        className={cn(
+          "flex-1 flex items-center gap-2 px-2 py-1.5 text-[12px] rounded transition-all text-left outline-none border-none bg-transparent cursor-pointer overflow-hidden",
+          active
+            ? "text-primary font-medium bg-primary/5 shadow-[inset_1px_0_0_0_currentColor]"
+            : "text-text-muted hover:text-text-secondary hover:bg-bg-hover",
+        )}
+        onClick={onClick}
+      >
+        <FileText
+          className={cn("h-3.5 w-3.5 shrink-0", active ? "text-primary" : "text-text-muted/60")}
+        />
+        <span className="truncate flex-1 min-w-0">{source.name}</span>
+      </button>
+
+      <div className="hidden group-hover:flex items-center gap-0.5 shrink-0 ml-1">
+        <button
+          type="button"
           onClick={(e) => {
             e.stopPropagation();
             onRenamingChange(true);
           }}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" || e.key === " ") {
-              e.stopPropagation();
-              onRenamingChange(true);
-            }
-          }}
-          className="p-0.5 hover:text-primary transition-colors outline-none cursor-pointer"
+          className="p-1 hover:text-primary transition-colors outline-none cursor-pointer border-none bg-transparent"
           title="Rename"
         >
           <Pencil className="h-3 w-3" />
-        </div>
-        <div
-          // biome-ignore lint/a11y/useSemanticElements: Nested buttons required
-          role="button"
-          tabIndex={0}
+        </button>
+        <button
+          type="button"
           onClick={(e) => {
             e.stopPropagation();
             onDelete();
           }}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" || e.key === " ") {
-              e.stopPropagation();
-              onDelete();
-            }
-          }}
-          className="p-0.5 hover:text-error transition-colors outline-none cursor-pointer"
+          className="p-1 hover:text-error transition-colors outline-none cursor-pointer border-none bg-transparent"
           title="Delete"
         >
           <Trash2 className="h-3 w-3" />
-        </div>
+        </button>
       </div>
     </div>
   );

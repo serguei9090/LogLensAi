@@ -72,6 +72,7 @@ class LogDatabase:
         cursor.execute("CREATE SEQUENCE IF NOT EXISTS log_streams_id_seq;")
         cursor.execute("CREATE SEQUENCE IF NOT EXISTS ai_messages_id_seq;")
         cursor.execute("CREATE SEQUENCE IF NOT EXISTS settings_templates_id_seq;")
+        cursor.execute("CREATE SEQUENCE IF NOT EXISTS ingestion_jobs_id_seq;")
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS logs (
                 id        INTEGER PRIMARY KEY DEFAULT nextval('log_id_seq'),
@@ -89,8 +90,9 @@ class LogDatabase:
             );
 
             CREATE TABLE IF NOT EXISTS ingestion_jobs (
-                id           INTEGER PRIMARY KEY DEFAULT nextval('settings_templates_id_seq'),
+                id           INTEGER PRIMARY KEY DEFAULT nextval('ingestion_jobs_id_seq'),
                 workspace_id TEXT,
+                source_id    TEXT,
                 status       TEXT DEFAULT 'pending', -- pending, processing, completed, failed
                 total_lines  INTEGER DEFAULT 0,
                 processed_lines INTEGER DEFAULT 0,
@@ -230,6 +232,7 @@ class LogDatabase:
         self._migrate_log_columns(cursor)
         self._migrate_log_facets(cursor)
         self._migrate_ingestion_columns(cursor)
+        self._migrate_ingestion_jobs(cursor)
         self._migrate_indexes(cursor)
 
     def _migrate_ingestion_columns(self, cursor):
@@ -253,6 +256,21 @@ class LogDatabase:
 
         # Ensure performance index for the worker
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_logs_processed ON logs (processed)")
+
+    def _migrate_ingestion_jobs(self, cursor):
+        """Ensures source_id column exists in ingestion_jobs table."""
+        try:
+            # Check if source_id exists
+            cursor.execute("SELECT source_id FROM ingestion_jobs LIMIT 1")
+        except Exception:
+            logger.info("[DB] Migration: Adding 'source_id' column to 'ingestion_jobs' table...")
+            try:
+                cursor.execute("ALTER TABLE ingestion_jobs ADD COLUMN source_id TEXT")
+            except Exception as e:
+                logger.error(f"[DB] Migration Error (ingestion_jobs.source_id): {e}. Recreating table.")
+                # Fallback: drop and recreate since ingestion_jobs is ephemeral
+                cursor.execute("DROP TABLE IF EXISTS ingestion_jobs")
+                self._setup_schema(cursor)
 
     def _migrate_indexes(self, cursor):
         """Ensure all performance indexes exist on legacy databases."""
@@ -844,6 +862,48 @@ class LogDatabase:
                 "sources": root_sources,
             },
         }
+
+    # --- Ingestion Job Tracking ---
+
+    def create_ingestion_job(self, workspace_id: str, source_id: str, total_lines: int) -> int:
+        cursor = self.get_cursor()
+        cursor.execute(
+            "INSERT INTO ingestion_jobs (workspace_id, source_id, total_lines, status) VALUES (?, ?, ?, 'processing') RETURNING id",
+            (workspace_id, source_id, total_lines),
+        )
+        job_id = cursor.fetchone()[0]
+        self.commit()
+        return job_id
+
+    def update_ingestion_progress(self, job_id: int, processed_lines: int, status: str = "processing"):
+        cursor = self.get_cursor()
+        cursor.execute(
+            "UPDATE ingestion_jobs SET processed_lines = ?, status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+            (processed_lines, status, job_id),
+        )
+        self.commit()
+
+    def get_ingestion_jobs(self, workspace_id: str | None = None) -> list[dict]:
+        cursor = self.get_cursor()
+        if workspace_id:
+            cursor.execute(
+                "SELECT id, workspace_id, source_id, status, total_lines, processed_lines, created_at, updated_at FROM ingestion_jobs WHERE workspace_id = ? ORDER BY created_at DESC",
+                (workspace_id,),
+            )
+        else:
+            cursor.execute(
+                "SELECT id, workspace_id, source_id, status, total_lines, processed_lines, created_at, updated_at FROM ingestion_jobs ORDER BY created_at DESC LIMIT 50"
+            )
+        columns = [desc[0] for desc in cursor.description]
+        results = []
+        for row in cursor.fetchall():
+            job = dict(zip(columns, row, strict=False))
+            # Format timestamps for JSON serialization
+            for key in ["created_at", "updated_at"]:
+                if job[key]:
+                    job[key] = job[key].isoformat()
+            results.append(job)
+        return results
 
 
 # Alias for backward compatibility

@@ -1,6 +1,8 @@
 export interface SidecarRequest {
   method: string;
   params?: Record<string, unknown>;
+  /** If true, transport and logic errors will not trigger a toast notification. Use for background polling. */
+  silent?: boolean;
 }
 
 export interface SidecarResponse<T> {
@@ -46,9 +48,10 @@ export async function callSidecar<T>(
   params?: Record<string, unknown>,
 ): Promise<T> {
   // Normalize input: could be (requestObject) or (methodName, params)
-  const method = typeof methodOrRequest === "string" ? methodOrRequest : methodOrRequest.method;
-  const rpcParams =
-    typeof methodOrRequest === "string" ? (params ?? {}) : (methodOrRequest.params ?? {});
+  const isObj = typeof methodOrRequest !== "string";
+  const method = isObj ? methodOrRequest.method : methodOrRequest;
+  const rpcParams = isObj ? (methodOrRequest.params ?? {}) : (params ?? {});
+  const silent = isObj ? !!methodOrRequest.silent : false;
 
   const rpcReq = {
     jsonrpc: "2.0",
@@ -91,9 +94,11 @@ export async function callSidecar<T>(
         : "";
       const errorMsg = (response.error.message ?? "JSON-RPC Error") + detail;
 
-      toast.error("Sidecar Error", {
-        description: response.error.message ?? "An unexpected error occurred",
-      });
+      if (!silent) {
+        toast.error("Sidecar Error", {
+          description: response.error.message ?? "An unexpected error occurred",
+        });
+      }
 
       throw new Error(errorMsg);
     }
@@ -102,11 +107,13 @@ export async function callSidecar<T>(
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
 
-    // Only toast if it's a transport error (JSON-RPC errors are handled above)
-    if (!message.includes("JSON-RPC Error") && !message.includes("Sidecar Error")) {
-      toast.error("Connection Error", {
-        description: "Failed to communicate with the sidecar. Is it running?",
-      });
+    if (!silent) {
+      // Only toast if it's a transport error (JSON-RPC errors are handled above)
+      if (!message.includes("JSON-RPC Error") && !message.includes("Sidecar Error")) {
+        toast.error("Connection Error", {
+          description: "Failed to communicate with the sidecar. Is it running?",
+        });
+      }
     }
 
     throw err;

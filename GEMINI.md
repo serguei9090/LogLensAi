@@ -55,3 +55,58 @@ The file must start with triple-dash (`---`) frontmatter including:
 - **No Recursion**: Subagents cannot call other subagents.
 - **Tool Isolation**: Only grant the tools strictly necessary for the subagent's domain.
 - **Verification**: Always verify a subagent's functionality after creation by attempting a delegation.
+
+## ⚙️ Sidecar API Best Practices
+All API methods implemented in `sidecar/src/api.py` must strictly adhere to the following JSON-RPC 2.0 standards:
+
+### 1. Method Naming Convention
+- All methods must follow the snake_case convention.
+- Methods exposed to the frontend must be prefixed with `api_` (e.g., `api_ingest_logs`).
+
+### 2. Request Format
+Requests from the frontend must strictly follow this structure:
+```json
+{
+  "jsonrpc": "2.0",
+  "method": "api_methodName",
+  "params": {
+    "param1": "value1",
+    "param2": 123
+  },
+  "id": 12345
+}
+```
+
+### 3. Response Format
+Responses from the backend must strictly follow this structure:
+```json
+{
+  "jsonrpc": "2.0",
+  "result": {
+    "data": "...",
+    "metadata": "..."
+  },
+  "id": 12345
+}
+```
+
+### 4. Error Handling
+All errors must strictly follow this structure:
+```json
+{
+  "jsonrpc": "2.0",
+  "error": {
+    "code": -32600,
+    "message": "Invalid Request",
+    "data": "Detailed error information"
+  },
+  "id": 12345
+}
+```
+
+### 5. Validation
+- All methods must implement strict parameter validation using Pydantic models.
+- Return 400 Bad Request for invalid parameters.
+- Return 500 Internal Server Error for unexpected issues.
+
+Prefer MCP-server over chrome tool for app test check screenshot etc. MCP server is more reliable and efficient for app test check screenshot etc.

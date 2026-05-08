@@ -10,6 +10,7 @@ import { useInvestigationStore } from "@/store/investigationStore";
 import { useSettingsStore } from "@/store/settingsStore";
 import { selectActiveWorkspace, useWorkspaceStore } from "@/store/workspaceStore";
 import { type VirtualItem, useVirtualizer } from "@tanstack/react-virtual";
+import type { IngestionJob } from "@/lib/hooks/useIngestionStatus";
 import {
   ArrowDown,
   ArrowUp,
@@ -53,6 +54,8 @@ interface VirtualLogTableProps {
   readonly sortOrder: "asc" | "desc";
   readonly anomalousClusters?: Set<string>;
   readonly onImport?: () => void;
+  readonly activeJob?: IngestionJob | null;
+  readonly isTransitioning?: boolean;
 }
 
 export function VirtualLogTable({
@@ -66,6 +69,8 @@ export function VirtualLogTable({
   sortOrder,
   anomalousClusters,
   onImport,
+  activeJob,
+  isTransitioning,
 }: VirtualLogTableProps) {
   const parentRef = useRef<HTMLDivElement>(null);
   const [expandedRow, setExpandedRow] = useState<number | null>(null);
@@ -90,6 +95,7 @@ export function VirtualLogTable({
   } = useInvestigationStore();
   const { logSessionMap, fetchMapping } = useAiStore();
   const activeWorkspace = useWorkspaceStore(selectActiveWorkspace);
+
 
   useEffect(() => {
     if (activeWorkspace?.id) {
@@ -233,7 +239,7 @@ export function VirtualLogTable({
       );
     } else {
       // Escape special regex characters for a literal match
-      const escaped = selectionInfo.text.replace(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`);
+      const escaped = selectionInfo.text.replaceALL(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`);
       regex = `(${escaped})`;
 
       const currentFacets = settings.facet_extractions || [];
@@ -316,12 +322,6 @@ export function VirtualLogTable({
     );
   };
 
-  const getAriaSort = (field: string): "ascending" | "descending" | "none" => {
-    if (sortBy !== field) {
-      return "none";
-    }
-    return sortOrder === "asc" ? "ascending" : "descending";
-  };
 
   return (
     <>
@@ -331,7 +331,51 @@ export function VirtualLogTable({
         aria-label="Log Table"
         tabIndex={-1}
       >
-        {logs.length === 0 ? (
+        {activeJob || isTransitioning ? (
+          <div className="absolute inset-0 flex flex-col items-center justify-center p-8 text-center animate-in fade-in zoom-in-95 duration-500 bg-bg-base/50 backdrop-blur-sm z-50">
+            <div className="flex flex-col items-center gap-6 max-w-md w-full">
+              <div className="relative">
+                <div className="absolute -inset-4 bg-primary/20 rounded-full blur-2xl animate-pulse" />
+                <div className="relative bg-bg-surface border border-border shadow-2xl rounded-2xl p-6">
+                  <Sparkles className="size-12 text-primary animate-pulse" />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <h3 className="text-xl font-bold text-text-primary">Ingesting Logs...</h3>
+                <p className="text-sm text-text-muted leading-relaxed">
+                  Mapping log patterns and indexing metadata for high-performance search.
+                </p>
+              </div>
+              {activeJob && (
+                <div className="w-full space-y-3">
+                  <div className="flex justify-between text-[10px] font-bold uppercase tracking-widest text-text-muted">
+                    <span>{activeJob.processed_lines.toLocaleString()} / {activeJob.total_lines.toLocaleString()} lines</span>
+                    <span className="text-primary">{Math.round((activeJob.processed_lines / activeJob.total_lines) * 100)}%</span>
+                  </div>
+                  <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden border border-white/5">
+                    <div 
+                      className="h-full bg-primary transition-all duration-500 ease-out shadow-[0_0_10px_rgba(34,197,94,0.5)]"
+                      style={{ width: `${(activeJob.processed_lines / activeJob.total_lines) * 100}%` }}
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+            <div className="mt-12 flex items-center gap-6 text-[10px] font-bold uppercase tracking-widest text-text-muted/30">
+              <div className="flex items-center gap-1.5">
+                <Download className="size-3" /> local files
+              </div>
+              <div className="w-1 h-1 rounded-full bg-current" />
+              <div className="flex items-center gap-1.5">
+                <Rocket className="size-3" /> live streams
+              </div>
+              <div className="w-1 h-1 rounded-full bg-current" />
+              <div className="flex items-center gap-1.5">
+                <Sparkles className="size-3" /> ssh tailing
+              </div>
+            </div>
+          </div>
+        ) : logs.length === 0 ? (
           <div className="absolute inset-0 flex flex-col items-center justify-center p-8 text-center animate-in fade-in zoom-in-95 duration-500">
             <div className="relative mb-6">
               <div className="absolute -inset-4 bg-primary/10 rounded-full blur-2xl animate-pulse" />
@@ -366,13 +410,14 @@ export function VirtualLogTable({
             </div>
           </div>
         ) : (
-          <div
-            style={{
-              height: `${rowVirtualizer.getTotalSize()}px`,
-              width: "100%",
-              position: "relative",
-            }}
-          >
+          <>
+            <div
+              style={{
+                height: `${rowVirtualizer.getTotalSize()}px`,
+                width: "100%",
+                position: "relative",
+              }}
+            >
             <table className="w-full text-left text-sm border-separate border-spacing-0 block">
               <thead className="sticky top-0 bg-bg-surface border-b border-border z-10 text-text-muted text-[10px] font-bold uppercase tracking-widest h-10 select-none block">
                 <tr className="grid grid-cols-[12px_60px_180px_90px_1fr_110px_100px] w-full items-center">
@@ -477,7 +522,8 @@ export function VirtualLogTable({
               </tbody>
             </table>
           </div>
-        )}
+        </>
+      )}
 
         {expandedRow !== null && (
           <div

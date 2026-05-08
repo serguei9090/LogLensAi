@@ -95,6 +95,7 @@ export default function DashboardPage() {
           end_time: timeRange.end || undefined,
           active_workspace_ids: workspaces.map(w => w.id),
         },
+        silent: true,
       });
       setStats(res);
     } catch (e) {
@@ -116,6 +117,7 @@ export default function DashboardPage() {
         params: { 
           workspace_id: selectedWorkspaceId === "all" ? undefined : selectedWorkspaceId,
         },
+        silent: true,
       });
       setIngestionJobs(res || []);
     } catch (e) {

@@ -34,9 +34,11 @@ from models import (
     GetAiMessagesRequest,
     GetAiSessionsRequest,
     GetAnomaliesRequest,
+    GetDashboardStatsRequest,
     GetFusedLogsRequest,
     GetFusionConfigRequest,
     GetHierarchyRequest,
+    GetIngestionJobsRequest,
     GetLogDistributionRequest,
     GetLogsRequest,
     GetLogStreamsRequest,
@@ -50,6 +52,7 @@ from models import (
     IngestLocalFileRequest,
     JSONRPCRequest,
     JSONRPCResponse,
+    PurgeInactiveWorkspacesRequest,
     ReadFileRequest,
     SaveMemoryRequest,
     SearchMemoryRequest,
@@ -119,6 +122,59 @@ DEFAULT_DB = os.path.join(PROJECT_ROOT, "data", "loglens.duckdb")
 
 
 class App:
+    """Main application singleton handling JSON-RPC dispatching and state orchestration."""
+
+    RPC_MODELS: dict[str, Any] = {
+        "get_logs": GetLogsRequest,
+        "get_fused_logs": GetFusedLogsRequest,
+        "update_fusion_config": UpdateFusionConfigRequest,
+        "get_fusion_config": GetFusionConfigRequest,
+        "start_tail": StartTailRequest,
+        "start_ssh_tail": StartSSHTailRequest,
+        "stop_tail": StartTailRequest,
+        "ingest_logs": IngestLogsRequest,
+        "ingest_local_file": IngestLocalFileRequest,
+        "read_file": ReadFileRequest,
+        "update_log_comment": UpdateCommentRequest,
+        "get_temporal_offsets": GetTemporalOffsetsRequest,
+        "get_workspace_sources": GetWorkspaceSourcesRequest,
+        "get_ingestion_jobs": GetIngestionJobsRequest,
+        "get_sample_lines": GetSampleLinesRequest,
+        "update_source_parser": UpdateSourceParserRequest,
+        "get_anomalies": GetAnomaliesRequest,
+        "get_metadata_facets": GetMetadataFacetsRequest,
+        "analyze_cluster": AnalyzeClusterRequest,
+        "get_settings": GetSettingsRequest,
+        "update_settings": UpdateSettingsRequest,
+        "get_dashboard_stats": GetDashboardStatsRequest,
+        "purge_inactive_workspaces": PurgeInactiveWorkspacesRequest,
+        "list_ai_models": None,
+        "send_ai_message": SendAiMessageRequest,
+        "get_ai_sessions": GetAiSessionsRequest,
+        "get_ai_messages": GetAiMessagesRequest,
+        "rename_ai_session": None,
+        "delete_ai_session": None,
+        "get_ai_mapping": None,
+        "save_memory": SaveMemoryRequest,
+        "search_memory": SearchMemoryRequest,
+        "reset_workspace_settings": GetSettingsRequest,
+        "get_log_streams": GetLogStreamsRequest,
+        "create_log_stream": CreateLogStreamRequest,
+        "delete_log_stream": DeleteLogStreamRequest,
+        "generate_facet_regex": GenerateExtractionRegexRequest,
+        "export_logs": ExportLogsRequest,
+        "delete_logs": DeleteLogsRequest,
+        "get_hierarchy": GetHierarchyRequest,
+        "create_folder": FolderCreateRequest,
+        "update_folder": FolderUpdateRequest,
+        "delete_folder": FolderDeleteRequest,
+        "create_log_source": CreateLogSourceRequest,
+        "update_log_source": SourceUpdateRequest,
+        "delete_log_source": DeleteLogSourceRequest,
+        "move_source": SourceMoveRequest,
+        "factory_reset": None,
+    }
+
     def __init__(
         self,
         db_path=None,
@@ -207,6 +263,11 @@ class App:
             model=settings.get("ai_model", "gemma4:e2b"),
             settings=settings,
         )
+
+    def method_get_ingestion_jobs(self, workspace_id: str | None = None) -> list[dict]:
+        """Fetch all ingestion jobs for a workspace."""
+        logger.info("RPC Dispatch: get_ingestion_jobs (workspace=%s)", workspace_id)
+        return self.db.get_ingestion_jobs(workspace_id)
 
     def method_delete_logs(self, workspace_id: str, source_id: str | None = None) -> dict:
         """Delete logs for a workspace or specific source."""
@@ -334,58 +395,10 @@ class App:
                     id=req.id, error={"code": -32601, "message": f"Method not found: {req.method}"}
                 )
 
-            # Map method names to their validation models
-            models: dict[str, Any] = {
-                "get_logs": GetLogsRequest,
-                "get_fused_logs": GetFusedLogsRequest,
-                "update_fusion_config": UpdateFusionConfigRequest,
-                "get_fusion_config": GetFusionConfigRequest,
-                "start_tail": StartTailRequest,
-                "start_ssh_tail": StartSSHTailRequest,
-                "stop_tail": StartTailRequest,
-                "ingest_logs": IngestLogsRequest,
-                "ingest_local_file": IngestLocalFileRequest,
-                "read_file": ReadFileRequest,
-                "update_log_comment": UpdateCommentRequest,
-                "get_workspace_sources": GetWorkspaceSourcesRequest,
-                "get_sample_lines": GetSampleLinesRequest,
-                "update_source_parser": UpdateSourceParserRequest,
-                "get_anomalies": GetAnomaliesRequest,
-                "get_metadata_facets": GetMetadataFacetsRequest,
-                "analyze_cluster": None,
-                "get_settings": GetSettingsRequest,
-                "update_settings": UpdateSettingsRequest,
-                "list_ai_models": None,
-                "send_ai_message": SendAiMessageRequest,
-                "get_ai_sessions": GetAiSessionsRequest,
-                "get_ai_messages": GetAiMessagesRequest,
-                "rename_ai_session": None,
-                "delete_ai_session": None,
-                "get_ai_mapping": None,
-                "save_memory": SaveMemoryRequest,
-                "search_memory": SearchMemoryRequest,
-                "reset_workspace_settings": GetSettingsRequest,
-                "get_log_streams": GetLogStreamsRequest,
-                "create_log_stream": CreateLogStreamRequest,
-                "delete_log_stream": DeleteLogStreamRequest,
-                "generate_facet_regex": GenerateExtractionRegexRequest,
-                "export_logs": ExportLogsRequest,
-                "delete_logs": DeleteLogsRequest,
-                "get_hierarchy": GetHierarchyRequest,
-                "create_folder": FolderCreateRequest,
-                "update_folder": FolderUpdateRequest,
-                "delete_folder": FolderDeleteRequest,
-                "create_log_source": CreateLogSourceRequest,
-                "update_log_source": SourceUpdateRequest,
-                "delete_log_source": DeleteLogSourceRequest,
-                "move_source": SourceMoveRequest,
-                "factory_reset": None,
-            }
-
             handler = getattr(self, method_name)
 
             # Perform Pydantic validation if a model is defined
-            model = models.get(req.method)
+            model = self.RPC_MODELS.get(req.method)
             import asyncio
             import inspect
 
@@ -409,6 +422,7 @@ class App:
                         else:
                             result = res
                 except ValidationError as ve:
+                    logger.error("JSON-RPC Validation Error for method '%s': %s", method, ve.errors())
                     return JSONRPCResponse(
                         id=req.id,
                         error={"code": -32602, "message": "Invalid params", "data": ve.errors()},
@@ -1083,15 +1097,11 @@ class App:
 
         job_id = None
         if batch_data:
-            # 1. Create Ingestion Job Record
-            for ws_id in workspace_ids:
-                total_ws_lines = len([b for b in batch_data if b[0] == ws_id])
-                cursor.execute(
-                    "INSERT INTO ingestion_jobs (workspace_id, status, total_lines) VALUES (?, 'pending', ?) RETURNING id",
-                    (ws_id, total_ws_lines),
-                )
-                res = cursor.fetchone()
-                job_id = res[0] if res else None
+            # 1. Create Ingestion Job Record per source
+            source_keys = list(set((log.get("workspace_id"), log.get("source_id", "manual")) for log in log_dicts))
+            for ws_id, src_id in source_keys:
+                total_src_lines = len([b for b in batch_data if b[0] == ws_id and b[1] == src_id])
+                job_id = self.db.create_ingestion_job(ws_id, src_id, total_src_lines)
 
             # 2. Bulk Insert Logs
             cursor.executemany(
@@ -1103,22 +1113,93 @@ class App:
         return {"status": "ok", "count": len(batch_data), "job_id": job_id}
 
     def method_ingest_local_file(self, workspace_id: str, source_id: str, filepath: str) -> dict:
-        """Optimized ingestion: sidecar reads directly from disk to bypass the JSON bridge."""
+        """Optimized ingestion: sidecar reads directly from disk and updates progress in chunks."""
         if not os.path.exists(filepath):
             raise FileNotFoundError(f"File not found: {filepath}")
 
-        # Basic parser to extract lines
-        lines = []
+        # 1. Count total lines first for progress tracking
+        total_lines = 0
         with open(filepath, "r", encoding="utf-8", errors="replace") as f:
-            for line in f:
-                if line.strip():
-                    lines.append({
-                        "workspace_id": workspace_id,
-                        "source_id": source_id,
-                        "raw_text": line.strip(),
-                    })
+            for _ in f:
+                total_lines += 1
+
+        if total_lines == 0:
+            return {"status": "ok", "count": 0, "job_id": None}
+
+        # 2. Create Job Record via DB method
+        job_id = self.db.create_ingestion_job(workspace_id, source_id, total_lines)
+
+        # 3. Process in chunks
+        chunk_size = 5000
+        processed_count = 0
+        cursor = None
         
-        return self.method_ingest_logs(logs=lines)
+        try:
+            cursor = self.db.get_cursor()
+            with open(filepath, "r", encoding="utf-8", errors="replace") as f:
+                chunk = []
+                for line in f:
+                    clean_line = line.strip()
+                    if not clean_line:
+                        continue
+                        
+                    chunk.append([
+                        workspace_id,
+                        source_id,
+                        clean_line,
+                        datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                        "INFO",
+                        "",
+                        None,
+                        "{}",
+                        False,
+                    ])
+
+                    if len(chunk) >= chunk_size:
+                        # Batch Insert
+                        cursor.executemany(
+                            "INSERT OR IGNORE INTO logs (workspace_id, source_id, raw_text, timestamp, level, message, cluster_id, facets, processed) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                            chunk,
+                        )
+                        processed_count += len(chunk)
+                        
+                        # Update Job Progress
+                        cursor.execute(
+                            "UPDATE ingestion_jobs SET processed_lines = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+                            (processed_count, job_id),
+                        )
+                        self.db.commit()
+                        chunk = []
+
+                # Final chunk
+                if chunk:
+                    cursor.executemany(
+                        "INSERT OR IGNORE INTO logs (workspace_id, source_id, raw_text, timestamp, level, message, cluster_id, facets, processed) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                        chunk,
+                    )
+                    processed_count += len(chunk)
+                    chunk = []
+
+            # Mark Job Completed
+            cursor.execute(
+                "UPDATE ingestion_jobs SET status = 'completed', processed_lines = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+                (processed_count, job_id),
+            )
+            self.db.commit()
+            
+            logger.info("[Ingestion] Completed job %d for %s: %d lines", job_id, workspace_id, processed_count)
+
+        except Exception as e:
+            logger.error("[Ingestion] Failed job %d: %s", job_id, e)
+            if cursor:
+                cursor.execute(
+                    "UPDATE ingestion_jobs SET status = 'failed', updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+                    (job_id,),
+                )
+                self.db.commit()
+            raise e
+
+        return {"status": "ok", "count": processed_count, "job_id": job_id}
 
     def method_cleanup_ingestion_jobs(self, workspace_id: str) -> dict:
         """Removes stalled ingestion jobs with no progress."""
@@ -1134,28 +1215,6 @@ class App:
         logger.info("[Cleanup] Purged %d stalled ingestion jobs for %s", count, workspace_id)
         return {"status": "success", "purged_count": count}
 
-    def method_get_ingestion_jobs(self, workspace_id: str | None = None) -> list:
-        """Fetch active or recent ingestion jobs for status tracking."""
-        cursor = self.db.get_cursor()
-        query = "SELECT id, workspace_id, status, total_lines, processed_lines, created_at, updated_at FROM ingestion_jobs"
-        params = []
-        if workspace_id:
-            query += " WHERE workspace_id = ?"
-            params.append(workspace_id)
-        query += " ORDER BY created_at DESC LIMIT 10"
-        cursor.execute(query, params)
-        return [
-            {
-                "id": r[0],
-                "workspace_id": r[1],
-                "status": r[2],
-                "total_lines": r[3],
-                "processed_lines": r[4],
-                "created_at": r[5].isoformat() if hasattr(r[5], "isoformat") else str(r[5]),
-                "updated_at": r[6].isoformat() if hasattr(r[6], "isoformat") else str(r[6]),
-            }
-            for r in cursor.fetchall()
-        ]
 
     def method_get_metadata_facets(self, **kwargs) -> dict:
         """Return the top unique metadata facets across all logs in a workspace."""
