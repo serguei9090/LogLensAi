@@ -39,6 +39,7 @@ from models import (
     GetFusionConfigRequest,
     GetHierarchyRequest,
     GetIngestionJobsRequest,
+    GetLogContentRequest,
     GetLogDistributionRequest,
     GetLogsRequest,
     GetLogStreamsRequest,
@@ -47,9 +48,9 @@ from models import (
     GetSettingsRequest,
     GetTemporalOffsetsRequest,
     GetWorkspaceSourcesRequest,
+    IngestLocalFileRequest,
     IngestLogEntry,
     IngestLogsRequest,
-    IngestLocalFileRequest,
     JSONRPCRequest,
     JSONRPCResponse,
     PurgeInactiveWorkspacesRequest,
@@ -70,6 +71,8 @@ from models import (
 )
 from parser import DrainParser
 from pydantic import ValidationError
+from services.fast_path import FastPathService
+from services.log_file_store import DiskLogStore
 from ssh_loader import SSHLoader
 from tailer import FileTailer
 from workers.clustering import ClusteringWorker
@@ -173,6 +176,7 @@ class App:
         "delete_log_source": DeleteLogSourceRequest,
         "move_source": SourceMoveRequest,
         "factory_reset": None,
+        "get_log_content": GetLogContentRequest,
     }
 
     def __init__(
@@ -195,6 +199,14 @@ class App:
 
         self.db = LogDatabase(db_path)
         logger.info("Database initialized at: %s", os.path.abspath(db_path))
+
+        # --- Disk-First / Fast-Path store ---
+        # All raw log text lives here; DuckDB only stores line_id pointers.
+        storage_dir = os.path.join(PROJECT_ROOT, "data", "storage")
+        self.log_store = DiskLogStore(storage_dir)
+        logger.info("DiskLogStore initialized at: %s", storage_dir)
+        self.fast_path = FastPathService(storage_dir)
+        logger.info("FastPathService initialized at: %s", storage_dir)
 
         self._parsers = {}
         self.tailers = {}
@@ -403,11 +415,11 @@ class App:
             import inspect
 
             # Methods that handle large payloads and must not block the event loop
-            OFFLOAD_TO_THREAD = {"ingest_logs", "ingest_local_file", "export_logs"}
+            offload_to_thread = {"ingest_logs", "ingest_local_file", "export_logs"}
 
             if model:
                 try:
-                    if req.method in OFFLOAD_TO_THREAD:
+                    if req.method in offload_to_thread:
                         # Offload validation + execution for large-payload methods
                         def _run_offloaded():
                             params_model = model(**req.params)
@@ -422,7 +434,7 @@ class App:
                         else:
                             result = res
                 except ValidationError as ve:
-                    logger.error("JSON-RPC Validation Error for method '%s': %s", method, ve.errors())
+                    logger.error("JSON-RPC Validation Error for method '%s': %s", req.method, ve.errors())
                     return JSONRPCResponse(
                         id=req.id,
                         error={"code": -32602, "message": "Invalid params", "data": ve.errors()},
@@ -595,6 +607,25 @@ class App:
                     log_dict["facets"] = {}
             elif "facets" in log_dict and log_dict["facets"] is None:
                 log_dict["facets"] = {}
+            
+            # --- Fast-Path Hydration ---
+            # Instead of pulling large text from DuckDB, we fetch it O(1) from mmap.
+            source_id = log_dict.get("source_id")
+            line_id = log_dict.get("line_id")
+            if source_id and line_id is not None:
+                content = self.fast_path.get_line(source_id, line_id)
+                if content:
+                    log_dict["raw_text"] = content
+                    log_dict["message"] = content
+                else:
+                    logger.warning("[Hydration] Failed for source=%s, line=%d", source_id, line_id)
+                    log_dict["raw_text"] = "<Missing log content>"
+                    log_dict["message"] = "<Missing log content>"
+            else:
+                logger.error("[Hydration] Missing IDs: source=%s, line=%s", source_id, line_id)
+                log_dict["raw_text"] = ""
+                log_dict["message"] = ""
+
             logs.append(log_dict)
 
         self._apply_temporal_offsets(workspace_id, logs)
@@ -886,10 +917,11 @@ class App:
         """Fetch raw lines from a source to help a user define a pattern."""
         cursor = self.db.get_cursor()
         cursor.execute(
-            "SELECT raw_text FROM logs WHERE workspace_id = ? AND source_id = ? LIMIT ?",
+            "SELECT line_id FROM logs WHERE workspace_id = ? AND source_id = ? LIMIT ?",
             (workspace_id, source_id, limit),
         )
-        return [row[0] for row in cursor.fetchall()]
+        line_ids = [row[0] for row in cursor.fetchall()]
+        return [self.fast_path.get_line(source_id, lid) or "" for lid in line_ids]
 
     def method_update_source_parser(
         self, workspace_id: str, source_id: str, parser_config: str
@@ -902,6 +934,12 @@ class App:
         )
         self.db.commit()
         return {"status": "ok"}
+
+    def method_get_log_content(self, **kwargs) -> dict:
+        """Fetch raw log content for a list of line_ids (O(1) mmap)."""
+        params = GetLogContentRequest(**kwargs)
+        lines = self.fast_path.get_lines(params.source_id, params.line_ids)
+        return {"lines": lines}
 
     def method_get_fusion_config(self, **kwargs) -> dict:
         """Retrieve current Fusion orchestration setup."""
@@ -937,7 +975,9 @@ class App:
         if key in self.tailers and self.tailers[key].running:
             return {"status": "already tailing"}
 
-        tailer = FileTailer(abs_path, workspace_id, self.parser, self.db, source_id=source_id)
+        tailer = FileTailer(
+            abs_path, workspace_id, self.parser, self.db, self.log_store, source_id=source_id
+        )
         self.tailers[key] = tailer
         tailer.start()
 
@@ -967,6 +1007,7 @@ class App:
             workspace_id,
             self.parser,
             self.db,
+            self.log_store,
             source_id=source_id,
         )
 
@@ -1072,132 +1113,166 @@ class App:
         ]
 
     def method_ingest_logs(self, logs: list[IngestLogEntry]) -> dict:
-        """High-speed batch ingestion of log entries (Deferred Processing)"""
-        cursor = self.db.get_cursor()
-        batch_data = []
+        """High-speed batch ingestion — Disk-First / Fast-Path.
 
-        # Map logs to dict if they are models
+        Raw text is appended to the per-source flat file under ``data/storage/``.
+        DuckDB receives only the skinny index row (line_id, metadata).
+        """
         log_dicts = [log.model_dump() if hasattr(log, "model_dump") else log for log in logs]
-        workspace_ids = list(set(log.get("workspace_id") for log in log_dicts))
 
+        if not log_dicts:
+            return {"status": "ok", "count": 0, "job_id": None}
+
+        # --- Group by (workspace_id, source_id) for job creation & batch write ---
+        from collections import defaultdict
+
+        grouped: dict[tuple[str, str], list[dict]] = defaultdict(list)
         for log in log_dicts:
-            # Lean ingestion: we save raw text and basic metadata.
-            # Rich extraction (Regex) and Clustering (Drain3) are deferred to the background worker.
-            batch_data.append([
-                log.get("workspace_id"),
-                log.get("source_id", "manual"),
-                log.get("raw_text", ""),
-                log.get("timestamp") or datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                log.get("level") or "INFO",
-                log.get("message") or "",
-                None, # cluster_id
-                json.dumps(log.get("facets", {})),
-                False, # processed = FALSE
-            ])
+            ws = log.get("workspace_id") or "default"
+            src = log.get("source_id") or "manual"
+            grouped[(ws, src)].append(log)
 
+        cursor = self.db.get_cursor()
+        total_inserted = 0
         job_id = None
-        if batch_data:
-            # 1. Create Ingestion Job Record per source
-            source_keys = list(set((log.get("workspace_id"), log.get("source_id", "manual")) for log in log_dicts))
-            for ws_id, src_id in source_keys:
-                total_src_lines = len([b for b in batch_data if b[0] == ws_id and b[1] == src_id])
-                job_id = self.db.create_ingestion_job(ws_id, src_id, total_src_lines)
 
-            # 2. Bulk Insert Logs
+        for (ws_id, src_id), src_logs in grouped.items():
+            # 1. Create ingestion job record
+            job_id = self.db.create_ingestion_job(ws_id, src_id, len(src_logs))
+
+            # 2. Disk-First: write raw lines in a single batch call
+            raw_lines = [
+                log.get("raw_text") or log.get("message") or ""
+                for log in src_logs
+            ]
+            line_ids = self.log_store.append_batch(src_id, raw_lines)
+
+            # 3. Build skinny DB rows — no raw_text, no message
+            now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            batch_data = [
+                (
+                    ws_id,
+                    src_id,
+                    line_ids[i],
+                    log.get("timestamp") or now,
+                    log.get("level") or "INFO",
+                    None,  # cluster_id — deferred to worker
+                    json.dumps(log.get("facets") or {}),
+                    False,  # processed = FALSE
+                )
+                for i, log in enumerate(src_logs)
+            ]
+
             cursor.executemany(
-                "INSERT OR IGNORE INTO logs (workspace_id, source_id, raw_text, timestamp, level, message, cluster_id, facets, processed) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                "INSERT INTO logs (workspace_id, source_id, line_id, timestamp, level, cluster_id, facets, processed)"
+                " VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
                 batch_data,
             )
-            self.db.commit()
+            total_inserted += len(batch_data)
 
-        return {"status": "ok", "count": len(batch_data), "job_id": job_id}
+        self.db.commit()
+        return {"status": "ok", "count": total_inserted, "job_id": job_id}
 
     def method_ingest_local_file(self, workspace_id: str, source_id: str, filepath: str) -> dict:
-        """Optimized ingestion: sidecar reads directly from disk and updates progress in chunks."""
+        """Optimised ingestion — Disk-First / Fast-Path.
+
+        Instead of storing raw text in DuckDB, the sidecar:
+        1. Streams lines from the source file and copies them to
+           ``data/storage/<source_id>.log`` (via DiskLogStore).
+        2. Tracks the line_id for each line.
+        3. Inserts only the skinny pointer row into DuckDB.
+        """
         if not os.path.exists(filepath):
             raise FileNotFoundError(f"File not found: {filepath}")
 
-        # 1. Count total lines first for progress tracking
+        # 1. Count total lines for progress tracking
         total_lines = 0
-        with open(filepath, "r", encoding="utf-8", errors="replace") as f:
+        with open(filepath, encoding="utf-8", errors="replace") as f:
             for _ in f:
                 total_lines += 1
 
         if total_lines == 0:
             return {"status": "ok", "count": 0, "job_id": None}
 
-        # 2. Create Job Record via DB method
+        # 2. Create ingestion job record
         job_id = self.db.create_ingestion_job(workspace_id, source_id, total_lines)
 
-        # 3. Process in chunks
-        chunk_size = 5000
+        # 3. Stream lines: write to disk store, insert skinny rows in chunks
+        # Adaptive chunking: start small (100) for immediate feedback, grow to 5000 for speed
+        initial_chunk_size = 100
+        max_chunk_size = 5000
+        current_chunk_size = min(initial_chunk_size, total_lines)
         processed_count = 0
         cursor = None
-        
+        now_ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
         try:
             cursor = self.db.get_cursor()
-            with open(filepath, "r", encoding="utf-8", errors="replace") as f:
-                chunk = []
-                for line in f:
-                    clean_line = line.strip()
-                    if not clean_line:
-                        continue
-                        
-                    chunk.append([
-                        workspace_id,
-                        source_id,
-                        clean_line,
-                        datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                        "INFO",
-                        "",
-                        None,
-                        "{}",
-                        False,
-                    ])
+            with open(filepath, encoding="utf-8", errors="replace") as f:
+                chunk_lines: list[str] = []
 
-                    if len(chunk) >= chunk_size:
-                        # Batch Insert
+                for raw_line in f:
+                    clean = raw_line.strip()
+                    if not clean:
+                        continue
+                    chunk_lines.append(clean)
+
+                    if len(chunk_lines) >= current_chunk_size:
+                        # --- Disk-First: batch-write chunk to flat file ---
+                        line_ids = self.log_store.append_batch(source_id, chunk_lines)
+
+                        batch_data = [
+                            (workspace_id, source_id, line_ids[i], now_ts, "INFO", None, "{}", False)
+                            for i in range(len(chunk_lines))
+                        ]
                         cursor.executemany(
-                            "INSERT OR IGNORE INTO logs (workspace_id, source_id, raw_text, timestamp, level, message, cluster_id, facets, processed) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                            chunk,
+                            "INSERT INTO logs"
+                            " (workspace_id, source_id, line_id, timestamp, level, cluster_id, facets, processed)"
+                            " VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                            batch_data,
                         )
-                        processed_count += len(chunk)
-                        
-                        # Update Job Progress
+                        processed_count += len(chunk_lines)
                         cursor.execute(
                             "UPDATE ingestion_jobs SET processed_lines = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
                             (processed_count, job_id),
                         )
                         self.db.commit()
-                        chunk = []
+                        chunk_lines = []
+                        # Scale up chunk size for better performance on large files
+                        current_chunk_size = min(max_chunk_size, current_chunk_size * 2)
 
                 # Final chunk
-                if chunk:
+                if chunk_lines:
+                    line_ids = self.log_store.append_batch(source_id, chunk_lines)
+                    batch_data = [
+                        (workspace_id, source_id, line_ids[i], now_ts, "INFO", None, "{}", False)
+                        for i in range(len(chunk_lines))
+                    ]
                     cursor.executemany(
-                        "INSERT OR IGNORE INTO logs (workspace_id, source_id, raw_text, timestamp, level, message, cluster_id, facets, processed) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                        chunk,
+                        "INSERT INTO logs"
+                        " (workspace_id, source_id, line_id, timestamp, level, cluster_id, facets, processed)"
+                        " VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                        batch_data,
                     )
-                    processed_count += len(chunk)
-                    chunk = []
+                    processed_count += len(chunk_lines)
 
-            # Mark Job Completed
+            # Mark job completed
             cursor.execute(
                 "UPDATE ingestion_jobs SET status = 'completed', processed_lines = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
                 (processed_count, job_id),
             )
             self.db.commit()
-            
             logger.info("[Ingestion] Completed job %d for %s: %d lines", job_id, workspace_id, processed_count)
 
-        except Exception as e:
-            logger.error("[Ingestion] Failed job %d: %s", job_id, e)
+        except Exception as exc:
+            logger.error("[Ingestion] Failed job %d: %s", job_id, exc)
             if cursor:
                 cursor.execute(
                     "UPDATE ingestion_jobs SET status = 'failed', updated_at = CURRENT_TIMESTAMP WHERE id = ?",
                     (job_id,),
                 )
                 self.db.commit()
-            raise e
+            raise
 
         return {"status": "ok", "count": processed_count, "job_id": job_id}
 
@@ -2112,7 +2187,7 @@ class App:
                 drift_params = [norm_start] if start_time else []
                 cursor.execute(f"SELECT COUNT(*) FROM clusters{drift_where}", drift_params)
                 new_patterns_count = cursor.fetchone()[0]
-        except:
+        except Exception:
             pass
 
         # 9. Source Heatmap (Log counts per source per bucket)
@@ -2136,7 +2211,7 @@ class App:
                 {"timestamp": r[0], "source_id": r[1], "source_name": r[2], "count": r[3]} 
                 for r in sh_raw
             ]
-        except:
+        except Exception:
             pass
 
         # 10. Latest AI Insight Snippet
@@ -2163,7 +2238,7 @@ class App:
                 import re
                 clean_content = re.sub(r'<think>.*?</think>', '', content, flags=re.DOTALL).strip()
                 latest_insight = (clean_content[:150] + "...") if len(clean_content) > 150 else clean_content
-        except:
+        except Exception:
             pass
 
         return {

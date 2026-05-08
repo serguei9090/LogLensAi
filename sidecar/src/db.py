@@ -75,14 +75,13 @@ class LogDatabase:
         cursor.execute("CREATE SEQUENCE IF NOT EXISTS ingestion_jobs_id_seq;")
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS logs (
-                id        INTEGER PRIMARY KEY DEFAULT nextval('log_id_seq'),
+                id           INTEGER PRIMARY KEY DEFAULT nextval('log_id_seq'),
                 workspace_id TEXT,
                 source_id    TEXT,
+                line_id      INTEGER,
                 timestamp    TEXT,
                 level        TEXT,
-                message      TEXT,
                 cluster_id   TEXT,
-                raw_text     TEXT,
                 has_comment  BOOLEAN DEFAULT FALSE,
                 comment      TEXT,
                 facets       JSON,
@@ -233,7 +232,62 @@ class LogDatabase:
         self._migrate_log_facets(cursor)
         self._migrate_ingestion_columns(cursor)
         self._migrate_ingestion_jobs(cursor)
+        self._migrate_fast_path_schema(cursor)
         self._migrate_indexes(cursor)
+
+    def _migrate_fast_path_schema(self, cursor):
+        """Migration: upgrade existing logs table to the Skinny / Fast-Path schema.
+
+        Old schema had ``raw_text TEXT`` and ``message TEXT`` columns.
+        New schema replaces them with ``line_id INTEGER`` — a pointer into the
+        source's flat file under ``data/storage/``.
+
+        Strategy (DuckDB)
+        -----------------
+        DuckDB ≥1.0 supports ``ALTER TABLE … DROP COLUMN`` natively when there
+        are no dependent indexes.  We drop relevant indexes first, apply column
+        changes, then rely on ``_migrate_indexes`` to recreate them.
+        """
+        # 1. Add line_id if missing
+        cursor.execute(
+            "SELECT count(*) FROM information_schema.columns"
+            " WHERE table_name = 'logs' AND column_name = 'line_id'"
+        )
+        if cursor.fetchone()[0] == 0:
+            logger.info("[DB] Fast-Path Migration: adding 'line_id' column...")
+            try:
+                cursor.execute("ALTER TABLE logs ADD COLUMN line_id INTEGER")
+            except Exception as exc:
+                logger.error("[DB] Fast-Path Migration (line_id): %s", exc)
+
+        # 2. Drop raw_text if it still exists
+        cursor.execute(
+            "SELECT count(*) FROM information_schema.columns"
+            " WHERE table_name = 'logs' AND column_name = 'raw_text'"
+        )
+        if cursor.fetchone()[0] > 0:
+            logger.info("[DB] Fast-Path Migration: dropping 'raw_text' column...")
+            try:
+                cursor.execute("DROP INDEX IF EXISTS idx_logs_workspace_id")
+                cursor.execute("DROP INDEX IF EXISTS idx_logs_source_id")
+                cursor.execute("DROP INDEX IF EXISTS idx_logs_timestamp")
+                cursor.execute("DROP INDEX IF EXISTS idx_logs_cluster_id")
+                cursor.execute("DROP INDEX IF EXISTS idx_logs_processed")
+                cursor.execute("ALTER TABLE logs DROP COLUMN raw_text")
+            except Exception as exc:
+                logger.error("[DB] Fast-Path Migration (drop raw_text): %s", exc)
+
+        # 3. Drop message if it still exists
+        cursor.execute(
+            "SELECT count(*) FROM information_schema.columns"
+            " WHERE table_name = 'logs' AND column_name = 'message'"
+        )
+        if cursor.fetchone()[0] > 0:
+            logger.info("[DB] Fast-Path Migration: dropping 'message' column...")
+            try:
+                cursor.execute("ALTER TABLE logs DROP COLUMN message")
+            except Exception as exc:
+                logger.error("[DB] Fast-Path Migration (drop message): %s", exc)
 
     def _migrate_ingestion_columns(self, cursor):
         """Adds columns required for asynchronous ingestion and clustering."""
@@ -249,10 +303,10 @@ class LogDatabase:
                 cursor.execute("DROP INDEX IF EXISTS idx_logs_source_id")
                 cursor.execute("DROP INDEX IF EXISTS idx_logs_timestamp")
                 cursor.execute("DROP INDEX IF EXISTS idx_logs_cluster_id")
-                
+
                 cursor.execute("ALTER TABLE logs ADD COLUMN processed BOOLEAN DEFAULT FALSE")
             except Exception as e:
-                logger.error(f"[DB] Migration Error (logs.processed): {e}")
+                logger.error("[DB] Migration Error (logs.processed): %s", e)
 
         # Ensure performance index for the worker
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_logs_processed ON logs (processed)")
@@ -441,7 +495,7 @@ class LogDatabase:
     def _parse_filters(self, filters: list) -> tuple[list[str], list[Any]]:
         where_clauses = []
         params = []
-        allowed_fields = ["level", "source_id", "cluster_id", "raw_text", "has_comment"]
+        allowed_fields = ["level", "source_id", "cluster_id", "has_comment"]
 
         for f in filters:
             if hasattr(f, "model_dump"):

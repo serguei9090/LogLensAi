@@ -7,7 +7,15 @@ from parser import DrainParser
 
 
 class FileTailer:
-    def __init__(self, filepath, workspace_id, parser: DrainParser, db, source_id: str = None):
+    def __init__(
+        self,
+        filepath: str,
+        workspace_id: str,
+        parser: DrainParser,
+        db,
+        log_store,
+        source_id: str = None,
+    ) -> None:
         # Normalize to forward slashes for consistent source_id across OS
         self.filepath = os.path.abspath(filepath).replace("\\", "/")
         self.workspace_id = workspace_id
@@ -17,6 +25,7 @@ class FileTailer:
         self.running = False
         self.thread = None
         self.db = db
+        self.log_store = log_store
 
     def start(self):
         if self.running:
@@ -46,50 +55,40 @@ class FileTailer:
         except FileNotFoundError:
             self.running = False
 
-    def _process_line(self, line: str):
+    def _process_line(self, line: str) -> None:
         if not line:
             return
 
-        # 1. Fetch custom extraction rules (Cached)
-        custom_rules = self._get_rules()
+        # 1. Disk-First: write raw line to the source's flat file and get its line_id.
+        #    This is the ONLY place raw text is persisted.  DuckDB only stores the pointer.
+        line_id = self.log_store.append_line(self.source_id, line)
 
-        # 2. Shared Metadata Extraction (Regex/Parser logic)
-        # Use source_id for extraction context if needed
+        # 2. Lightweight metadata extraction (timestamp + level only — no Drain3 here).
+        #    Full extraction and clustering are deferred to the ClusteringWorker.
+        custom_rules = self._get_rules()
         metadata = extract_log_metadata(
             self.workspace_id, self.source_id, line, custom_rules=custom_rules
         )
         timestamp = metadata["timestamp"]
         level = metadata["level"]
-        raw_message = metadata["message"]
         facets = metadata.get("facets", {})
 
-        # 3. Clustering (Pattern Mining)
-        try:
-            res = self.parser.parse(raw_message)
-            cluster_id = str(res["cluster_id"])
-            message = res["template"]
-        except Exception:
-            cluster_id = "unknown"
-            message = raw_message
-
-        # 4. Persistence
-        cursor = self.db.get_cursor()
+        # 3. Insert the skinny row — no raw_text, no message, just the pointer.
         import json
 
         facets_json = json.dumps(facets) if facets else None
+        cursor = self.db.get_cursor()
         cursor.execute(
             """
-            INSERT INTO logs (workspace_id, source_id, timestamp, level, message, cluster_id, raw_text, facets)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO logs (workspace_id, source_id, line_id, timestamp, level, cluster_id, facets, processed)
+            VALUES (?, ?, ?, ?, ?, NULL, ?, FALSE)
             """,
             (
                 self.workspace_id,
                 self.source_id,
+                line_id,
                 timestamp,
                 level,
-                message,
-                cluster_id,
-                line,
                 facets_json,
             ),
         )

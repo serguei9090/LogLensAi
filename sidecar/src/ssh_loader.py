@@ -14,9 +14,10 @@ class SSHLoader(FileTailer):
         workspace_id,
         parser: DrainParser,
         db,
+        log_store,
         source_id: str = None,
     ):
-        super().__init__(filepath, workspace_id, parser, db, source_id=source_id)
+        super().__init__(filepath, workspace_id, parser, db, log_store, source_id=source_id)
         self.host = host
         self.port = port
         self.username = username

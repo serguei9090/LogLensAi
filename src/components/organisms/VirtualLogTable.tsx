@@ -3,6 +3,7 @@ import { type LogLevel, LogLevelBadge } from "@/components/atoms/LogLevelBadge";
 import type { FilterEntry } from "@/components/molecules/FilterBuilder";
 import type { HighlightEntry } from "@/components/molecules/HighlightBuilder";
 import { Button } from "@/components/ui/button";
+import type { IngestionJob } from "@/lib/hooks/useIngestionStatus";
 import { callSidecar } from "@/lib/hooks/useSidecarBridge";
 import { cn } from "@/lib/utils";
 import { useAiStore } from "@/store/aiStore";
@@ -10,7 +11,6 @@ import { useInvestigationStore } from "@/store/investigationStore";
 import { useSettingsStore } from "@/store/settingsStore";
 import { selectActiveWorkspace, useWorkspaceStore } from "@/store/workspaceStore";
 import { type VirtualItem, useVirtualizer } from "@tanstack/react-virtual";
-import type { IngestionJob } from "@/lib/hooks/useIngestionStatus";
 import {
   ArrowDown,
   ArrowUp,
@@ -31,6 +31,7 @@ import { toast } from "sonner";
 
 export interface LogEntry {
   id: number;
+  line_id: number;
   timestamp: string;
   level: LogLevel;
   message: string;
@@ -95,7 +96,6 @@ export function VirtualLogTable({
   } = useInvestigationStore();
   const { logSessionMap, fetchMapping } = useAiStore();
   const activeWorkspace = useWorkspaceStore(selectActiveWorkspace);
-
 
   useEffect(() => {
     if (activeWorkspace?.id) {
@@ -239,7 +239,7 @@ export function VirtualLogTable({
       );
     } else {
       // Escape special regex characters for a literal match
-      const escaped = selectionInfo.text.replaceALL(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`);
+      const escaped = selectionInfo.text.replaceAll(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`);
       regex = `(${escaped})`;
 
       const currentFacets = settings.facet_extractions || [];
@@ -322,7 +322,6 @@ export function VirtualLogTable({
     );
   };
 
-
   return (
     <>
       <section
@@ -349,13 +348,20 @@ export function VirtualLogTable({
               {activeJob && (
                 <div className="w-full space-y-3">
                   <div className="flex justify-between text-[10px] font-bold uppercase tracking-widest text-text-muted">
-                    <span>{activeJob.processed_lines.toLocaleString()} / {activeJob.total_lines.toLocaleString()} lines</span>
-                    <span className="text-primary">{Math.round((activeJob.processed_lines / activeJob.total_lines) * 100)}%</span>
+                    <span>
+                      {activeJob.processed_lines.toLocaleString()} /{" "}
+                      {activeJob.total_lines.toLocaleString()} lines
+                    </span>
+                    <span className="text-primary">
+                      {Math.round((activeJob.processed_lines / activeJob.total_lines) * 100)}%
+                    </span>
                   </div>
                   <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden border border-white/5">
-                    <div 
+                    <div
                       className="h-full bg-primary transition-all duration-500 ease-out shadow-[0_0_10px_rgba(34,197,94,0.5)]"
-                      style={{ width: `${(activeJob.processed_lines / activeJob.total_lines) * 100}%` }}
+                      style={{
+                        width: `${(activeJob.processed_lines / activeJob.total_lines) * 100}%`,
+                      }}
                     />
                   </div>
                 </div>
@@ -418,112 +424,112 @@ export function VirtualLogTable({
                 position: "relative",
               }}
             >
-            <table className="w-full text-left text-sm border-separate border-spacing-0 block">
-              <thead className="sticky top-0 bg-bg-surface border-b border-border z-10 text-text-muted text-[10px] font-bold uppercase tracking-widest h-10 select-none block">
-                <tr className="grid grid-cols-[12px_60px_180px_90px_1fr_110px_100px] w-full items-center">
-                  <th
-                    className="p-0 transition-colors group/select-all"
-                    title={selectedLogIds.length === logs.length ? "Deselect All" : "Select All"}
-                  >
-                    <button
-                      type="button"
-                      className="w-full h-10 flex items-center justify-center hover:bg-white/5 outline-none focus-visible:bg-white/10"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        if (selectedLogIds.length === logs.length) {
-                          clearSelection();
-                        } else {
-                          setSelectedLogIds(logs.map((l) => l.id));
+              <table className="w-full text-left text-sm border-separate border-spacing-0 block">
+                <thead className="sticky top-0 bg-bg-surface border-b border-border z-10 text-text-muted text-[10px] font-bold uppercase tracking-widest h-10 select-none block">
+                  <tr className="grid grid-cols-[12px_60px_180px_90px_1fr_110px_100px] w-full items-center">
+                    <th
+                      className="p-0 transition-colors group/select-all"
+                      title={selectedLogIds.length === logs.length ? "Deselect All" : "Select All"}
+                    >
+                      <button
+                        type="button"
+                        className="w-full h-10 flex items-center justify-center hover:bg-white/5 outline-none focus-visible:bg-white/10"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (selectedLogIds.length === logs.length) {
+                            clearSelection();
+                          } else {
+                            setSelectedLogIds(logs.map((l) => l.id));
+                          }
+                        }}
+                        aria-label={
+                          selectedLogIds.length === logs.length ? "Deselect All" : "Select All"
                         }
-                      }}
-                      aria-label={
-                        selectedLogIds.length === logs.length ? "Deselect All" : "Select All"
-                      }
-                    >
-                      <div
-                        className={cn(
-                          "w-1 h-4 rounded-full transition-all",
-                          selectedLogIds.length === logs.length
-                            ? "bg-emerald-500"
-                            : "bg-white/10 group-hover/select-all:bg-white/30",
-                        )}
-                      />
-                    </button>
-                  </th>
-                  <th className="p-0 text-center flex items-center justify-center">
-                    <button
-                      type="button"
-                      className="w-full h-10 px-3 flex items-center justify-center gap-1.5 hover:text-text-primary transition-colors focus-visible:bg-primary/5 outline-none"
-                      onClick={() => onSort("id")}
-                    >
-                      ID {renderSortIcon("id")}
-                    </button>
-                  </th>
-                  <th className="p-0 text-left flex items-center">
-                    <button
-                      type="button"
-                      className="w-full h-10 px-3 flex items-center gap-1.5 hover:text-text-primary transition-colors focus-visible:bg-primary/5 outline-none"
-                      onClick={() => onSort("timestamp")}
-                    >
-                      Timestamp {renderSortIcon("timestamp")}
-                    </button>
-                  </th>
-                  <th className="p-0 text-left flex items-center">
-                    <button
-                      type="button"
-                      className="w-full h-10 px-3 flex items-center gap-1.5 hover:text-text-primary transition-colors focus-visible:bg-primary/5 outline-none"
-                      onClick={() => onSort("level")}
-                    >
-                      Level {renderSortIcon("level")}
-                    </button>
-                  </th>
-                  <th className="p-0 text-left min-w-0 flex items-center">
-                    <div className="px-3 py-1 text-left w-full">Message</div>
-                  </th>
-                  <th className="p-0 text-center flex items-center justify-center">
-                    <button
-                      type="button"
-                      className="w-full h-10 px-3 flex items-center justify-center gap-1.5 hover:text-text-primary transition-colors focus-visible:bg-primary/5 outline-none"
-                      onClick={() => onSort("cluster_id")}
-                    >
-                      Cluster {renderSortIcon("cluster_id")}
-                    </button>
-                  </th>
-                  <th className="p-0 text-center flex items-center justify-center">
-                    <div className="w-full h-10 px-3 flex items-center justify-center gap-1.5">
-                      Actions
-                    </div>
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="font-mono text-[12px] relative z-0 block">
-                {rowVirtualizer.getVirtualItems().map((virtualRow) => {
-                  const log = logs[virtualRow.index];
-                  const isExpanded = expandedRow === log.id;
-                  const isSelected = selectedLogIds.includes(log.id);
+                      >
+                        <div
+                          className={cn(
+                            "w-1 h-4 rounded-full transition-all",
+                            selectedLogIds.length === logs.length
+                              ? "bg-emerald-500"
+                              : "bg-white/10 group-hover/select-all:bg-white/30",
+                          )}
+                        />
+                      </button>
+                    </th>
+                    <th className="p-0 text-center flex items-center justify-center">
+                      <button
+                        type="button"
+                        className="w-full h-10 px-3 flex items-center justify-center gap-1.5 hover:text-text-primary transition-colors focus-visible:bg-primary/5 outline-none"
+                        onClick={() => onSort("id")}
+                      >
+                        ID {renderSortIcon("id")}
+                      </button>
+                    </th>
+                    <th className="p-0 text-left flex items-center">
+                      <button
+                        type="button"
+                        className="w-full h-10 px-3 flex items-center gap-1.5 hover:text-text-primary transition-colors focus-visible:bg-primary/5 outline-none"
+                        onClick={() => onSort("timestamp")}
+                      >
+                        Timestamp {renderSortIcon("timestamp")}
+                      </button>
+                    </th>
+                    <th className="p-0 text-left flex items-center">
+                      <button
+                        type="button"
+                        className="w-full h-10 px-3 flex items-center gap-1.5 hover:text-text-primary transition-colors focus-visible:bg-primary/5 outline-none"
+                        onClick={() => onSort("level")}
+                      >
+                        Level {renderSortIcon("level")}
+                      </button>
+                    </th>
+                    <th className="p-0 text-left min-w-0 flex items-center">
+                      <div className="px-3 py-1 text-left w-full">Message</div>
+                    </th>
+                    <th className="p-0 text-center flex items-center justify-center">
+                      <button
+                        type="button"
+                        className="w-full h-10 px-3 flex items-center justify-center gap-1.5 hover:text-text-primary transition-colors focus-visible:bg-primary/5 outline-none"
+                        onClick={() => onSort("cluster_id")}
+                      >
+                        Cluster {renderSortIcon("cluster_id")}
+                      </button>
+                    </th>
+                    <th className="p-0 text-center flex items-center justify-center">
+                      <div className="w-full h-10 px-3 flex items-center justify-center gap-1.5">
+                        Actions
+                      </div>
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="font-mono text-[12px] relative z-0 block">
+                  {rowVirtualizer.getVirtualItems().map((virtualRow) => {
+                    const log = logs[virtualRow.index];
+                    const isExpanded = expandedRow === log.id;
+                    const isSelected = selectedLogIds.includes(log.id);
 
-                  return (
-                    <LogTableRow
-                      key={virtualRow.key}
-                      log={log}
-                      content={getHighlightedElements(log.message, highlights)}
-                      virtualRow={virtualRow}
-                      isExpanded={isExpanded}
-                      isSelected={isSelected}
-                      measureElement={rowVirtualizer.measureElement}
-                      onSelect={handleSelectRow}
-                      onToggleView={handleToggleView}
-                      onAnalyzeCluster={onAnalyzeCluster}
-                      anomalousClusters={anomalousClusters}
-                      logSessionMap={logSessionMap}
-                    />
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        </>
-      )}
+                    return (
+                      <LogTableRow
+                        key={virtualRow.key}
+                        log={log}
+                        content={getHighlightedElements(log.message, highlights)}
+                        virtualRow={virtualRow}
+                        isExpanded={isExpanded}
+                        isSelected={isSelected}
+                        measureElement={rowVirtualizer.measureElement}
+                        onSelect={handleSelectRow}
+                        onToggleView={handleToggleView}
+                        onAnalyzeCluster={onAnalyzeCluster}
+                        anomalousClusters={anomalousClusters}
+                        logSessionMap={logSessionMap}
+                      />
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </>
+        )}
 
         {expandedRow !== null && (
           <div
@@ -833,7 +839,7 @@ function LogTableRow({
         </div>
       </td>
       <td className="px-3 py-2 text-center text-text-muted/50 select-none group-hover:text-text-secondary align-top font-bold">
-        {log.id}
+        {log.line_id + 1}
       </td>
       <td className="px-3 py-2 text-text-secondary/70 align-top opacity-80 whitespace-nowrap overflow-hidden text-ellipsis">
         {log.timestamp}
@@ -842,9 +848,7 @@ function LogTableRow({
         <LogLevelBadge level={log.level} className="scale-75 origin-left" />
       </td>
       <td className="px-3 py-2 text-text-primary/90 align-top whitespace-normal break-words leading-relaxed min-w-0">
-        <div className="max-w-full overflow-hidden">
-          {content}
-        </div>
+        <div className="max-w-full overflow-hidden">{content}</div>
       </td>
       <td className="px-3 py-2 text-center align-top flex flex-col items-center justify-start">
         {log.cluster_id ? (

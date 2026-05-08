@@ -339,3 +339,8 @@ class DeleteLogsRequest(BaseModel):
 
 class PurgeInactiveWorkspacesRequest(BaseModel):
     active_workspace_ids: list[str]
+
+
+class GetLogContentRequest(BaseModel):
+    source_id: str
+    line_ids: list[int]

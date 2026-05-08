@@ -1,10 +1,10 @@
+import json
 import logging
 import threading
 import time
 from typing import Any
-from datetime import datetime
+
 from metadata_extractor import extract_log_metadata
-import json
 
 logger = logging.getLogger("ClusteringWorker")
 
@@ -56,7 +56,7 @@ class ClusteringWorker:
         # 1. Fetch a batch of unprocessed logs
         # We process logs in order of ID to maintain sequence
         cursor.execute(
-            "SELECT id, workspace_id, source_id, raw_text, facets FROM logs WHERE processed = FALSE ORDER BY id ASC LIMIT ?",
+            "SELECT id, workspace_id, source_id, line_id, facets FROM logs WHERE processed = FALSE ORDER BY id ASC LIMIT ?",
             (self.batch_size,)
         )
         batch = cursor.fetchall()
@@ -73,8 +73,14 @@ class ClusteringWorker:
         updates = []
         cluster_increments = {}  # (ws_id, cluster_id, template) -> count
 
-        for log_id, ws_id, source_id, raw_text, facets_json in batch:
+        for log_id, ws_id, source_id, line_id, facets_json in batch:
             try:
+                # 0. Fetch raw text via Fast-Path
+                raw_text = self.app.fast_path.get_line(source_id, line_id)
+                if raw_text is None:
+                    logger.warning(f"[Worker] Missing raw text for source {source_id}, line {line_id}")
+                    raw_text = ""
+
                 # 2. Rich Metadata Extraction (Regex parsing)
                 existing_facets = json.loads(facets_json) if facets_json else {}
                 rules = self.app._get_facet_rules_for_workspace(cursor, ws_id, rules_cache, global_rules)
@@ -95,7 +101,7 @@ class ClusteringWorker:
                 cluster_id = str(res["cluster_id"])
                 template = res["template"]
                 
-                updates.append((timestamp, level, message, facets, cluster_id, log_id))
+                updates.append((timestamp, level, facets, cluster_id, log_id))
                 
                 # Aggregate cluster counts to minimize DB writes
                 key = (ws_id, cluster_id, template)
@@ -104,7 +110,7 @@ class ClusteringWorker:
             except Exception as e:
                 logger.error(f"[Worker] Failed to process log {log_id}: {e}")
                 # Mark as processed with fallback to raw info
-                updates.append((None, "ERROR", raw_text, facets_json, "unknown", log_id))
+                updates.append((None, "ERROR", facets_json, "unknown", log_id))
 
         # 4. Update logs table in bulk
         if updates:
@@ -113,7 +119,6 @@ class ClusteringWorker:
                 UPDATE logs 
                 SET timestamp = COALESCE(?, timestamp), 
                     level = ?, 
-                    message = ?, 
                     facets = ?, 
                     cluster_id = ?, 
                     processed = TRUE 
@@ -135,7 +140,7 @@ class ClusteringWorker:
             )
 
         # 5. Update Ingestion Job Status (Checkpointing)
-        affected_sources = list(set((ws_id, src_id) for _, ws_id, src_id, _, _ in batch))
+        affected_sources = list({(ws_id, src_id) for _, ws_id, src_id, _, _ in batch})
         for ws_id, src_id in affected_sources:
             # Get processed count for this specific source
             cursor.execute(

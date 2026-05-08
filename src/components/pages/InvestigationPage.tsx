@@ -285,11 +285,11 @@ export function InvestigationPage() {
       toast.info("Filters cleared");
     };
 
-    window.addEventListener("loglens:refresh-logs", handleRefresh);
-    window.addEventListener("loglens:clear-filters", handleClear);
+    globalThis.addEventListener("loglens:refresh-logs", handleRefresh);
+    globalThis.addEventListener("loglens:clear-filters", handleClear);
     return () => {
-      window.removeEventListener("loglens:refresh-logs", handleRefresh);
-      window.removeEventListener("loglens:clear-filters", handleClear);
+      globalThis.removeEventListener("loglens:refresh-logs", handleRefresh);
+      globalThis.removeEventListener("loglens:clear-filters", handleClear);
     };
   }, [fetchLogs, setSearchQuery, setFilters, setHighlights]);
 
