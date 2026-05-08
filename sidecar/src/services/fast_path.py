@@ -34,9 +34,12 @@ class MappedSource:
 
     def _ensure_mapped(self):
         """Lazy initialization of mmap objects."""
-        if self._log_mmap is not None:
-            # Check if file size changed (appended)
-            if os.path.getsize(self.log_path) > self._log_mmap.size():
+        if self._log_mmap is not None and self._idx_mmap is not None:
+            # Check if file sizes changed (appended)
+            if (
+                os.path.getsize(self.log_path) > self._log_mmap.size()
+                or os.path.getsize(self.idx_path) > self._idx_mmap.size()
+            ):
                 self.close()
             else:
                 return

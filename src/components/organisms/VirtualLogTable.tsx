@@ -426,7 +426,7 @@ export function VirtualLogTable({
             >
               <table className="w-full text-left text-sm border-separate border-spacing-0 block">
                 <thead className="sticky top-0 bg-bg-surface border-b border-border z-10 text-text-muted text-[10px] font-bold uppercase tracking-widest h-10 select-none block">
-                  <tr className="grid grid-cols-[12px_60px_180px_90px_1fr_110px_100px] w-full items-center">
+                  <tr className="grid grid-cols-[12px_80px_180px_90px_1fr_110px_100px] w-full items-center">
                     <th
                       className="p-0 transition-colors group/select-all"
                       title={selectedLogIds.length === logs.length ? "Deselect All" : "Select All"}
@@ -543,7 +543,7 @@ export function VirtualLogTable({
                 </div>
                 Log Entry Annotation
                 <span className="text-text-muted font-mono text-[10px] ml-2 opacity-50 bg-white/5 px-2 py-0.5 rounded-full">
-                  ID: {expandedRow}
+                  Line: {logs.find((l) => l.id === expandedRow)?.line_id + 1 || expandedRow}
                 </span>
               </h3>
               <div className="flex items-center gap-3">
@@ -811,7 +811,7 @@ function LogTableRow({
       aria-controls={isExpanded ? `row-details-${log.id}` : undefined}
       className={cn(
         "group cursor-pointer transition-all border-b border-border/40 outline-none focus-visible:bg-bg-hover focus-visible:ring-1 focus-visible:ring-primary/30 relative",
-        "grid grid-cols-[12px_60px_180px_90px_1fr_110px_100px] items-stretch",
+        "grid grid-cols-[12px_80px_180px_90px_1fr_110px_100px] items-stretch",
         getRowLevelStyles(log.level),
         isSelected && "bg-emerald-500/[0.04]",
         isExpanded && "bg-bg-hover ring-1 ring-primary/20 z-10",

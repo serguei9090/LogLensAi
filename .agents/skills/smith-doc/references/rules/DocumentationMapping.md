@@ -13,7 +13,7 @@ Map code changes to the smallest relevant docs.
 | Architecture boundaries or major flow | `docs/architecture/project_summary.md`, `docs/architecture/Technical_Specification.md`, `docs/architecture/diagrams.md` |
 | UI design tokens or product visual rules | `DESIGN.md` |
 | Lessons or recurring project facts | `docs/track/LessonsLearned.md`, `bd remember` |
-| Deferred docs debt | `docs/track/CodeDebt.md` or a bead |
+| Deferred docs debt | `docs/track/CodeDebt.md` |
 
 Do not update every possible target. Update the docs that a future engineer would reasonably consult for the changed behavior.
 

@@ -1,3 +1,7 @@
+---
+trigger: always_on
+---
+
 # Project Documentation Standard
 
 Repository documentation lives under `docs/`.
@@ -6,7 +10,6 @@ Repository documentation lives under `docs/`.
 
 - Documentation is part of the codebase and must change with the behavior it describes.
 - Architecture docs must be verified against code.
-- Task docs support Beads; they do not replace Beads.
 
 ## Canonical Locations
 

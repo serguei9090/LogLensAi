@@ -143,8 +143,6 @@ This document provides explicit, ultra-high-context definitions for every person
 ### 14. The Memory Specialist (@memory-manager)
 - **Mindset**: Intelligence sync, context density, mnemonic anchoring.
 - **Responsibilities**:
-  - Distill architectural rationale into **Cognee** (L2).
-  - Manage the **Beads** (L5) task memory and state.
   - Synchronize documentation research across **Context7** (L4).
 - **Handoff**: Provide high-signal context to any agent starting a task.
 
@@ -191,6 +189,6 @@ This document provides explicit, ultra-high-context definitions for every person
 
 ## 📜 Global Persona Laws
 1. **Assume Role Header**: Every file edited by an agent MUST start with `Assume Role: <Persona> (@handle)`.
-2. **5-Layer Memory**: Agents MUST consult **Sequential Thinking**, **Codanna**, **Cognee**, **Local Docs**, and **Beads** before major edits.
+2. **5-Layer Memory**: Agents MUST consult **Sequential Thinking**
 3. **Collaboration**: Agents must proactively delegate to specialists via the defined handoff paths.
-4. **No Placeholders**: Never leave silent placeholders. If it's missing, it gets a bead (`bd create`).
+

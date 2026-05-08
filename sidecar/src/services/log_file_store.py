@@ -183,22 +183,39 @@ class DiskLogStore:
             # Index should be (N+1) * 8 bytes.
             if idx_size >= 8 and idx_size % 8 == 0:
                 # Check the last entry in the index matches the log size
-                with open(idx_path, "rb") as f:
-                    f.seek(-8, os.SEEK_END)
-                    last_offset = struct.unpack("<Q", f.read(8))[0]
-                    if last_offset == log_size:
-                        return (idx_size // 8) - 1
+                try:
+                    with open(idx_path, "rb") as f:
+                        f.seek(-8, os.SEEK_END)
+                        last_offset = struct.unpack("<Q", f.read(8))[0]
+                        if last_offset == log_size:
+                            return (idx_size // 8) - 1
+                        if last_offset < log_size:
+                            # Index is behind, resume instead of rebuild
+                            logger.info("[DiskLogStore] Index behind for %s. Resuming...", path)
+                            return self._rebuild_index(
+                                path,
+                                idx_path,
+                                resume_from=last_offset,
+                                initial_count=(idx_size // 8) - 1,
+                            )
+                except Exception as e:
+                    logger.warning("[DiskLogStore] Index check failed for %s: %s", path, e)
 
         # Rebuild required
-        logger.info("[DiskLogStore] Rebuilding index for %s...", path)
+        logger.info("[DiskLogStore] Building/Rebuilding index for %s...", path)
         return self._rebuild_index(path, idx_path)
 
-    def _rebuild_index(self, path: str, idx_path: str) -> int:
-        count = 0
+    def _rebuild_index(
+        self, path: str, idx_path: str, resume_from: int = 0, initial_count: int = 0
+    ) -> int:
+        count = initial_count
+        mode = "ab" if resume_from > 0 else "wb"
         try:
-            with open(path, "rb") as lf, open(idx_path, "wb") as idx:
-                # First offset is always 0
-                idx.write(struct.pack("<Q", 0))
+            with open(path, "rb") as lf, open(idx_path, mode) as idx:
+                if resume_from == 0:
+                    idx.write(struct.pack("<Q", 0))
+                else:
+                    lf.seek(resume_from)
 
                 while True:
                     chunk = lf.read(1 << 20)
@@ -214,17 +231,16 @@ class DiskLogStore:
                         pos = chunk.find(b"\n", pos + 1)
 
                 # Ensure the very last byte of the file is indexed if not ending in \n
-                # But our ingestion always appends \n.
-                # Just in case, check if the last written offset matches file size
                 final_size = lf.tell()
                 idx.flush()
-                if os.path.getsize(idx_path) > 0:
-                    with open(idx_path, "rb+") as f:
-                        f.seek(-8, os.SEEK_END)
-                        if struct.unpack("<Q", f.read(8))[0] != final_size:
-                            f.write(struct.pack("<Q", final_size))
+
+            # Verify final offset
+            with open(idx_path, "rb+") as f:
+                f.seek(-8, os.SEEK_END)
+                if struct.unpack("<Q", f.read(8))[0] != final_size:
+                    f.write(struct.pack("<Q", final_size))
 
         except Exception as exc:
-            logger.error("[DiskLogStore] Failed to rebuild index for %s: %s", path, exc)
-            return 0
+            logger.error("[DiskLogStore] Failed to index %s: %s", path, exc)
+            return initial_count
         return count
