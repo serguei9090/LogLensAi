@@ -35,6 +35,11 @@ class FileTailer:
         self._manager = SharedSourceManager(log_store)
         self._shared_source = None
 
+    @property
+    def running(self) -> bool:
+        """Returns True if currently subscribed to a shared source."""
+        return self._shared_source is not None
+
     def start(self):
         """Subscribe to the shared source."""
         if self._shared_source:

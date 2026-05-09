@@ -79,6 +79,7 @@ export function VirtualLogTable({
     toggleLogSelection,
     clearSelection,
     setSelectedLogIds,
+    isTailing,
   } = useInvestigationStore();
   const { logSessionMap, fetchMapping } = useAiStore();
   const activeWorkspace = useWorkspaceStore(selectActiveWorkspace);
@@ -255,8 +256,30 @@ export function VirtualLogTable({
     getScrollElement: () => parentRef.current,
     estimateSize: () => 40,
     overscan: 10,
+    getItemKey: useCallback((index: number) => logs[index]?.id ?? index, [logs]),
     measureElement: (element) => element?.getBoundingClientRect().height,
   });
+
+  const prevLogsLength = useRef(logs.length);
+
+  // Auto-scroll logic for Tailing / Streaming mode
+  useEffect(() => {
+    const hasNewLogs = logs.length > prevLogsLength.current;
+    if ((activeJob || isTailing) && hasNewLogs) {
+      if (sortOrder === "asc") {
+        // Scroll to bottom if we are at the end of the file
+        rowVirtualizer.scrollToIndex(logs.length - 1, { align: "end", behavior: "smooth" });
+      } else if (sortBy === "timestamp" || sortBy === "id") {
+        // If newest are at top, ensure we stay at top to see them
+        // But only if we were already near the top
+        const scrollOffset = parentRef.current?.scrollTop || 0;
+        if (scrollOffset < 100) {
+          rowVirtualizer.scrollToIndex(0, { align: "start", behavior: "smooth" });
+        }
+      }
+    }
+    prevLogsLength.current = logs.length;
+  }, [logs.length, sortOrder, sortBy, activeJob, isTailing, rowVirtualizer]);
 
   const handleToggleView = (id: number) => {
     const row = logs.find((l) => l.id === id);
@@ -316,7 +339,8 @@ export function VirtualLogTable({
         aria-label="Log Table"
         tabIndex={-1}
       >
-        {activeJob || isTransitioning ? (
+        {/* Full-screen Loading/Ingestion Overlay — only when table is empty */}
+        {(activeJob || isTransitioning) && logs.length === 0 && (
           <div className="absolute inset-0 flex flex-col items-center justify-center p-8 text-center animate-in fade-in zoom-in-95 duration-500 bg-bg-base/50 backdrop-blur-sm z-50">
             <div className="flex flex-col items-center gap-6 max-w-md w-full">
               <div className="relative">
@@ -371,7 +395,10 @@ export function VirtualLogTable({
               </div>
             </div>
           </div>
-        ) : logs.length === 0 ? (
+        )}
+
+        {/* Empty State */}
+        {logs.length === 0 && !activeJob && !isTransitioning ? (
           <div className="absolute inset-0 flex flex-col items-center justify-center p-8 text-center animate-in fade-in zoom-in-95 duration-500">
             <div className="relative mb-6">
               <div className="absolute -inset-4 bg-primary/10 rounded-full blur-2xl animate-pulse" />
@@ -406,119 +433,156 @@ export function VirtualLogTable({
             </div>
           </div>
         ) : (
-          <>
-            <div
-              style={{
-                height: `${rowVirtualizer.getTotalSize()}px`,
-                width: "100%",
-                position: "relative",
-              }}
-            >
-              <table className="w-full text-left text-sm border-separate border-spacing-0 block">
-                <thead className="sticky top-0 bg-bg-surface border-b border-border z-10 text-text-muted text-[10px] font-bold uppercase tracking-widest h-10 select-none block">
-                  <tr className="grid grid-cols-[12px_80px_180px_90px_1fr_110px_100px] w-full items-center">
-                    <th
-                      className="p-0 transition-colors group/select-all"
-                      title={selectedLogIds.length === logs.length ? "Deselect All" : "Select All"}
-                    >
-                      <button
-                        type="button"
-                        className="w-full h-10 flex items-center justify-center hover:bg-white/5 outline-none focus-visible:bg-white/10"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          if (selectedLogIds.length === logs.length) {
-                            clearSelection();
-                          } else {
-                            setSelectedLogIds(logs.map((l) => l.id));
-                          }
+          logs.length > 0 && (
+            <>
+              {/* Subtle background Ingestion Progress for "Streaming" feel */}
+              {activeJob && (
+                <div className="sticky top-10 left-0 w-full z-40 px-6 py-2 bg-bg-surface/80 backdrop-blur-md border-b border-white/5 animate-in slide-in-from-top duration-300">
+                  <div className="flex items-center justify-between gap-4">
+                    <div className="flex items-center gap-2">
+                      <Sparkles className="size-3 text-primary animate-pulse" />
+                      <span className="text-[10px] font-bold uppercase tracking-widest text-text-muted">
+                        Ingesting: {activeJob.processed_lines.toLocaleString()} lines
+                      </span>
+                    </div>
+                    <div className="flex-1 max-w-xs h-1 bg-white/5 rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-primary transition-all duration-300"
+                        style={{
+                          width: `${(activeJob.processed_lines / activeJob.total_lines) * 100}%`,
                         }}
-                        aria-label={
-                          selectedLogIds.length === logs.length ? "Deselect All" : "Select All"
-                        }
-                      >
-                        <div
-                          className={cn(
-                            "w-1 h-4 rounded-full transition-all",
-                            selectedLogIds.length === logs.length
-                              ? "bg-emerald-500"
-                              : "bg-white/10 group-hover/select-all:bg-white/30",
-                          )}
-                        />
-                      </button>
-                    </th>
-                    <th className="p-0 text-center flex items-center justify-center">
-                      <button
-                        type="button"
-                        className="w-full h-10 px-3 flex items-center justify-center gap-1.5 hover:text-text-primary transition-colors focus-visible:bg-primary/5 outline-none"
-                        onClick={() => onSort("id")}
-                      >
-                        ID {renderSortIcon("id")}
-                      </button>
-                    </th>
-                    <th className="p-0 text-left flex items-center">
-                      <button
-                        type="button"
-                        className="w-full h-10 px-3 flex items-center gap-1.5 hover:text-text-primary transition-colors focus-visible:bg-primary/5 outline-none"
-                        onClick={() => onSort("timestamp")}
-                      >
-                        Timestamp {renderSortIcon("timestamp")}
-                      </button>
-                    </th>
-                    <th className="p-0 text-left flex items-center">
-                      <button
-                        type="button"
-                        className="w-full h-10 px-3 flex items-center gap-1.5 hover:text-text-primary transition-colors focus-visible:bg-primary/5 outline-none"
-                        onClick={() => onSort("level")}
-                      >
-                        Level {renderSortIcon("level")}
-                      </button>
-                    </th>
-                    <th className="p-0 text-left min-w-0 flex items-center">
-                      <div className="px-3 py-1 text-left w-full">Message</div>
-                    </th>
-                    <th className="p-0 text-center flex items-center justify-center">
-                      <button
-                        type="button"
-                        className="w-full h-10 px-3 flex items-center justify-center gap-1.5 hover:text-text-primary transition-colors focus-visible:bg-primary/5 outline-none"
-                        onClick={() => onSort("cluster_id")}
-                      >
-                        Cluster {renderSortIcon("cluster_id")}
-                      </button>
-                    </th>
-                    <th className="p-0 text-center flex items-center justify-center">
-                      <div className="w-full h-10 px-3 flex items-center justify-center gap-1.5">
-                        Actions
-                      </div>
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="font-mono text-[12px] relative z-0 block">
-                  {rowVirtualizer.getVirtualItems().map((virtualRow) => {
-                    const log = logs[virtualRow.index];
-                    const isExpanded = expandedRow === log.id;
-                    const isSelected = selectedLogIds.includes(log.id);
-
-                    return (
-                      <LogTableRow
-                        key={virtualRow.key}
-                        log={log}
-                        content={getHighlightedElements(log.message, highlights)}
-                        virtualRow={virtualRow}
-                        isExpanded={isExpanded}
-                        isSelected={isSelected}
-                        measureElement={rowVirtualizer.measureElement}
-                        onSelect={handleSelectRow}
-                        onToggleView={handleToggleView}
-                        onAnalyzeCluster={onAnalyzeCluster}
-                        anomalousClusters={anomalousClusters}
-                        logSessionMap={logSessionMap}
                       />
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </>
+                    </div>
+                    <span className="text-[10px] font-bold text-primary">
+                      {Math.round((activeJob.processed_lines / activeJob.total_lines) * 100)}%
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              {/* Background Fetch Indicator (Silent Loader) */}
+              {isTransitioning && !activeJob && (
+                <div className="absolute top-2 right-6 z-[60] flex items-center gap-2 px-3 py-1 bg-primary/10 border border-primary/20 rounded-full animate-in fade-in slide-in-from-top-2 duration-300">
+                  <div className="size-1.5 bg-primary rounded-full animate-pulse" />
+                  <span className="text-[9px] font-bold uppercase tracking-widest text-primary/80">
+                    Syncing logs...
+                  </span>
+                </div>
+              )}
+
+              <div
+                style={{
+                  height: `${rowVirtualizer.getTotalSize()}px`,
+                  width: "100%",
+                  position: "relative",
+                }}
+              >
+                <table className="w-full text-left text-sm border-separate border-spacing-0 block">
+                  <thead className="sticky top-0 bg-bg-surface border-b border-border z-10 text-text-muted text-[10px] font-bold uppercase tracking-widest h-10 select-none block">
+                    <tr className="grid grid-cols-[12px_80px_180px_90px_1fr_110px_100px] w-full items-center">
+                      <th
+                        className="p-0 transition-colors group/select-all"
+                        title={selectedLogIds.length === logs.length ? "Deselect All" : "Select All"}
+                      >
+                        <button
+                          type="button"
+                          className="w-full h-10 flex items-center justify-center hover:bg-white/5 outline-none focus-visible:bg-white/10"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (selectedLogIds.length === logs.length) {
+                              clearSelection();
+                            } else {
+                              setSelectedLogIds(logs.map((l) => l.id));
+                            }
+                          }}
+                          aria-label={
+                            selectedLogIds.length === logs.length ? "Deselect All" : "Select All"
+                          }
+                        >
+                          <div
+                            className={cn(
+                              "w-1 h-4 rounded-full transition-all",
+                              selectedLogIds.length === logs.length
+                                ? "bg-emerald-500"
+                                : "bg-white/10 group-hover/select-all:bg-white/30",
+                            )}
+                          />
+                        </button>
+                      </th>
+                      <th className="p-0 text-center flex items-center justify-center">
+                        <button
+                          type="button"
+                          className="w-full h-10 px-3 flex items-center justify-center gap-1.5 hover:text-text-primary transition-colors focus-visible:bg-primary/5 outline-none"
+                          onClick={() => onSort("id")}
+                        >
+                          ID {renderSortIcon("id")}
+                        </button>
+                      </th>
+                      <th className="p-0 text-left flex items-center">
+                        <button
+                          type="button"
+                          className="w-full h-10 px-3 flex items-center gap-1.5 hover:text-text-primary transition-colors focus-visible:bg-primary/5 outline-none"
+                          onClick={() => onSort("timestamp")}
+                        >
+                          Timestamp {renderSortIcon("timestamp")}
+                        </button>
+                      </th>
+                      <th className="p-0 text-left flex items-center">
+                        <button
+                          type="button"
+                          className="w-full h-10 px-3 flex items-center gap-1.5 hover:text-text-primary transition-colors focus-visible:bg-primary/5 outline-none"
+                          onClick={() => onSort("level")}
+                        >
+                          Level {renderSortIcon("level")}
+                        </button>
+                      </th>
+                      <th className="p-0 text-left min-w-0 flex items-center">
+                        <div className="px-3 py-1 text-left w-full">Message</div>
+                      </th>
+                      <th className="p-0 text-center flex items-center justify-center">
+                        <button
+                          type="button"
+                          className="w-full h-10 px-3 flex items-center justify-center gap-1.5 hover:text-text-primary transition-colors focus-visible:bg-primary/5 outline-none"
+                          onClick={() => onSort("cluster_id")}
+                        >
+                          Cluster {renderSortIcon("cluster_id")}
+                        </button>
+                      </th>
+                      <th className="p-0 text-center flex items-center justify-center">
+                        <div className="w-full h-10 px-3 flex items-center justify-center gap-1.5">
+                          Actions
+                        </div>
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="font-mono text-[12px] relative z-0 block">
+                    {rowVirtualizer.getVirtualItems().map((virtualRow) => {
+                      const log = logs[virtualRow.index];
+                      const isExpanded = expandedRow === log.id;
+                      const isSelected = selectedLogIds.includes(log.id);
+
+                      return (
+                        <LogTableRow
+                          key={virtualRow.key}
+                          log={log}
+                          content={getHighlightedElements(log.message, highlights)}
+                          virtualRow={virtualRow}
+                          isExpanded={isExpanded}
+                          isSelected={isSelected}
+                          measureElement={rowVirtualizer.measureElement}
+                          onSelect={handleSelectRow}
+                          onToggleView={handleToggleView}
+                          onAnalyzeCluster={onAnalyzeCluster}
+                          anomalousClusters={anomalousClusters}
+                          logSessionMap={logSessionMap}
+                        />
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          )
         )}
 
         {expandedRow !== null && (

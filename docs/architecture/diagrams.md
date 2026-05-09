@@ -1,141 +1,117 @@
-# 📊 Visual Architecture Diagrams
+# Global Architecture Diagrams (diagrams.md)
 
-> **Init Selector** — Check the diagram types relevant to this project. The AI will generate and maintain the checked diagrams throughout the project lifecycle.
+This document is the repository for complex Mermaid.js diagrams that span multiple layers of the LogLensAi system.
 
-<!-- AI_PROMPT: If no diagram types are checked below, review `stack.md` and `communication.md`
-     to determine which diagrams best capture this project's architecture. Propose the top 3.
-     Once confirmed, generate an initial draft for each selected type using the diagram-creator skill. -->
+## 👤 Persona: `@diagram-arch`
+Expert in visual architecture mapping and C4-modeling. Focuses on system interoperability.
 
----
+## 📡 End-to-End Request Flow (Sequence Diagram)
 
-## 🎨 Diagram Type Selection
-
-- [ ] **System Context Diagram (C4 Level 1)** — How this system fits in the broader environment
-- [ ] **Container Diagram (C4 Level 2)** — High-level tech containers (Frontend, Backend, DB, etc.)
-- [x] **Sequence Diagram** — Frontend → Backend → DB request/response flow *(default: always)*
-- [ ] **Component Diagram (C4 Level 3)** — Internal structure of a container
-- [x] **ERD (Entity Relationship Diagram)** — Database schema relationships *(default: when DB exists)*
-- [ ] **State Machine Diagram** — State transitions for complex UI flows or agentic loops
-- [x] **Data Flow Diagram (DFD)** — How data moves through the full system
-- [ ] **Deployment Diagram** — Infrastructure topology (Docker, Cloud, Tauri packaging)
-- [x] **AI Agent Orchestration Diagram** — Agent→Tool→Agent delegation map (AVAS standard)
-- [ ] **Atomic Design Component Map** — Atoms → Molecules → Organisms hierarchy
-
----
-
-## 📐 Diagram Specifications
-
-### 🌊 Data Ingestion & Clustering Pipeline (DFD)
-
-This diagram visualizes the high-performance path from raw log input to indexed clusters.
-
-```mermaid
-graph LR
-    Input[Raw Log File / Stream] --> Ingestion[IngestionServer]
-    Ingestion --> Store[DiskLogStore]
-    Ingestion --> Fast[FastPath Buffer]
-    
-    Fast --> UI[Frontend Real-time View]
-    
-    Store -.->|Sync Index| DuckDB[(DuckDB)]
-    
-    subgraph "Background Processing"
-        Worker[ClusteringWorker]
-        Parser[LogParser / Drain3]
-        
-        Worker -->|Pull Raw| Store
-        Worker -->|Extract Template| Parser
-        Parser -->|Template Match| Worker
-        Worker -->|Update Clusters| DuckDB
-    end
-    
-    DuckDB -->|Query| API[App API]
-    API -->|JSON-RPC| UI
-```
-
-### 🔄 Sequence Diagram *(checked by default)*
-
-> Update this diagram whenever a new API method is added to `communication.md`.
+This diagram shows how a user action (e.g., clicking the "Live Tail" switch) moves through the entire system.
 
 ```mermaid
 sequenceDiagram
-    participant User
-    participant FE as Frontend
-    participant Bridge as Bridge Hook
-    participant BE as Backend (Sidecar)
-    participant DB as Database
+  participant UI as LogToolbar (React)
+  participant Store as useInvestigationStore (Zustand)
+  participant Bridge as useSidecarBridge.ts
+  participant API as api.py (Python)
+  participant Tailer as tailer.py (Python)
+  participant DB as loglens.duckdb (DuckDB)
 
-    User->>FE: Trigger Action
-    FE->>Bridge: callSidecar("method_name", params)
-    Bridge->>BE: JSON-RPC Request
-    BE->>DB: Query / Mutation
-    DB-->>BE: Result Set
-    BE-->>Bridge: JSON-RPC Response
-    Bridge-->>FE: Typed Result
-    FE-->>User: Update UI
+  UI->>Store: setTailing(true)
+  Store->>Bridge: callSidecar("start_tail", { filepath })
+  Bridge->>API: JSON-RPC (stdin)
+  API->>Tailer: FileTailer.start()
+  
+  loop Every 500ms
+    Tailer->>File: read offset
+    Tailer->>Parser: parse(line)
+    Parser->>DB: INSERT INTO logs
+  end
+
+  API-->>Bridge: { "status": "started" }
+  Bridge-->>UI: Update UI state (Green Pulse)
 ```
 
----
-
-### 🗄️ Entity Relationship Diagram *(checked by default)*
-
-> Update this diagram when `layers/backend.md` database schema changes.
+## 📐 Database Schema (Entity-Relationship)
 
 ```mermaid
 erDiagram
-    PROJECT ||--o{ ENTITY : contains
-    ENTITY ||--o{ RECORD : has
+  WORKSPACES ||--o{ LOGS : contains
+  WORKSPACES ||--o{ CLUSTERS : registers
+  WORKSPACES ||--o{ FUSION_CONFIGS : orchestrates
+  CLUSTERS ||--o{ LOGS : categorizes
+  
+  LOGS {
+    int id PK
+    timestamp timestamp
+    varchar level
+    varchar source_id
+    text raw_text
+    text message
+    varchar cluster_id FK
+    boolean has_comment
+  }
+  
+  CLUSTERS {
+    varchar workspace_id PK
+    varchar cluster_id PK
+    text template
+    int count
+  }
+
+  FUSION_CONFIGS {
+    varchar workspace_id PK
+    varchar fusion_id PK
+    varchar source_id PK
+    boolean enabled
+    int tz_offset
+  }
 ```
 
----
-
-### 🏗️ Container Diagram (C4 L2) *(fill when checked)*
+## 🏗️ UI Component Tree (High-Level)
 
 ```mermaid
 graph TD
-    subgraph "User's Machine"
-        FE["Frontend\n(React / Tauri)"]
-        BE["Backend Sidecar\n(Python / FastAPI)"]
-        DB[(Database\nDuckDB / SQLite)]
-    end
-    FE -- "Bridge Protocol" --> BE
-    BE -- "Query" --> DB
+  AppLayout --> Sidebar
+  AppLayout --> InvestigationLayout
+  
+  InvestigationLayout --> LogToolbar
+  InvestigationLayout --> VirtualLogTable
+  
+  LogToolbar --> SearchBar
+  LogToolbar --> FilterBuilder
+  LogToolbar --> HighlightBuilder
+  LogToolbar --> TailSwitch
+  
+  VirtualLogTable --> LogRow
+  LogRow --> LogLevelBadge
+  LogRow --> HighlightedMessage
 ```
 
----
+## 🧠 AI Investigation Flow (LangGraph State Machine)
 
-### 🤖 AI Agent Orchestration Diagram *(fill when checked)*
-
-> Follow AVAS standard: use subgraphs and labeled connections. Activate `diagram-creator` skill.
+This diagram visualizes the `sidecar/src/ai/graph.py` logic, showing how the AI decides between tool execution and final analysis.
 
 ```mermaid
 graph TD
-    User([User]) --> Antigravity{Antigravity}
-    subgraph "Local Execution"
-        Antigravity --> Agent1["Agent 1"]
-        Agent1 --> Tool1["Tool 1"]
-    end
+  START((START)) --> R[Node: Reasoning]
+  R --> COND{Should Continue?}
+  
+  COND -- "TOOL_CALL requested" --> T[Node: Tool Execution]
+  T --> R
+  
+  COND -- "No more tools" --> F[Node: Final Answer]
+  F --> END((END))
+
+  subgraph "AI Provider Layer"
+    R -- "chat()" --> Gemini[Google AI Studio]
+    R -- "chat()" --> Ollama[Ollama Local]
+    R -- "chat()" --> CLI[Gemini CLI]
+  end
+
+  subgraph "Tool Registry"
+    T -- "get_logs()" --> DB[(DuckDB)]
+    T -- "analyze_cluster()" --> Drain[Drain3]
+  end
 ```
-
----
-
-### 🎯 State Machine Diagram *(fill when checked)*
-
-```mermaid
-stateDiagram-v2
-    [*] --> Idle
-    Idle --> Loading : trigger
-    Loading --> Success : result
-    Loading --> Error : failure
-    Error --> Idle : retry
-    Success --> Idle : reset
-```
-
----
-
-## 🔗 References
-
-- **AVAS Law**: `.agents/rules/Specialized/VisualArchitecture.md`
-- **Diagram Skill**: `.agents/skills/diagram-creator/`
-- **Communication Flow**: `docs/architecture/communication.md`
-- **DB Schema**: `docs/architecture/layers/backend.md`

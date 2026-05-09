@@ -2169,7 +2169,7 @@ class App:
 
         return {
             "status": "ok",
-            "uptime_seconds": uptime_sec,
+            "uptime": uptime_sec,
             "database": {"logs": total_logs, "clusters": total_clusters},
             "active_tailers": len(active_tailers),
             "tailer_keys": active_tailers,

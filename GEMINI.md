@@ -2,7 +2,8 @@
 
 ## 📑 Table of Contents
 - [Global Project Standards](c:/users/ascc/.gemini/gemini.md) — Mandatory architecture and tooling standards.
-- [Project Architecture](./docs/Documentation/architecture/gemini.md) — Detailed system design, personas, and engine environment.
+- [Project Architecture](./docs/architecture/gemini.md) — Detailed system design, personas, and engine environment.
+- [System Interaction Map](./docs/architecture/interaction_map.md) — High-level bridge between Frontend stores and Sidecar API.
 - [Design Standards](./DESIGN.md) — UI/UX specifications and design tokens.
 
 ## 🏗️ Core Architecture (Sidecar Standard)

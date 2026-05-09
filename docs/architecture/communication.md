@@ -1,87 +1,83 @@
-# 📡 Communication Protocol & Bridge Logic
+# Communication & Protocol (communication.md)
 
-> **Init Selector** — Check one protocol at project start. The AI will use the checked protocol as the source of truth for all backend↔frontend communication code.
+This document describes the bridging mechanism between the Tauri Rust layer and the Python sidecar engine, as well as the JSON-RPC 2.0 contract.
 
-<!-- AI_PROMPT: If no protocol is checked below, analyze the project stack from `stack.md` 
-     and propose the top 3 options that best fit. Present them as a numbered list with 
-     a 1-sentence rationale for each. Wait for user confirmation before checking the box.
-     Once confirmed, populate the "Registered Methods" section with the project's actual methods. -->
+## 👤 Persona: `@bridge-arch`
+Expert in distributed communication, JSON-RPC 2.0 specs, and low-latency bridging. Focuses on the "Tauri ↔ Sidecar" interface.
 
----
+## 🌉 The Bridge (useSidecarBridge.ts)
+LogLensAi uses a unified `callSidecar<T>` function to handle all communication with the sidecar.
 
-## ⚙️ Protocol Selection
+| Path | Protocol | Purpose |
+|---|---|---|
+| **Development** | HTTP (Port 5000) | Local dev server for faster hot-reloading. |
+| **Production** | STDIN / STDOUT | Direct pipe between the Tauri process and the Sidecar binary. |
 
-Select the communication protocol for this project:
+### Error Propagation Flow
+1. **Python Exception**: Caught in `api.py`. Returns a JSON-RPC error object with status `-32603` (Internal Error).
+2. **Rust Wrapper**: Receives the response over the pipe.
+3. **JS/TS Frontend**: `callSidecar` parses the error object and throws a detailed `Error` that includes Python tracebacks in dev mode.
 
-- [x] **JSON-RPC 2.0 over Tauri IPC** *(Recommended for Tauri desktop apps)*
-  — Direct Rust↔Python Sidecar via `invoke()`. Zero network overhead, typed by Pydantic.
-- [ ] **JSON-RPC 2.0 over WebSocket** *(Recommended for web apps with real-time needs)*
-  — Full-duplex channel. Supports streaming responses and event push.
-- [ ] **REST/HTTP (FastAPI)** *(Recommended for standalone web backends or microservices)*
-  — Standard HTTP verbs + OpenAPI docs auto-generation.
-- [ ] **gRPC / Protocol Buffers** *(Recommended for high-performance multi-service systems)*
-  — Binary protocol. Best for internal service-to-service communication at scale.
-- [ ] **tRPC** *(Recommended for TypeScript-only full-stack apps — Next.js, Bun)*
-  — End-to-end type safety without a schema. Auto-inferred client from server router.
-- [ ] **GraphQL (Apollo / Strawberry)** *(Recommended for flexible client-driven data fetching)*
-  — Single endpoint. Clients request exactly what they need.
+## 📡 JSON-RPC 2.0 Specification
 
----
+All requests must conform to the following schema:
 
-## 📐 Protocol Specification
-
-### JSON-RPC 2.0 (Tauri IPC)
-
-**Standard Request Format:**
 ```json
 {
   "jsonrpc": "2.0",
-  "method": "METHOD_NAME",
-  "params": { },
-  "id": "UNIQUE_ID"
+  "id": 123,
+  "method": "<method_name>",
+  "params": {
+    "workspace_id": "ws_001",
+    "..." : "..."
+  }
 }
 ```
 
-**Standard Response Format:**
+### Response (Success)
 ```json
 {
   "jsonrpc": "2.0",
-  "result": { },
-  "id": "UNIQUE_ID"
+  "id": 123,
+  "result": { "status": "ok" }
 }
 ```
 
-**Bridge Hook (Frontend):**
-LogLensAi uses the `useSidecarBridge.ts` hook which abstracts the transport. In development, it uses HTTP to `localhost:5000`. In production, it uses Tauri's `invoke` which pipes to the sidecar's stdin/stdout.
-
-```typescript
-// src/lib/hooks/useSidecarBridge.ts
-const response = await invoke("call_sidecar", { method, params });
+### Response (Error)
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 123,
+  "error": {
+    "code": -32603,
+    "message": "Internal error",
+    "data": "Python Exception Traceback..."
+  }
+}
 ```
 
----
+## 🔐 Type-Safety Guardrails
 
-## 📋 Registered Methods
+### Pydantic Validation (Backend)
+Every incoming request in `api.py` is validated against a Pydantic `BaseModel`. This ensures that required fields (like `workspace_id`) are present before any logic begins.
 
-| Method / Endpoint | Protocol | Request Schema | Response Schema | Description |
-|---|---|---|---|---|
-| `factory_reset` | JSON-RPC | `ResetRequest` | `ResetResponse` | Complete wipe of DB and storage |
-| `get_logs` | JSON-RPC | `LogQuery` | `LogResults` | Query logs with filters and LLQL |
-| `start_tail` | JSON-RPC | `TailRequest` | `TailStatus` | Start tailing a local file |
-| `ingest_logs` | JSON-RPC | `IngestBatch` | `Status` | Bulk ingestion of log entries |
-| `analyze_cluster` | JSON-RPC | `AnalyzeRequest` | `AnalysisResponse` | AI analysis of log clusters |
-| `get_dashboard_stats` | JSON-RPC | `StatsRequest` | `DashboardStats` | Summary metrics for investigation |
-| `get_health` | JSON-RPC | — | `HealthResponse` | System health and worker status |
-| `get_clusters` | JSON-RPC | `ClusterQuery` | `ClusterList` | Retrieve mined templates/clusters |
-| `stop_tail` | JSON-RPC | `TailRequest` | `Status` | Stop an active file tailing job |
-| `is_tailing` | JSON-RPC | `TailRequest` | `boolean` | Check if a file is being tailed |
-| `update_settings` | JSON-RPC | `SettingsUpdate` | `Status` | Update global or workspace settings |
+### TypeScript Interfaces (Frontend)
+Response data from `callSidecar<T>` should be cast to a global interface defined in the corresponding layer (e.g., `LogEntry[]` for `get_logs`).
 
----
+## 🔄 Interaction Diagram (Request ↔ Response)
 
-## 🔗 References
-
-- **Bridge Rule**: `.agents/rules/Architecture.md` — The Bridge Protocol (Law #1)
-- **Backend Layer**: `docs/architecture/layers/backend.md`
-- **Frontend Layer**: `docs/architecture/layers/frontend.md`
-- **Stack**: `docs/architecture/stack.md`
+```mermaid
+sequenceDiagram
+  participant UI as Frontend (React)
+  participant Bridge as useSidecarBridge.ts
+  participant Rust as Rust Command (IPC)
+  participant Python as Sidecar Engine (Python)
+  
+  UI->>Bridge: callSidecar("get_logs", params)
+  Bridge->>Rust: invoke("dispatch_sidecar", { request })
+  Rust->>Python: write to STDIN
+  Python->>Python: _get_logs_internal()
+  Python-->>Rust: write to STDOUT
+  Rust-->>Bridge: return stringified JSON
+  Bridge-->>UI: return Typed Result
+```

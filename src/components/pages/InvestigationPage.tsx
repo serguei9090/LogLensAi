@@ -121,14 +121,10 @@ export function InvestigationPage() {
   const [transitioningSourceId, setTransitioningSourceId] = useState<string | null>(null);
 
   // Clear transitioning state once a job for that source is detected
+  // We check for ANY status because a job might finish extremely quickly (e.g. 150 lines)
+  // skipping the 'processing' check in our poll window.
   useEffect(() => {
-    if (
-      jobs.some(
-        (j) =>
-          j.source_id === transitioningSourceId &&
-          (j.status === "processing" || j.status === "pending"),
-      )
-    ) {
+    if (transitioningSourceId && jobs.some((j) => j.source_id === transitioningSourceId)) {
       setTransitioningSourceId(null);
     }
   }, [jobs, transitioningSourceId]);
@@ -276,8 +272,6 @@ export function InvestigationPage() {
   // ── Polling logic ──────────────────────────────────────────────────────────
 
   // Stabilized polling interval.
-  // We use a separate effect for the interval that doesn't depend on volatile fetchLogs dependencies
-  // like searchQuery or filters, ensuring we don't clear/restart the timer every time a user types.
   useEffect(() => {
     if (!activeWorkspaceId || !activeSourceId) {
       return;
@@ -285,13 +279,12 @@ export function InvestigationPage() {
 
     const interval = setInterval(() => {
       // Only poll if we are tailing OR if there is an active ingestion job for this source.
-      // If it's a static file that's fully ingested, we don't need to poll get_logs.
       const shouldPoll = isTailing || !!activeJobForSource;
 
       if (shouldPoll && !isFetching) {
         fetchLogs();
       }
-    }, 3000); // Increased interval slightly to 3s for stability
+    }, isTailing ? 1000 : 3000); // 1s for tailing, 3s for background ingestion monitoring
 
     return () => clearInterval(interval);
   }, [activeWorkspaceId, activeSourceId, isTailing, activeJobForSource, isFetching, fetchLogs]);
@@ -305,12 +298,7 @@ export function InvestigationPage() {
   const searchRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    if (!lastJob) {
-      // If we had an active job that disappeared without reaching 'completed' or 'failed'
-      // (e.g. workspace switch), we might want to clear the toast.
-      // But typically, sonner toasts should have a timeout or be manually dismissible.
-      return;
-    }
+    if (!lastJob) return;
 
     // Initialize refs on first job discovery to avoid "phantom" toasts for old jobs
     if (lastJobId.current === null) {
@@ -319,14 +307,13 @@ export function InvestigationPage() {
       return;
     }
 
-    // Only trigger if it's a new job or a status transition for the same job
+    // Monitor status transitions for the global lastJob (for toasts)
     if (lastJob.id !== lastJobId.current || lastJob.status !== prevJobStatus.current) {
       if (lastJob.status === "completed") {
         toast.success("Ingestion complete", {
           id: "ingest",
           description: `Processed ${lastJob.total_lines.toLocaleString()} lines.`,
         });
-        fetchLogs();
       } else if (lastJob.status === "failed") {
         toast.error("Ingestion failed", {
           id: "ingest",
@@ -337,7 +324,19 @@ export function InvestigationPage() {
       lastJobId.current = lastJob.id;
       prevJobStatus.current = lastJob.status;
     }
-  }, [lastJob, fetchLogs]);
+  }, [lastJob]);
+
+  // Specific effect to trigger fetchLogs when the job for the ACTIVE source completes
+  const completedJobIds = useRef<Set<number>>(new Set());
+  useEffect(() => {
+    const sourceJob = jobs.find((j) => j.source_id === activeSourceId);
+    if (!sourceJob) return;
+
+    if (sourceJob.status === "completed" && !completedJobIds.current.has(sourceJob.id)) {
+      completedJobIds.current.add(sourceJob.id);
+      fetchLogs();
+    }
+  }, [jobs, activeSourceId, fetchLogs]);
 
   // Memoized non-fusion sources
   const nonFusionSources = useMemo(() => sources.filter((s) => s.type !== "fusion"), [sources]);
@@ -429,6 +428,9 @@ export function InvestigationPage() {
         },
       });
 
+      setTransitioningSourceId(null);
+      fetchLogs();
+
       if (tail) {
         await callSidecar({
           method: "start_tail",
@@ -487,6 +489,9 @@ export function InvestigationPage() {
         folder_id: folderId,
       });
 
+      setTransitioningSourceId(null);
+      fetchLogs();
+
       setTailingSourceIds((prev) => new Set(prev).add(newSource.id));
       setTailing(true);
       toast.success(`SSH tailing started for ${connectionPath}`);
@@ -521,6 +526,8 @@ export function InvestigationPage() {
       setLogs([], 0);
       // Lean INSERT — fast because Drain3/metadata are deferred to background worker
       await callSidecar({ method: "ingest_logs", params: { logs: entries } });
+      setTransitioningSourceId(null);
+      fetchLogs();
     } catch (error) {
       setTransitioningSourceId(null);
       toast.error(error instanceof Error ? error.message : "Manual ingestion failed.", {

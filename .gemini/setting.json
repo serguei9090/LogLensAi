@@ -1,0 +1,17 @@
+{
+    "mcpServers": {
+            "vibegraph": {
+      "args": [
+        "tool",
+        "run",
+        "--python",
+        "3.12",
+        "--from",
+        "git+https://github.com/serguei9090/vibegraph",
+        "vibegraph-mcp"
+      ],
+      "command": "uv",
+      "disabled": false
+    }
+    }
+}

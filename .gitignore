@@ -59,3 +59,4 @@ data/
 debug_*
 final_debug*
 /scripts/logs/**
+**/.lancedb/**

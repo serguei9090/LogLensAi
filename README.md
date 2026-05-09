@@ -23,11 +23,39 @@ LogLensAi is developed using the **Jules-Cycle**:
 4. **Validation**: Auto-running unit tests and background autofix cycles.
 5. **Review**: Architectural audit by `@reviewer-agent`.
 
-## 📂 Project Structure
-```text
-.agents/         # AI-Native rules, skills, and workflows.
-.gemini/         # Subagent personas and configurations.
-docs/            # Living Specifications, ADRs, and Reports.
-src/             # React Frontend (Atomic Design).
-sidecar/         # Python Logic & DuckDB Engine.
+## 📂 Documentation & Project Map
+
+| Area | Location | Description |
+| :--- | :--- | :--- |
+| **Core Mandates** | [GEMINI.md](./GEMINI.md) | Mandatory standards, styles, and AI subagent rules. |
+| **Interaction Map** | [interaction_map.md](./docs/architecture/interaction_map.md) | Bridges Frontend stores with Backend JSON-RPC API. |
+| **API Contract** | [communication.md](./docs/architecture/communication.md) | JSON-RPC 2.0 schema and bridging protocols. |
+| **Persistence** | [database.md](./docs/architecture/database.md) | DuckDB schema and log storage strategy. |
+| **Living Specs** | [docs/track/](./docs/track/) | Active feature plans, handoffs, and retrospectives. |
+
+### Directory Breakdown
+- `.agents/`: AI-Native rules, skills, and workflows.
+- `.gemini/`: Subagent personas and configurations.
+- `docs/architecture/`: Permanent architectural records (ADRs).
+- `src/`: React Frontend (Atomic Design: Atoms, Molecules, Organisms).
+- `sidecar/src/`: Python Logic, RPC Dispatcher, and DuckDB Engine.
+- `src-tauri/`: Rust shell for desktop integration and window mgmt.
+
+## 🚀 Getting Started
+
+### 1. Prerequisites
+- **Node.js**: [Bun](https://bun.sh) recommended.
+- **Python**: [uv](https://github.com/astral-sh/uv) required.
+- **Rust**: Latest stable (for Tauri).
+
+### 2. Setup
+```bash
+# Install frontend dependencies
+bun install
+
+# Setup backend sidecar (automatic via uv)
+cd sidecar && uv sync && cd ..
+
+# Start development (Starts Vite + Sidecar)
+bun run tauri dev
 ```
