@@ -19,8 +19,11 @@ class ClusteringWorker:
         self.batch_size = batch_size
         self.interval = interval
         self.running = False
+        self.mode = "auto"  # auto, manual, burst
+        self.processed_session = 0
         self._thread = None
         self._stop_event = threading.Event()
+        self._force_cycle = threading.Event()
 
     def start(self):
         if self.running:
@@ -41,30 +44,60 @@ class ClusteringWorker:
     def _run(self):
         while not self._stop_event.is_set():
             try:
-                processed_count = self._process_batch()
+                if self.mode == "manual" and not self._force_cycle.is_set():
+                    self._force_cycle.wait(timeout=1.0)
+                    if not self._force_cycle.is_set():
+                        continue
+
+                # Adjust batch size and interval based on mode
+                current_batch_size = self.batch_size
+                current_interval = self.interval
+                
+                if self.mode == "burst":
+                    current_batch_size = self.batch_size * 4
+                    current_interval = 0.1
+                elif self.mode == "manual":
+                    current_batch_size = self.batch_size * 2
+                
+                processed_count = self._process_batch(batch_size=current_batch_size)
+                self.processed_session += processed_count
+                
                 if processed_count == 0:
+                    self._force_cycle.clear()
                     # STAB-005: Periodic sync to handle ingestion jobs stuck by duplicate suppression
                     self._sync_job_statuses()
-                    time.sleep(self.interval)
+                    time.sleep(current_interval)
+                elif self.mode == "burst":
+                    # In burst mode, keep hammering without much delay
+                    time.sleep(current_interval)
+                else:
+                    # Normal pacing
+                    time.sleep(0.1) # Small gap between batches even in auto
+                    
             except Exception as e:
                 logger.error(f"[Worker] Error in clustering cycle: {e}")
                 time.sleep(self.interval * 2) # Back off on error
 
-    def _process_batch(self) -> int:
+    def _process_batch(self, batch_size: int | None = None) -> int:
         cursor = self.db.get_cursor()
+        limit = batch_size or self.batch_size
         
+        # Initialize quarantine if not present
+        if not hasattr(self, "_quarantine"):
+            self._quarantine = {} # (source_id, line_id) -> (retry_count, last_retry)
+
         # 1. Fetch a batch of unprocessed logs
         # We process logs in order of ID to maintain sequence
         cursor.execute(
             "SELECT id, workspace_id, source_id, line_id, facets FROM logs WHERE processed = FALSE ORDER BY id ASC LIMIT ?",
-            (self.batch_size,)
+            (limit,)
         )
         batch = cursor.fetchall()
         
         if not batch:
             return 0
 
-        logger.info(f"[Worker] Processing batch of {len(batch)} logs...")
+        logger.debug(f"[Worker] Processing batch of {len(batch)} logs...")
         
         # Caches for this batch
         rules_cache = {}
@@ -74,24 +107,36 @@ class ClusteringWorker:
         cluster_increments = {}  # (ws_id, cluster_id, template) -> count
         batch_counts = {}        # (ws_id, source_id) -> count processed in this batch
         parser_configs = {}      # (ws_id, source_id) -> (config, tz_offset)
+        now = time.time()
 
         for log_id, ws_id, source_id, line_id, facets_json in batch:
             try:
-                # 0. Fetch raw text via Fast-Path
-                # 0. Fetch raw text via Fast-Path with small retry for indexing lag
-                raw_text = None
-                for retry in range(3):
-                    raw_text = self.app.fast_path.get_line(source_id, line_id)
-                    if raw_text is not None:
-                        break
-                    time.sleep(0.1) # Wait 100ms for indexer/OS flush
+                # 0. Fetch raw text via Fast-Path (Non-blocking)
+                q_key = (source_id, line_id)
+                if q_key in self._quarantine:
+                    retries, last_t = self._quarantine[q_key]
+                    # Exponential backoff: 2, 4, 8, 16, 32 seconds...
+                    wait_time = min(32, 2 ** retries)
+                    if now - last_t < wait_time:
+                        continue
+                
+                raw_text = self.app.fast_path.get_line(source_id, line_id)
                 
                 if raw_text is None:
-                    # OPTIMIZATION: Don't spam warnings if many lines are missing
-                    if len(updates) % 500 == 0:
-                         logger.warning(f"[Worker] Missing raw text for source {source_id}, line {line_id} (Suppressed similar)")
-                    updates.append((None, "MISSING", "{}", None, log_id))
-                    continue
+                    # Quarantine it
+                    retries, _ = self._quarantine.get(q_key, (0, 0))
+                    if retries < 8: # Increased retries for high-IO safety
+                        self._quarantine[q_key] = (retries + 1, now)
+                        continue 
+                    else:
+                        # Permanent failure
+                        logger.warning(f"[Worker] Hydration timeout for {source_id}:{line_id}. Marking as MISSING.")
+                        if q_key in self._quarantine: del self._quarantine[q_key]
+                        updates.append((None, "MISSING", "{}", None, log_id))
+                        continue
+
+                # Success, clear quarantine if present
+                if q_key in self._quarantine: del self._quarantine[q_key]
 
                 # 2. Rich Metadata Extraction (Regex parsing)
                 existing_facets = json.loads(facets_json) if facets_json else {}
@@ -176,29 +221,27 @@ class ClusteringWorker:
                 logger.error(f"[Worker] Transaction failed: {e}")
                 raise e
 
-        # 5. Update Ingestion Job Status (Incremental)
+        # 5. Update Ingestion Job Status (Target only the most recent active job)
         for (ws_id, src_id), count in batch_counts.items():
             cursor.execute(
                 """
                 UPDATE ingestion_jobs 
                 SET processed_lines = processed_lines + ?,
                     updated_at = CURRENT_TIMESTAMP
-                WHERE workspace_id = ? AND source_id = ? AND status IN ('pending', 'processing')
+                WHERE id = (
+                    SELECT id FROM ingestion_jobs 
+                    WHERE workspace_id = ? AND source_id = ? AND status IN ('pending', 'processing')
+                    ORDER BY created_at DESC LIMIT 1
+                )
                 """,
                 (count, ws_id, src_id)
             )
             
-            # Check if job is completed (only query if needed)
+            # Check if job is completed
             cursor.execute(
-                "SELECT processed_lines, total_lines FROM ingestion_jobs WHERE workspace_id = ? AND source_id = ?",
+                "UPDATE ingestion_jobs SET status = 'completed' WHERE workspace_id = ? AND source_id = ? AND status = 'processing' AND processed_lines >= total_lines",
                 (ws_id, src_id)
             )
-            row = cursor.fetchone()
-            if row and row[0] >= row[1]:
-                cursor.execute(
-                    "UPDATE ingestion_jobs SET status = 'completed' WHERE workspace_id = ? AND source_id = ?",
-                    (ws_id, src_id)
-                )
 
         self.db.commit()
         return len(batch)
@@ -248,3 +291,29 @@ class ClusteringWorker:
             except Exception:
                 pass
         return []
+
+    def get_status(self) -> dict:
+        """Returns the current status of the clustering worker."""
+        cursor = self.db.get_cursor()
+        cursor.execute("SELECT COUNT(*) FROM logs WHERE processed = FALSE")
+        backlog = cursor.fetchone()[0]
+        
+        return {
+            "mode": self.mode,
+            "running": self.running,
+            "backlog": backlog,
+            "processed_session": self.processed_session
+        }
+
+    def set_mode(self, mode: str):
+        """Changes the operational mode of the worker."""
+        if mode not in ["auto", "manual", "burst"]:
+            raise ValueError(f"Invalid clustering mode: {mode}")
+        self.mode = mode
+        if mode in ["auto", "burst"]:
+            self._force_cycle.set()
+        logger.info(f"[Worker] Clustering mode changed to: {mode}")
+
+    def trigger_cycle(self):
+        """Manually trigger a single processing cycle."""
+        self._force_cycle.set()

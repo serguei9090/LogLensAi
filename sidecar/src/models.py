@@ -233,6 +233,22 @@ class GetIngestionJobsRequest(BaseModel):
     workspace_id: str | None = None
 
 
+class GetClusteringStatusRequest(BaseModel):
+    workspace_id: str | None = None
+
+
+class GetClusteringStatusResponse(BaseModel):
+    mode: str
+    running: bool
+    backlog: int
+    processed_session: int
+
+
+class SetClusteringModeRequest(BaseModel):
+    mode: str  # 'auto', 'manual', 'burst'
+    workspace_id: str | None = None
+
+
 class GetLogDistributionRequest(BaseModel):
     workspace_id: str
     fusion_id: str | None = None

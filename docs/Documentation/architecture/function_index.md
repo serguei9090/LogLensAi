@@ -19,6 +19,9 @@ This file provides a comprehensive list of all core logic functions in the backe
 | `FileTailer.start` | Background thread execution for real-time local file monitoring. | `sidecar/src/tailer.py` |
 | `SSHLoader.start_remote_tail` | Background thread execution for paramiko-based remote monitoring. | `sidecar/src/ssh_loader.py` |
 | `AIProviderFactory.get_provider` | Factory for instantiating AI strategies (Gemini, Ollama, AI Studio). | `sidecar/src/ai/__init__.py` |
+| `ClusteringWorker.process` | Background worker for batch log clustering and job status tracking. | `sidecar/src/workers/clustering.py` |
+| `FastPath.get_line` | Mmap-based high-speed retrieval of raw log text from disk. | `sidecar/src/services/fast_path.py` |
+| `parse_llql` | Recursive descent parser for translating LLQL to parameterized SQL. | `sidecar/src/query_parser.py` |
 
 ## ⚛️ Frontend (React/TypeScript)
 
@@ -37,4 +40,4 @@ This file provides a comprehensive list of all core logic functions in the backe
 | `useAiStore` | Zustand store for AI session history and streaming state. | `src/store/aiStore.ts` |
 
 ---
-*Generated automatically by Antigravity on 2026-04-19.*
+*Generated automatically by Antigravity on 2026-05-08.*

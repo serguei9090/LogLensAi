@@ -78,9 +78,8 @@ def test_apply_custom_extractions():
 
 
 def test_extract_base_metadata_no_config(mock_db):
-    mock_db.fetchone.return_value = None
     line = "ERROR: Something went wrong"
-    ts, lvl, msg = _extract_base_metadata("ws1", "src1", line)
+    ts, lvl, msg = _extract_base_metadata(line)
     assert lvl == "ERROR"
     assert msg == line
 
@@ -88,10 +87,9 @@ def test_extract_base_metadata_no_config(mock_db):
 def test_extract_base_metadata_with_config(mock_db):
     # Mock config with regex: ^(?P<timestamp>.*?) \[(?P<level>.*?)\] (?P<message>.*)$
     config = {"regex": r"^(?P<timestamp>.*?) \[(?P<level>.*?)\] (?P<message>.*)$"}
-    mock_db.fetchone.return_value = (json.dumps(config), 0)
-
+    
     line = "2026-04-23 12:00:00 [DEBUG] Detailed info"
-    ts, lvl, msg = _extract_base_metadata("ws1", "src1", line)
+    ts, lvl, msg = _extract_base_metadata(line, parser_config=config)
     assert ts == "2026-04-23 12:00:00"
     assert lvl == "DEBUG"
     assert msg == "Detailed info"
@@ -100,17 +98,15 @@ def test_extract_base_metadata_with_config(mock_db):
 def test_extract_base_metadata_with_timezone(mock_db):
     # Use a more explicit regex to avoid non-greedy capture issues
     config = {"regex": r"^(?P<timestamp>[\d\- :]{19}) (?P<message>.*)$"}
-    mock_db.fetchone.return_value = (json.dumps(config), 2)  # +2 hours
-
+    
     line = "2026-04-23 12:00:00 Something happened"
-    ts, lvl, msg = _extract_base_metadata("ws1", "src1", line)
+    ts, lvl, msg = _extract_base_metadata(line, parser_config=config, tz_offset=2)
     assert ts == "2026-04-23 14:00:00"
 
 
 def test_extract_log_metadata_full(mock_db):
-    mock_db.fetchone.return_value = None
     line = "ERROR [main] user_id=admin 192.168.1.1 GET /login"
-    result = extract_log_metadata("ws1", "src1", line)
+    result = extract_log_metadata(line)
     assert result["level"] == "ERROR"
     assert result["facets"]["user_id"] == "admin"
     assert result["facets"]["ip"] == "192.168.1.1"
@@ -119,8 +115,9 @@ def test_extract_log_metadata_full(mock_db):
 
 
 def test_extract_base_metadata_exception(mock_db):
-    mock_db.execute.side_effect = Exception("DB error")
-    ts, lvl, msg = _extract_base_metadata("ws1", "src1", "Some line")
+    # Test fallback on invalid regex
+    config = {"regex": "["}
+    ts, lvl, msg = _extract_base_metadata("Some line", parser_config=config)
     assert lvl == "INFO"  # Default
     assert msg == "Some line"
 

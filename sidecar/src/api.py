@@ -38,8 +38,10 @@ from models import (
     GetFusedLogsRequest,
     GetFusionConfigRequest,
     GetHierarchyRequest,
+    GetClusteringStatusRequest,
     GetIngestionJobsRequest,
     GetLogContentRequest,
+    SetClusteringModeRequest,
     GetLogDistributionRequest,
     GetLogsRequest,
     GetLogStreamsRequest,
@@ -142,6 +144,8 @@ class App:
         "get_temporal_offsets": GetTemporalOffsetsRequest,
         "get_workspace_sources": GetWorkspaceSourcesRequest,
         "get_ingestion_jobs": GetIngestionJobsRequest,
+        "get_clustering_status": GetClusteringStatusRequest,
+        "set_clustering_mode": SetClusteringModeRequest,
         "get_sample_lines": GetSampleLinesRequest,
         "update_source_parser": UpdateSourceParserRequest,
         "get_anomalies": GetAnomaliesRequest,
@@ -177,6 +181,7 @@ class App:
         "move_source": SourceMoveRequest,
         "factory_reset": None,
         "get_log_content": GetLogContentRequest,
+        "get_health": None,
     }
 
     def __init__(
@@ -205,7 +210,7 @@ class App:
         storage_dir = os.path.join(PROJECT_ROOT, "data", "storage")
         self.log_store = DiskLogStore(storage_dir)
         logger.info("DiskLogStore initialized at: %s", storage_dir)
-        self.fast_path = FastPathService(storage_dir)
+        self.fast_path = FastPathService(storage_dir, log_store=self.log_store)
         logger.info("FastPathService initialized at: %s", storage_dir)
 
         self._parsers = {}
@@ -280,6 +285,17 @@ class App:
         """Fetch all ingestion jobs for a workspace."""
         logger.info("RPC Dispatch: get_ingestion_jobs (workspace=%s)", workspace_id)
         return self.db.get_ingestion_jobs(workspace_id)
+
+    def method_get_clustering_status(self, workspace_id: str | None = None) -> dict:
+        """Fetch current clustering worker status and backlog."""
+        logger.debug("RPC Dispatch: get_clustering_status")
+        return self.clustering_worker.get_status()
+
+    def method_set_clustering_mode(self, mode: str, workspace_id: str | None = None) -> dict:
+        """Set clustering worker mode (auto, manual, burst)."""
+        logger.info("RPC Dispatch: set_clustering_mode (mode=%s)", mode)
+        self.clustering_worker.set_mode(mode)
+        return {"status": "success", "mode": mode}
 
     def method_delete_logs(self, workspace_id: str, source_id: str | None = None) -> dict:
         """Delete logs for a workspace or specific source."""
@@ -416,6 +432,15 @@ class App:
         # 4. Clustering Worker
         if hasattr(self, "clustering_worker"):
             self.clustering_worker.stop()
+
+        # 4.5 Save Clustering States (Drain3)
+        if hasattr(self, "_parsers"):
+            logger.info("Sidecar: Saving clustering states...")
+            for key, parser in self._parsers.items():
+                try:
+                    parser.save()
+                except Exception as e:
+                    logger.error("Failed to save clustering state for %s: %s", key, e)
 
         # 5. MCP Server
         self._stop_mcp_server()
@@ -1405,6 +1430,21 @@ class App:
         return [
             {"id": c.cluster_id, "template": c.get_template(), "size": c.size} for c in clusters
         ]
+
+    def method_get_health(self) -> dict:
+        """Returns internal system health metrics."""
+        return {
+            "status": "healthy",
+            "uptime": time.time() - self._start_time,
+            "hydration": {
+                "misses": self.fast_path.hydrate_misses,
+                "quarantine_size": getattr(self.clustering_worker, "_quarantine", {}).__len__()
+            },
+            "workers": {
+                "clustering": self.clustering_worker.running,
+                "ingestion": self.ingestion_server.running if hasattr(self.ingestion_server, "running") else True
+            }
+        }
 
     async def method_analyze_cluster(self, **kwargs) -> dict:
         params = AnalyzeClusterRequest(**kwargs)

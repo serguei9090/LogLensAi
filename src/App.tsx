@@ -11,6 +11,7 @@ import { useSettingsStore } from "@/store/settingsStore";
 import { useUIStore } from "@/store/uiStore";
 import { useWorkspaceStore } from "@/store/workspaceStore";
 import { useDebugStore } from "@/store/debugStore";
+import { useHealthStatus } from "@/lib/hooks/useHealthStatus";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 export type NavTab = "investigation" | "settings" | "dashboard";
@@ -29,6 +30,9 @@ export default function App() {
   const { settings, fetchSettings } = useSettingsStore();
   const [activeNav, setActiveNav] = useState<NavTab>("investigation");
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
+
+  // Global Health Monitoring
+  useHealthStatus();
 
   // Load settings on mount
   useEffect(() => {

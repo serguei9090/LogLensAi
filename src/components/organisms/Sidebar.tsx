@@ -4,8 +4,10 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { DraggableItem, DroppableArea } from "@/lib/dnd-wrappers";
 import { cn } from "@/lib/utils";
 import { useUIStore } from "@/store/uiStore";
+
 import type { Workspace } from "@/store/workspaceStore";
 import { useWorkspaceStore } from "@/store/workspaceStore";
+
 import { motion } from "framer-motion";
 import {
   Check,

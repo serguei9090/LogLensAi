@@ -3,8 +3,31 @@ import ipaddress
 import json
 import logging
 import re
+import typing
 
 from db import Database
+
+logger = logging.getLogger(__name__)
+
+# --- Pre-compiled Patterns for Performance ---
+RE_LEVEL = re.compile(r"\b(FATAL|ERROR|WARN|DEBUG|TRACE|INFO)\b", re.I)
+RE_IPV4 = r"(?:\d{1,3}\.){3}\d{1,3}"
+RE_IPV6 = r"(?:(?:[0-9a-fA-F]{1,4}:){2,7}[0-9a-fA-F]{1,4}|(?:[0-9a-fA-F]{1,4}:){1,7}:|:(?::[0-9a-fA-F]{1,4}){1,7}|::)"
+RE_IP = re.compile(f"\\b({RE_IPV4}|{RE_IPV6})\\b")
+RE_UUID = re.compile(r"\b[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\b")
+RE_EMAIL = re.compile(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b")
+RE_HTTP_METHOD = re.compile(r"\b(GET|POST|PUT|DELETE|PATCH|HEAD|OPTIONS)\b")
+RE_HTTP_STATUS = re.compile(r"status[:\s=]+(\d{3})", re.I)
+RE_HOST = re.compile(r"\bhost[:=]([a-zA-Z0-9\.\-]+)\b", re.I)
+RE_THREAD = re.compile(r"\[([^\]]{3,20})\]|thread[:=]([\w\-]+)", re.I)
+RE_LOGGER = re.compile(r"\b([\w\.]{5,40})[:\s]+(?=[A-Z])|logger[:=]([\w\.]+)")
+RE_KV_PAIRS = re.compile(r"\b(\w+)=([\w\-\.@]+)\b")
+RE_USER_ID = re.compile(r"user[:_]?id[:\s=]+(\w+)", re.I)
+
+RESERVED_FACETS = {
+    "timestamp", "level", "id", "ip", "uuid", "email", "host", 
+    "thread", "logger", "method", "status", "user_id"
+}
 
 
 def _extract_base_metadata(
@@ -18,11 +41,9 @@ def _extract_base_metadata(
     message = raw_line
 
     # Generic heuristic for level
-    upper_line = raw_line.upper()
-    for lvl in ["FATAL", "ERROR", "WARN", "DEBUG", "TRACE", "INFO"]:
-        if lvl in upper_line:
-            level = lvl
-            break
+    match = RE_LEVEL.search(raw_line)
+    if match:
+        level = match.group(1).upper()
 
     if parser_config:
         pattern = parser_config.get("regex")
@@ -66,34 +87,29 @@ def _extract_heuristic_facets(raw_line: str) -> dict:
     facets = {}
 
     # 1. IPs
-    ipv4_pattern = r"\b(?:\d{1,3}\.){3}\d{1,3}\b"
-    ipv6_pattern = r"\b(?:(?:[0-9a-fA-F]{1,4}:){2,7}[0-9a-fA-F]{1,4}|(?:[0-9a-fA-F]{1,4}:){1,7}:|:(?::[0-9a-fA-F]{1,4}){1,7}|::)\b"
-    candidates = re.findall(f"{ipv4_pattern}|{ipv6_pattern}", raw_line)
-    for cand in candidates:
+    ip_match = RE_IP.search(raw_line)
+    if ip_match:
         try:
-            facets["ip"] = str(ipaddress.ip_address(cand))
-            break
+            facets["ip"] = str(ipaddress.ip_address(ip_match.group(1)))
         except ValueError:
-            continue
+            pass
 
     # 2. UUIDs
-    uuid_match = re.search(
-        r"\b[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\b", raw_line
-    )
+    uuid_match = RE_UUID.search(raw_line)
     if uuid_match:
         facets["uuid"] = uuid_match.group(0)
 
     # 3. Emails
-    email_match = re.search(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b", raw_line)
+    email_match = RE_EMAIL.search(raw_line)
     if email_match:
         facets["email"] = email_match.group(0)
 
     # 4. HTTP Methods & Status
-    method_match = re.search(r"\b(GET|POST|PUT|DELETE|PATCH|HEAD|OPTIONS)\b", raw_line)
+    method_match = RE_HTTP_METHOD.search(raw_line)
     if method_match:
         facets["method"] = method_match.group(1)
 
-    status_match = re.search(r"status[:\s=]+(\d{3})", raw_line, re.I)
+    status_match = RE_HTTP_STATUS.search(raw_line)
     if status_match:
         facets["status"] = status_match.group(1)
 
@@ -103,43 +119,29 @@ def _extract_heuristic_facets(raw_line: str) -> dict:
 def _extract_context_facets(raw_line: str, facets: dict):
     """Extracts host, thread, logger information."""
     if "host" not in facets:
-        host_match = re.search(r"\bhost[:=]([a-zA-Z0-9\.\-]+)\b", raw_line, re.I)
+        host_match = RE_HOST.search(raw_line)
         if host_match:
             facets["host"] = host_match.group(1)
 
     if "thread" not in facets:
-        thread_match = re.search(r"\[([^\]]{3,20})\]|thread[:=]([\w\-]+)", raw_line, re.I)
+        thread_match = RE_THREAD.search(raw_line)
         if thread_match:
             val = thread_match.group(1) or thread_match.group(2)
             if val and val.upper() not in ["INFO", "ERROR", "WARN", "DEBUG", "TRACE", "FATAL"]:
                 facets["thread"] = val
 
     if "logger" not in facets:
-        logger_match = re.search(r"\b([\w\.]{5,40})[:\s]+(?=[A-Z])|logger[:=]([\w\.]+)", raw_line)
+        logger_match = RE_LOGGER.search(raw_line)
         if logger_match:
             facets["logger"] = logger_match.group(1) or logger_match.group(2)
 
 
 def _extract_kv_facets(raw_line: str, facets: dict):
     """Extracts general key=value pairs."""
-    kv_matches = re.finditer(r"\b(\w+)=([\w\-\.@]+)\b", raw_line)
-    reserved = {
-        "timestamp",
-        "level",
-        "id",
-        "ip",
-        "uuid",
-        "email",
-        "host",
-        "thread",
-        "logger",
-        "method",
-        "status",
-        "user_id",
-    }
+    kv_matches = RE_KV_PAIRS.finditer(raw_line)
     for m in kv_matches:
         key, val = m.groups()
-        if key.lower() not in reserved:
+        if key.lower() not in RESERVED_FACETS:
             facets[key.lower()] = val
 
 
@@ -193,7 +195,7 @@ def extract_log_metadata(
 
     # 5. Specialized (User ID)
     if "user_id" not in facets:
-        uid_match = re.search(r"user[:_]?id[:\s=]+(\w+)", raw_line, re.I)
+        uid_match = RE_USER_ID.search(raw_line)
         if uid_match:
             facets["user_id"] = uid_match.group(1)
 

@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 import { useDebugStore } from "@/store/debugStore";
+import { useHealthStore } from "@/store/healthStore";
 import {
   AlertCircle,
   AlertTriangle,
@@ -18,6 +19,7 @@ import {
 
 export function SystemDiagnosticConsole() {
   const { logs, isOpen, setOpen, clearLogs } = useDebugStore();
+  const { health } = useHealthStore();
   const isEnabled = import.meta.env.VITE_DEBUG_GUI === "true";
 
   if (!isEnabled) {
@@ -65,25 +67,6 @@ export function SystemDiagnosticConsole() {
 
   return (
     <>
-      {/* Floating Trigger Button */}
-      <div className="fixed bottom-4 right-4 z-[9999]">
-        <Button
-          variant="outline"
-          size="icon"
-          onClick={() => setOpen(!isOpen)}
-          className={cn(
-            "rounded-full size-10 shadow-2xl border-white/10 bg-bg-surface backdrop-blur-xl transition-all hover:scale-110 active:scale-95 group",
-            isOpen ? "bg-primary text-white border-primary" : "hover:border-primary/50",
-          )}
-          title="Open System Diagnostic Console"
-        >
-          <Bug className={cn("size-5", isOpen && "animate-pulse")} />
-          {!isOpen && logs.some((l) => l.level === "error") && (
-            <span className="absolute top-0 right-0 size-2.5 bg-red-500 rounded-full border-2 border-bg-surface group-hover:animate-ping" />
-          )}
-        </Button>
-      </div>
-
       {/* Slide-over Console */}
       <div
         className={cn(
@@ -109,6 +92,26 @@ export function SystemDiagnosticConsole() {
                 </p>
               </div>
             </div>
+            
+            {health && (
+              <div className="flex items-center gap-4 px-3 border-l border-white/5 ml-4">
+                <div className="flex flex-col items-end">
+                  <span className="text-[10px] text-text-muted opacity-60 uppercase tracking-widest font-semibold">Uptime</span>
+                  <span className="text-[10px] font-mono text-primary">
+                    {Math.floor(health.uptime / 3600)}h {Math.floor((health.uptime % 3600) / 60)}m
+                  </span>
+                </div>
+                <div className="flex flex-col items-end">
+                  <span className="text-[10px] text-text-muted opacity-60 uppercase tracking-widest font-semibold">Hydration</span>
+                  <span className={cn(
+                    "text-[10px] font-mono",
+                    health.hydration.misses > 0 ? "text-warning" : "text-emerald-400"
+                  )}>
+                    {health.hydration.misses} misses
+                  </span>
+                </div>
+              </div>
+            )}
             <div className="flex items-center gap-2">
               <Button
                 variant="ghost"

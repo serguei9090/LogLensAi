@@ -13,6 +13,7 @@ import mmap
 import os
 import struct
 import threading
+import time
 from collections.abc import Sequence
 
 logger = logging.getLogger(__name__)
@@ -21,7 +22,18 @@ class MappedSource:
     """
     Encapsulates mmap objects for a single source's log and index files.
     """
-    __slots__ = ("log_path", "idx_path", "_log_mmap", "_idx_mmap", "_log_f", "_idx_f", "lock")
+    __slots__ = (
+        "log_path",
+        "idx_path",
+        "_log_mmap",
+        "_idx_mmap",
+        "_log_f",
+        "_idx_f",
+        "lock",
+        "_last_check",
+        "_last_log_size",
+        "_last_idx_size",
+    )
 
     def __init__(self, log_path: str, idx_path: str):
         self.log_path = log_path
@@ -38,9 +50,9 @@ class MappedSource:
     def _ensure_mapped(self):
         """Lazy initialization of mmap objects with size caching."""
         now = time.time()
-        # Optimization: Only stat the files once per second or if not mapped
+        # Optimization: Only stat the files frequently if not mapped or if size changed
         if self._log_mmap is not None and self._idx_mmap is not None:
-            if now - self._last_check < 1.0:
+            if now - self._last_check < 0.1:  # 100ms debounce
                 return
             
             self._last_check = now
@@ -122,24 +134,52 @@ class FastPathService:
     """
     Singleton service providing O(1) access to raw log text.
     """
-    def __init__(self, storage_dir: str):
+    def __init__(self, storage_dir: str, log_store=None):
         self.storage_dir = storage_dir
+        self.log_store = log_store # Link to DiskLogStore for locking
         self._sources: dict[str, MappedSource] = {}
         self._lock = threading.Lock()
+        self.hydrate_misses = 0 # Health metric
 
     def get_line(self, source_id: str, line_id: int) -> str | None:
         source = self._get_source(source_id)
         if not source:
             return None
-        return source.get_line(line_id)
+        
+        # Synchronize with DiskLogStore writers
+        lock = self.log_store.get_lock(source_id) if self.log_store else None
+        
+        if lock:
+            with lock:
+                res = source.get_line(line_id)
+        else:
+            res = source.get_line(line_id)
+            
+        if res is None:
+            self.hydrate_misses += 1
+        return res
 
     def get_lines(self, source_id: str, line_ids: Sequence[int]) -> list[str | None]:
         source = self._get_source(source_id)
         if not source:
             return [None] * len(line_ids)
         
-        # Batching doesn't really help mmap much but we keep the API consistent
-        return [source.get_line(lid) for lid in line_ids]
+        lock = self.log_store.get_lock(source_id) if self.log_store else None
+        results = []
+        
+        if lock:
+            with lock:
+                for lid in line_ids:
+                    res = source.get_line(lid)
+                    if res is None: self.hydrate_misses += 1
+                    results.append(res)
+        else:
+            for lid in line_ids:
+                res = source.get_line(lid)
+                if res is None: self.hydrate_misses += 1
+                results.append(res)
+                
+        return results
 
     def _get_source(self, source_id: str) -> MappedSource | None:
         with self._lock:
