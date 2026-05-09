@@ -17,14 +17,18 @@ def mock_log_file():
 
 
 @pytest.fixture
-def e2e_api():
+async def e2e_api():
     app = App(db_path=":memory:")
     yield app
+    app.stop()
+    import asyncio
+
+    await asyncio.sleep(0.2)
     Database.reset()
 
 
 @pytest.mark.asyncio
-async def test_start_tail_and_get_logs(e2e_api, mock_log_file):
+async def test_start_tail_and_get_logs(mock_log_file, e2e_api):
     req_start = JSONRPCRequest(
         id=1, method="start_tail", params={"filepath": mock_log_file, "workspace_id": "test_e2e_ws"}
     )

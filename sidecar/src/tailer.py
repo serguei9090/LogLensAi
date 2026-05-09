@@ -1,12 +1,18 @@
+import json
 import os
-import threading
 import time
 
 from metadata_extractor import extract_log_metadata
 from parser import DrainParser
+from services.shared_core import SharedSourceManager
 
 
 class FileTailer:
+    """
+    A workspace-specific subscriber to a SharedSource.
+    Handles metadata extraction and database insertion for a single workspace.
+    """
+
     def __init__(
         self,
         filepath: str,
@@ -22,74 +28,59 @@ class FileTailer:
         # Use the provided source_id (UUID) or fallback to filepath (legacy)
         self.source_id = source_id or self.filepath
         self.parser = parser
-        self.running = False
-        self.thread = None
         self.db = db
         self.log_store = log_store
 
+        # Shared source management
+        self._manager = SharedSourceManager(log_store)
+        self._shared_source = None
+
     def start(self):
-        if self.running:
+        """Subscribe to the shared source."""
+        if self._shared_source:
             return
-        self.running = True
-        self.thread = threading.Thread(target=self._tail, daemon=True)
-        self.thread.start()
+
+        self._shared_source = self._manager.get_source(self.source_id, self.filepath)
+        self._shared_source.subscribe(self._process_line_callback)
 
     def stop(self):
-        self.running = False
-        if self.thread:
-            self.thread.join(timeout=2)
+        """Unsubscribe from the shared source."""
+        if self._shared_source:
+            self._shared_source.unsubscribe(self._process_line_callback)
+            self._shared_source = None
 
-    def _tail(self):
-        try:
-            with open(self.filepath, encoding="utf-8", errors="replace") as f:
-                # Seek to end for live tailing
-                f.seek(0, 2)
+    def _process_line_callback(self, line: str, line_id: int) -> None:
+        """Callback from SharedSource when a new line is detected."""
+        self._process_line(line, line_id)
 
-                while self.running:
-                    line = f.readline()
-                    if not line:
-                        time.sleep(0.1)
-                        continue
-
-                    self._process_line(line.rstrip())
-        except FileNotFoundError:
-            self.running = False
-
-    def _process_line(self, line: str) -> None:
+    def _process_line(self, line: str, line_id: int) -> None:
         if not line:
             return
-
-        # 1. Disk-First: write raw line to the source's flat file and get its line_id.
-        line_id = self.log_store.append_line(self.source_id, line)
 
         # 2. Lightweight metadata extraction (timestamp + level only).
         custom_rules = self._get_rules()
         p_config, p_tz = self._get_parser_config()
-        
+
         metadata = extract_log_metadata(
-            line, 
-            custom_rules=custom_rules,
-            parser_config=p_config,
-            tz_offset=p_tz
+            line, custom_rules=custom_rules, parser_config=p_config, tz_offset=p_tz
         )
         timestamp = metadata["timestamp"]
         level = metadata["level"]
         facets = metadata.get("facets", {})
 
         # 3. Insert the skinny row
-        import json
-
         facets_json = json.dumps(facets) if facets else None
         cursor = self.db.get_cursor()
         cursor.execute(
             """
-            INSERT INTO logs (workspace_id, source_id, line_id, timestamp, level, cluster_id, facets, processed)
-            VALUES (?, ?, ?, ?, ?, NULL, ?, FALSE)
+            INSERT INTO logs (workspace_id, source_id, line_id, raw_text, timestamp, level, cluster_id, facets, processed)
+            VALUES (?, ?, ?, ?, ?, ?, NULL, ?, FALSE)
             """,
             (
                 self.workspace_id,
                 self.source_id,
                 line_id,
+                line,  # raw_text
                 timestamp,
                 level,
                 facets_json,
@@ -116,7 +107,6 @@ class FileTailer:
             )
             row = cursor.fetchone()
             if row:
-                import json
                 config = json.loads(row[0]) if row[0] else {}
                 tz_offset = row[1] or 0.0
         except Exception:
@@ -143,8 +133,6 @@ class FileTailer:
             cursor.execute("SELECT value FROM settings WHERE key = 'facet_extractions'")
             global_row = cursor.fetchone()
             if global_row and global_row[0]:
-                import json
-
                 rules = json.loads(global_row[0])
                 custom_rules.extend(rules if isinstance(rules, list) else [])
 
@@ -155,8 +143,6 @@ class FileTailer:
             )
             ws_row = cursor.fetchone()
             if ws_row and ws_row[0]:
-                import json
-
                 rules = json.loads(ws_row[0])
                 custom_rules.extend(rules if isinstance(rules, list) else [])
         except Exception:

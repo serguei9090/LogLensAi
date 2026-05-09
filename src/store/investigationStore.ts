@@ -1,6 +1,6 @@
 import type { FilterEntry } from "@/components/molecules/FilterBuilder";
 import type { HighlightEntry } from "@/components/molecules/HighlightBuilder";
-import type { LogEntry } from "@/components/organisms/VirtualLogTable";
+import type { LogEntry } from "@/types/log";
 import { create } from "zustand";
 
 export interface SourceState {

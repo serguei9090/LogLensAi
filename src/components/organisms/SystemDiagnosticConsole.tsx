@@ -92,21 +92,27 @@ export function SystemDiagnosticConsole() {
                 </p>
               </div>
             </div>
-            
+
             {health && (
               <div className="flex items-center gap-4 px-3 border-l border-white/5 ml-4">
                 <div className="flex flex-col items-end">
-                  <span className="text-[10px] text-text-muted opacity-60 uppercase tracking-widest font-semibold">Uptime</span>
+                  <span className="text-[10px] text-text-muted opacity-60 uppercase tracking-widest font-semibold">
+                    Uptime
+                  </span>
                   <span className="text-[10px] font-mono text-primary">
                     {Math.floor(health.uptime / 3600)}h {Math.floor((health.uptime % 3600) / 60)}m
                   </span>
                 </div>
                 <div className="flex flex-col items-end">
-                  <span className="text-[10px] text-text-muted opacity-60 uppercase tracking-widest font-semibold">Hydration</span>
-                  <span className={cn(
-                    "text-[10px] font-mono",
-                    health.hydration.misses > 0 ? "text-warning" : "text-emerald-400"
-                  )}>
+                  <span className="text-[10px] text-text-muted opacity-60 uppercase tracking-widest font-semibold">
+                    Hydration
+                  </span>
+                  <span
+                    className={cn(
+                      "text-[10px] font-mono",
+                      health.hydration.misses > 0 ? "text-warning" : "text-emerald-400",
+                    )}
+                  >
                     {health.hydration.misses} misses
                   </span>
                 </div>

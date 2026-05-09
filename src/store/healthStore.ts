@@ -1,5 +1,5 @@
-import { create } from "zustand";
 import { callSidecar } from "@/lib/hooks/useSidecarBridge";
+import { create } from "zustand";
 
 export interface HealthStatus {
   status: "healthy" | "degraded" | "unreachable";
@@ -30,8 +30,10 @@ export const useHealthStore = create<HealthStore>((set, get) => ({
 
   fetchHealth: async () => {
     try {
-      const res = await callSidecar<Omit<HealthStatus, "lastUpdate" | "status"> & { status: string }>("get_health", {});
-      
+      const res = await callSidecar<
+        Omit<HealthStatus, "lastUpdate" | "status"> & { status: string }
+      >("get_health", {});
+
       let overallStatus: HealthStatus["status"] = "healthy";
       if (!res.workers.clustering || !res.workers.ingestion || res.hydration.misses > 100) {
         overallStatus = "degraded";

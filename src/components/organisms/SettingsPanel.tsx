@@ -12,6 +12,8 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { callSidecar } from "@/lib/hooks/useSidecarBridge";
 import { cn } from "@/lib/utils";
+import { useIngestionStore } from "@/store/ingestionStore";
+import { useInvestigationStore } from "@/store/investigationStore";
 import {
   type AppSettings,
   type KeyboardShortcut,
@@ -19,8 +21,6 @@ import {
   useSettingsStore,
 } from "@/store/settingsStore";
 import { useWorkspaceStore } from "@/store/workspaceStore";
-import { useIngestionStore } from "@/store/ingestionStore";
-import { useInvestigationStore } from "@/store/investigationStore";
 import {
   Activity,
   Bot,

@@ -1,10 +1,10 @@
-
+import logging
 import os
 import struct
-import logging
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("RepairIndex")
+
 
 def rebuild_index(path, idx_path):
     count = 0
@@ -29,7 +29,7 @@ def rebuild_index(path, idx_path):
             # Ensure the very last byte of the file is indexed if not ending in \n
             final_size = lf.tell()
             idx.flush()
-            
+
         # Re-check the last entry
         with open(idx_path, "rb+") as f:
             f.seek(-8, os.SEEK_END)
@@ -37,11 +37,12 @@ def rebuild_index(path, idx_path):
             if last_val != final_size:
                 logger.info(f"Adding final offset {final_size} to {idx_path}")
                 f.write(struct.pack("<Q", final_size))
-                
+
         return count
     except Exception as exc:
         logger.error(f"Failed to rebuild index for {path}: {exc}")
         return 0
+
 
 storage_dir = r"i:/01-Master_Code/Apps/LogLensAi/data/storage"
 for f in os.listdir(storage_dir):

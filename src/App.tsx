@@ -5,13 +5,13 @@ import { InvestigationPage } from "@/components/pages/InvestigationPage";
 import { SettingsPage } from "@/components/pages/SettingsPage";
 import { AppLayout } from "@/components/templates/AppLayout";
 import { Toaster } from "@/components/ui/sonner";
+import { useHealthStatus } from "@/lib/hooks/useHealthStatus";
 import { useKeyboardShortcuts } from "@/lib/hooks/useKeyboardShortcuts";
 import { useAiStore } from "@/store/aiStore";
+import { useDebugStore } from "@/store/debugStore";
 import { useSettingsStore } from "@/store/settingsStore";
 import { useUIStore } from "@/store/uiStore";
 import { useWorkspaceStore } from "@/store/workspaceStore";
-import { useDebugStore } from "@/store/debugStore";
-import { useHealthStatus } from "@/lib/hooks/useHealthStatus";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 export type NavTab = "investigation" | "settings" | "dashboard";

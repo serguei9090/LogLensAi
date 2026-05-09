@@ -1,11 +1,8 @@
+import contextlib
 import datetime
 import ipaddress
-import json
 import logging
 import re
-import typing
-
-from db import Database
 
 logger = logging.getLogger(__name__)
 
@@ -14,7 +11,9 @@ RE_LEVEL = re.compile(r"\b(FATAL|ERROR|WARN|DEBUG|TRACE|INFO)\b", re.I)
 RE_IPV4 = r"(?:\d{1,3}\.){3}\d{1,3}"
 RE_IPV6 = r"(?:(?:[0-9a-fA-F]{1,4}:){2,7}[0-9a-fA-F]{1,4}|(?:[0-9a-fA-F]{1,4}:){1,7}:|:(?::[0-9a-fA-F]{1,4}){1,7}|::)"
 RE_IP = re.compile(f"\\b({RE_IPV4}|{RE_IPV6})\\b")
-RE_UUID = re.compile(r"\b[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\b")
+RE_UUID = re.compile(
+    r"\b[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\b"
+)
 RE_EMAIL = re.compile(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b")
 RE_HTTP_METHOD = re.compile(r"\b(GET|POST|PUT|DELETE|PATCH|HEAD|OPTIONS)\b")
 RE_HTTP_STATUS = re.compile(r"status[:\s=]+(\d{3})", re.I)
@@ -25,15 +24,23 @@ RE_KV_PAIRS = re.compile(r"\b(\w+)=([\w\-\.@]+)\b")
 RE_USER_ID = re.compile(r"user[:_]?id[:\s=]+(\w+)", re.I)
 
 RESERVED_FACETS = {
-    "timestamp", "level", "id", "ip", "uuid", "email", "host", 
-    "thread", "logger", "method", "status", "user_id"
+    "timestamp",
+    "level",
+    "id",
+    "ip",
+    "uuid",
+    "email",
+    "host",
+    "thread",
+    "logger",
+    "method",
+    "status",
+    "user_id",
 }
 
 
 def _extract_base_metadata(
-    raw_line: str, 
-    parser_config: dict = None, 
-    tz_offset: float = 0
+    raw_line: str, parser_config: dict = None, tz_offset: float = 0
 ) -> tuple[str, str, str]:
     """Extracts timestamp, level, and message using provided configuration."""
     timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -89,10 +96,8 @@ def _extract_heuristic_facets(raw_line: str) -> dict:
     # 1. IPs
     ip_match = RE_IP.search(raw_line)
     if ip_match:
-        try:
+        with contextlib.suppress(ValueError):
             facets["ip"] = str(ipaddress.ip_address(ip_match.group(1)))
-        except ValueError:
-            pass
 
     # 2. UUIDs
     uuid_match = RE_UUID.search(raw_line)
@@ -172,10 +177,7 @@ def _apply_custom_extractions(raw_line: str, custom_rules: list, facets: dict):
 
 
 def extract_log_metadata(
-    raw_line: str, 
-    custom_rules: list = None,
-    parser_config: dict = None,
-    tz_offset: float = 0
+    raw_line: str, custom_rules: list = None, parser_config: dict = None, tz_offset: float = 0
 ) -> dict:
     """
     Applies source-specific regex patterns and timezone normalization to a raw log line.

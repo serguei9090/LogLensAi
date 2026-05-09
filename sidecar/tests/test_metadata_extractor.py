@@ -1,4 +1,3 @@
-import json
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -87,7 +86,7 @@ def test_extract_base_metadata_no_config(mock_db):
 def test_extract_base_metadata_with_config(mock_db):
     # Mock config with regex: ^(?P<timestamp>.*?) \[(?P<level>.*?)\] (?P<message>.*)$
     config = {"regex": r"^(?P<timestamp>.*?) \[(?P<level>.*?)\] (?P<message>.*)$"}
-    
+
     line = "2026-04-23 12:00:00 [DEBUG] Detailed info"
     ts, lvl, msg = _extract_base_metadata(line, parser_config=config)
     assert ts == "2026-04-23 12:00:00"
@@ -98,7 +97,7 @@ def test_extract_base_metadata_with_config(mock_db):
 def test_extract_base_metadata_with_timezone(mock_db):
     # Use a more explicit regex to avoid non-greedy capture issues
     config = {"regex": r"^(?P<timestamp>[\d\- :]{19}) (?P<message>.*)$"}
-    
+
     line = "2026-04-23 12:00:00 Something happened"
     ts, lvl, msg = _extract_base_metadata(line, parser_config=config, tz_offset=2)
     assert ts == "2026-04-23 14:00:00"

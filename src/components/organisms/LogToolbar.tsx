@@ -15,7 +15,7 @@ import { useAiStore } from "@/store/aiStore";
 import { useClusteringStore } from "@/store/clusteringStore";
 import { useInvestigationStore } from "@/store/investigationStore";
 import { useUIStore } from "@/store/uiStore";
-import { type LogSource } from "@/store/workspaceStore";
+import type { LogSource } from "@/store/workspaceStore";
 import {
   Columns,
   Cpu,

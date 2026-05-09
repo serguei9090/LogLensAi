@@ -12,6 +12,7 @@ Usage (lefthook / CI):
 Usage (full re-index, no args):
     uv run python scripts/codanna/index.py
 """
+
 import subprocess
 import sys
 from pathlib import Path

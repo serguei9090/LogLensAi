@@ -8,11 +8,13 @@ from metadata_extractor import extract_log_metadata
 
 logger = logging.getLogger("ClusteringWorker")
 
+
 class ClusteringWorker:
     """
     Background worker that processes logs for Drain3 clustering.
     Ensures that log ingestion is non-blocking and resumable.
     """
+
     def __init__(self, app_instance: Any, batch_size: int = 500, interval: float = 2.0):
         self.app = app_instance
         self.db = app_instance.db
@@ -52,16 +54,16 @@ class ClusteringWorker:
                 # Adjust batch size and interval based on mode
                 current_batch_size = self.batch_size
                 current_interval = self.interval
-                
+
                 if self.mode == "burst":
                     current_batch_size = self.batch_size * 4
                     current_interval = 0.1
                 elif self.mode == "manual":
                     current_batch_size = self.batch_size * 2
-                
+
                 processed_count = self._process_batch(batch_size=current_batch_size)
                 self.processed_session += processed_count
-                
+
                 if processed_count == 0:
                     self._force_cycle.clear()
                     # STAB-005: Periodic sync to handle ingestion jobs stuck by duplicate suppression
@@ -72,95 +74,104 @@ class ClusteringWorker:
                     time.sleep(current_interval)
                 else:
                     # Normal pacing
-                    time.sleep(0.1) # Small gap between batches even in auto
-                    
+                    time.sleep(0.1)  # Small gap between batches even in auto
+
             except Exception as e:
                 logger.error(f"[Worker] Error in clustering cycle: {e}")
-                time.sleep(self.interval * 2) # Back off on error
+                time.sleep(self.interval * 2)  # Back off on error
 
     def _process_batch(self, batch_size: int | None = None) -> int:
         cursor = self.db.get_cursor()
         limit = batch_size or self.batch_size
-        
+
         # Initialize quarantine if not present
         if not hasattr(self, "_quarantine"):
-            self._quarantine = {} # (source_id, line_id) -> (retry_count, last_retry)
+            self._quarantine = {}  # (source_id, line_id) -> (retry_count, last_retry)
 
         # 1. Fetch a batch of unprocessed logs
         # We process logs in order of ID to maintain sequence
         cursor.execute(
-            "SELECT id, workspace_id, source_id, line_id, facets FROM logs WHERE processed = FALSE ORDER BY id ASC LIMIT ?",
-            (limit,)
+            "SELECT id, workspace_id, source_id, line_id, facets, raw_text FROM logs WHERE processed = FALSE ORDER BY id ASC LIMIT ?",
+            (limit,),
         )
         batch = cursor.fetchall()
-        
+
         if not batch:
             return 0
 
         logger.debug(f"[Worker] Processing batch of {len(batch)} logs...")
-        
+
         # Caches for this batch
         rules_cache = {}
         global_rules = self._get_global_rules(cursor)
 
         updates = []
         cluster_increments = {}  # (ws_id, cluster_id, template) -> count
-        batch_counts = {}        # (ws_id, source_id) -> count processed in this batch
-        parser_configs = {}      # (ws_id, source_id) -> (config, tz_offset)
+        batch_counts = {}  # (ws_id, source_id) -> count processed in this batch
+        parser_configs = {}  # (ws_id, source_id) -> (config, tz_offset)
         now = time.time()
 
-        for log_id, ws_id, source_id, line_id, facets_json in batch:
+        for log_id, ws_id, source_id, line_id, facets_json, raw_text in batch:
             try:
-                # 0. Fetch raw text via Fast-Path (Non-blocking)
-                q_key = (source_id, line_id)
-                if q_key in self._quarantine:
-                    retries, last_t = self._quarantine[q_key]
-                    # Exponential backoff: 2, 4, 8, 16, 32 seconds...
-                    wait_time = min(32, 2 ** retries)
-                    if now - last_t < wait_time:
-                        continue
-                
-                raw_text = self.app.fast_path.get_line(source_id, line_id)
-                
-                if raw_text is None:
-                    # Quarantine it
-                    retries, _ = self._quarantine.get(q_key, (0, 0))
-                    if retries < 8: # Increased retries for high-IO safety
-                        self._quarantine[q_key] = (retries + 1, now)
-                        continue 
-                    else:
-                        # Permanent failure
-                        logger.warning(f"[Worker] Hydration timeout for {source_id}:{line_id}. Marking as MISSING.")
-                        if q_key in self._quarantine: del self._quarantine[q_key]
-                        updates.append((None, "MISSING", "{}", None, log_id))
-                        continue
+                # 0. Raw text already present in cold storage (Dual-Track Architecture)
+                if not raw_text:
+                    # Fallback to Fast-Path if raw_text is missing (legacy logs or edge cases)
+                    q_key = (source_id, line_id)
+                    if q_key in self._quarantine:
+                        retries, last_t = self._quarantine[q_key]
+                        wait_time = min(32, 2**retries)
+                        if now - last_t < wait_time:
+                            continue
 
-                # Success, clear quarantine if present
-                if q_key in self._quarantine: del self._quarantine[q_key]
+                    raw_text = self.app.fast_path.get_line(source_id, line_id)
+
+                    if raw_text is None:
+                        retries, _ = self._quarantine.get(q_key, (0, 0))
+                        if retries < 8:
+                            self._quarantine[q_key] = (retries + 1, now)
+                            continue
+                        else:
+                            logger.warning(
+                                f"[Worker] Hydration failure for {source_id}:{line_id}. Marking as MISSING."
+                            )
+                            if q_key in self._quarantine:
+                                del self._quarantine[q_key]
+                            updates.append((None, "MISSING", "{}", None, log_id))
+                            continue
+
+                    if q_key in self._quarantine:
+                        del self._quarantine[q_key]
 
                 # 2. Rich Metadata Extraction (Regex parsing)
                 existing_facets = json.loads(facets_json) if facets_json else {}
-                rules = self.app._get_facet_rules_for_workspace(cursor, ws_id, rules_cache, global_rules)
-                
+                rules = self.app._get_facet_rules_for_workspace(
+                    cursor, ws_id, rules_cache, global_rules
+                )
+
                 # Fetch/Cache parser config for this source
                 source_key = (ws_id, source_id)
                 if source_key not in parser_configs:
                     cursor.execute(
                         "SELECT parser_config, tz_offset FROM fusion_configs WHERE workspace_id = ? AND source_id = ?",
-                        (ws_id, source_id)
+                        (ws_id, source_id),
                     )
                     row = cursor.fetchone()
                     if row:
-                        parser_configs[source_key] = (json.loads(row[0]) if row[0] else {}, row[1] or 0)
+                        parser_configs[source_key] = (
+                            json.loads(row[0]) if row[0] else {},
+                            row[1] or 0,
+                        )
                     else:
                         parser_configs[source_key] = ({}, 0)
-                
+
                 p_config, p_tz = parser_configs[source_key]
-                meta = extract_log_metadata(raw_text, custom_rules=rules, parser_config=p_config, tz_offset=p_tz)
-                
+                meta = extract_log_metadata(
+                    raw_text, custom_rules=rules, parser_config=p_config, tz_offset=p_tz
+                )
+
                 # Merge heuristic facets with existing ones
                 meta["facets"].update(existing_facets)
-                
+
                 timestamp = meta["timestamp"]
                 level = meta["level"]
                 message = meta["message"]
@@ -177,11 +188,11 @@ class ClusteringWorker:
                 cluster_increments[key] = cluster_increments.get(key, 0) + 1
 
                 updates.append((timestamp, level, facets, cluster_id, log_id))
-                
+
                 # Update batch counts for ingestion job tracking
                 job_key = (ws_id, source_id)
                 batch_counts[job_key] = batch_counts.get(job_key, 0) + 1
-                
+
             except Exception as e:
                 logger.error(f"[Worker] Failed to process log {log_id}: {e}")
                 # Mark as processed with fallback to raw info
@@ -201,9 +212,9 @@ class ClusteringWorker:
                         processed = TRUE 
                     WHERE id = ?
                     """,
-                    updates
+                    updates,
                 )
-    
+
                 # 4. Update clusters metadata table
                 for (ws_id, cluster_id, template), count in cluster_increments.items():
                     cursor.execute(
@@ -213,7 +224,7 @@ class ClusteringWorker:
                         ON CONFLICT (workspace_id, cluster_id) 
                         DO UPDATE SET count = count + excluded.count, template = excluded.template
                         """,
-                        (ws_id, cluster_id, template, count)
+                        (ws_id, cluster_id, template, count),
                     )
                 cursor.execute("COMMIT")
             except Exception as e:
@@ -234,13 +245,13 @@ class ClusteringWorker:
                     ORDER BY created_at DESC LIMIT 1
                 )
                 """,
-                (count, ws_id, src_id)
+                (count, ws_id, src_id),
             )
-            
+
             # Check if job is completed
             cursor.execute(
                 "UPDATE ingestion_jobs SET status = 'completed' WHERE workspace_id = ? AND source_id = ? AND status = 'processing' AND processed_lines >= total_lines",
-                (ws_id, src_id)
+                (ws_id, src_id),
             )
 
         self.db.commit()
@@ -254,18 +265,26 @@ class ClusteringWorker:
         try:
             cursor = self.db.get_cursor()
             # Find active jobs and their sources
-            cursor.execute("SELECT workspace_id, source_id FROM ingestion_jobs WHERE status IN ('pending', 'processing')")
+            cursor.execute(
+                "SELECT workspace_id, source_id FROM ingestion_jobs WHERE status IN ('pending', 'processing')"
+            )
             active_jobs = cursor.fetchall()
-            
+
             for ws_id, src_id in active_jobs:
                 # If there are no more unprocessed logs for this source, mark job as completed
-                cursor.execute("SELECT COUNT(*) FROM logs WHERE workspace_id = ? AND source_id = ? AND processed = FALSE", (ws_id, src_id))
+                cursor.execute(
+                    "SELECT COUNT(*) FROM logs WHERE workspace_id = ? AND source_id = ? AND processed = FALSE",
+                    (ws_id, src_id),
+                )
                 unprocessed = cursor.fetchone()[0]
-                
+
                 if unprocessed == 0:
-                    cursor.execute("SELECT COUNT(*) FROM logs WHERE workspace_id = ? AND source_id = ? AND processed = TRUE", (ws_id, src_id))
+                    cursor.execute(
+                        "SELECT COUNT(*) FROM logs WHERE workspace_id = ? AND source_id = ? AND processed = TRUE",
+                        (ws_id, src_id),
+                    )
                     processed_now = cursor.fetchone()[0]
-                    
+
                     cursor.execute(
                         """
                         UPDATE ingestion_jobs 
@@ -274,7 +293,7 @@ class ClusteringWorker:
                             updated_at = CURRENT_TIMESTAMP
                         WHERE workspace_id = ? AND source_id = ? AND status IN ('pending', 'processing')
                         """,
-                        (processed_now, ws_id, src_id)
+                        (processed_now, ws_id, src_id),
                     )
             self.db.commit()
         except Exception as e:
@@ -297,12 +316,12 @@ class ClusteringWorker:
         cursor = self.db.get_cursor()
         cursor.execute("SELECT COUNT(*) FROM logs WHERE processed = FALSE")
         backlog = cursor.fetchone()[0]
-        
+
         return {
             "mode": self.mode,
             "running": self.running,
             "backlog": backlog,
-            "processed_session": self.processed_session
+            "processed_session": self.processed_session,
         }
 
     def set_mode(self, mode: str):

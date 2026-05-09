@@ -1,5 +1,5 @@
 import { IconButton } from "@/components/atoms/IconButton";
-import { type LogLevel, LogLevelBadge } from "@/components/atoms/LogLevelBadge";
+import { LogLevelBadge } from "@/components/atoms/LogLevelBadge";
 import type { FilterEntry } from "@/components/molecules/FilterBuilder";
 import type { HighlightEntry } from "@/components/molecules/HighlightBuilder";
 import { Button } from "@/components/ui/button";
@@ -10,6 +10,7 @@ import { useAiStore } from "@/store/aiStore";
 import { useInvestigationStore } from "@/store/investigationStore";
 import { useSettingsStore } from "@/store/settingsStore";
 import { selectActiveWorkspace, useWorkspaceStore } from "@/store/workspaceStore";
+import type { LogEntry, LogLevel } from "@/types/log";
 import { type VirtualItem, useVirtualizer } from "@tanstack/react-virtual";
 import {
   ArrowDown,
@@ -28,21 +29,6 @@ import {
 import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { toast } from "sonner";
-
-export interface LogEntry {
-  id: number;
-  line_id: number;
-  timestamp: string;
-  level: LogLevel;
-  message: string;
-  cluster_id: string;
-  source_id: string;
-  cluster_percent?: number;
-  cluster_template?: string;
-  has_comment?: boolean;
-  comment?: string;
-  raw_text?: string;
-}
 
 interface VirtualLogTableProps {
   readonly logs: LogEntry[];

@@ -5,7 +5,6 @@ import re
 import subprocess
 from pathlib import Path
 
-
 ROOT = Path(__file__).resolve().parents[4]
 MARKER = ROOT / "docs" / "track" / "documentation-sync.md"
 MARKER_RE = re.compile(r"^Last documented commit:\s*([0-9a-fA-F]+)\s*$", re.MULTILINE)
@@ -43,9 +42,17 @@ def first_commit() -> str | None:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Show commits and changed files since the documentation sync marker.")
-    parser.add_argument("--base", help="Base commit. Defaults to docs/track/documentation-sync.md marker.")
-    parser.add_argument("--summary", action="store_true", help="Print commit range, commits, changed files, and working tree state.")
+    parser = argparse.ArgumentParser(
+        description="Show commits and changed files since the documentation sync marker."
+    )
+    parser.add_argument(
+        "--base", help="Base commit. Defaults to docs/track/documentation-sync.md marker."
+    )
+    parser.add_argument(
+        "--summary",
+        action="store_true",
+        help="Print commit range, commits, changed files, and working tree state.",
+    )
     args = parser.parse_args()
 
     head = run_git(["rev-parse", "HEAD"], allow_failure=True)

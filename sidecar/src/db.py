@@ -79,6 +79,7 @@ class LogDatabase:
                 workspace_id TEXT,
                 source_id    TEXT,
                 line_id      INTEGER,
+                raw_text     TEXT,
                 timestamp    TEXT,
                 level        TEXT,
                 cluster_id   TEXT,
@@ -87,7 +88,17 @@ class LogDatabase:
                 facets       JSON,
                 processed    BOOLEAN DEFAULT FALSE
             );
+        """)
 
+        # --- MIGRATIONS (Vibe Shift v0.12.0) ---
+        # 1. Add raw_text column if it doesn't exist
+        cursor.execute("PRAGMA table_info('logs')")
+        columns = [row[1] for row in cursor.fetchall()]
+        if "raw_text" not in columns:
+            logger.info("[DB] Migrating: Adding 'raw_text' column to logs table")
+            cursor.execute("ALTER TABLE logs ADD COLUMN raw_text TEXT")
+
+        cursor.execute("""
             CREATE TABLE IF NOT EXISTS ingestion_jobs (
                 id           INTEGER PRIMARY KEY DEFAULT nextval('ingestion_jobs_id_seq'),
                 workspace_id TEXT,
@@ -260,22 +271,17 @@ class LogDatabase:
             except Exception as exc:
                 logger.error("[DB] Fast-Path Migration (line_id): %s", exc)
 
-        # 2. Drop raw_text if it still exists
+        # 2. Add raw_text if missing (REVERSED: v0.12.0)
         cursor.execute(
             "SELECT count(*) FROM information_schema.columns"
             " WHERE table_name = 'logs' AND column_name = 'raw_text'"
         )
-        if cursor.fetchone()[0] > 0:
-            logger.info("[DB] Fast-Path Migration: dropping 'raw_text' column...")
+        if cursor.fetchone()[0] == 0:
+            logger.info("[DB] Dual-Track Migration: adding 'raw_text' column back...")
             try:
-                cursor.execute("DROP INDEX IF EXISTS idx_logs_workspace_id")
-                cursor.execute("DROP INDEX IF EXISTS idx_logs_source_id")
-                cursor.execute("DROP INDEX IF EXISTS idx_logs_timestamp")
-                cursor.execute("DROP INDEX IF EXISTS idx_logs_cluster_id")
-                cursor.execute("DROP INDEX IF EXISTS idx_logs_processed")
-                cursor.execute("ALTER TABLE logs DROP COLUMN raw_text")
+                cursor.execute("ALTER TABLE logs ADD COLUMN raw_text TEXT")
             except Exception as exc:
-                logger.error("[DB] Fast-Path Migration (drop raw_text): %s", exc)
+                logger.error("[DB] Dual-Track Migration (raw_text): %s", exc)
 
         # 3. Drop message if it still exists
         cursor.execute(
@@ -321,7 +327,9 @@ class LogDatabase:
             try:
                 cursor.execute("ALTER TABLE ingestion_jobs ADD COLUMN source_id TEXT")
             except Exception as e:
-                logger.error(f"[DB] Migration Error (ingestion_jobs.source_id): {e}. Recreating table.")
+                logger.error(
+                    f"[DB] Migration Error (ingestion_jobs.source_id): {e}. Recreating table."
+                )
                 # Fallback: drop and recreate since ingestion_jobs is ephemeral
                 cursor.execute("DROP TABLE IF EXISTS ingestion_jobs")
                 self._setup_schema(cursor)
@@ -929,7 +937,9 @@ class LogDatabase:
         self.commit()
         return job_id
 
-    def update_ingestion_progress(self, job_id: int, processed_lines: int, status: str = "processing"):
+    def update_ingestion_progress(
+        self, job_id: int, processed_lines: int, status: str = "processing"
+    ):
         cursor = self.get_cursor()
         cursor.execute(
             "UPDATE ingestion_jobs SET processed_lines = ?, status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",

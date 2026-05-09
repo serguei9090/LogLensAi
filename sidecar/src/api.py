@@ -1,3 +1,5 @@
+import asyncio
+import inspect
 import json
 import logging
 import os
@@ -34,14 +36,13 @@ from models import (
     GetAiMessagesRequest,
     GetAiSessionsRequest,
     GetAnomaliesRequest,
+    GetClusteringStatusRequest,
     GetDashboardStatsRequest,
     GetFusedLogsRequest,
     GetFusionConfigRequest,
     GetHierarchyRequest,
-    GetClusteringStatusRequest,
     GetIngestionJobsRequest,
     GetLogContentRequest,
-    SetClusteringModeRequest,
     GetLogDistributionRequest,
     GetLogsRequest,
     GetLogStreamsRequest,
@@ -60,6 +61,7 @@ from models import (
     SaveMemoryRequest,
     SearchMemoryRequest,
     SendAiMessageRequest,
+    SetClusteringModeRequest,
     SourceMoveRequest,
     SourceUpdateRequest,
     StartSSHTailRequest,
@@ -213,6 +215,11 @@ class App:
         self.fast_path = FastPathService(storage_dir, log_store=self.log_store)
         logger.info("FastPathService initialized at: %s", storage_dir)
 
+        from services.shared_core import SharedSourceManager
+
+        self.shared_manager = SharedSourceManager(self.log_store)
+        logger.info("SharedSourceManager initialized")
+
         self._parsers = {}
         self.tailers = {}
         self._start_time = time.time()
@@ -359,11 +366,11 @@ class App:
 
         # Re-start workers
         self.ingestion_server.start()
-        
+
         # FIX: Re-initialize and start anomaly detector to pick up new DB handle
         self.anomaly_detector = AnomalyDetector(self.db)
         self.anomaly_detector.start()
-        
+
         # FIX: Re-initialize and start clustering worker
         self.clustering_worker = ClusteringWorker(self)
         self.clustering_worker.start()
@@ -445,6 +452,12 @@ class App:
         # 5. MCP Server
         self._stop_mcp_server()
 
+        # 6. Log Store & Shared Core
+        if hasattr(self, "log_store"):
+            self.log_store.close_all()
+        if hasattr(self, "shared_source_mgr"):
+            self.shared_source_mgr.cleanup()
+
         logger.info("Sidecar: Background workers stopped.")
 
     async def dispatch(self, req: JSONRPCRequest) -> JSONRPCResponse:
@@ -461,8 +474,6 @@ class App:
 
             # Perform Pydantic validation if a model is defined
             model = self.RPC_MODELS.get(req.method)
-            import asyncio
-            import inspect
 
             # Methods that handle large payloads and must not block the event loop
             offload_to_thread = {"ingest_logs", "ingest_local_file", "export_logs"}
@@ -474,6 +485,7 @@ class App:
                         def _run_offloaded():
                             params_model = model(**req.params)
                             return handler(**params_model.model_dump())
+
                         result = await asyncio.to_thread(_run_offloaded)
                     else:
                         params_model = model(**req.params)
@@ -484,7 +496,9 @@ class App:
                         else:
                             result = res
                 except ValidationError as ve:
-                    logger.error("JSON-RPC Validation Error for method '%s': %s", req.method, ve.errors())
+                    logger.error(
+                        "JSON-RPC Validation Error for method '%s': %s", req.method, ve.errors()
+                    )
                     return JSONRPCResponse(
                         id=req.id,
                         error={"code": -32602, "message": "Invalid params", "data": ve.errors()},
@@ -588,6 +602,10 @@ class App:
 
     def _hydrate_log(self, log_dict: dict) -> dict:
         """Fetch raw log content for a single log dictionary using the Fast-Path mmap service."""
+        if log_dict.get("raw_text"):
+            log_dict["message"] = log_dict["raw_text"]
+            return log_dict
+
         source_id = log_dict.get("source_id")
         line_id = log_dict.get("line_id")
 
@@ -604,7 +622,7 @@ class App:
             # Fallback if no hydration is possible
             log_dict["raw_text"] = log_dict.get("raw_text", "")
             log_dict["message"] = log_dict.get("message", "")
-        
+
         return log_dict
 
     def _get_logs_internal(
@@ -678,7 +696,7 @@ class App:
                     log_dict["facets"] = {}
             elif "facets" in log_dict and log_dict["facets"] is None:
                 log_dict["facets"] = {}
-            
+
             # --- Fast-Path Hydration ---
             self._hydrate_log(log_dict)
             logs.append(log_dict)
@@ -1050,24 +1068,32 @@ class App:
     ) -> dict:
 
         key = source_id if source_id else f"ssh:{workspace_id}:{host}:{filepath}"
-        if key in self.tailers and self.tailers[key].running:
+        if key in self.tailers:
             return {"status": "already tailing"}
 
-        tailer = SSHLoader(
-            host,
-            port,
-            username,
-            password,
-            filepath,
-            workspace_id,
-            self.parser,
-            self.db,
-            self.log_store,
-            source_id=source_id,
-        )
+        # 1. Start/Get the Shared Ingestor (SSHLoader)
+        ingestor_key = f"ingestor:ssh:{source_id}"
+        if ingestor_key not in self.tailers:
+            ingestor = SSHLoader(
+                host,
+                port,
+                username,
+                password,
+                filepath,
+                self.log_store,
+                source_id=source_id,
+            )
+            self.tailers[ingestor_key] = ingestor
+            ingestor.start()
+            logger.info("[SSH] Started shared ingestor for source: %s", source_id)
 
-        self.tailers[key] = tailer
-        tailer.start()
+        # 2. Start the Workspace Subscriber (FileTailer)
+        # Note: we pass filepath=None to SharedSource so it doesn't try local tailing
+        subscriber = FileTailer(
+            filepath, workspace_id, self.parser, self.db, self.log_store, source_id=source_id
+        )
+        self.tailers[key] = subscriber
+        subscriber.start()
 
         return {"status": "started", "source_id": source_id}
 
@@ -1196,10 +1222,7 @@ class App:
             job_id = self.db.create_ingestion_job(ws_id, src_id, len(src_logs))
 
             # 2. Disk-First: write raw lines in a single batch call
-            raw_lines = [
-                log.get("raw_text") or log.get("message") or ""
-                for log in src_logs
-            ]
+            raw_lines = [log.get("raw_text") or log.get("message") or "" for log in src_logs]
             line_ids = self.log_store.append_batch(src_id, raw_lines)
 
             # 3. Build skinny DB rows — no raw_text, no message
@@ -1209,6 +1232,7 @@ class App:
                     ws_id,
                     src_id,
                     line_ids[i],
+                    raw_lines[i],  # raw_text
                     log.get("timestamp") or now,
                     log.get("level") or "INFO",
                     None,  # cluster_id — deferred to worker
@@ -1219,11 +1243,18 @@ class App:
             ]
 
             cursor.executemany(
-                "INSERT INTO logs (workspace_id, source_id, line_id, timestamp, level, cluster_id, facets, processed)"
-                " VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                "INSERT INTO logs (workspace_id, source_id, line_id, raw_text, timestamp, level, cluster_id, facets, processed)"
+                " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 batch_data,
             )
             total_inserted += len(batch_data)
+
+            # 4. Broadcast to active overlays via SharedSource
+            try:
+                shared_src = self.shared_source_mgr.get_source(src_id)
+                shared_src.push_batch(raw_lines, line_ids)
+            except Exception as e:
+                logger.error("[Ingestion] Broadcast failed for %s: %s", src_id, e)
 
         self.db.commit()
         return {"status": "ok", "count": total_inserted, "job_id": job_id}
@@ -1277,13 +1308,23 @@ class App:
                         line_ids = self.log_store.append_batch(source_id, chunk_lines)
 
                         batch_data = [
-                            (workspace_id, source_id, line_ids[i], now_ts, "INFO", None, "{}", False)
+                            (
+                                workspace_id,
+                                source_id,
+                                line_ids[i],
+                                chunk_lines[i],
+                                now_ts,
+                                "INFO",
+                                None,
+                                "{}",
+                                False,
+                            )
                             for i in range(len(chunk_lines))
                         ]
                         cursor.executemany(
                             "INSERT INTO logs"
-                            " (workspace_id, source_id, line_id, timestamp, level, cluster_id, facets, processed)"
-                            " VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                            " (workspace_id, source_id, line_id, raw_text, timestamp, level, cluster_id, facets, processed)"
+                            " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
                             batch_data,
                         )
                         processed_count += len(chunk_lines)
@@ -1300,13 +1341,23 @@ class App:
                 if chunk_lines:
                     line_ids = self.log_store.append_batch(source_id, chunk_lines)
                     batch_data = [
-                        (workspace_id, source_id, line_ids[i], now_ts, "INFO", None, "{}", False)
+                        (
+                            workspace_id,
+                            source_id,
+                            line_ids[i],
+                            chunk_lines[i],
+                            now_ts,
+                            "INFO",
+                            None,
+                            "{}",
+                            False,
+                        )
                         for i in range(len(chunk_lines))
                     ]
                     cursor.executemany(
                         "INSERT INTO logs"
-                        " (workspace_id, source_id, line_id, timestamp, level, cluster_id, facets, processed)"
-                        " VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                        " (workspace_id, source_id, line_id, raw_text, timestamp, level, cluster_id, facets, processed)"
+                        " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
                         batch_data,
                     )
                     processed_count += len(chunk_lines)
@@ -1317,7 +1368,12 @@ class App:
                 (processed_count, job_id),
             )
             self.db.commit()
-            logger.info("[Ingestion] Completed job %d for %s: %d lines", job_id, workspace_id, processed_count)
+            logger.info(
+                "[Ingestion] Completed job %d for %s: %d lines",
+                job_id,
+                workspace_id,
+                processed_count,
+            )
 
         except Exception as exc:
             logger.error("[Ingestion] Failed job %d: %s", job_id, exc)
@@ -1344,7 +1400,6 @@ class App:
         self.db.commit()
         logger.info("[Cleanup] Purged %d stalled ingestion jobs for %s", count, workspace_id)
         return {"status": "success", "purged_count": count}
-
 
     def method_get_metadata_facets(self, **kwargs) -> dict:
         """Return the top unique metadata facets across all logs in a workspace."""
@@ -1431,20 +1486,7 @@ class App:
             {"id": c.cluster_id, "template": c.get_template(), "size": c.size} for c in clusters
         ]
 
-    def method_get_health(self) -> dict:
-        """Returns internal system health metrics."""
-        return {
-            "status": "healthy",
-            "uptime": time.time() - self._start_time,
-            "hydration": {
-                "misses": self.fast_path.hydrate_misses,
-                "quarantine_size": getattr(self.clustering_worker, "_quarantine", {}).__len__()
-            },
-            "workers": {
-                "clustering": self.clustering_worker.running,
-                "ingestion": self.ingestion_server.running if hasattr(self.ingestion_server, "running") else True
-            }
-        }
+
 
     async def method_analyze_cluster(self, **kwargs) -> dict:
         params = AnalyzeClusterRequest(**kwargs)
@@ -1513,9 +1555,9 @@ class App:
             )
             columns = [desc[0] for desc in cursor.description]
             raw_logs = [dict(zip(columns, row, strict=False)) for row in cursor.fetchall()]
-            
+
             # Hydrate logs with actual text from Fast-Path
-            logs = [self._hydrate_log(l) for l in raw_logs]
+            logs = [self._hydrate_log(log) for log in raw_logs]
 
             if logs:
                 summary = self.context_manager.prepare_log_context(logs)
@@ -2131,6 +2173,16 @@ class App:
             "database": {"logs": total_logs, "clusters": total_clusters},
             "active_tailers": len(active_tailers),
             "tailer_keys": active_tailers,
+            "hydration": {
+                "misses": self.fast_path.hydrate_misses,
+                "quarantine_size": getattr(self.clustering_worker, "_quarantine", {}).__len__(),
+            },
+            "workers": {
+                "clustering": self.clustering_worker.running,
+                "ingestion": self.ingestion_server.running
+                if hasattr(self.ingestion_server, "running")
+                else True,
+            },
         }
 
     def method_get_dashboard_stats(
@@ -2182,7 +2234,11 @@ class App:
         # 4. Top 10 Clusters (Filtered)
         # We join with the clusters table to get the template string.
         # Fallback to 'Pattern {ID}' if not found in cluster cache.
-        cluster_where = f"{where_sql} AND l.cluster_id IS NOT NULL" if where_sql else " WHERE l.cluster_id IS NOT NULL"
+        cluster_where = (
+            f"{where_sql} AND l.cluster_id IS NOT NULL"
+            if where_sql
+            else " WHERE l.cluster_id IS NOT NULL"
+        )
         cluster_query = f"""
             SELECT 
                 COALESCE(c.template, 'Pattern ' || l.cluster_id) as template,
@@ -2200,15 +2256,18 @@ class App:
         # 5. Global Metrics
         if active_workspace_ids:
             placeholders = ", ".join(["?"] * len(active_workspace_ids))
-            cursor.execute(f"SELECT COUNT(DISTINCT workspace_id) FROM logs WHERE workspace_id IN ({placeholders})", active_workspace_ids)
+            cursor.execute(
+                f"SELECT COUNT(DISTINCT workspace_id) FROM logs WHERE workspace_id IN ({placeholders})",
+                active_workspace_ids,
+            )
         else:
             cursor.execute("SELECT COUNT(DISTINCT workspace_id) FROM logs")
         workspace_count = cursor.fetchone()[0]
 
         # 6. Time Series (Log Volume & Severity over time)
         # Determine bucket size based on time range (default to 5m if no range)
-        bucket_format = '%Y-%m-%d %H:%M:00' # Default 1m buckets
-        
+        bucket_format = "%Y-%m-%d %H:%M:00"  # Default 1m buckets
+
         # Simple heuristic: if range > 24h, use 1h buckets. If > 7d, use 1d.
         # For now, let's keep it consistent at 1m or 5m for high-velocity feel.
         ts_query = f"""
@@ -2223,18 +2282,22 @@ class App:
         """
         cursor.execute(ts_query, params)
         ts_raw = cursor.fetchall()
-        
+
         # Pivot results: { "2024...": { "INFO": 10, "ERROR": 2 }, ... }
         ts_pivot = {}
         for bucket, level, count in ts_raw:
             if bucket not in ts_pivot:
                 ts_pivot[bucket] = {"timestamp": bucket}
             ts_pivot[bucket][level] = count
-        
+
         time_series = list(ts_pivot.values())
 
         # 7. Top Error Clusters (Filtered for critical levels)
-        error_where = f"{where_sql} AND l.level IN ('ERROR', 'FATAL', 'CRITICAL') AND l.cluster_id IS NOT NULL" if where_sql else " WHERE l.level IN ('ERROR', 'FATAL', 'CRITICAL') AND l.cluster_id IS NOT NULL"
+        error_where = (
+            f"{where_sql} AND l.level IN ('ERROR', 'FATAL', 'CRITICAL') AND l.cluster_id IS NOT NULL"
+            if where_sql
+            else " WHERE l.level IN ('ERROR', 'FATAL', 'CRITICAL') AND l.cluster_id IS NOT NULL"
+        )
         error_cluster_query = f"""
             SELECT 
                 COALESCE(c.template, 'Pattern ' || l.cluster_id) as template,
@@ -2250,15 +2313,17 @@ class App:
         top_error_clusters = [{"template": row[0], "count": row[1]} for row in cursor.fetchall()]
 
         # 8. Pattern Drift (New clusters in this window)
-        # Assuming clusters table has a 'created_at' column. 
+        # Assuming clusters table has a 'created_at' column.
         # If not, we approximate by checking the first log timestamp for each cluster in this window.
         # For now, let's just count unique clusters in the window vs total.
         new_patterns_count = 0
         try:
             # Check if clusters table has created_at
-            cursor.execute("SELECT count(*) FROM information_schema.columns WHERE table_name = 'clusters' AND column_name = 'created_at'")
+            cursor.execute(
+                "SELECT count(*) FROM information_schema.columns WHERE table_name = 'clusters' AND column_name = 'created_at'"
+            )
             has_created_at = cursor.fetchone()[0] > 0
-            
+
             if has_created_at:
                 # Actual new clusters
                 drift_where = " WHERE created_at >= ?" if start_time else ""
@@ -2286,7 +2351,7 @@ class App:
             cursor.execute(sh_query, params)
             sh_raw = cursor.fetchall()
             source_heatmap = [
-                {"timestamp": r[0], "source_id": r[1], "source_name": r[2], "count": r[3]} 
+                {"timestamp": r[0], "source_id": r[1], "source_name": r[2], "count": r[3]}
                 for r in sh_raw
             ]
         except Exception:
@@ -2305,7 +2370,7 @@ class App:
             if workspace_id:
                 insight_query += " AND s.workspace_id = ?"
                 insight_params.append(workspace_id)
-            
+
             insight_query += " ORDER BY m.timestamp DESC LIMIT 1"
             cursor.execute(insight_query, insight_params)
             row = cursor.fetchone()
@@ -2314,8 +2379,11 @@ class App:
                 content = row[0].strip()
                 # Remove reasoning blocks for snippet
                 import re
-                clean_content = re.sub(r'<think>.*?</think>', '', content, flags=re.DOTALL).strip()
-                latest_insight = (clean_content[:150] + "...") if len(clean_content) > 150 else clean_content
+
+                clean_content = re.sub(r"<think>.*?</think>", "", content, flags=re.DOTALL).strip()
+                latest_insight = (
+                    (clean_content[:150] + "...") if len(clean_content) > 150 else clean_content
+                )
         except Exception:
             pass
 
@@ -2342,21 +2410,28 @@ class App:
         placeholders = ", ".join(["?"] * len(active_workspace_ids))
 
         # Delete logs
-        cursor.execute(f"DELETE FROM logs WHERE workspace_id NOT IN ({placeholders})", active_workspace_ids)
+        cursor.execute(
+            f"DELETE FROM logs WHERE workspace_id NOT IN ({placeholders})", active_workspace_ids
+        )
         logs_deleted = cursor.rowcount
 
         # Delete clusters
-        cursor.execute(f"DELETE FROM clusters WHERE workspace_id NOT IN ({placeholders})", active_workspace_ids)
+        cursor.execute(
+            f"DELETE FROM clusters WHERE workspace_id NOT IN ({placeholders})", active_workspace_ids
+        )
         clusters_deleted = cursor.rowcount
 
         # Delete workspace settings
-        cursor.execute(f"DELETE FROM workspace_settings WHERE workspace_id NOT IN ({placeholders})", active_workspace_ids)
+        cursor.execute(
+            f"DELETE FROM workspace_settings WHERE workspace_id NOT IN ({placeholders})",
+            active_workspace_ids,
+        )
 
         return {
             "status": "ok",
             "logs_deleted": logs_deleted,
             "clusters_deleted": clusters_deleted,
-            "message": f"Purged data for inactive workspaces. {logs_deleted} logs removed."
+            "message": f"Purged data for inactive workspaces. {logs_deleted} logs removed.",
         }
 
     # --- Private Helpers for Complexity Reduction ---

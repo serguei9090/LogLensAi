@@ -5,10 +5,9 @@ import json
 import shutil
 import subprocess
 import sys
+from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable
-
 
 ROOT = Path.cwd()
 IGNORED_PARTS = {
@@ -107,10 +106,23 @@ def detect_python() -> tuple[list[str], list[CommandSpec]]:
 
     if has_uv or which("ruff"):
         commands.append(CommandSpec("python:ruff-check", [*ruff_cmd, "check", "."], check=True))
-        commands.append(CommandSpec("python:ruff-fix", [*ruff_cmd, "check", "--fix", "."], fix=True, check=False))
-        commands.append(CommandSpec("python:ruff-format", [*ruff_cmd, "format", "."], fix=True, check=False))
+        commands.append(
+            CommandSpec(
+                "python:ruff-fix", [*ruff_cmd, "check", "--fix", "."], fix=True, check=False
+            )
+        )
+        commands.append(
+            CommandSpec("python:ruff-format", [*ruff_cmd, "format", "."], fix=True, check=False)
+        )
     else:
-        commands.append(CommandSpec("python:compileall", [sys.executable, "-m", "compileall", "."], check=True, reason="ruff unavailable"))
+        commands.append(
+            CommandSpec(
+                "python:compileall",
+                [sys.executable, "-m", "compileall", "."],
+                check=True,
+                reason="ruff unavailable",
+            )
+        )
 
     return project, commands
 
@@ -127,30 +139,67 @@ def detect_js() -> tuple[list[str], list[CommandSpec]]:
 
     for script in ("lint", "check", "typecheck", "test:lint"):
         if runner and script in scripts:
-            commands.append(CommandSpec(f"js:script:{script}", script_command(runner, script), check=True))
+            commands.append(
+                CommandSpec(f"js:script:{script}", script_command(runner, script), check=True)
+            )
 
     for script in ("lint:fix", "format", "format:fix"):
         if runner and script in scripts:
-            commands.append(CommandSpec(f"js:script:{script}", script_command(runner, script), fix=True, check=False))
+            commands.append(
+                CommandSpec(
+                    f"js:script:{script}", script_command(runner, script), fix=True, check=False
+                )
+            )
 
-    deps = {**package.get("dependencies", {}), **package.get("devDependencies", {})} if package else {}
+    deps = (
+        {**package.get("dependencies", {}), **package.get("devDependencies", {})} if package else {}
+    )
 
     if runner and ("@biomejs/biome" in deps or exists("biome.json") or exists("biome.jsonc")):
-        commands.append(CommandSpec("js:biome-check", exec_command(runner, "biome", ["check", "."]), check=True))
-        commands.append(CommandSpec("js:biome-write", exec_command(runner, "biome", ["check", "--write", "."]), fix=True, check=False))
+        commands.append(
+            CommandSpec("js:biome-check", exec_command(runner, "biome", ["check", "."]), check=True)
+        )
+        commands.append(
+            CommandSpec(
+                "js:biome-write",
+                exec_command(runner, "biome", ["check", "--write", "."]),
+                fix=True,
+                check=False,
+            )
+        )
     elif which("biome"):
         commands.append(CommandSpec("js:biome-check-global", ["biome", "check", "."], check=True))
-        commands.append(CommandSpec("js:biome-write-global", ["biome", "check", "--write", "."], fix=True, check=False))
+        commands.append(
+            CommandSpec(
+                "js:biome-write-global", ["biome", "check", "--write", "."], fix=True, check=False
+            )
+        )
 
-    if runner and ("eslint" in deps or exists(".eslintrc") or exists("eslint.config.js") or exists("eslint.config.mjs")):
+    if runner and (
+        "eslint" in deps
+        or exists(".eslintrc")
+        or exists("eslint.config.js")
+        or exists("eslint.config.mjs")
+    ):
         commands.append(CommandSpec("js:eslint", exec_command(runner, "eslint", ["."]), check=True))
-        commands.append(CommandSpec("js:eslint-fix", exec_command(runner, "eslint", [".", "--fix"]), fix=True, check=False))
+        commands.append(
+            CommandSpec(
+                "js:eslint-fix",
+                exec_command(runner, "eslint", [".", "--fix"]),
+                fix=True,
+                check=False,
+            )
+        )
     elif which("eslint"):
         commands.append(CommandSpec("js:eslint-global", ["eslint", "."], check=True))
-        commands.append(CommandSpec("js:eslint-fix-global", ["eslint", ".", "--fix"], fix=True, check=False))
+        commands.append(
+            CommandSpec("js:eslint-fix-global", ["eslint", ".", "--fix"], fix=True, check=False)
+        )
 
     if runner and ("typescript" in deps or exists("tsconfig.json")):
-        commands.append(CommandSpec("js:tsc", exec_command(runner, "tsc", ["--noEmit"]), check=True))
+        commands.append(
+            CommandSpec("js:tsc", exec_command(runner, "tsc", ["--noEmit"]), check=True)
+        )
 
     return project, dedupe(commands)
 
@@ -163,7 +212,9 @@ def detect_flutter() -> tuple[list[str], list[CommandSpec]]:
     commands: list[CommandSpec] = []
     if which("flutter") and exists("pubspec.yaml"):
         commands.append(CommandSpec("flutter:analyze", ["flutter", "analyze"], check=True))
-        commands.append(CommandSpec("flutter:format", ["dart", "format", "."], fix=True, check=False))
+        commands.append(
+            CommandSpec("flutter:format", ["dart", "format", "."], fix=True, check=False)
+        )
     elif which("dart"):
         commands.append(CommandSpec("dart:analyze", ["dart", "analyze"], check=True))
         commands.append(CommandSpec("dart:format", ["dart", "format", "."], fix=True, check=False))
@@ -177,10 +228,22 @@ def detect_rust() -> tuple[list[str], list[CommandSpec]]:
     project = ["rust"]
     commands: list[CommandSpec] = []
     if which("cargo"):
-        commands.append(CommandSpec("rust:fmt-check", ["cargo", "fmt", "--all", "--", "--check"], check=True))
+        commands.append(
+            CommandSpec("rust:fmt-check", ["cargo", "fmt", "--all", "--", "--check"], check=True)
+        )
         commands.append(CommandSpec("rust:fmt", ["cargo", "fmt", "--all"], fix=True, check=False))
-        commands.append(CommandSpec("rust:clippy", ["cargo", "clippy", "--all-targets", "--all-features", "--", "-D", "warnings"], check=True))
-        commands.append(CommandSpec("rust:check", ["cargo", "check", "--all-targets", "--all-features"], check=True))
+        commands.append(
+            CommandSpec(
+                "rust:clippy",
+                ["cargo", "clippy", "--all-targets", "--all-features", "--", "-D", "warnings"],
+                check=True,
+            )
+        )
+        commands.append(
+            CommandSpec(
+                "rust:check", ["cargo", "check", "--all-targets", "--all-features"], check=True
+            )
+        )
     return project, commands
 
 
@@ -209,11 +272,19 @@ def run(command: CommandSpec) -> int:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Detect project lint tools and run lint checks or safe fixes.")
+    parser = argparse.ArgumentParser(
+        description="Detect project lint tools and run lint checks or safe fixes."
+    )
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument("--check", action="store_true", help="Run check-only lint commands.")
-    mode.add_argument("--fix", action="store_true", help="Run safe auto-fix commands, then check commands.")
-    mode.add_argument("--plan", action="store_true", help="Print detected project types and selected commands without running.")
+    mode.add_argument(
+        "--fix", action="store_true", help="Run safe auto-fix commands, then check commands."
+    )
+    mode.add_argument(
+        "--plan",
+        action="store_true",
+        help="Print detected project types and selected commands without running.",
+    )
     args = parser.parse_args()
 
     detectors = [detect_python, detect_js, detect_flutter, detect_rust]

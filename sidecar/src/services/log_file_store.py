@@ -18,8 +18,9 @@ import logging
 import os
 import re
 import struct
+import sys
 import threading
-import msvcrt
+from collections import deque
 from collections.abc import Sequence
 
 logger = logging.getLogger(__name__)
@@ -46,13 +47,15 @@ class SourceFileHandle:
     is the current total size of the log file.
     """
 
-    __slots__ = ("path", "idx_path", "line_count", "lock", "_fh", "_ifh")
+    __slots__ = ("path", "idx_path", "line_count", "lock", "_fh", "_ifh", "hot_buffer")
 
     def __init__(self, path: str, idx_path: str, existing_count: int) -> None:
         self.path = path
         self.idx_path = idx_path
         self.line_count = existing_count
         self.lock = threading.Lock()
+        # Hot RAM Buffer for real-time reads and multi-workspace sync
+        self.hot_buffer = deque(maxlen=1000)
 
         # Open log in append mode; binary for consistent '\n'
         self._fh = open(path, "ab")  # noqa: SIM115
@@ -66,47 +69,26 @@ class SourceFileHandle:
 
     def write_line(self, raw: str) -> int:
         """Append *raw* as a single line and return its 0-based line_id."""
-        encoded = (raw.rstrip("\n") + "\n").encode("utf-8", errors="replace")
+        # String interning for memory efficiency in the hot buffer
+        interned_raw = sys.intern(raw.rstrip("\n"))
+        encoded = (interned_raw + "\n").encode("utf-8", errors="replace")
+
         with self.lock:
-            log_fd = self._fh.fileno()
-            idx_fd = self._ifh.fileno()
-            
-            # Use non-blocking lock with retry to avoid "deadlock avoided" error
-            locked = False
-            for _ in range(10):
-                try:
-                    self._fh.seek(0, os.SEEK_END)
-                    msvcrt.locking(log_fd, msvcrt.LK_NBLCK, 1024 * 1024)
-                    self._ifh.seek(0, os.SEEK_END)
-                    msvcrt.locking(idx_fd, msvcrt.LK_NBLCK, 1024)
-                    locked = True
-                    break
-                except OSError:
-                    time.sleep(0.01)
-            
-            if not locked:
-                # Fallback to blocking lock if retries fail, though NBLCK is safer
-                msvcrt.locking(log_fd, msvcrt.LK_LOCK, 1024 * 1024)
-                msvcrt.locking(idx_fd, msvcrt.LK_LOCK, 1024)
+            # 1. Write the log line to disk
+            self._fh.write(encoded)
+            self._fh.flush()
 
-            try:
-                # 1. Write the log line
-                self._fh.write(encoded)
-                self._fh.flush()
+            # 2. Record the new offset (current file size)
+            new_offset = self._fh.tell()
+            self._ifh.write(struct.pack("<Q", new_offset))
+            self._ifh.flush()
 
-                # 2. Record the new offset (current file size)
-                new_offset = self._fh.tell()
-                self._ifh.write(struct.pack("<Q", new_offset))
-                self._ifh.flush()
+            line_id = self.line_count
+            self.line_count += 1
 
-                line_id = self.line_count
-                self.line_count += 1
-            finally:
-                with contextlib.suppress(Exception):
-                    self._fh.seek(0, os.SEEK_END)
-                    msvcrt.locking(log_fd, msvcrt.LK_UNLCK, 1024 * 1024)
-                    self._ifh.seek(0, os.SEEK_END)
-                    msvcrt.locking(idx_fd, msvcrt.LK_UNLCK, 1024)
+            # 3. Push to Hot RAM Buffer
+            self.hot_buffer.append({"id": line_id, "text": interned_raw})
+
         return line_id
 
     def write_batch(self, raws: Sequence[str]) -> list[int]:
@@ -114,49 +96,25 @@ class SourceFileHandle:
         if not raws:
             return []
 
-        encoded_lines = [
-            (r.rstrip("\n") + "\n").encode("utf-8", errors="replace") for r in raws
-        ]
+        # String interning for batch processing
+        interned_lines = [sys.intern(r.rstrip("\n")) for r in raws]
+        encoded_lines = [(r + "\n").encode("utf-8", errors="replace") for r in interned_lines]
 
         with self.lock:
-            log_fd = self._fh.fileno()
-            idx_fd = self._ifh.fileno()
-            
-            # Use non-blocking lock with retry to avoid "deadlock avoided" error
-            locked = False
-            for _ in range(10):
-                try:
-                    self._fh.seek(0, os.SEEK_END)
-                    msvcrt.locking(log_fd, msvcrt.LK_NBLCK, 10 * 1024 * 1024)
-                    self._ifh.seek(0, os.SEEK_END)
-                    msvcrt.locking(idx_fd, msvcrt.LK_NBLCK, 1024 * 1024)
-                    locked = True
-                    break
-                except OSError:
-                    time.sleep(0.01)
+            start_id = self.line_count
+            for i, enc in enumerate(encoded_lines):
+                # Write line
+                self._fh.write(enc)
+                # Record new offset
+                new_offset = self._fh.tell()
+                self._ifh.write(struct.pack("<Q", new_offset))
 
-            if not locked:
-                msvcrt.locking(log_fd, msvcrt.LK_LOCK, 10 * 1024 * 1024)
-                msvcrt.locking(idx_fd, msvcrt.LK_LOCK, 1024 * 1024)
+                # Push to Hot RAM Buffer
+                self.hot_buffer.append({"id": start_id + i, "text": interned_lines[i]})
 
-            try:
-                start_id = self.line_count
-                for enc in encoded_lines:
-                    # Write line
-                    self._fh.write(enc)
-                    # Record new offset
-                    new_offset = self._fh.tell()
-                    self._ifh.write(struct.pack("<Q", new_offset))
-
-                self._fh.flush()
-                self._ifh.flush()
-                self.line_count += len(encoded_lines)
-            finally:
-                with contextlib.suppress(Exception):
-                    self._fh.seek(0, os.SEEK_END)
-                    msvcrt.locking(log_fd, msvcrt.LK_UNLCK, 10 * 1024 * 1024)
-                    self._ifh.seek(0, os.SEEK_END)
-                    msvcrt.locking(idx_fd, msvcrt.LK_UNLCK, 1024 * 1024)
+            self._fh.flush()
+            self._ifh.flush()
+            self.line_count += len(encoded_lines)
 
         return list(range(start_id, start_id + len(encoded_lines)))
 
@@ -192,6 +150,12 @@ class DiskLogStore:
         handle = self._get_handle(source_id)
         return handle.write_batch(raws)
 
+    def get_hot_buffer(self, source_id: str) -> list[dict]:
+        """Returns the current Hot RAM Buffer for a source."""
+        handle = self._get_handle(source_id)
+        with handle.lock:
+            return list(handle.hot_buffer)
+
     def file_path(self, source_id: str) -> str:
         return os.path.join(self._storage_dir, f"{_safe_name(source_id)}.log")
 
@@ -208,6 +172,10 @@ class DiskLogStore:
             for handle in self._registry.values():
                 handle.close()
             self._registry.clear()
+
+    def get_handle(self, source_id: str) -> SourceFileHandle:
+        """Public access to the source handle."""
+        return self._get_handle(source_id)
 
     def _get_handle(self, source_id: str) -> SourceFileHandle:
         with self._registry_lock:

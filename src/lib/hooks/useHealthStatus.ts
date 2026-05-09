@@ -1,5 +1,5 @@
-import { useEffect, useRef } from "react";
 import { useHealthStore } from "@/store/healthStore";
+import { useEffect, useRef } from "react";
 
 const POLLING_INTERVAL = 5000; // 5 seconds
 
@@ -17,7 +17,7 @@ export function useHealthStatus() {
 
     // Start polling
     setPolling(true);
-    
+
     timerRef.current = setInterval(() => {
       fetchHealth();
     }, POLLING_INTERVAL);

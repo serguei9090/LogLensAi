@@ -109,15 +109,19 @@ Action Details:
                 system_prompt=system_prompt,
                 model=model or default_model,
             )
-        
+
         # All others support 'host'
-        return provider_class(
-            api_key=api_key,
-            system_prompt=system_prompt,
-            host=host or default_host,
-            model=model or default_model,
-        ) if provider_class == OpenAICompatibleProvider else provider_class(
-            host=host or default_host,
-            system_prompt=system_prompt,
-            model=model or default_model,
+        return (
+            provider_class(
+                api_key=api_key,
+                system_prompt=system_prompt,
+                host=host or default_host,
+                model=model or default_model,
+            )
+            if provider_class == OpenAICompatibleProvider
+            else provider_class(
+                host=host or default_host,
+                system_prompt=system_prompt,
+                model=model or default_model,
+            )
         )

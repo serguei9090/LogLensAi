@@ -43,6 +43,8 @@ def test_llql_escaping():
     assert "l.source_id = ?" in sql
     assert "auth*" in params
     assert "ILIKE" not in sql
+
+
 def test_llql_range_facet():
     sql, params = parse_llql("price:[10 TO 50]")
     assert "json_extract_string(l.facets, '$.\"price\"') >= ?" in sql

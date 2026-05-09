@@ -7,11 +7,11 @@ Usage:
     uv run python scripts/codanna/impact.py <SymbolName> --depth 5
     uv run python scripts/codanna/impact.py --id 1234
 """
+
 import argparse
 import json
 import subprocess
 import sys
-
 
 if sys.platform == "win32":
     sys.stdout.reconfigure(encoding="utf-8")
@@ -21,8 +21,11 @@ if sys.platform == "win32":
 def _run(args_dict: dict) -> None:
     """Build and execute the codanna mcp analyze_impact command."""
     cmd = [
-        "codanna", "mcp", "analyze_impact",
-        "--args", json.dumps(args_dict),
+        "codanna",
+        "mcp",
+        "analyze_impact",
+        "--args",
+        json.dumps(args_dict),
         "--json",
     ]
     result = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8")
@@ -61,8 +64,12 @@ def main() -> None:
     )
     group = parser.add_mutually_exclusive_group(required=True)
     group.add_argument("name", nargs="?", help="Symbol name (function, class, method)")
-    group.add_argument("--id", type=int, dest="symbol_id", help="Symbol ID (from a previous search)")
-    parser.add_argument("--depth", type=int, default=None, help="Max traversal depth (default: codanna default)")
+    group.add_argument(
+        "--id", type=int, dest="symbol_id", help="Symbol ID (from a previous search)"
+    )
+    parser.add_argument(
+        "--depth", type=int, default=None, help="Max traversal depth (default: codanna default)"
+    )
     parser.add_argument("--lang", help="Filter by language e.g. python, typescript")
 
     args = parser.parse_args()

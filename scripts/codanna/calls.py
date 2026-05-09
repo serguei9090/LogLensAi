@@ -6,11 +6,11 @@ Usage:
     uv run python scripts/codanna/calls.py <SymbolName>
     uv run python scripts/codanna/calls.py --id 1883
 """
+
 import argparse
 import json
 import subprocess
 import sys
-
 
 if sys.platform == "win32":
     sys.stdout.reconfigure(encoding="utf-8")
@@ -19,8 +19,11 @@ if sys.platform == "win32":
 
 def _run(args_dict: dict) -> None:
     cmd = [
-        "codanna", "mcp", "get_calls",
-        "--args", json.dumps(args_dict),
+        "codanna",
+        "mcp",
+        "get_calls",
+        "--args",
+        json.dumps(args_dict),
         "--json",
     ]
     result = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8")
@@ -51,9 +54,7 @@ def _run(args_dict: dict) -> None:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(
-        description="Codanna: get_calls — list what a symbol calls."
-    )
+    parser = argparse.ArgumentParser(description="Codanna: get_calls — list what a symbol calls.")
     group = parser.add_mutually_exclusive_group(required=True)
     group.add_argument("name", nargs="?", help="Symbol name")
     group.add_argument("--id", type=int, dest="symbol_id", help="Symbol ID")
