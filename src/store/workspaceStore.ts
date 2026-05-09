@@ -183,11 +183,16 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
               }
               const remaining = w.sources.filter((s) => s.id !== sourceId);
               const wasActive = w.activeSourceId === sourceId;
+
+              // Fallback logic:
+              // If the deleted source was active, go to folder view (null)
+              // to show the ExplorerView instead of jumping to a random sibling.
+              const nextSourceId = wasActive ? null : w.activeSourceId;
+
               return {
                 ...w,
                 sources: remaining,
-                // Fall back to first remaining source or null (aggregate)
-                activeSourceId: wasActive ? (remaining[0]?.id ?? null) : w.activeSourceId,
+                activeSourceId: nextSourceId,
               };
             }),
           }));

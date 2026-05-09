@@ -31,23 +31,39 @@ class MappedSource:
         self._idx_mmap = None
         self._log_f = None
         self._idx_f = None
+        self._last_check = 0.0
+        self._last_log_size = 0
+        self._last_idx_size = 0
 
     def _ensure_mapped(self):
-        """Lazy initialization of mmap objects."""
+        """Lazy initialization of mmap objects with size caching."""
+        now = time.time()
+        # Optimization: Only stat the files once per second or if not mapped
         if self._log_mmap is not None and self._idx_mmap is not None:
+            if now - self._last_check < 1.0:
+                return
+            
+            self._last_check = now
+            log_size = os.path.getsize(self.log_path)
+            idx_size = os.path.getsize(self.idx_path)
+            
+            if log_size == self._last_log_size and idx_size == self._last_idx_size:
+                return
+                
             # Check if file sizes changed (appended)
-            if (
-                os.path.getsize(self.log_path) > self._log_mmap.size()
-                or os.path.getsize(self.idx_path) > self._idx_mmap.size()
-            ):
+            if log_size > self._log_mmap.size() or idx_size > self._idx_mmap.size():
                 self.close()
             else:
+                self._last_log_size = log_size
+                self._last_idx_size = idx_size
                 return
 
         try:
-            log_size = os.path.getsize(self.log_path)
-            idx_size = os.path.getsize(self.idx_path)
-            if log_size == 0 or idx_size < 8:
+            self._last_check = now
+            self._last_log_size = os.path.getsize(self.log_path)
+            self._last_idx_size = os.path.getsize(self.idx_path)
+            
+            if self._last_log_size == 0 or self._last_idx_size < 8:
                 return
 
             self._log_f = open(self.log_path, "rb")  # noqa: SIM115

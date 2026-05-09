@@ -8,9 +8,11 @@ from db import Database
 
 
 def _extract_base_metadata(
-    workspace_id: str, source_id: str, raw_line: str
+    raw_line: str, 
+    parser_config: dict = None, 
+    tz_offset: float = 0
 ) -> tuple[str, str, str]:
-    """Extracts timestamp, level, and message using source-specific regex."""
+    """Extracts timestamp, level, and message using provided configuration."""
     timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     level = "INFO"
     message = raw_line
@@ -22,20 +24,10 @@ def _extract_base_metadata(
             level = lvl
             break
 
-    # Fetch configuration from DuckDB
-    db = Database()
-    cursor = db.get_cursor()
-    try:
-        cursor.execute(
-            "SELECT parser_config, tz_offset FROM fusion_configs WHERE workspace_id = ? AND source_id = ?",
-            (workspace_id, source_id),
-        )
-        row = cursor.fetchone()
-
-        if row and row[0]:
-            config = json.loads(row[0])
-            pattern = config.get("regex")
-            if pattern:
+    if parser_config:
+        pattern = parser_config.get("regex")
+        if pattern:
+            try:
                 match = re.search(pattern, raw_line)
                 if match:
                     groups = match.groupdict()
@@ -52,9 +44,8 @@ def _extract_base_metadata(
                         try:
                             # Attempt to parse common formats: YYYY-MM-DD HH:MM:SS
                             dt = datetime.datetime.strptime(timestamp[:19], "%Y-%m-%d %H:%M:%S")
-                            offset_hrs = row[1] or 0
-                            if offset_hrs != 0:
-                                dt = dt + datetime.timedelta(hours=offset_hrs)
+                            if tz_offset != 0:
+                                dt = dt + datetime.timedelta(hours=tz_offset)
                                 timestamp = dt.strftime("%Y-%m-%d %H:%M:%S")
                         except Exception:
                             pass
@@ -63,10 +54,9 @@ def _extract_base_metadata(
                         level = groups["level"].upper()
                     if "message" in groups:
                         message = groups["message"]
-    except Exception as e:
-        logging.getLogger("LogLensSidecar").error(
-            "Failed to process line from %s: %s", source_id, e
-        )
+            except Exception:
+                # Fallback to defaults on regex failure
+                pass
 
     return timestamp, level, message
 
@@ -180,14 +170,17 @@ def _apply_custom_extractions(raw_line: str, custom_rules: list, facets: dict):
 
 
 def extract_log_metadata(
-    workspace_id: str, source_id: str, raw_line: str, custom_rules: list = None
+    raw_line: str, 
+    custom_rules: list = None,
+    parser_config: dict = None,
+    tz_offset: float = 0
 ) -> dict:
     """
     Applies source-specific regex patterns and timezone normalization to a raw log line.
     Shared by both one-time ingestion and live tailing.
     """
     # 1. Base Metadata
-    timestamp, level, message = _extract_base_metadata(workspace_id, source_id, raw_line)
+    timestamp, level, message = _extract_base_metadata(raw_line, parser_config, tz_offset)
 
     # 2. Heuristic Facets
     facets = _extract_heuristic_facets(raw_line)

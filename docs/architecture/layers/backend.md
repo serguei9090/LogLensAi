@@ -17,7 +17,12 @@
 |--------|------|---------------|
 | `App` (API Router) | `sidecar/src/api.py` | JSON-RPC dispatcher — all `method_*` live here |
 | `Database` | `sidecar/src/db.py` | DuckDB connection manager, `get_cursor()` provider |
-| *(fill)* | *(fill)* | *(fill)* |
+| `IngestionServer` | `sidecar/src/ingestion.py` | Log streaming and ingestion management |
+| `LogParser` | `sidecar/src/parser.py` | Drain3-based log template extraction |
+| `FastPath` | `sidecar/src/services/fast_path.py` | Low-latency in-memory buffer for live logs |
+| `DiskLogStore` | `sidecar/src/services/log_file_store.py` | Persistent raw log storage on disk |
+| `ClusteringWorker` | `sidecar/src/workers/clustering.py` | Background template mining and clustering |
+| `AnomalyDetector` | `sidecar/src/anomalies.py` | Pattern-based anomaly detection service |
 
 ---
 
@@ -25,7 +30,8 @@
 
 | Module | Path | Framework | Responsibility |
 |--------|------|-----------|---------------|
-| *(fill — e.g., `LlmAgent`)* | `sidecar/src/ai/agent.py` | *(ADK / Pydantic AI / LangGraph)* | *(fill)* |
+| `HybridRunner` | `sidecar/src/ai/runner.py` | ADK 2.0 + LangGraph | Hybrid orchestration for local/remote LLMs |
+| `ToolRegistry` | `sidecar/src/ai/tools.py` | Pydantic AI | Tool definition for LLM interaction |
 
 ---
 
@@ -37,30 +43,24 @@
 
 | Table | Description | Key Columns |
 |-------|-------------|-------------|
-| *(fill)* | *(fill)* | *(fill)* |
-
-### Connection Pattern (MANDATORY)
-
-```python
-# Always use get_cursor() — never share cursors across async boundaries
-async def method_example(self, req: ExampleRequest) -> ExampleResponse:
-    with self.db.get_cursor() as cur:
-        result = cur.execute("SELECT ...", [req.param]).fetchall()
-    return ExampleResponse(data=result)
-```
+| `logs` | Main log storage | `id`, `timestamp`, `level`, `source_id`, `cluster_id` |
+| `workspaces` | Workspace metadata | `id`, `name`, `created_at` |
+| `settings` | K/V application settings | `key`, `value`, `workspace_id` |
+| `clusters` | Drain3 cluster metadata | `cluster_id`, `template`, `count` |
 
 ---
 
 ## 📋 Registered API Methods
 
-> Every method in `api.py` MUST appear here. Keep in sync with `communication.md` "Registered Methods" table.
-
-<!-- AI_PROMPT: Whenever you add a new method_ to api.py, immediately add a row here 
-     AND in communication.md. Missing entries are a protocol violation. -->
-
 | Method Name | Request Model | Response Model | Description |
 |-------------|--------------|----------------|-------------|
-| *(none yet)* | — | — | — |
+| `factory_reset` | `ResetRequest` | `ResetResponse` | Complete wipe of DB and storage |
+| `get_logs` | `LogQuery` | `LogResults` | Query logs with filters and LLQL |
+| `start_tail` | `TailRequest` | `TailStatus` | Start tailing a local file |
+| `ingest_logs` | `IngestBatch` | `Status` | Bulk ingestion of log entries |
+| `analyze_cluster` | `AnalyzeRequest` | `AnalysisResponse` | AI analysis of log clusters |
+| `get_dashboard_stats` | `StatsRequest` | `DashboardStats` | Summary metrics for investigation |
+| `get_health` | — | `HealthResponse` | System health and worker status |
 
 ---
 

@@ -13,7 +13,7 @@
 
 Select the communication protocol for this project:
 
-- [ ] **JSON-RPC 2.0 over Tauri IPC** *(Recommended for Tauri desktop apps)*
+- [x] **JSON-RPC 2.0 over Tauri IPC** *(Recommended for Tauri desktop apps)*
   — Direct Rust↔Python Sidecar via `invoke()`. Zero network overhead, typed by Pydantic.
 - [ ] **JSON-RPC 2.0 over WebSocket** *(Recommended for web apps with real-time needs)*
   — Full-duplex channel. Supports streaming responses and event push.
@@ -30,11 +30,7 @@ Select the communication protocol for this project:
 
 ## 📐 Protocol Specification
 
-> Fill the section matching your checked protocol above. Remove or collapse the others.
-
----
-
-### JSON-RPC 2.0 (Tauri IPC or WebSocket)
+### JSON-RPC 2.0 (Tauri IPC)
 
 **Standard Request Format:**
 ```json
@@ -55,75 +51,31 @@ Select the communication protocol for this project:
 }
 ```
 
-**Error Format:**
-```json
-{
-  "jsonrpc": "2.0",
-  "error": { "code": -32600, "message": "Invalid Request" },
-  "id": "UNIQUE_ID"
-}
-```
-
 **Bridge Hook (Frontend):**
+LogLensAi uses the `useSidecarBridge.ts` hook which abstracts the transport. In development, it uses HTTP to `localhost:5000`. In production, it uses Tauri's `invoke` which pipes to the sidecar's stdin/stdout.
+
 ```typescript
-// hooks/useSidecarBridge.ts
-async function callSidecar<T>(method: string, params: Record<string, unknown>): Promise<T> {
-  // Tauri IPC variant:
-  return await invoke<T>("plugin:jsonrpc|call", { method, params });
-  // WebSocket variant: send via ws and await reply by id
-}
-```
-
-**Server Class (Backend — api.py):**
-```python
-class App:
-    async def method_example(self, req: ExampleRequest) -> ExampleResponse:
-        ...
-```
-
----
-
-### REST/HTTP (FastAPI)
-
-**Base URL:** `http://localhost:{PORT}/api/v1`
-
-**Standard Response Envelope:**
-```json
-{ "data": {}, "error": null, "meta": { "timestamp": "ISO8601" } }
-```
-
-**Router Registration:**
-```python
-router = APIRouter(prefix="/api/v1")
-app.include_router(router)
-```
-
----
-
-### tRPC
-
-**Router Definition:**
-```typescript
-export const appRouter = router({
-  exampleProcedure: publicProcedure
-    .input(z.object({ id: z.string() }))
-    .query(async ({ input }) => { ... }),
-});
-export type AppRouter = typeof appRouter;
+// src/lib/hooks/useSidecarBridge.ts
+const response = await invoke("call_sidecar", { method, params });
 ```
 
 ---
 
 ## 📋 Registered Methods
 
-> Add every API method / endpoint here as it is implemented. Keep this list synchronized with `layers/backend.md`.
-
-<!-- AI_PROMPT: Every time a new method is added to api.py or a new route to the backend router,
-     append it to this table immediately. Never leave a method undocumented here. -->
-
 | Method / Endpoint | Protocol | Request Schema | Response Schema | Description |
 |---|---|---|---|---|
-| *(none yet — populate during /init)* | — | — | — | — |
+| `factory_reset` | JSON-RPC | `ResetRequest` | `ResetResponse` | Complete wipe of DB and storage |
+| `get_logs` | JSON-RPC | `LogQuery` | `LogResults` | Query logs with filters and LLQL |
+| `start_tail` | JSON-RPC | `TailRequest` | `TailStatus` | Start tailing a local file |
+| `ingest_logs` | JSON-RPC | `IngestBatch` | `Status` | Bulk ingestion of log entries |
+| `analyze_cluster` | JSON-RPC | `AnalyzeRequest` | `AnalysisResponse` | AI analysis of log clusters |
+| `get_dashboard_stats` | JSON-RPC | `StatsRequest` | `DashboardStats` | Summary metrics for investigation |
+| `get_health` | JSON-RPC | — | `HealthResponse` | System health and worker status |
+| `get_clusters` | JSON-RPC | `ClusterQuery` | `ClusterList` | Retrieve mined templates/clusters |
+| `stop_tail` | JSON-RPC | `TailRequest` | `Status` | Stop an active file tailing job |
+| `is_tailing` | JSON-RPC | `TailRequest` | `boolean` | Check if a file is being tailed |
+| `update_settings` | JSON-RPC | `SettingsUpdate` | `Status` | Update global or workspace settings |
 
 ---
 

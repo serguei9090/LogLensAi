@@ -340,9 +340,13 @@ export function VirtualLogTable({
                 </div>
               </div>
               <div className="space-y-2">
-                <h3 className="text-xl font-bold text-text-primary">Ingesting Logs...</h3>
+                <h3 className="text-xl font-bold text-text-primary">
+                  {activeJob ? "Ingesting Logs..." : "Retrieving Logs..."}
+                </h3>
                 <p className="text-sm text-text-muted leading-relaxed">
-                  Mapping log patterns and indexing metadata for high-performance search.
+                  {activeJob
+                    ? "Mapping log patterns and indexing metadata for high-performance search."
+                    : "Hydrating log records from storage and applying active filters."}
                 </p>
               </div>
               {activeJob && (

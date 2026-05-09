@@ -60,20 +60,23 @@ class FileTailer:
             return
 
         # 1. Disk-First: write raw line to the source's flat file and get its line_id.
-        #    This is the ONLY place raw text is persisted.  DuckDB only stores the pointer.
         line_id = self.log_store.append_line(self.source_id, line)
 
-        # 2. Lightweight metadata extraction (timestamp + level only — no Drain3 here).
-        #    Full extraction and clustering are deferred to the ClusteringWorker.
+        # 2. Lightweight metadata extraction (timestamp + level only).
         custom_rules = self._get_rules()
+        p_config, p_tz = self._get_parser_config()
+        
         metadata = extract_log_metadata(
-            self.workspace_id, self.source_id, line, custom_rules=custom_rules
+            line, 
+            custom_rules=custom_rules,
+            parser_config=p_config,
+            tz_offset=p_tz
         )
         timestamp = metadata["timestamp"]
         level = metadata["level"]
         facets = metadata.get("facets", {})
 
-        # 3. Insert the skinny row — no raw_text, no message, just the pointer.
+        # 3. Insert the skinny row
         import json
 
         facets_json = json.dumps(facets) if facets else None
@@ -92,6 +95,36 @@ class FileTailer:
                 facets_json,
             ),
         )
+
+    def _get_parser_config(self) -> tuple[dict, float]:
+        """Fetches and caches parser configuration for the source."""
+        now = time.time()
+        if not hasattr(self, "_p_config_cache"):
+            self._p_config_cache = None
+            self._p_config_expiry = 0
+
+        if self._p_config_cache is not None and now < self._p_config_expiry:
+            return self._p_config_cache
+
+        config = {}
+        tz_offset = 0.0
+        try:
+            cursor = self.db.get_cursor()
+            cursor.execute(
+                "SELECT parser_config, tz_offset FROM fusion_configs WHERE workspace_id = ? AND source_id = ?",
+                (self.workspace_id, self.source_id),
+            )
+            row = cursor.fetchone()
+            if row:
+                import json
+                config = json.loads(row[0]) if row[0] else {}
+                tz_offset = row[1] or 0.0
+        except Exception:
+            pass
+
+        self._p_config_cache = (config, tz_offset)
+        self._p_config_expiry = now + 30  # Cache for 30 seconds
+        return self._p_config_cache
 
     def _get_rules(self) -> list:
         now = time.time()

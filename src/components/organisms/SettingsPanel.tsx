@@ -19,6 +19,8 @@ import {
   useSettingsStore,
 } from "@/store/settingsStore";
 import { useWorkspaceStore } from "@/store/workspaceStore";
+import { useIngestionStore } from "@/store/ingestionStore";
+import { useInvestigationStore } from "@/store/investigationStore";
 import {
   Activity,
   Bot,
@@ -30,6 +32,7 @@ import {
   EyeOff,
   FolderOpen,
   Layers,
+  Loader2,
   Network,
   Palette,
   Plus,
@@ -190,8 +193,8 @@ function safeParse(raw: string | null): unknown {
         .replaceAll("False", "false")
         .replaceAll("None", "null");
       return JSON.parse(jsonified);
-    } catch {
-      // Swallow silently — caller handles the null case
+    } catch (err) {
+      console.debug("safeParse: Failed to parse Python repr fallback:", err);
       return null;
     }
   }
@@ -413,6 +416,8 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
   const [isResetPatternsModalOpen, setIsResetPatternsModalOpen] = useState(false);
   const [isFactoryResetModalOpen, setIsFactoryResetModalOpen] = useState(false);
   const { activeWorkspaceId, reset: resetWorkspaces } = useWorkspaceStore();
+  const { clearState: clearIngestion } = useIngestionStore();
+  const { reset: resetInvestigation } = useInvestigationStore();
   const { updateSettings } = useSettingsStore();
 
   const update = <K extends keyof AppSettings>(key: K, value: AppSettings[K], immediate = true) => {
@@ -427,6 +432,7 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
   };
 
   const [isResetModalOpen, setIsResetModalOpen] = useState(false);
+  const [isRestarting, setIsRestarting] = useState(false);
 
   const handleResetAll = async () => {
     try {
@@ -446,11 +452,16 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
 
   const handleFactoryReset = async () => {
     try {
+      setIsRestarting(true);
+      setIsFactoryResetModalOpen(false);
+
       // 1. Backend Wipe
       await callSidecar({ method: "factory_reset", params: {} });
 
       // 2. Frontend Wipe
-      resetWorkspaces();
+      clearIngestion(); // Remove any ghost jobs
+      resetWorkspaces(); // Clear workspace definitions
+      resetInvestigation(); // Clear source metadata and cached logs
       localStorage.clear(); // Nuclear option for all persisted stores
 
       toast.success("Factory reset complete. Application will restart.");
@@ -1632,6 +1643,16 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      {/* Restarting Overlay */}
+      {isRestarting && (
+        <div className="fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-background/95 backdrop-blur-sm pointer-events-auto">
+          <Loader2 className="h-12 w-12 animate-spin text-primary mb-4" />
+          <h2 className="text-2xl font-bold text-foreground">Initializing System...</h2>
+          <p className="text-sm text-zinc-400 mt-2">
+            Please wait while the environment is prepared.
+          </p>
+        </div>
+      )}
     </div>
   );
 }

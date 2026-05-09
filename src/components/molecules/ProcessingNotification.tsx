@@ -1,28 +1,31 @@
 import { callSidecar } from "@/lib/hooks/useSidecarBridge";
-import { motion, AnimatePresence } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
 import { RefreshCcw, Sparkles } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 
 interface IngestionJob {
   id: number;
   workspace_id: string;
-  status: 'pending' | 'processing' | 'completed' | 'failed';
+  status: "pending" | "processing" | "completed" | "failed";
   total_lines: number;
   processed_lines: number;
 }
 
 export function ProcessingNotification() {
   const [activeJobs, setActiveJobs] = useState<IngestionJob[]>([]);
-  
+
   const fetchJobs = useCallback(async () => {
     try {
       const res = await callSidecar<IngestionJob[]>({
         method: "get_ingestion_jobs",
       });
-      const pending = (res || []).filter(j => j.status === 'processing' || j.status === 'pending');
+      const pending = (res || []).filter(
+        (j) => j.status === "processing" || j.status === "pending",
+      );
       setActiveJobs(pending);
-    } catch (e) {
+    } catch (error) {
       // Fail silently for background polling
+      console.debug("[ProcessingNotification] Fetch failed:", error);
     }
   }, []);
 
@@ -32,7 +35,9 @@ export function ProcessingNotification() {
     return () => clearInterval(timer);
   }, [fetchJobs]);
 
-  if (activeJobs.length === 0) return null;
+  if (activeJobs.length === 0) {
+    return null;
+  }
 
   // Aggregate progress for the primary notification
   const totalProcessed = activeJobs.reduce((sum, j) => sum + j.processed_lines, 0);
@@ -54,8 +59,12 @@ export function ProcessingNotification() {
               <Sparkles className="size-2 text-primary-green absolute -top-1 -right-1 animate-pulse" />
             </div>
             <div>
-              <h4 className="text-[10px] font-bold uppercase tracking-widest text-text-primary">Drain3 Pattern Mining</h4>
-              <p className="text-[9px] text-text-muted font-mono">{activeJobs.length} active Drain3 {activeJobs.length === 1 ? 'task' : 'tasks'}</p>
+              <h4 className="text-[10px] font-bold uppercase tracking-widest text-text-primary">
+                Drain3 Pattern Mining
+              </h4>
+              <p className="text-[9px] text-text-muted font-mono">
+                {activeJobs.length} active Drain3 {activeJobs.length === 1 ? "task" : "tasks"}
+              </p>
             </div>
             <div className="ml-auto text-right">
               <span className="text-xs font-mono font-bold text-primary-green">{percent}%</span>
@@ -63,21 +72,21 @@ export function ProcessingNotification() {
           </div>
 
           <div className="h-1 bg-bg-base/50 rounded-full overflow-hidden border border-white/5">
-            <motion.div 
+            <motion.div
               className="h-full bg-primary-green shadow-[0_0_8px_rgba(16,185,129,0.5)]"
               initial={{ width: 0 }}
               animate={{ width: `${percent}%` }}
               transition={{ type: "spring", stiffness: 40 }}
             />
           </div>
-          
+
           <div className="mt-2 flex justify-between items-center">
-             <span className="text-[8px] font-mono text-text-muted uppercase">
-               {totalProcessed.toLocaleString()} / {totalLines.toLocaleString()}
-             </span>
-             <span className="text-[8px] font-bold text-primary-green opacity-0 group-hover:opacity-100 transition-opacity">
-               Mining Patterns
-             </span>
+            <span className="text-[8px] font-mono text-text-muted uppercase">
+              {totalProcessed.toLocaleString()} / {totalLines.toLocaleString()}
+            </span>
+            <span className="text-[8px] font-bold text-primary-green opacity-0 group-hover:opacity-100 transition-opacity">
+              Mining Patterns
+            </span>
           </div>
 
           {/* Decorative accent */}

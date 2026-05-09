@@ -7,12 +7,14 @@
 
 ## 🔵 Active Tasks
 
-- [ ] **LogLensAi-pdt**: Fix Clustering Job Stalls and Deadlock (P1).
 - [ ] **LLQL-Verification**: Audit `docs/track/LLQL_Professional_Spec.md` against current implementation in `sidecar/src/`.
+- [x] **PERF-001**: Optimize Ingestion Pipeline (FastPath caching, incremental job updates, removal of per-line DB queries). (Done 2026-05-08)
 
 ---
 
 ## ✅ Done
+- [x] **DOC-SYNC-001**: Audit documentation functional relations and update architecture layers/diagrams. (Done 2026-05-08)
+- [x] **LogLensAi-pdt**: Fix Clustering Job Stalls and Deadlock (P1). (Done 2026-05-08)
 - [x] **DASH-002**: Advanced Dashboard with AI Toggle and Workspace Filtering. (Done 2026-05-06)
 - [x] Archive legacy CHANGELOG.md (2026-05-06).
 - [x] **refactor_ai_factory_001**: Refactor `AIProviderFactory` to registry pattern. (Done 2026-05-06)

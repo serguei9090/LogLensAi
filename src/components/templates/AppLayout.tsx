@@ -81,9 +81,7 @@ export function AppLayout({
           onNavSelect={onNavSelect}
           activeFolderId={activeFolderId}
         />
-        <main className="flex-1 flex flex-col min-w-0 relative h-full bg-bg-base">
-          {children}
-        </main>
+        <main className="flex-1 flex flex-col min-w-0 relative h-full bg-bg-base">{children}</main>
         <DiagnosticSidebar
           open={diagnosticOpen}
           onClose={onDiagnosticClose}

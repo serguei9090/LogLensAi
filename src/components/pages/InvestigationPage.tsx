@@ -8,8 +8,8 @@ import type { LogEntry } from "@/components/organisms/VirtualLogTable";
 import { VirtualLogTable } from "@/components/organisms/VirtualLogTable";
 import { WorkspaceEngineSettings } from "@/components/organisms/WorkspaceEngineSettings";
 import { InvestigationLayout } from "@/components/templates/InvestigationLayout";
-import { useKeyboardShortcuts } from "@/lib/hooks/useKeyboardShortcuts";
 import { useIngestionStatus } from "@/lib/hooks/useIngestionStatus";
+import { useKeyboardShortcuts } from "@/lib/hooks/useKeyboardShortcuts";
 import { callSidecar } from "@/lib/hooks/useSidecarBridge";
 import { useAiStore } from "@/store/aiStore";
 import { useInvestigationStore } from "@/store/investigationStore";
@@ -98,6 +98,7 @@ export function InvestigationPage() {
   const [isImportOpen, setIsImportOpen] = useState(false);
   const [isEngineSettingsOpen, setIsEngineSettingsOpen] = useState(false);
   const [isConnected, setIsConnected] = useState(true);
+  const [isFetching, setIsFetching] = useState(false);
 
   // Orchestrator Hub state
   const [isOrchestratorOpen, setIsOrchestratorOpen] = useState(false);
@@ -121,71 +122,109 @@ export function InvestigationPage() {
 
   // Clear transitioning state once a job for that source is detected
   useEffect(() => {
-    if (jobs.some(j => j.source_id === transitioningSourceId && (j.status === 'processing' || j.status === 'pending'))) {
+    if (
+      jobs.some(
+        (j) =>
+          j.source_id === transitioningSourceId &&
+          (j.status === "processing" || j.status === "pending"),
+      )
+    ) {
       setTransitioningSourceId(null);
     }
   }, [jobs, transitioningSourceId]);
 
   // Find the active job for the CURRENTLY SELECTED source
   const activeJobForSource = useMemo(() => {
-    const job = jobs.find(j => j.source_id === activeSourceId && (j.status === 'processing' || j.status === 'pending'));
-    // If we have an active job, we should also consider it "transitioning" to show the loading screen immediately
-    return job || null;
+    return (
+      jobs.find(
+        (j) =>
+          j.source_id === activeSourceId && (j.status === "processing" || j.status === "pending"),
+      ) || null
+    );
   }, [jobs, activeSourceId]);
+
+  // Clear logs immediately when the source or workspace changes to prevent "ghost data"
+  useEffect(() => {
+    if (!activeWorkspaceId || !activeSourceId) {
+      return;
+    }
+
+    setLogs([], 0);
+    setAvailableFacets({});
+    // Also reset any local investigation state if needed
+    setAnomalousClusters(new Set());
+  }, [activeWorkspaceId, activeSourceId, setLogs, setAvailableFacets]);
+
+  // Combined loading state for the table
+
+  // Memoize the query params to reduce complexity in fetchLogs
+  const queryParams = useMemo(() => {
+    const activeSrc = sources.find((s) => s.id === activeSourceId);
+    if (!activeSrc) {
+      return null;
+    }
+
+    const isFusion = activeSrc.type === "fusion";
+    const sourceFilter = isFusion
+      ? []
+      : [{ field: "source_id", operator: "equals", value: activeSrc.id }];
+    const combinedFilters =
+      filters.length > 0 || sourceFilter.length > 0 ? [...sourceFilter, ...filters] : undefined;
+    const fusionId = isFusion ? activeSrc.path : undefined;
+
+    return {
+      isFusion,
+      fusionId,
+      combinedFilters,
+      activeSrc,
+    };
+  }, [sources, activeSourceId, filters]);
 
   // Combined loading state for the table
   const isSourceLoading = useMemo(() => {
-    return transitioningSourceId === activeSourceId || !!activeJobForSource;
-  }, [transitioningSourceId, activeSourceId, activeJobForSource]);
+    return transitioningSourceId === activeSourceId || !!activeJobForSource || isFetching;
+  }, [transitioningSourceId, activeSourceId, activeJobForSource, isFetching]);
 
   // ── Log fetching ──────────────────────────────────────────────────────────
 
   const fetchLogs = useCallback(async () => {
-    if (!activeWorkspaceId) {
-      return;
-    }
-
-    // If no source is selected (Explorer/Folder view) or no sources exist,
-    // clear everything to avoid stale data display.
-    if (sources.length === 0 || !activeSourceId) {
+    if (!activeWorkspaceId || !activeSourceId || !queryParams) {
+      if (!activeWorkspaceId) {
+        return;
+      }
       setLogs([], 0);
       setAvailableFacets({});
       return;
     }
 
     const currentSourceRef = activeSourceId;
+    setIsFetching(true);
+
     try {
+      // 1. Fetch Anomalies if needed
       if (showAnomalies) {
-        const anomRes = await callSidecar<{ anomalies: { cluster_id: string }[] }>({
+        const res = await callSidecar<{ anomalies: { cluster_id: string }[] }>({
           method: "get_anomalies",
           params: { workspace_id: activeWorkspaceId },
           silent: true,
         });
-        if (currentSourceRef !== activeSourceId) return;
-        setAnomalousClusters(new Set(anomRes.anomalies.map((a) => a.cluster_id)));
+        if (currentSourceRef === activeSourceId) {
+          setAnomalousClusters(new Set(res.anomalies.map((a) => a.cluster_id)));
+        }
       } else {
         setAnomalousClusters(new Set());
       }
 
-      const activeSrc = sources.find((s) => s.id === activeSourceId);
-      const isFusion = activeSrc?.type === "fusion";
-      const sourceFilter =
-        activeSrc && !isFusion
-          ? [{ field: "source_id", operator: "equals", value: activeSrc.id }]
-          : [];
-      const combinedFilters =
-        filters.length > 0 || sourceFilter.length > 0 ? [...sourceFilter, ...filters] : undefined;
-      const fusionId = isFusion ? activeSrc?.path : undefined;
-
-      const result = await callSidecar<{ logs: LogEntry[]; total: number }>({
-        method: isFusion ? "get_fused_logs" : "get_logs",
+      // 2. Fetch Logs
+      const logResult = await callSidecar<{ logs: LogEntry[]; total: number }>({
+        method: queryParams.isFusion ? "get_fused_logs" : "get_logs",
         params: {
           workspace_id: activeWorkspaceId,
-          ...(fusionId ? { fusion_id: fusionId } : {}),
+          ...(queryParams.fusionId ? { fusion_id: queryParams.fusionId } : {}),
           offset: 0,
           limit: 1000,
           query: searchQuery || undefined,
-          filters: combinedFilters,
+          filters: queryParams.combinedFilters,
           sort_by: sortBy,
           sort_order: sortOrder,
           start_time: timeRange.start || undefined,
@@ -194,31 +233,36 @@ export function InvestigationPage() {
         silent: true,
       });
 
-      if (currentSourceRef !== activeSourceId) return;
-      setLogs(result.logs ?? [], result.total ?? 0);
+      if (currentSourceRef !== activeSourceId) {
+        return;
+      }
+      setLogs(logResult.logs ?? [], logResult.total ?? 0);
 
+      // 3. Fetch Facets
       const facetRes = await callSidecar<Record<string, { value: string; count: number }[]>>({
         method: "get_metadata_facets",
         params: {
           workspace_id: activeWorkspaceId,
-          source_ids: activeSrc && !isFusion ? [activeSrc.id] : undefined,
+          source_ids: queryParams.isFusion ? undefined : [queryParams.activeSrc.id],
         },
         silent: true,
       });
-      
-      if (currentSourceRef !== activeSourceId) return;
-      setAvailableFacets(facetRes);
-      setIsConnected(true);
+
+      if (currentSourceRef === activeSourceId) {
+        setAvailableFacets(facetRes);
+        setIsConnected(true);
+      }
     } catch (e) {
-      console.error("Fetch logs/facets failed", e);
+      console.error("Fetch logs failed", e);
       setIsConnected(false);
+    } finally {
+      setIsFetching(false);
     }
   }, [
     activeWorkspaceId,
     activeSourceId,
-    sources,
+    queryParams,
     searchQuery,
-    filters,
     sortBy,
     sortOrder,
     setLogs,
@@ -229,10 +273,32 @@ export function InvestigationPage() {
 
   // Orchestrator Hub state
 
+  // ── Polling logic ──────────────────────────────────────────────────────────
+
+  // Stabilized polling interval.
+  // We use a separate effect for the interval that doesn't depend on volatile fetchLogs dependencies
+  // like searchQuery or filters, ensuring we don't clear/restart the timer every time a user types.
+  useEffect(() => {
+    if (!activeWorkspaceId || !activeSourceId) {
+      return;
+    }
+
+    const interval = setInterval(() => {
+      // Only poll if we are tailing OR if there is an active ingestion job for this source.
+      // If it's a static file that's fully ingested, we don't need to poll get_logs.
+      const shouldPoll = isTailing || !!activeJobForSource;
+
+      if (shouldPoll && !isFetching) {
+        fetchLogs();
+      }
+    }, 3000); // Increased interval slightly to 3s for stability
+
+    return () => clearInterval(interval);
+  }, [activeWorkspaceId, activeSourceId, isTailing, activeJobForSource, isFetching, fetchLogs]);
+
+  // Initial fetch and fetch-on-demand for filter/search changes
   useEffect(() => {
     fetchLogs();
-    const interval = setInterval(fetchLogs, 2500);
-    return () => clearInterval(interval);
   }, [fetchLogs]);
 
   // Search Bar Ref
@@ -262,7 +328,10 @@ export function InvestigationPage() {
         });
         fetchLogs();
       } else if (lastJob.status === "failed") {
-        toast.error("Ingestion failed", { id: "ingest", description: "Check sidecar logs for details." });
+        toast.error("Ingestion failed", {
+          id: "ingest",
+          description: "Check sidecar logs for details.",
+        });
       }
 
       lastJobId.current = lastJob.id;
@@ -272,7 +341,6 @@ export function InvestigationPage() {
 
   // Memoized non-fusion sources
   const nonFusionSources = useMemo(() => sources.filter((s) => s.type !== "fusion"), [sources]);
-
 
   // ── Event Listeners ────────────────────────────────────────────────────────
 
@@ -351,13 +419,13 @@ export function InvestigationPage() {
     try {
       setTransitioningSourceId(newSource.id);
       setLogs([], 0); // Clear current logs immediately
-      
+
       await callSidecar({
         method: "ingest_local_file",
-        params: { 
+        params: {
           filepath: normalizedPath,
           workspace_id: activeWorkspaceId,
-          source_id: newSource.id
+          source_id: newSource.id,
         },
       });
 
@@ -511,11 +579,16 @@ export function InvestigationPage() {
 
       setActiveSource(activeWorkspaceId, newSource.id);
 
+      const listeningOn = [
+        types.syslog && `UDP:${settings.ingestion_syslog_port}`,
+        types.http && `HTTP:${settings.ingestion_http_port}`,
+      ]
+        .filter(Boolean)
+        .join(" & ");
+
       toast.success(`Live collection "${name}" active`, {
         id: "live-ingest",
-        description: `Listening on ${types.syslog ? `UDP:${settings.ingestion_syslog_port} ` : ""}${
-          types.http ? `HTTP:${settings.ingestion_http_port}` : ""
-        }`,
+        description: listeningOn ? `Listening on ${listeningOn}` : undefined,
       });
     } catch (e: unknown) {
       toast.error(e instanceof Error ? e.message : "Failed to start live collection.", {
@@ -564,13 +637,23 @@ export function InvestigationPage() {
     }
     removeSource(activeWorkspaceId, sourceId);
 
-    // Also wipe the logs from the database for this specific source to avoid "ghost logs"
+    // If we just removed the active source, clear the logs immediately to avoid "ghost logs"
+    if (activeSourceId === sourceId) {
+      setLogs([], 0);
+      setAvailableFacets({});
+    }
+
+    // Also wipe the logs from the database for this specific source
     try {
       await callSidecar({
         method: "delete_logs",
         params: { workspace_id: activeWorkspaceId, source_id: src?.id },
       });
-      fetchLogs();
+      // Refresh to ensure any aggregate views are updated,
+      // but only if we still have a valid selection context
+      if (activeSourceId && activeSourceId !== sourceId) {
+        fetchLogs();
+      }
     } catch (e) {
       console.warn("Failed to delete logs for removed source:", e);
     }
@@ -594,15 +677,15 @@ export function InvestigationPage() {
 
   const handleFusionSaved = async (fusionId: string, fusionName: string) => {
     const existingSrc = sources.find((s) => s.path === fusionId);
-    if (!existingSrc) {
+    if (existingSrc) {
+      updateSource(activeWorkspaceId, existingSrc.id, { name: fusionName });
+    } else {
       const newSrc = await createSource(activeWorkspaceId, {
         name: fusionName,
         type: "fusion",
         path: fusionId,
       });
       setActiveSource(activeWorkspaceId, newSrc.id);
-    } else {
-      updateSource(activeWorkspaceId, existingSrc.id, { name: fusionName });
     }
   };
 

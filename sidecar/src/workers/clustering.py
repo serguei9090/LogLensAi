@@ -72,20 +72,46 @@ class ClusteringWorker:
 
         updates = []
         cluster_increments = {}  # (ws_id, cluster_id, template) -> count
+        batch_counts = {}        # (ws_id, source_id) -> count processed in this batch
+        parser_configs = {}      # (ws_id, source_id) -> (config, tz_offset)
 
         for log_id, ws_id, source_id, line_id, facets_json in batch:
             try:
                 # 0. Fetch raw text via Fast-Path
-                raw_text = self.app.fast_path.get_line(source_id, line_id)
+                # 0. Fetch raw text via Fast-Path with small retry for indexing lag
+                raw_text = None
+                for retry in range(3):
+                    raw_text = self.app.fast_path.get_line(source_id, line_id)
+                    if raw_text is not None:
+                        break
+                    time.sleep(0.1) # Wait 100ms for indexer/OS flush
+                
                 if raw_text is None:
-                    logger.warning(f"[Worker] Missing raw text for source {source_id}, line {line_id}")
-                    raw_text = ""
+                    # OPTIMIZATION: Don't spam warnings if many lines are missing
+                    if len(updates) % 500 == 0:
+                         logger.warning(f"[Worker] Missing raw text for source {source_id}, line {line_id} (Suppressed similar)")
+                    updates.append((None, "MISSING", "{}", None, log_id))
+                    continue
 
                 # 2. Rich Metadata Extraction (Regex parsing)
                 existing_facets = json.loads(facets_json) if facets_json else {}
                 rules = self.app._get_facet_rules_for_workspace(cursor, ws_id, rules_cache, global_rules)
                 
-                meta = extract_log_metadata(ws_id, source_id, raw_text, custom_rules=rules)
+                # Fetch/Cache parser config for this source
+                source_key = (ws_id, source_id)
+                if source_key not in parser_configs:
+                    cursor.execute(
+                        "SELECT parser_config, tz_offset FROM fusion_configs WHERE workspace_id = ? AND source_id = ?",
+                        (ws_id, source_id)
+                    )
+                    row = cursor.fetchone()
+                    if row:
+                        parser_configs[source_key] = (json.loads(row[0]) if row[0] else {}, row[1] or 0)
+                    else:
+                        parser_configs[source_key] = ({}, 0)
+                
+                p_config, p_tz = parser_configs[source_key]
+                meta = extract_log_metadata(raw_text, custom_rules=rules, parser_config=p_config, tz_offset=p_tz)
                 
                 # Merge heuristic facets with existing ones
                 meta["facets"].update(existing_facets)
@@ -98,70 +124,81 @@ class ClusteringWorker:
                 # 3. Get Drain3 result (Pattern Mining)
                 parser = self.app.get_drain_parser(ws_id)
                 res = parser.parse(message)
-                cluster_id = str(res["cluster_id"])
+                cluster_id = res["cluster_id"]
                 template = res["template"]
-                
-                updates.append((timestamp, level, facets, cluster_id, log_id))
-                
-                # Aggregate cluster counts to minimize DB writes
+
+                # Update increment cache for bulk metadata update
                 key = (ws_id, cluster_id, template)
                 cluster_increments[key] = cluster_increments.get(key, 0) + 1
+
+                updates.append((timestamp, level, facets, cluster_id, log_id))
+                
+                # Update batch counts for ingestion job tracking
+                job_key = (ws_id, source_id)
+                batch_counts[job_key] = batch_counts.get(job_key, 0) + 1
                 
             except Exception as e:
                 logger.error(f"[Worker] Failed to process log {log_id}: {e}")
                 # Mark as processed with fallback to raw info
-                updates.append((None, "ERROR", facets_json, "unknown", log_id))
+                updates.append((None, "ERROR", facets_json, None, log_id))
 
         # 4. Update logs table in bulk
         if updates:
-            cursor.executemany(
-                """
-                UPDATE logs 
-                SET timestamp = COALESCE(?, timestamp), 
-                    level = ?, 
-                    facets = ?, 
-                    cluster_id = ?, 
-                    processed = TRUE 
-                WHERE id = ?
-                """,
-                updates
-            )
+            cursor.execute("BEGIN TRANSACTION")
+            try:
+                cursor.executemany(
+                    """
+                    UPDATE logs 
+                    SET timestamp = COALESCE(?, timestamp), 
+                        level = ?, 
+                        facets = ?, 
+                        cluster_id = ?, 
+                        processed = TRUE 
+                    WHERE id = ?
+                    """,
+                    updates
+                )
+    
+                # 4. Update clusters metadata table
+                for (ws_id, cluster_id, template), count in cluster_increments.items():
+                    cursor.execute(
+                        """
+                        INSERT INTO clusters (workspace_id, cluster_id, template, count) 
+                        VALUES (?, ?, ?, ?)
+                        ON CONFLICT (workspace_id, cluster_id) 
+                        DO UPDATE SET count = count + excluded.count, template = excluded.template
+                        """,
+                        (ws_id, cluster_id, template, count)
+                    )
+                cursor.execute("COMMIT")
+            except Exception as e:
+                cursor.execute("ROLLBACK")
+                logger.error(f"[Worker] Transaction failed: {e}")
+                raise e
 
-        # 4. Update clusters metadata table
-        for (ws_id, cluster_id, template), count in cluster_increments.items():
-            cursor.execute(
-                """
-                INSERT INTO clusters (workspace_id, cluster_id, template, count) 
-                VALUES (?, ?, ?, ?)
-                ON CONFLICT (workspace_id, cluster_id) 
-                DO UPDATE SET count = count + excluded.count, template = excluded.template
-                """,
-                (ws_id, cluster_id, template, count)
-            )
-
-        # 5. Update Ingestion Job Status (Checkpointing)
-        affected_sources = list({(ws_id, src_id) for _, ws_id, src_id, _, _ in batch})
-        for ws_id, src_id in affected_sources:
-            # Get processed count for this specific source
-            cursor.execute(
-                "SELECT COUNT(*) FROM logs WHERE workspace_id = ? AND source_id = ? AND processed = TRUE", 
-                (ws_id, src_id)
-            )
-            processed_now = cursor.fetchone()[0]
-
+        # 5. Update Ingestion Job Status (Incremental)
+        for (ws_id, src_id), count in batch_counts.items():
             cursor.execute(
                 """
                 UPDATE ingestion_jobs 
-                SET processed_lines = ?,
-                status = CASE 
-                    WHEN ? >= total_lines THEN 'completed' 
-                    ELSE 'processing' 
-                END,
-                updated_at = CURRENT_TIMESTAMP
+                SET processed_lines = processed_lines + ?,
+                    updated_at = CURRENT_TIMESTAMP
                 WHERE workspace_id = ? AND source_id = ? AND status IN ('pending', 'processing')
                 """,
-                (processed_now, processed_now, ws_id, src_id)
+                (count, ws_id, src_id)
             )
+            
+            # Check if job is completed (only query if needed)
+            cursor.execute(
+                "SELECT processed_lines, total_lines FROM ingestion_jobs WHERE workspace_id = ? AND source_id = ?",
+                (ws_id, src_id)
+            )
+            row = cursor.fetchone()
+            if row and row[0] >= row[1]:
+                cursor.execute(
+                    "UPDATE ingestion_jobs SET status = 'completed' WHERE workspace_id = ? AND source_id = ?",
+                    (ws_id, src_id)
+                )
 
         self.db.commit()
         return len(batch)

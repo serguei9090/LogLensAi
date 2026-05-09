@@ -32,6 +32,7 @@ export const SIDECAR_BASE_URL = import.meta.env.VITE_SIDECAR_URL || "http://loca
 
 export const SIDECAR_URL = `${SIDECAR_BASE_URL}/rpc`;
 
+import { useDebugStore } from "@/store/debugStore";
 import { toast } from "sonner";
 
 /**
@@ -88,6 +89,15 @@ export async function callSidecar<T>(
       response = await httpResp.json();
     }
 
+    if (import.meta.env.VITE_DEBUG_GUI === "true") {
+      useDebugStore.getState().addLog({
+        level: "info",
+        source: "sidecar",
+        message: `RPC Call: ${method}`,
+        data: { params: rpcParams, result: response.result },
+      });
+    }
+
     if (response.error) {
       const detail = response.error.data
         ? `\n\nDetail:\n${typeof response.error.data === "string" ? response.error.data : JSON.stringify(response.error.data, null, 2)}`
@@ -99,6 +109,13 @@ export async function callSidecar<T>(
           description: response.error.message ?? "An unexpected error occurred",
         });
       }
+
+      useDebugStore.getState().addLog({
+        level: "error",
+        source: "sidecar",
+        message: `RPC Error [${method}]: ${response.error.message}`,
+        data: response.error.data,
+      });
 
       throw new Error(errorMsg);
     }
@@ -115,6 +132,13 @@ export async function callSidecar<T>(
         });
       }
     }
+
+    useDebugStore.getState().addLog({
+      level: "error",
+      source: isTauriRuntime() ? "tauri" : "system",
+      message: `Transport Error [${method}]: ${message}`,
+      data: err,
+    });
 
     throw err;
   }

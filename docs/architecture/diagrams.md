@@ -16,14 +16,42 @@
 - [ ] **Component Diagram (C4 Level 3)** — Internal structure of a container
 - [x] **ERD (Entity Relationship Diagram)** — Database schema relationships *(default: when DB exists)*
 - [ ] **State Machine Diagram** — State transitions for complex UI flows or agentic loops
-- [ ] **Data Flow Diagram (DFD)** — How data moves through the full system
+- [x] **Data Flow Diagram (DFD)** — How data moves through the full system
 - [ ] **Deployment Diagram** — Infrastructure topology (Docker, Cloud, Tauri packaging)
-- [ ] **AI Agent Orchestration Diagram** — Agent→Tool→Agent delegation map (AVAS standard)
+- [x] **AI Agent Orchestration Diagram** — Agent→Tool→Agent delegation map (AVAS standard)
 - [ ] **Atomic Design Component Map** — Atoms → Molecules → Organisms hierarchy
 
 ---
 
 ## 📐 Diagram Specifications
+
+### 🌊 Data Ingestion & Clustering Pipeline (DFD)
+
+This diagram visualizes the high-performance path from raw log input to indexed clusters.
+
+```mermaid
+graph LR
+    Input[Raw Log File / Stream] --> Ingestion[IngestionServer]
+    Ingestion --> Store[DiskLogStore]
+    Ingestion --> Fast[FastPath Buffer]
+    
+    Fast --> UI[Frontend Real-time View]
+    
+    Store -.->|Sync Index| DuckDB[(DuckDB)]
+    
+    subgraph "Background Processing"
+        Worker[ClusteringWorker]
+        Parser[LogParser / Drain3]
+        
+        Worker -->|Pull Raw| Store
+        Worker -->|Extract Template| Parser
+        Parser -->|Template Match| Worker
+        Worker -->|Update Clusters| DuckDB
+    end
+    
+    DuckDB -->|Query| API[App API]
+    API -->|JSON-RPC| UI
+```
 
 ### 🔄 Sequence Diagram *(checked by default)*
 

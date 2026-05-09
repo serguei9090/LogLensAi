@@ -20,6 +20,9 @@ class DrainParser:
         self.config.drain_sim_th = sim_th
         self.config.drain_max_children = max_children
         self.config.drain_max_clusters = max_clusters
+        # Optimization: Don't save on every single cluster creation
+        self.config.snapshot_interval_minutes = 10
+        self.config.snapshot_compress_state = True
 
         if masking_instructions and isinstance(masking_instructions, (list, tuple)):
             for mi in masking_instructions:

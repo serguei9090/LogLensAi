@@ -294,6 +294,12 @@ class App:
         # 1. Stop all workers and threads
         self.stop()
 
+        # 1.5 Close raw file handles
+        if hasattr(self, "log_store"):
+            self.log_store.close_all()
+        if hasattr(self, "fast_path"):
+            self.fast_path.close_all()
+
         # 2. Close and reset the DB singleton
         LogDatabase.reset()
 
@@ -304,6 +310,7 @@ class App:
         db_path = os.path.join(data_dir, "loglens.duckdb")
         ai_path = os.path.join(data_dir, AI_STATE_DB)
         drain_dir = os.path.join(data_dir, "drain")
+        storage_dir = os.path.join(data_dir, "storage")
 
         files_to_delete = [db_path, f"{db_path}.wal", ai_path, f"{ai_path}-wal", f"{ai_path}-shm"]
 
@@ -315,12 +322,13 @@ class App:
                 except Exception as e:
                     logger.error("Failed to delete %s: %s", f, e)
 
-        if os.path.exists(drain_dir):
-            try:
-                shutil.rmtree(drain_dir)
-                logger.info("Deleted directory: %s", drain_dir)
-            except Exception as e:
-                logger.error("Failed to delete drain dir: %s", e)
+        for d in [drain_dir, storage_dir]:
+            if os.path.exists(d):
+                try:
+                    shutil.rmtree(d)
+                    logger.info("Deleted directory: %s", d)
+                except Exception as e:
+                    logger.error("Failed to delete dir: %s", e)
 
         # 4. Re-initialize
         # Note: We don't fully re-init 'self' because we are in a dispatch loop.
@@ -328,12 +336,29 @@ class App:
         self.db = LogDatabase(db_path)
         self.parser = self.get_drain_parser()
 
-        # Re-start ingestion/anomalies if they were active
-        # (This is tricky since we just stopped them, but usually we'll want the app to reboot or just continue)
-        self.ingestion_server.start()
-        self.anomaly_detector.start()
+        if hasattr(self, "log_store"):
+            os.makedirs(storage_dir, exist_ok=True)
+            self.log_store = DiskLogStore(storage_dir)
+            self.fast_path = FastPathService(storage_dir)
 
-        return {"status": "ok", "message": "Backend reset complete. Restart recommended."}
+        # Re-start workers
+        self.ingestion_server.start()
+        
+        # FIX: Re-initialize and start anomaly detector to pick up new DB handle
+        self.anomaly_detector = AnomalyDetector(self.db)
+        self.anomaly_detector.start()
+        
+        # FIX: Re-initialize and start clustering worker
+        self.clustering_worker = ClusteringWorker(self)
+        self.clustering_worker.start()
+
+        # FIX: Re-initialize Hybrid Runner (AI State)
+        ai_data_dir = os.path.join(PROJECT_ROOT, "data")
+        self.hybrid_runner = HybridRunner(
+            self, self.ai, db_path=os.path.join(ai_data_dir, AI_STATE_DB)
+        )
+
+        return {"status": "ok", "message": "Backend reset complete. System fully re-initialized."}
 
     def _start_mcp_server(self):
         """Starts the MCP server in a background thread using FastMCP SSE."""
@@ -536,6 +561,27 @@ class App:
 
         return SQL_AND_JOIN.join(where_clauses), params
 
+    def _hydrate_log(self, log_dict: dict) -> dict:
+        """Fetch raw log content for a single log dictionary using the Fast-Path mmap service."""
+        source_id = log_dict.get("source_id")
+        line_id = log_dict.get("line_id")
+
+        if source_id and line_id is not None:
+            content = self.fast_path.get_line(source_id, line_id)
+            if content:
+                log_dict["raw_text"] = content
+                log_dict["message"] = content
+            else:
+                logger.warning("[Hydration] Failed for source=%s, line=%d", source_id, line_id)
+                log_dict["raw_text"] = "<Missing log content>"
+                log_dict["message"] = "<Missing log content>"
+        else:
+            # Fallback if no hydration is possible
+            log_dict["raw_text"] = log_dict.get("raw_text", "")
+            log_dict["message"] = log_dict.get("message", "")
+        
+        return log_dict
+
     def _get_logs_internal(
         self,
         workspace_id: str,
@@ -609,23 +655,7 @@ class App:
                 log_dict["facets"] = {}
             
             # --- Fast-Path Hydration ---
-            # Instead of pulling large text from DuckDB, we fetch it O(1) from mmap.
-            source_id = log_dict.get("source_id")
-            line_id = log_dict.get("line_id")
-            if source_id and line_id is not None:
-                content = self.fast_path.get_line(source_id, line_id)
-                if content:
-                    log_dict["raw_text"] = content
-                    log_dict["message"] = content
-                else:
-                    logger.warning("[Hydration] Failed for source=%s, line=%d", source_id, line_id)
-                    log_dict["raw_text"] = "<Missing log content>"
-                    log_dict["message"] = "<Missing log content>"
-            else:
-                logger.error("[Hydration] Missing IDs: source=%s, line=%s", source_id, line_id)
-                log_dict["raw_text"] = ""
-                log_dict["message"] = ""
-
+            self._hydrate_log(log_dict)
             logs.append(log_dict)
 
         self._apply_temporal_offsets(workspace_id, logs)
@@ -1381,10 +1411,15 @@ class App:
         cursor = self.db.get_cursor()
 
         cursor.execute(
-            "SELECT raw_text FROM logs WHERE workspace_id = ? AND cluster_id = ? LIMIT ?",
+            "SELECT source_id, line_id FROM logs WHERE workspace_id = ? AND cluster_id = ? LIMIT ?",
             (params.workspace_id, params.cluster_id, params.sample_size),
         )
-        samples = [row[0] for row in cursor.fetchall()]
+        rows = cursor.fetchall()
+        samples = []
+        for row in rows:
+            content = self.fast_path.get_line(row[0], row[1])
+            if content:
+                samples.append(content)
 
         clusters = self.parser.get_clusters()
         template = ""
@@ -1433,11 +1468,14 @@ class App:
         if params.context_logs:
             placeholders = ",".join(["?"] * len(params.context_logs))
             cursor.execute(
-                f"SELECT timestamp, level, message, raw_text, cluster_id FROM logs WHERE id IN ({placeholders})",
+                f"SELECT id, timestamp, level, source_id, line_id, cluster_id FROM logs WHERE id IN ({placeholders})",
                 params.context_logs,
             )
             columns = [desc[0] for desc in cursor.description]
-            logs = [dict(zip(columns, row, strict=False)) for row in cursor.fetchall()]
+            raw_logs = [dict(zip(columns, row, strict=False)) for row in cursor.fetchall()]
+            
+            # Hydrate logs with actual text from Fast-Path
+            logs = [self._hydrate_log(l) for l in raw_logs]
 
             if logs:
                 summary = self.context_manager.prepare_log_context(logs)

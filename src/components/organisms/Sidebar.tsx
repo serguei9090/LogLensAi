@@ -431,14 +431,14 @@ function HierarchyTree({
   activeFolderId,
   isNavActive,
   onNavSelect,
-}: {
+}: Readonly<{
   node: any;
   workspaceId: string;
   activeSourceId: string | null;
   activeFolderId: string | null;
   isNavActive: boolean;
   onNavSelect: (nav: NavTab) => void;
-}) {
+}>) {
   const {
     setActiveSource,
     setActiveFolder,
@@ -471,7 +471,7 @@ function HierarchyTree({
     if (deleteTarget.type === "folder") {
       await deleteFolder(deleteTarget.id);
     } else {
-      await removeSource(workspaceId, deleteTarget.id);
+      removeSource(workspaceId, deleteTarget.id);
     }
     setDeleteTarget(null);
   };

@@ -106,7 +106,9 @@ export function InvestigationLayout({
       )}
       <div className="flex-1 flex min-h-0 min-w-0 overflow-hidden">
         {leftPanel}
-        <div className="flex-1 flex flex-col min-w-0 min-h-0 overflow-hidden relative">{children}</div>
+        <div className="flex-1 flex flex-col min-w-0 min-h-0 overflow-hidden relative">
+          {children}
+        </div>
         {rightPanel}
       </div>
     </div>
