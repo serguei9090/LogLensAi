@@ -12,11 +12,23 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 import { useAiStore } from "@/store/aiStore";
+import { useClusteringStore } from "@/store/clusteringStore";
 import { useInvestigationStore } from "@/store/investigationStore";
 import { useUIStore } from "@/store/uiStore";
-import type { LogSource } from "@/store/workspaceStore";
-import { Columns, Cpu, Download, LayoutTemplate, List, Plus, Sparkles, Upload } from "lucide-react";
-import { useState } from "react";
+import { type LogSource } from "@/store/workspaceStore";
+import {
+  Columns,
+  Cpu,
+  Download,
+  LayoutTemplate,
+  List,
+  Plus,
+  Sparkles,
+  Upload,
+  Zap,
+  ZapOff,
+} from "lucide-react";
+import { useEffect, useState } from "react";
 import { LoadTemplateModal } from "./LoadTemplateModal";
 import { SaveTemplateModal } from "./SaveTemplateModal";
 
@@ -72,8 +84,14 @@ export function LogToolbar({
   const { timeRange, setTimeRange } = useInvestigationStore();
   const { isSidebarOpen, setSidebarOpen } = useAiStore();
   const { facetSidebarCollapsed, toggleFacetSidebar } = useUIStore();
+  const { status: clusteringStatus, startPolling, stopPolling, setMode } = useClusteringStore();
   const [isSaveTemplateModalOpen, setIsSaveTemplateModalOpen] = useState(false);
   const [isLoadTemplateModalOpen, setIsLoadTemplateModalOpen] = useState(false);
+
+  useEffect(() => {
+    startPolling(activeWorkspaceId);
+    return () => stopPolling();
+  }, [activeWorkspaceId, startPolling, stopPolling]);
 
   return (
     <div className="sticky top-0 z-10 flex flex-nowrap items-center gap-3 bg-bg-base/95 backdrop-blur-sm border-b border-border/60 px-4 py-2.5 shadow-sm overflow-x-auto scrollbar-none">
@@ -145,6 +163,65 @@ export function LogToolbar({
         {/* Tail control moved to left */}
         <div className="flex items-center gap-3 shrink-0">
           <TailSwitch checked={isTailing} onCheckedChange={onTailToggle} />
+        </div>
+
+        <div className="h-5 w-px bg-zinc-800 shrink-0" />
+
+        {/* Clustering Status & Controls */}
+        <div className="flex items-center gap-2 px-2 py-1 rounded-md bg-zinc-900/50 border border-zinc-800/50">
+          <div className="flex flex-col items-start leading-tight pr-1">
+            <span className="text-[10px] uppercase font-bold text-zinc-500 tracking-wider">
+              Clustering
+            </span>
+            <div className="flex items-center gap-1.5">
+              <StatusDot active={!!clusteringStatus?.running} />
+              <span className="text-[11px] font-mono text-zinc-400">
+                {clusteringStatus?.backlog ?? 0} backlog
+              </span>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-1 ml-1 border-l border-zinc-800 pl-2">
+            <button
+              type="button"
+              onClick={() =>
+                setMode(clusteringStatus?.mode === "burst" ? "auto" : "burst", activeWorkspaceId)
+              }
+              className={cn(
+                "p-1.5 rounded-md transition-all group shrink-0 border",
+                clusteringStatus?.mode === "burst"
+                  ? "bg-amber-500/10 border-amber-500/20 text-amber-400 shadow-[0_0_12px_rgba(245,158,11,0.1)]"
+                  : "bg-zinc-800 border-zinc-700 text-zinc-500 hover:text-zinc-300 hover:border-zinc-600",
+              )}
+              title={
+                clusteringStatus?.mode === "burst" ? "Deactivate Burst Mode" : "Activate Burst Mode"
+              }
+            >
+              {clusteringStatus?.mode === "burst" ? (
+                <Zap className="size-3.5 fill-current" />
+              ) : (
+                <ZapOff className="size-3.5" />
+              )}
+            </button>
+
+            {clusteringStatus?.mode === "manual" ? (
+              <button
+                type="button"
+                onClick={() => setMode("auto", activeWorkspaceId)}
+                className="px-2 py-1 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[10px] font-bold hover:bg-emerald-500/20 transition-colors"
+              >
+                AUTO
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setMode("manual", activeWorkspaceId)}
+                className="px-2 py-1 rounded bg-zinc-800 text-zinc-400 border border-zinc-700 text-[10px] font-bold hover:bg-zinc-700 transition-colors"
+              >
+                MANUAL
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
