@@ -24,24 +24,8 @@ class DrainParser:
         self.config.snapshot_interval_minutes = 10
         self.config.snapshot_compress_state = True
 
-        if masking_instructions and isinstance(masking_instructions, (list, tuple)):
-            for mi in masking_instructions:
-                if not isinstance(mi, dict):
-                    continue
-                if not mi.get("enabled", True):
-                    continue
-                pattern = mi.get("pattern")
-                label = mi.get("label")
-                if pattern and label:
-                    try:
-                        # Validate regex before adding
-                        import re
-
-                        re.compile(pattern)
-                        self.config.masking_instructions.append(MaskingInstruction(pattern, label))
-                    except re.error:
-                        # Log or handle invalid regex
-                        continue
+        if masking_instructions:
+            self._apply_masking_instructions(masking_instructions)
 
         self.persistence = None
         if persistence_path:
@@ -51,6 +35,29 @@ class DrainParser:
 
         self.miner = TemplateMiner(persistence_handler=self.persistence, config=self.config)
         self.lock = threading.RLock()
+
+    def _apply_masking_instructions(self, masking_instructions):
+        if not isinstance(masking_instructions, (list, tuple)):
+            return
+
+        import re
+
+        for mi in masking_instructions:
+            if not isinstance(mi, dict) or not mi.get("enabled", True):
+                continue
+
+            pattern = mi.get("pattern")
+            label = mi.get("label")
+            if not pattern or not label:
+                continue
+
+            try:
+                # Validate regex before adding
+                re.compile(pattern)
+                self.config.masking_instructions.append(MaskingInstruction(pattern, label))
+            except re.error:
+                # Log or handle invalid regex
+                continue
 
     def parse(self, log_line: str) -> dict:
         """Returns a dict with cluster_id and template for the given log line."""

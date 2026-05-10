@@ -181,18 +181,11 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
               if (w.id !== workspaceId) {
                 return w;
               }
-              const remaining = w.sources.filter((s) => s.id !== sourceId);
-              const wasActive = w.activeSourceId === sourceId;
-
-              // Fallback logic:
-              // If the deleted source was active, go to folder view (null)
-              // to show the ExplorerView instead of jumping to a random sibling.
-              const nextSourceId = wasActive ? null : w.activeSourceId;
 
               return {
                 ...w,
-                sources: remaining,
-                activeSourceId: nextSourceId,
+                sources: w.sources.filter((s) => s.id !== sourceId),
+                activeSourceId: w.activeSourceId === sourceId ? null : w.activeSourceId,
               };
             }),
           }));
@@ -219,15 +212,14 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
           await callSidecar("update_log_source", { source_id: sourceId, name });
 
           set((state) => ({
-            workspaces: state.workspaces.map((w) => {
-              if (w.id !== workspaceId) {
-                return w;
-              }
-              return {
-                ...w,
-                sources: w.sources.map((s) => (s.id === sourceId ? { ...s, name } : s)),
-              };
-            }),
+            workspaces: state.workspaces.map((w) =>
+              w.id === workspaceId
+                ? {
+                    ...w,
+                    sources: w.sources.map((s) => (s.id === sourceId ? { ...s, name } : s)),
+                  }
+                : w,
+            ),
           }));
 
           // Refresh hierarchy
@@ -302,7 +294,7 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
           await callSidecar("update_folder", { folder_id: folderId, name, parent_id: parentId });
           const state = (useWorkspaceStore.getState as any)();
           if (state.activeWorkspaceId) {
-            await state.fetchHierarchy(state.activeWorkspaceId);
+            await state.fetchHierarchy?.(state.activeWorkspaceId);
           }
         } finally {
           set({ isHierarchyLoading: false });
@@ -316,7 +308,7 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
           await callSidecar("delete_folder", { folder_id: folderId });
           const state = (useWorkspaceStore.getState as any)();
           if (state.activeWorkspaceId) {
-            await state.fetchHierarchy(state.activeWorkspaceId);
+            await state.fetchHierarchy?.(state.activeWorkspaceId);
           }
         } finally {
           set({ isHierarchyLoading: false });
@@ -330,7 +322,7 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
           await callSidecar("move_source", { source_id: sourceId, folder_id: folderId });
           const state = (useWorkspaceStore.getState as any)();
           if (state.activeWorkspaceId) {
-            await state.fetchHierarchy(state.activeWorkspaceId);
+            await state.fetchHierarchy?.(state.activeWorkspaceId);
           }
         } finally {
           set({ isHierarchyLoading: false });
@@ -355,8 +347,9 @@ export const selectActiveWorkspace = (state: WorkspaceStore) =>
 /** Returns the active LogSource inside the active workspace, or null for aggregate view */
 export const selectActiveSource = (state: WorkspaceStore): LogSource | null => {
   const ws = selectActiveWorkspace(state);
-  if (!ws || ws.activeSourceId === null) {
+  const activeId = ws?.activeSourceId;
+  if (!ws || activeId === null) {
     return null;
   }
-  return ws.sources.find((s) => s.id === ws.activeSourceId) ?? null;
+  return ws.sources.find((s) => s.id === activeId) ?? null;
 };

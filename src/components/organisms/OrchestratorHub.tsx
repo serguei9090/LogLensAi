@@ -5,17 +5,7 @@ import { cn } from "@/lib/utils";
 import { useClusteringStore } from "@/store/clusteringStore";
 import { useInvestigationStore } from "@/store/investigationStore";
 import type { LogSource } from "@/store/workspaceStore";
-import {
-  Check,
-  Clock,
-  Cpu,
-  Layers,
-  Settings2,
-  Sparkles,
-  Zap,
-  ZapOff,
-  X,
-} from "lucide-react";
+import { Check, Clock, Cpu, Layers, Settings2, Sparkles, X, Zap, ZapOff } from "lucide-react";
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { toast } from "sonner";

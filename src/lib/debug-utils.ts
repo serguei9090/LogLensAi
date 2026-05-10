@@ -70,7 +70,7 @@ export function initDebugInterceptor() {
   };
 
   // Global Error Listeners
-  window.addEventListener("error", (event) => {
+  globalThis.addEventListener("error", (event) => {
     useDebugStore.getState().addLog({
       level: "error",
       source: "system",
@@ -84,7 +84,7 @@ export function initDebugInterceptor() {
     });
   });
 
-  window.addEventListener("unhandledrejection", (event) => {
+  globalThis.addEventListener("unhandledrejection", (event) => {
     useDebugStore.getState().addLog({
       level: "error",
       source: "system",

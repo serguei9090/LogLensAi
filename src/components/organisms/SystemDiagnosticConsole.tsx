@@ -65,6 +65,17 @@ export function SystemDiagnosticConsole() {
     }
   };
 
+  const getMessageColor = (level: string) => {
+    switch (level) {
+      case "error":
+        return "text-red-400";
+      case "warn":
+        return "text-amber-400";
+      default:
+        return "text-text-secondary";
+    }
+  };
+
   return (
     <>
       {/* Slide-over Console */}
@@ -188,11 +199,7 @@ export function SystemDiagnosticConsole() {
                     <p
                       className={cn(
                         "text-[11px] font-mono leading-normal break-all whitespace-pre-wrap",
-                        log.level === "error"
-                          ? "text-red-400"
-                          : log.level === "warn"
-                            ? "text-amber-400"
-                            : "text-text-secondary",
+                        getMessageColor(log.level),
                       )}
                     >
                       {log.message}

@@ -23,18 +23,18 @@ def test_llql_range_inclusive():
 
 
 def test_llql_range_exclusive():
-    sql, params = parse_llql("id:{100 TO 200}")
+    sql, _ = parse_llql("id:{100 TO 200}")
     assert "(l.id > ? AND l.id < ?)" in sql
 
 
 def test_llql_range_mixed():
-    sql, params = parse_llql("level:ERROR AND id:[100 TO 200]")
+    sql, _ = parse_llql("level:ERROR AND id:[100 TO 200]")
     assert "l.level = ?" in sql
     assert "(l.id >= ? AND l.id <= ?)" in sql
 
 
 def test_llql_plus_operator():
-    sql, params = parse_llql("+level:ERROR")
+    sql, _ = parse_llql("+level:ERROR")
     assert "l.level = ?" in sql
 
 

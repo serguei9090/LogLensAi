@@ -1,7 +1,7 @@
-import { type IngestionJob, useIngestionStore } from "@/store/ingestionStore";
+import { useIngestionStore } from "@/store/ingestionStore";
 import { useEffect } from "react";
 
-export type { IngestionJob };
+export type { IngestionJob } from "@/store/ingestionStore";
 
 /**
  * Hook to monitor the status of log ingestion jobs for a specific workspace.

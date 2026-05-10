@@ -80,165 +80,145 @@ class ClusteringWorker:
                 logger.error(f"[Worker] Error in clustering cycle: {e}")
                 time.sleep(self.interval * 2)  # Back off on error
 
+    def _hydrate_log_text(self, source_id: str, line_id: int, raw_text: str | None, now: float) -> str | None | bool:
+        """Hydrates log text from fast_path if missing, handling quarantine."""
+        if raw_text:
+            return raw_text
+
+        q_key = (source_id, line_id)
+        if q_key in self._quarantine:
+            retries, last_t = self._quarantine[q_key]
+            wait_time = min(32, 2**retries)
+            if now - last_t < wait_time:
+                return False  # Skip for now
+
+        raw_text = self.app.fast_path.get_line(source_id, line_id)
+        if raw_text is None:
+            retries, _ = self._quarantine.get(q_key, (0, 0))
+            if retries < 8:
+                self._quarantine[q_key] = (retries + 1, now)
+                return False  # Skip for now
+            
+            logger.warning(f"[Worker] Hydration failure for {source_id}:{line_id}. Marking as MISSING.")
+            if q_key in self._quarantine:
+                del self._quarantine[q_key]
+            return None  # Missing permanently
+
+        if q_key in self._quarantine:
+            del self._quarantine[q_key]
+        return raw_text
+
+    def _get_parser_config(self, cursor: Any, ws_id: str, source_id: str, parser_configs: dict) -> tuple[dict, int]:
+        """Fetches and caches parser configuration."""
+        source_key = (ws_id, source_id)
+        if source_key not in parser_configs:
+            cursor.execute(
+                "SELECT parser_config, tz_offset FROM fusion_configs WHERE workspace_id = ? AND source_id = ?",
+                (ws_id, source_id),
+            )
+            row = cursor.fetchone()
+            if row:
+                parser_configs[source_key] = (
+                    json.loads(row[0]) if row[0] else {},
+                    row[1] or 0,
+                )
+            else:
+                parser_configs[source_key] = ({}, 0)
+        return parser_configs[source_key]
+
     def _process_batch(self, batch_size: int | None = None) -> int:
         cursor = self.db.get_cursor()
         limit = batch_size or self.batch_size
 
-        # Initialize quarantine if not present
         if not hasattr(self, "_quarantine"):
-            self._quarantine = {}  # (source_id, line_id) -> (retry_count, last_retry)
+            self._quarantine = {}
 
-        # 1. Fetch a batch of unprocessed logs
-        # We process logs in order of ID to maintain sequence
         cursor.execute(
             "SELECT id, workspace_id, source_id, line_id, facets, raw_text FROM logs WHERE processed = FALSE ORDER BY id ASC LIMIT ?",
             (limit,),
         )
         batch = cursor.fetchall()
-
         if not batch:
             return 0
 
         logger.debug(f"[Worker] Processing batch of {len(batch)} logs...")
-
-        # Caches for this batch
-        rules_cache = {}
-        global_rules = self._get_global_rules(cursor)
-
-        updates = []
-        cluster_increments = {}  # (ws_id, cluster_id, template) -> count
-        batch_counts = {}  # (ws_id, source_id) -> count processed in this batch
-        parser_configs = {}  # (ws_id, source_id) -> (config, tz_offset)
+        rules_cache, global_rules = {}, self._get_global_rules(cursor)
+        updates, cluster_increments, batch_counts, parser_configs = [], {}, {}, {}
         now = time.time()
 
         for log_id, ws_id, source_id, line_id, facets_json, raw_text in batch:
             try:
-                # 0. Raw text already present in cold storage (Dual-Track Architecture)
-                if not raw_text:
-                    # Fallback to Fast-Path if raw_text is missing (legacy logs or edge cases)
-                    q_key = (source_id, line_id)
-                    if q_key in self._quarantine:
-                        retries, last_t = self._quarantine[q_key]
-                        wait_time = min(32, 2**retries)
-                        if now - last_t < wait_time:
-                            continue
+                # 1. Hydrate
+                raw_text = self._hydrate_log_text(source_id, line_id, raw_text, now)
+                if raw_text is False: continue
+                if raw_text is None:
+                    updates.append((None, "MISSING", "{}", None, log_id))
+                    continue
 
-                    raw_text = self.app.fast_path.get_line(source_id, line_id)
-
-                    if raw_text is None:
-                        retries, _ = self._quarantine.get(q_key, (0, 0))
-                        if retries < 8:
-                            self._quarantine[q_key] = (retries + 1, now)
-                            continue
-                        else:
-                            logger.warning(
-                                f"[Worker] Hydration failure for {source_id}:{line_id}. Marking as MISSING."
-                            )
-                            if q_key in self._quarantine:
-                                del self._quarantine[q_key]
-                            updates.append((None, "MISSING", "{}", None, log_id))
-                            continue
-
-                    if q_key in self._quarantine:
-                        del self._quarantine[q_key]
-
-                # 2. Rich Metadata Extraction (Regex parsing)
+                # 2. Extract Metadata
+                rules = self.app._get_facet_rules_for_workspace(cursor, ws_id, rules_cache, global_rules)
+                p_config, p_tz = self._get_parser_config(cursor, ws_id, source_id, parser_configs)
+                meta = extract_log_metadata(raw_text, custom_rules=rules, parser_config=p_config, tz_offset=p_tz)
+                
+                # Merge facets
                 existing_facets = json.loads(facets_json) if facets_json else {}
-                rules = self.app._get_facet_rules_for_workspace(
-                    cursor, ws_id, rules_cache, global_rules
-                )
-
-                # Fetch/Cache parser config for this source
-                source_key = (ws_id, source_id)
-                if source_key not in parser_configs:
-                    cursor.execute(
-                        "SELECT parser_config, tz_offset FROM fusion_configs WHERE workspace_id = ? AND source_id = ?",
-                        (ws_id, source_id),
-                    )
-                    row = cursor.fetchone()
-                    if row:
-                        parser_configs[source_key] = (
-                            json.loads(row[0]) if row[0] else {},
-                            row[1] or 0,
-                        )
-                    else:
-                        parser_configs[source_key] = ({}, 0)
-
-                p_config, p_tz = parser_configs[source_key]
-                meta = extract_log_metadata(
-                    raw_text, custom_rules=rules, parser_config=p_config, tz_offset=p_tz
-                )
-
-                # Merge heuristic facets with existing ones
                 meta["facets"].update(existing_facets)
-
-                timestamp = meta["timestamp"]
-                level = meta["level"]
-                message = meta["message"]
-                facets = json.dumps(meta["facets"])
-
-                # 3. Get Drain3 result (Pattern Mining)
+                
+                # 3. Pattern Mining
                 parser = self.app.get_drain_parser(ws_id)
-                res = parser.parse(message)
-                cluster_id = res["cluster_id"]
-                template = res["template"]
+                res = parser.parse(meta["message"])
+                cluster_id, template = res["cluster_id"], res["template"]
 
-                # Update increment cache for bulk metadata update
+                # 4. Cache for Bulk Update
                 key = (ws_id, cluster_id, template)
                 cluster_increments[key] = cluster_increments.get(key, 0) + 1
-
-                updates.append((timestamp, level, facets, cluster_id, log_id))
-
-                # Update batch counts for ingestion job tracking
+                updates.append((meta["timestamp"], meta["level"], json.dumps(meta["facets"]), cluster_id, log_id))
+                
                 job_key = (ws_id, source_id)
                 batch_counts[job_key] = batch_counts.get(job_key, 0) + 1
 
             except Exception as e:
                 logger.error(f"[Worker] Failed to process log {log_id}: {e}")
-                # Mark as processed with fallback to raw info
                 updates.append((None, "ERROR", facets_json, None, log_id))
 
-        # 4. Update logs table in bulk
         if updates:
-            cursor.execute("BEGIN TRANSACTION")
-            try:
-                cursor.executemany(
+            self._apply_batch_updates(cursor, updates, cluster_increments)
+        
+        self._update_ingestion_jobs(cursor, batch_counts)
+        self.db.commit()
+        return len(batch)
+
+    def _apply_batch_updates(self, cursor: Any, updates: list, cluster_increments: dict):
+        """Applies batch updates to logs and clusters tables."""
+        cursor.execute("BEGIN TRANSACTION")
+        try:
+            cursor.executemany(
+                "UPDATE logs SET timestamp = COALESCE(?, timestamp), level = ?, facets = ?, cluster_id = ?, processed = TRUE WHERE id = ?",
+                updates,
+            )
+            for (ws_id, cluster_id, template), count in cluster_increments.items():
+                cursor.execute(
                     """
-                    UPDATE logs 
-                    SET timestamp = COALESCE(?, timestamp), 
-                        level = ?, 
-                        facets = ?, 
-                        cluster_id = ?, 
-                        processed = TRUE 
-                    WHERE id = ?
+                    INSERT INTO clusters (workspace_id, cluster_id, template, count) 
+                    VALUES (?, ?, ?, ?)
+                    ON CONFLICT (workspace_id, cluster_id) 
+                    DO UPDATE SET count = count + excluded.count, template = excluded.template
                     """,
-                    updates,
+                    (ws_id, cluster_id, template, count),
                 )
+            cursor.execute("COMMIT")
+        except Exception as e:
+            cursor.execute("ROLLBACK")
+            logger.error(f"[Worker] Transaction failed: {e}")
+            raise e
 
-                # 4. Update clusters metadata table
-                for (ws_id, cluster_id, template), count in cluster_increments.items():
-                    cursor.execute(
-                        """
-                        INSERT INTO clusters (workspace_id, cluster_id, template, count) 
-                        VALUES (?, ?, ?, ?)
-                        ON CONFLICT (workspace_id, cluster_id) 
-                        DO UPDATE SET count = count + excluded.count, template = excluded.template
-                        """,
-                        (ws_id, cluster_id, template, count),
-                    )
-                cursor.execute("COMMIT")
-            except Exception as e:
-                cursor.execute("ROLLBACK")
-                logger.error(f"[Worker] Transaction failed: {e}")
-                raise e
-
-        # 5. Update Ingestion Job Status (Target only the most recent active job)
+    def _update_ingestion_jobs(self, cursor: Any, batch_counts: dict):
+        """Updates ingestion job progress."""
         for (ws_id, src_id), count in batch_counts.items():
             cursor.execute(
                 """
                 UPDATE ingestion_jobs 
-                SET processed_lines = processed_lines + ?,
-                    updated_at = CURRENT_TIMESTAMP
+                SET processed_lines = processed_lines + ?, updated_at = CURRENT_TIMESTAMP
                 WHERE id = (
                     SELECT id FROM ingestion_jobs 
                     WHERE workspace_id = ? AND source_id = ? AND status IN ('pending', 'processing')
@@ -247,8 +227,6 @@ class ClusteringWorker:
                 """,
                 (count, ws_id, src_id),
             )
-
-            # Check if job is completed
             cursor.execute(
                 "UPDATE ingestion_jobs SET status = 'completed' WHERE workspace_id = ? AND source_id = ? AND status = 'processing' AND processed_lines >= total_lines",
                 (ws_id, src_id),

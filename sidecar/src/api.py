@@ -293,18 +293,18 @@ class App:
         logger.info("RPC Dispatch: get_ingestion_jobs (workspace=%s)", workspace_id)
         return self.db.get_ingestion_jobs(workspace_id)
 
-    def method_get_clustering_status(self, workspace_id: str | None = None) -> dict:
+    def method_get_clustering_status(self, _workspace_id: str | None = None) -> dict:
         """Fetch current clustering worker status and backlog."""
         logger.debug("RPC Dispatch: get_clustering_status")
         return self.clustering_worker.get_status()
 
-    def method_set_clustering_mode(self, mode: str, workspace_id: str | None = None) -> dict:
+    def method_set_clustering_mode(self, mode: str, _workspace_id: str | None = None) -> dict:
         """Set clustering worker mode (auto, manual, burst)."""
         logger.info("RPC Dispatch: set_clustering_mode (mode=%s)", mode)
         self.clustering_worker.set_mode(mode)
         return {"status": "success", "mode": self.clustering_worker.mode, "paused": self.clustering_worker.paused}
 
-    def method_set_clustering_paused(self, paused: bool, workspace_id: str | None = None) -> dict:
+    def method_set_clustering_paused(self, paused: bool, _workspace_id: str | None = None) -> dict:
         """Explicitly pause or resume the clustering worker."""
         logger.info("RPC Dispatch: set_clustering_paused (paused=%s)", paused)
         self.clustering_worker.set_paused(paused)
@@ -1162,7 +1162,7 @@ class App:
         with open(abs_path, encoding="utf-8", errors="replace") as f:
             return f.read()
 
-    def _ingest_single_log(self, cursor: Any, log: dict, custom_rules: list = None) -> list[Any]:
+    def _ingest_single_log(self, _cursor: Any, log: dict, custom_rules: list = None) -> list[Any]:
         """Extracts clustering logic into a reusable helper"""
         workspace_id = log.get("workspace_id")
         source_id = log.get("source_id", "manual")
@@ -1289,7 +1289,7 @@ class App:
                     (job_id,),
                 )
                 self.db.commit()
-            except:
+            except Exception:
                 pass
 
     def method_ingest_local_file(self, workspace_id: str, source_id: str, filepath: str) -> dict:
@@ -1324,12 +1324,16 @@ class App:
 
     def _bg_ingest_local_file(self, workspace_id: str, source_id: str, filepath: str, job_id: int):
         """Background worker for local file ingestion."""
-        # 3. Stream lines: write to disk store, insert skinny rows in chunks
-        # Adaptive chunking: start small (100) for immediate feedback, grow to 5000 for speed
-        initial_chunk_size = 100
+        # Speed Optimization: 
+        # 1. Increase initial chunk size (was 100, now 1000)
+        # 2. Batch commits (only commit every 5000 lines) to reduce DuckDB WAL overhead
+        initial_chunk_size = 1000
         max_chunk_size = 5000
+        commit_interval = 5000 
+        
         current_chunk_size = initial_chunk_size
         processed_count = 0
+        uncommitted_count = 0
         now_ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
         try:
@@ -1371,11 +1375,17 @@ class App:
                             batch_data,
                         )
                         processed_count += len(chunk_lines)
-                        cursor.execute(
-                            "UPDATE ingestion_jobs SET processed_lines = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
-                            (processed_count, job_id),
-                        )
-                        db_instance.commit()
+                        uncommitted_count += len(chunk_lines)
+                        
+                        # Only commit every few chunks or at the end
+                        if uncommitted_count >= commit_interval:
+                            cursor.execute(
+                                "UPDATE ingestion_jobs SET processed_lines = ?, status = 'processing', updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+                                (processed_count, job_id),
+                            )
+                            db_instance.commit()
+                            uncommitted_count = 0
+                            
                         chunk_lines = []
                         # Scale up chunk size for better performance on large files
                         current_chunk_size = min(max_chunk_size, current_chunk_size * 2)
@@ -1428,7 +1438,7 @@ class App:
                     (job_id,),
                 )
                 self.db.commit()
-            except:
+            except Exception:
                 pass
 
 
@@ -2149,7 +2159,7 @@ class App:
             return response
 
     async def method_generate_facet_regex(
-        self, log_line: str, selected_text: str, **kwargs
+        self, log_line: str, selected_text: str, **_kwargs
     ) -> dict:
         """Uses AI to generate a regex pattern for extracting a selected value from a log line."""
         prompt = (
@@ -2230,19 +2240,18 @@ class App:
             },
         }
 
-    def method_get_dashboard_stats(
+    def _prepare_dashboard_where(
         self,
         workspace_id: str | None = None,
         source_id: str | None = None,
         start_time: str | None = None,
         end_time: str | None = None,
         active_workspace_ids: list[str] | None = None,
-    ) -> dict:
-        """Fetch high-level metrics for the Dashboard view with advanced filtering."""
-        cursor = self.db.get_cursor()
-
+    ) -> tuple[str, list[Any], str | None]:
+        """Helper to build WHERE clause for dashboard stats."""
         where_clauses = []
         params = []
+        norm_start = None
         if workspace_id:
             where_clauses.append("l.workspace_id = ?")
             params.append(workspace_id)
@@ -2263,6 +2272,22 @@ class App:
             params.extend(active_workspace_ids)
 
         where_sql = " WHERE " + SQL_AND_JOIN.join(where_clauses) if where_clauses else ""
+        return where_sql, params, norm_start
+
+    def method_get_dashboard_stats(
+        self,
+        workspace_id: str | None = None,
+        source_id: str | None = None,
+        start_time: str | None = None,
+        end_time: str | None = None,
+        active_workspace_ids: list[str] | None = None,
+    ) -> dict:
+        """Fetch high-level metrics for the Dashboard view with advanced filtering."""
+        cursor = self.db.get_cursor()
+
+        where_sql, params, norm_start = self._prepare_dashboard_where(
+            workspace_id, source_id, start_time, end_time, active_workspace_ids
+        )
 
         # 1. Total Logs (Filtered)
         cursor.execute(f"SELECT COUNT(*) FROM logs l{where_sql}", params)
@@ -2277,8 +2302,6 @@ class App:
         total_clusters = cursor.fetchone()[0]
 
         # 4. Top 10 Clusters (Filtered)
-        # We join with the clusters table to get the template string.
-        # Fallback to 'Pattern {ID}' if not found in cluster cache.
         cluster_where = (
             f"{where_sql} AND l.cluster_id IS NOT NULL"
             if where_sql
@@ -2310,11 +2333,7 @@ class App:
         workspace_count = cursor.fetchone()[0]
 
         # 6. Time Series (Log Volume & Severity over time)
-        # Determine bucket size based on time range (default to 5m if no range)
-        bucket_format = "%Y-%m-%d %H:%M:00"  # Default 1m buckets
-
-        # Simple heuristic: if range > 24h, use 1h buckets. If > 7d, use 1d.
-        # For now, let's keep it consistent at 1m or 5m for high-velocity feel.
+        bucket_format = "%Y-%m-%d %H:%M:00"
         ts_query = f"""
             SELECT 
                 strftime('{bucket_format}', l.timestamp::TIMESTAMP) as bucket,
@@ -2328,16 +2347,14 @@ class App:
         cursor.execute(ts_query, params)
         ts_raw = cursor.fetchall()
 
-        # Pivot results: { "2024...": { "INFO": 10, "ERROR": 2 }, ... }
         ts_pivot = {}
         for bucket, level, count in ts_raw:
             if bucket not in ts_pivot:
                 ts_pivot[bucket] = {"timestamp": bucket}
             ts_pivot[bucket][level] = count
-
         time_series = list(ts_pivot.values())
 
-        # 7. Top Error Clusters (Filtered for critical levels)
+        # 7. Top Error Clusters
         error_where = (
             f"{where_sql} AND l.level IN ('ERROR', 'FATAL', 'CRITICAL') AND l.cluster_id IS NOT NULL"
             if where_sql
@@ -2357,20 +2374,13 @@ class App:
         cursor.execute(error_cluster_query, params)
         top_error_clusters = [{"template": row[0], "count": row[1]} for row in cursor.fetchall()]
 
-        # 8. Pattern Drift (New clusters in this window)
-        # Assuming clusters table has a 'created_at' column.
-        # If not, we approximate by checking the first log timestamp for each cluster in this window.
-        # For now, let's just count unique clusters in the window vs total.
+        # 8. Pattern Drift
         new_patterns_count = 0
         try:
-            # Check if clusters table has created_at
             cursor.execute(
                 "SELECT count(*) FROM information_schema.columns WHERE table_name = 'clusters' AND column_name = 'created_at'"
             )
-            has_created_at = cursor.fetchone()[0] > 0
-
-            if has_created_at:
-                # Actual new clusters
+            if cursor.fetchone()[0] > 0:
                 drift_where = " WHERE created_at >= ?" if start_time else ""
                 drift_params = [norm_start] if start_time else []
                 cursor.execute(f"SELECT COUNT(*) FROM clusters{drift_where}", drift_params)
@@ -2378,7 +2388,7 @@ class App:
         except Exception:
             pass
 
-        # 9. Source Heatmap (Log counts per source per bucket)
+        # 9. Source Heatmap
         source_heatmap = []
         try:
             sh_query = f"""
@@ -2394,10 +2404,9 @@ class App:
                 ORDER BY bucket ASC
             """
             cursor.execute(sh_query, params)
-            sh_raw = cursor.fetchall()
             source_heatmap = [
                 {"timestamp": r[0], "source_id": r[1], "source_name": r[2], "count": r[3]}
-                for r in sh_raw
+                for r in cursor.fetchall()
             ]
         except Exception:
             pass
@@ -2406,7 +2415,7 @@ class App:
         latest_insight = None
         try:
             insight_query = """
-                SELECT m.content 
+                SELECT m.content
                 FROM ai_messages m
                 JOIN ai_sessions s ON m.session_id = s.session_id
                 WHERE m.role = 'assistant'
@@ -2420,11 +2429,8 @@ class App:
             cursor.execute(insight_query, insight_params)
             row = cursor.fetchone()
             if row:
-                # Basic snippet: first 150 chars or first line
                 content = row[0].strip()
-                # Remove reasoning blocks for snippet
                 import re
-
                 clean_content = re.sub(r"<think>.*?</think>", "", content, flags=re.DOTALL).strip()
                 latest_insight = (
                     (clean_content[:150] + "...") if len(clean_content) > 150 else clean_content
@@ -2440,7 +2446,7 @@ class App:
             "top_error_clusters": top_error_clusters,
             "time_series": time_series,
             "source_heatmap": source_heatmap,
-            "latest_ai_insight": latest_insight,
+            "latest_insight": latest_insight,
             "new_patterns_count": new_patterns_count,
             "workspace_count": workspace_count,
             "active_tailers": len([k for k, t in self.tailers.items() if t.running]),

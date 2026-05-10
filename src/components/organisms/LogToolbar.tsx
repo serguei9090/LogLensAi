@@ -169,7 +169,10 @@ export function LogToolbar({
 
         {/* Clustering Status & Controls */}
         <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-zinc-900/50 border border-zinc-800/50 shrink-0">
-          <div className="flex items-center gap-2 group cursor-help" title="Clustering Engine Status">
+          <div
+            className="flex items-center gap-2 group cursor-help"
+            title="Clustering Engine Status"
+          >
             <StatusDot active={!!clusteringStatus?.running && !clusteringStatus?.paused} />
             <span className="text-[11px] font-mono text-zinc-400">
               {clusteringStatus?.backlog?.toLocaleString() ?? 0}
@@ -190,7 +193,9 @@ export function LogToolbar({
                 : "text-zinc-500 hover:text-zinc-300 hover:bg-white/5",
             )}
             title={
-              clusteringStatus?.mode === "burst" ? "Burst Mode Active (High CPU)" : "Activate Burst Mode"
+              clusteringStatus?.mode === "burst"
+                ? "Burst Mode Active (High CPU)"
+                : "Activate Burst Mode"
             }
           >
             <Zap className={cn("size-3.5", clusteringStatus?.mode === "burst" && "fill-current")} />

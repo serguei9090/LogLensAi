@@ -8,7 +8,7 @@ const POLLING_INTERVAL = 5000; // 5 seconds
  * Should be initialized at the root of the application.
  */
 export function useHealthStatus() {
-  const { fetchHealth, isPolling, setPolling } = useHealthStore();
+  const { fetchHealth, setPolling } = useHealthStore();
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {

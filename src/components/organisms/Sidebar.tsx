@@ -5,7 +5,7 @@ import { DraggableItem, DroppableArea } from "@/lib/dnd-wrappers";
 import { cn } from "@/lib/utils";
 import { useUIStore } from "@/store/uiStore";
 
-import type { Workspace } from "@/store/workspaceStore";
+import type { HierarchyNode, LogSource, Workspace } from "@/store/workspaceStore";
 import { useWorkspaceStore } from "@/store/workspaceStore";
 
 import { motion } from "framer-motion";
@@ -434,7 +434,7 @@ function HierarchyTree({
   isNavActive,
   onNavSelect,
 }: Readonly<{
-  node: any;
+  node: HierarchyNode;
   workspaceId: string;
   activeSourceId: string | null;
   activeFolderId: string | null;
@@ -724,15 +724,15 @@ function SourceItem({
   onRename,
   isRenaming,
   onRenamingChange,
-}: {
-  source: any;
+}: Readonly<{
+  source: LogSource;
   active: boolean;
   onClick: () => void;
   onDelete: () => void;
   onRename: (name: string) => void;
   isRenaming: boolean;
   onRenamingChange: (renaming: boolean) => void;
-}) {
+}>) {
   const [nameValue, setNameValue] = useState(source.name);
 
   useEffect(() => {

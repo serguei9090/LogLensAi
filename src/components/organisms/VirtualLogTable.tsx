@@ -351,11 +351,11 @@ export function VirtualLogTable({
               </div>
               <div className="space-y-2">
                 <h3 className="text-xl font-bold text-text-primary">
-                  {activeJob ? "Ingesting Logs..." : "Retrieving Logs..."}
+                  {activeJob ? "Indexing Dataset..." : "Retrieving Logs..."}
                 </h3>
                 <p className="text-sm text-text-muted leading-relaxed">
                   {activeJob
-                    ? "Mapping log patterns and indexing metadata for high-performance search."
+                    ? "Building database indices and mapping patterns for the complete file. Almost ready."
                     : "Hydrating log records from storage and applying active filters."}
                 </p>
               </div>
@@ -472,7 +472,9 @@ export function VirtualLogTable({
                     <tr className="grid grid-cols-[12px_80px_180px_90px_1fr_110px_100px] w-full items-center">
                       <th
                         className="p-0 transition-colors group/select-all"
-                        title={selectedLogIds.length === logs.length ? "Deselect All" : "Select All"}
+                        title={
+                          selectedLogIds.length === logs.length ? "Deselect All" : "Select All"
+                        }
                       >
                         <button
                           type="button"
@@ -587,7 +589,7 @@ export function VirtualLogTable({
                 </div>
                 Log Entry Annotation
                 <span className="text-text-muted font-mono text-[10px] ml-2 opacity-50 bg-white/5 px-2 py-0.5 rounded-full">
-                  Line: {logs.find((l) => l.id === expandedRow)?.line_id + 1 || expandedRow}
+                  Line: {(logs.find((l) => l.id === expandedRow)?.line_id ?? -1) + 1 || expandedRow}
                 </span>
               </h3>
               <div className="flex items-center gap-3">
@@ -738,6 +740,8 @@ export function VirtualLogTable({
 
 function getRowLevelStyles(level: LogLevel): string {
   switch (level) {
+    case "FATAL":
+    case "CRITICAL":
     case "ERROR":
       return "bg-error/5 border-l-2 border-error hover:bg-error/10";
     case "WARN":
@@ -746,6 +750,9 @@ function getRowLevelStyles(level: LogLevel): string {
       return "bg-info/3 hover:bg-info/8 text-info/90";
     case "DEBUG":
       return "bg-debug/2 hover:bg-debug/5 text-debug/80";
+    case "TRACE":
+    case "VERBOSE":
+      return "bg-primary-muted/5 border-l-2 border-primary-muted/30 hover:bg-primary-muted/10";
     default:
       return "hover:bg-bg-hover";
   }

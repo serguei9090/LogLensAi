@@ -4,7 +4,6 @@ import { ExplorerView } from "@/components/organisms/ExplorerView";
 import { FacetSidebar } from "@/components/organisms/FacetSidebar";
 import { ImportFeedModal } from "@/components/organisms/ImportFeedModal";
 import { OrchestratorHub } from "@/components/organisms/OrchestratorHub";
-import type { LogEntry } from "@/components/organisms/VirtualLogTable";
 import { VirtualLogTable } from "@/components/organisms/VirtualLogTable";
 import { WorkspaceEngineSettings } from "@/components/organisms/WorkspaceEngineSettings";
 import { InvestigationLayout } from "@/components/templates/InvestigationLayout";
@@ -15,6 +14,7 @@ import { useAiStore } from "@/store/aiStore";
 import { useInvestigationStore } from "@/store/investigationStore";
 import { useSettingsStore } from "@/store/settingsStore";
 import { type LogSource, selectActiveWorkspace, useWorkspaceStore } from "@/store/workspaceStore";
+import type { LogEntry } from "@/types/log";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
@@ -178,7 +178,19 @@ export function InvestigationPage() {
 
   // Combined loading state for the table
   const isSourceLoading = useMemo(() => {
-    return transitioningSourceId === activeSourceId || !!activeJobForSource || isFetching;
+    // If we are in the initial transition phase (waiting for job creation)
+    if (transitioningSourceId === activeSourceId) {
+      return true;
+    }
+
+    // If there is an active ingestion job for this source, we WAIT until it's finished
+    // This is the "Commit-Lock" strategy — don't show the table until 100% indexed.
+    if (activeJobForSource) {
+      return true;
+    }
+
+    // Otherwise, standard fetching state
+    return isFetching;
   }, [transitioningSourceId, activeSourceId, activeJobForSource, isFetching]);
 
   // ── Log fetching ──────────────────────────────────────────────────────────
@@ -277,14 +289,17 @@ export function InvestigationPage() {
       return;
     }
 
-    const interval = setInterval(() => {
-      // Only poll if we are tailing OR if there is an active ingestion job for this source.
-      const shouldPoll = isTailing || !!activeJobForSource;
+    const interval = setInterval(
+      () => {
+        // Only poll if we are tailing OR if there is an active ingestion job for this source.
+        const shouldPoll = isTailing || !!activeJobForSource;
 
-      if (shouldPoll && !isFetching) {
-        fetchLogs();
-      }
-    }, isTailing ? 1000 : 3000); // 1s for tailing, 3s for background ingestion monitoring
+        if (shouldPoll && !isFetching) {
+          fetchLogs();
+        }
+      },
+      isTailing ? 1000 : 3000,
+    ); // 1s for tailing, 3s for background ingestion monitoring
 
     return () => clearInterval(interval);
   }, [activeWorkspaceId, activeSourceId, isTailing, activeJobForSource, isFetching, fetchLogs]);
@@ -298,7 +313,9 @@ export function InvestigationPage() {
   const searchRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    if (!lastJob) return;
+    if (!lastJob) {
+      return;
+    }
 
     // Initialize refs on first job discovery to avoid "phantom" toasts for old jobs
     if (lastJobId.current === null) {
@@ -330,7 +347,9 @@ export function InvestigationPage() {
   const completedJobIds = useRef<Set<number>>(new Set());
   useEffect(() => {
     const sourceJob = jobs.find((j) => j.source_id === activeSourceId);
-    if (!sourceJob) return;
+    if (!sourceJob) {
+      return;
+    }
 
     if (sourceJob.status === "completed" && !completedJobIds.current.has(sourceJob.id)) {
       completedJobIds.current.add(sourceJob.id);

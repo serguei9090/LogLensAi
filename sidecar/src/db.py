@@ -12,6 +12,9 @@ from query_parser import parse_llql
 logger = logging.getLogger(__name__)
 
 
+MEMORY_DB = ":memory:"
+
+
 class LogDatabase:
     _instance = None
     _lock = threading.Lock()
@@ -21,7 +24,7 @@ class LogDatabase:
             if cls._instance is None:
                 if db_path is None:
                     # In extreme cases, fallback to a memory DB rather than creating a random file
-                    db_path = ":memory:"
+                    db_path = MEMORY_DB
                 instance = super().__new__(cls)
                 instance._init_db(db_path)
                 cls._instance = instance
@@ -30,14 +33,14 @@ class LogDatabase:
     def _init_db(self, db_path):
         self.conn: Any = None
         # Memory mode is allowed for tests, else absolute path
-        if db_path != ":memory:":
+        if db_path != MEMORY_DB:
             db_path = os.path.abspath(db_path)
 
         try:
             self.conn = duckdb.connect(db_path)
         except Exception as e:
             # BUG-001 / STAB-003 Resolution: Robust WAL Recovery
-            if db_path != ":memory:":
+            if db_path != MEMORY_DB:
                 wal_path = f"{db_path}.wal"
                 if os.path.exists(wal_path):
                     logger.warning("[DB] WAL replay failed: %s", e)

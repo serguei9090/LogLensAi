@@ -78,7 +78,7 @@ def test_apply_custom_extractions():
 
 def test_extract_base_metadata_no_config(mock_db):
     line = "ERROR: Something went wrong"
-    ts, lvl, msg = _extract_base_metadata(line)
+    _, lvl, msg = _extract_base_metadata(line)
     assert lvl == "ERROR"
     assert msg == line
 
@@ -99,7 +99,7 @@ def test_extract_base_metadata_with_timezone(mock_db):
     config = {"regex": r"^(?P<timestamp>[\d\- :]{19}) (?P<message>.*)$"}
 
     line = "2026-04-23 12:00:00 Something happened"
-    ts, lvl, msg = _extract_base_metadata(line, parser_config=config, tz_offset=2)
+    ts, _, _ = _extract_base_metadata(line, parser_config=config, tz_offset=2)
     assert ts == "2026-04-23 14:00:00"
 
 
@@ -116,7 +116,7 @@ def test_extract_log_metadata_full(mock_db):
 def test_extract_base_metadata_exception(mock_db):
     # Test fallback on invalid regex
     config = {"regex": "["}
-    ts, lvl, msg = _extract_base_metadata("Some line", parser_config=config)
+    _, lvl, msg = _extract_base_metadata("Some line", parser_config=config)
     assert lvl == "INFO"  # Default
     assert msg == "Some line"
 
