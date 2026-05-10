@@ -1,6 +1,6 @@
 {
-    "mcpServers": {
-            "vibegraph": {
+  "mcpServers": {
+    "vibegraph": {
       "args": [
         "tool",
         "run",
@@ -13,5 +13,5 @@
       "command": "uv",
       "disabled": false
     }
-    }
+  }
 }

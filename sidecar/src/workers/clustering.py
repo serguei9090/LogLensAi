@@ -231,9 +231,7 @@ class ClusteringWorker:
                 "UPDATE ingestion_jobs SET status = 'completed' WHERE workspace_id = ? AND source_id = ? AND status = 'processing' AND processed_lines >= total_lines",
                 (ws_id, src_id),
             )
-
         self.db.commit()
-        return len(batch)
 
     def _sync_job_statuses(self):
         """

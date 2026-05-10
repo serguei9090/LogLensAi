@@ -131,12 +131,10 @@ export function InvestigationPage() {
 
   // Find the active job for the CURRENTLY SELECTED source
   const activeJobForSource = useMemo(() => {
-    return (
-      jobs.find(
-        (j) =>
-          j.source_id === activeSourceId && (j.status === "processing" || j.status === "pending"),
-      ) || null
-    );
+    // Check for ANY non-completed job (not just processing/pending)
+    // This ensures the "Commit-Lock" persists until ingestion is explicitly finished
+    // even during tab switches when job state might briefly fluctuate.
+    return jobs.find((j) => j.source_id === activeSourceId && j.status !== "completed") || null;
   }, [jobs, activeSourceId]);
 
   // Clear logs immediately when the source or workspace changes to prevent "ghost data"

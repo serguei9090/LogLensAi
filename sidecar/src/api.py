@@ -293,18 +293,18 @@ class App:
         logger.info("RPC Dispatch: get_ingestion_jobs (workspace=%s)", workspace_id)
         return self.db.get_ingestion_jobs(workspace_id)
 
-    def method_get_clustering_status(self, _workspace_id: str | None = None) -> dict:
+    def method_get_clustering_status(self, workspace_id: str | None = None) -> dict:
         """Fetch current clustering worker status and backlog."""
         logger.debug("RPC Dispatch: get_clustering_status")
         return self.clustering_worker.get_status()
 
-    def method_set_clustering_mode(self, mode: str, _workspace_id: str | None = None) -> dict:
+    def method_set_clustering_mode(self, mode: str, workspace_id: str | None = None) -> dict:
         """Set clustering worker mode (auto, manual, burst)."""
         logger.info("RPC Dispatch: set_clustering_mode (mode=%s)", mode)
         self.clustering_worker.set_mode(mode)
         return {"status": "success", "mode": self.clustering_worker.mode, "paused": self.clustering_worker.paused}
 
-    def method_set_clustering_paused(self, paused: bool, _workspace_id: str | None = None) -> dict:
+    def method_set_clustering_paused(self, paused: bool, workspace_id: str | None = None) -> dict:
         """Explicitly pause or resume the clustering worker."""
         logger.info("RPC Dispatch: set_clustering_paused (paused=%s)", paused)
         self.clustering_worker.set_paused(paused)
@@ -1535,7 +1535,7 @@ class App:
         key = f"{workspace_id}:{abs_path}"
         return key in self.tailers and self.tailers[key].running
 
-    def method_get_clusters(self, _workspace_id: str) -> list:
+    def method_get_clusters(self, workspace_id: str) -> list:
         clusters = self.parser.get_clusters()
         return [
             {"id": c.cluster_id, "template": c.get_template(), "size": c.size} for c in clusters
