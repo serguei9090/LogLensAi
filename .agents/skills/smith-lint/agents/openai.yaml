@@ -1,4 +1,0 @@
-interface:
-  display_name: "Smit Lint"
-  short_description: "Detect project lint tools and run checks/fixes"
-  default_prompt: "Detect the project type and available lint tools, then run lint checks or safe auto-fixes."

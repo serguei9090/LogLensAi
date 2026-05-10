@@ -1,0 +1,90 @@
+{
+  "summary": {
+    "training_speed": 63371.46828634454,
+    "tagging_speed": 53455.27491658574,
+    "match_rate": 0.952
+  },
+  "sample_extractions": [
+    {
+      "log": "86.1.76.62 - - [17/May/2015:11:05:03 +0000] \"GET /favicon.ico HTTP/1.1\" 200 3638 \"-\" \"Mozilla/5.0 (X11; Linux x86_64; rv:24.0) Gecko/20140205 Firefox/24.0 Iceweasel/24.3.0\"",
+      "template": "<*> - - <*> +0000] \"GET <*> HTTP/1.1\" <*> <*> <*> \"Mozilla/5.0 (X11; Linux <*> <*> <*> <*> <*>",
+      "params": [
+        "86.1.76.62",
+        "[17/May/2015:11:05:03",
+        "/favicon.ico",
+        "200",
+        "3638",
+        "\"-\"",
+        "x86_64;",
+        "rv:24.0)",
+        "Gecko/20140205",
+        "Firefox/24.0",
+        "Iceweasel/24.3.0\""
+      ]
+    },
+    {
+      "log": "86.1.76.62 - - [17/May/2015:11:05:28 +0000] \"GET /images/jordan-80.png HTTP/1.1\" 200 6146 \"http://www.semicomplete.com/projects/xdotool/\" \"Mozilla/5.0 (X11; Linux x86_64; rv:24.0) Gecko/20140205 Firefox/24.0 Iceweasel/24.3.0\"",
+      "template": "<*> - - <*> +0000] \"GET <*> HTTP/1.1\" <*> <*> <*> \"Mozilla/5.0 (X11; Linux <*> <*> <*> <*> <*>",
+      "params": [
+        "86.1.76.62",
+        "[17/May/2015:11:05:28",
+        "/images/jordan-80.png",
+        "200",
+        "6146",
+        "\"http://www.semicomplete.com/projects/xdotool/\"",
+        "x86_64;",
+        "rv:24.0)",
+        "Gecko/20140205",
+        "Firefox/24.0",
+        "Iceweasel/24.3.0\""
+      ]
+    },
+    {
+      "log": "86.1.76.62 - - [17/May/2015:11:05:07 +0000] \"GET /images/web/2009/banner.png HTTP/1.1\" 200 52315 \"http://www.semicomplete.com/style2.css\" \"Mozilla/5.0 (X11; Linux x86_64; rv:24.0) Gecko/20140205 Firefox/24.0 Iceweasel/24.3.0\"",
+      "template": "<*> - - <*> +0000] \"GET <*> HTTP/1.1\" <*> <*> <*> \"Mozilla/5.0 (X11; Linux <*> <*> <*> <*> <*>",
+      "params": [
+        "86.1.76.62",
+        "[17/May/2015:11:05:07",
+        "/images/web/2009/banner.png",
+        "200",
+        "52315",
+        "\"http://www.semicomplete.com/style2.css\"",
+        "x86_64;",
+        "rv:24.0)",
+        "Gecko/20140205",
+        "Firefox/24.0",
+        "Iceweasel/24.3.0\""
+      ]
+    },
+    {
+      "log": "66.249.73.135 - - [17/May/2015:11:05:58 +0000] \"GET /blog/tags/bdb HTTP/1.1\" 200 23099 \"-\" \"DoCoMo/2.0 N905i(c100;TB;W24H16) (compatible; Googlebot-Mobile/2.1; +http://www.google.com/bot.html)\"",
+      "template": "<*> - - <*> +0000] \"GET <*> HTTP/1.1\" 200 <*> \"-\" <*> <*> <*> <*> <*>",
+      "params": [
+        "66.249.73.135",
+        "[17/May/2015:11:05:58",
+        "/blog/tags/bdb",
+        "23099",
+        "\"DoCoMo/2.0",
+        "N905i(c100;TB;W24H16)",
+        "(compatible;",
+        "Googlebot-Mobile/2.1;",
+        "+http://www.google.com/bot.html)\""
+      ]
+    },
+    {
+      "log": "107.170.41.69 - - [17/May/2015:11:05:31 +0000] \"GET /?flav=atom HTTP/1.1\" 200 32352 \"-\" \"Feedbin - 1 subscribers\"",
+      "template": "<*> - - <*> +0000] \"GET <*> HTTP/1.1\" 200 <*> <*> <*> <*> <*> <*>",
+      "params": [
+        "107.170.41.69",
+        "[17/May/2015:11:05:31",
+        "/?flav=atom",
+        "32352",
+        "\"-\"",
+        "\"Feedbin",
+        "-",
+        "1",
+        "subscribers\""
+      ]
+    }
+  ]
+}

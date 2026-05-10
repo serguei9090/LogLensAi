@@ -1,4 +1,0 @@
-interface:
-  display_name: "Smth Doc"
-  short_description: "Synchronize docs from commit history"
-  default_prompt: "Update project documentation from the changed files and commits since the last documented commit."

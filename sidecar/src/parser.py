@@ -60,7 +60,7 @@ class DrainParser:
                 continue
 
     def parse(self, log_line: str) -> dict:
-        """Returns a dict with cluster_id and template for the given log line."""
+        """Returns a dict with cluster_id and template for the given log line (updates tree)."""
         with self.lock:
             result = self.miner.add_log_message(log_line)
             return {
@@ -68,6 +68,20 @@ class DrainParser:
                 "template": result["template_mined"],
                 "change_type": result["change_type"],
             }
+
+    def match(self, log_line: str) -> dict | None:
+        """
+        Identify cluster for a log line without updating the tree.
+        Thread-safe and suitable for parallel tagging.
+        """
+        # Note: miner.match is read-only on the Drain tree
+        cluster = self.miner.match(log_line)
+        if cluster:
+            return {
+                "cluster_id": str(cluster.cluster_id),
+                "template": cluster.get_template(),
+            }
+        return None
 
     def get_clusters(self):
         with self.lock:
