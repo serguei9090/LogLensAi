@@ -240,12 +240,18 @@ class GetClusteringStatusRequest(BaseModel):
 class GetClusteringStatusResponse(BaseModel):
     mode: str
     running: bool
+    paused: bool
     backlog: int
     processed_session: int
 
 
 class SetClusteringModeRequest(BaseModel):
-    mode: str  # 'auto', 'manual', 'burst'
+    mode: str  # 'auto', 'burst'
+    workspace_id: str | None = None
+
+
+class SetClusteringPausedRequest(BaseModel):
+    paused: bool
     workspace_id: str | None = None
 
 

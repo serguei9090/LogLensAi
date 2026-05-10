@@ -302,7 +302,13 @@ class App:
         """Set clustering worker mode (auto, manual, burst)."""
         logger.info("RPC Dispatch: set_clustering_mode (mode=%s)", mode)
         self.clustering_worker.set_mode(mode)
-        return {"status": "success", "mode": mode}
+        return {"status": "success", "mode": self.clustering_worker.mode, "paused": self.clustering_worker.paused}
+
+    def method_set_clustering_paused(self, paused: bool, workspace_id: str | None = None) -> dict:
+        """Explicitly pause or resume the clustering worker."""
+        logger.info("RPC Dispatch: set_clustering_paused (paused=%s)", paused)
+        self.clustering_worker.set_paused(paused)
+        return {"status": "success", "paused": self.clustering_worker.paused}
 
     def method_delete_logs(self, workspace_id: str, source_id: str | None = None) -> dict:
         """Delete logs for a workspace or specific source."""
@@ -1213,33 +1219,46 @@ class App:
             src = log.get("source_id") or "manual"
             grouped[(ws, src)].append(log)
 
-        cursor = self.db.get_cursor()
-        total_inserted = 0
         job_id = None
-
         for (ws_id, src_id), src_logs in grouped.items():
             # 1. Create ingestion job record
             job_id = self.db.create_ingestion_job(ws_id, src_id, len(src_logs))
+            
+            # 2. Launch background ingestion for this batch
+            thread = threading.Thread(
+                target=self._bg_ingest_logs,
+                args=(ws_id, src_id, src_logs, job_id),
+                daemon=True,
+            )
+            thread.start()
 
-            # 2. Disk-First: write raw lines in a single batch call
-            raw_lines = [log.get("raw_text") or log.get("message") or "" for log in src_logs]
-            line_ids = self.log_store.append_batch(src_id, raw_lines)
+        return {"status": "ok", "job_id": job_id}
 
-            # 3. Build skinny DB rows — no raw_text, no message
+    def _bg_ingest_logs(self, workspace_id: str, source_id: str, logs: list[dict], job_id: int):
+        """Background worker for batch ingestion."""
+        try:
+            db_instance = self.db
+            cursor = db_instance.get_cursor()
+            
+            # 1. Disk-First: write raw lines in a single batch call
+            raw_lines = [log.get("raw_text") or log.get("message") or "" for log in logs]
+            line_ids = self.log_store.append_batch(source_id, raw_lines)
+
+            # 2. Build skinny DB rows
             now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             batch_data = [
                 (
-                    ws_id,
-                    src_id,
+                    workspace_id,
+                    source_id,
                     line_ids[i],
-                    raw_lines[i],  # raw_text
+                    raw_lines[i],
                     log.get("timestamp") or now,
                     log.get("level") or "INFO",
-                    None,  # cluster_id — deferred to worker
+                    None,
                     json.dumps(log.get("facets") or {}),
-                    False,  # processed = FALSE
+                    False,
                 )
-                for i, log in enumerate(src_logs)
+                for i, log in enumerate(logs)
             ]
 
             cursor.executemany(
@@ -1247,31 +1266,41 @@ class App:
                 " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 batch_data,
             )
-            total_inserted += len(batch_data)
 
-            # 4. Broadcast to active overlays via SharedSource
+            # 3. Mark job completed
+            cursor.execute(
+                "UPDATE ingestion_jobs SET status = 'completed', processed_lines = total_lines, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+                (job_id,),
+            )
+            db_instance.commit()
+
+            # 4. Broadcast to active overlays
             try:
-                shared_src = self.shared_source_mgr.get_source(src_id)
+                shared_src = self.shared_source_mgr.get_source(source_id)
                 shared_src.push_batch(raw_lines, line_ids)
             except Exception as e:
-                logger.error("[Ingestion] Broadcast failed for %s: %s", src_id, e)
+                logger.error("[Ingestion] Broadcast failed for %s: %s", source_id, e)
 
-        self.db.commit()
-        return {"status": "ok", "count": total_inserted, "job_id": job_id}
+        except Exception as exc:
+            logger.error("[Ingestion] Failed background batch job %d: %s", job_id, exc)
+            try:
+                self.db.get_cursor().execute(
+                    "UPDATE ingestion_jobs SET status = 'failed', updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+                    (job_id,),
+                )
+                self.db.commit()
+            except:
+                pass
 
     def method_ingest_local_file(self, workspace_id: str, source_id: str, filepath: str) -> dict:
         """Optimised ingestion — Disk-First / Fast-Path.
-
-        Instead of storing raw text in DuckDB, the sidecar:
-        1. Streams lines from the source file and copies them to
-           ``data/storage/<source_id>.log`` (via DiskLogStore).
-        2. Tracks the line_id for each line.
-        3. Inserts only the skinny pointer row into DuckDB.
+        
+        Now runs in a background thread to prevent blocking the UI.
         """
         if not os.path.exists(filepath):
             raise FileNotFoundError(f"File not found: {filepath}")
 
-        # 1. Count total lines for progress tracking
+        # 1. Count total lines for progress tracking (quick scan)
         total_lines = 0
         with open(filepath, encoding="utf-8", errors="replace") as f:
             for _ in f:
@@ -1283,17 +1312,31 @@ class App:
         # 2. Create ingestion job record
         job_id = self.db.create_ingestion_job(workspace_id, source_id, total_lines)
 
+        # 3. Launch background ingestion
+        thread = threading.Thread(
+            target=self._bg_ingest_local_file,
+            args=(workspace_id, source_id, filepath, job_id),
+            daemon=True,
+        )
+        thread.start()
+
+        return {"status": "ok", "job_id": job_id, "total_lines": total_lines}
+
+    def _bg_ingest_local_file(self, workspace_id: str, source_id: str, filepath: str, job_id: int):
+        """Background worker for local file ingestion."""
         # 3. Stream lines: write to disk store, insert skinny rows in chunks
         # Adaptive chunking: start small (100) for immediate feedback, grow to 5000 for speed
         initial_chunk_size = 100
         max_chunk_size = 5000
-        current_chunk_size = min(initial_chunk_size, total_lines)
+        current_chunk_size = initial_chunk_size
         processed_count = 0
-        cursor = None
         now_ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
         try:
-            cursor = self.db.get_cursor()
+            # We need a fresh cursor for the background thread
+            db_instance = self.db 
+            cursor = db_instance.get_cursor()
+            
             with open(filepath, encoding="utf-8", errors="replace") as f:
                 chunk_lines: list[str] = []
 
@@ -1332,7 +1375,7 @@ class App:
                             "UPDATE ingestion_jobs SET processed_lines = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
                             (processed_count, job_id),
                         )
-                        self.db.commit()
+                        db_instance.commit()
                         chunk_lines = []
                         # Scale up chunk size for better performance on large files
                         current_chunk_size = min(max_chunk_size, current_chunk_size * 2)
@@ -1367,25 +1410,27 @@ class App:
                 "UPDATE ingestion_jobs SET status = 'completed', processed_lines = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
                 (processed_count, job_id),
             )
-            self.db.commit()
+            db_instance.commit()
             logger.info(
-                "[Ingestion] Completed job %d for %s: %d lines",
+                "[Ingestion] Completed background job %d for %s: %d lines",
                 job_id,
                 workspace_id,
                 processed_count,
             )
 
         except Exception as exc:
-            logger.error("[Ingestion] Failed job %d: %s", job_id, exc)
-            if cursor:
+            logger.error("[Ingestion] Failed background job %d: %s", job_id, exc)
+            # Try to mark as failed
+            try:
+                cursor = self.db.get_cursor()
                 cursor.execute(
                     "UPDATE ingestion_jobs SET status = 'failed', updated_at = CURRENT_TIMESTAMP WHERE id = ?",
                     (job_id,),
                 )
                 self.db.commit()
-            raise
+            except:
+                pass
 
-        return {"status": "ok", "count": processed_count, "job_id": job_id}
 
     def method_cleanup_ingestion_jobs(self, workspace_id: str) -> dict:
         """Removes stalled ingestion jobs with no progress."""

@@ -21,7 +21,8 @@ class ClusteringWorker:
         self.batch_size = batch_size
         self.interval = interval
         self.running = False
-        self.mode = "auto"  # auto, manual, burst
+        self.mode = "auto"  # auto, burst
+        self.paused = False
         self.processed_session = 0
         self._thread = None
         self._stop_event = threading.Event()
@@ -46,7 +47,8 @@ class ClusteringWorker:
     def _run(self):
         while not self._stop_event.is_set():
             try:
-                if self.mode == "manual" and not self._force_cycle.is_set():
+                # If paused, wait for force_cycle or stop_event
+                if self.paused and not self._force_cycle.is_set():
                     self._force_cycle.wait(timeout=1.0)
                     if not self._force_cycle.is_set():
                         continue
@@ -58,8 +60,6 @@ class ClusteringWorker:
                 if self.mode == "burst":
                     current_batch_size = self.batch_size * 4
                     current_interval = 0.1
-                elif self.mode == "manual":
-                    current_batch_size = self.batch_size * 2
 
                 processed_count = self._process_batch(batch_size=current_batch_size)
                 self.processed_session += processed_count
@@ -320,18 +320,33 @@ class ClusteringWorker:
         return {
             "mode": self.mode,
             "running": self.running,
+            "paused": self.paused,
             "backlog": backlog,
             "processed_session": self.processed_session,
         }
 
     def set_mode(self, mode: str):
-        """Changes the operational mode of the worker."""
-        if mode not in ["auto", "manual", "burst"]:
-            raise ValueError(f"Invalid clustering mode: {mode}")
-        self.mode = mode
-        if mode in ["auto", "burst"]:
+        """Changes the operational mode of the worker.
+        'manual' is deprecated and now mapped to auto + paused.
+        """
+        if mode == "manual":
+            self.mode = "auto"
+            self.paused = True
+        elif mode in ["auto", "burst"]:
+            self.mode = mode
+            self.paused = False
             self._force_cycle.set()
-        logger.info(f"[Worker] Clustering mode changed to: {mode}")
+        else:
+            raise ValueError(f"Invalid clustering mode: {mode}")
+
+        logger.info(f"[Worker] Clustering mode changed to: {self.mode} (paused={self.paused})")
+
+    def set_paused(self, paused: bool):
+        """Explicitly pause or resume the worker."""
+        self.paused = paused
+        if not paused:
+            self._force_cycle.set()
+        logger.info(f"[Worker] Clustering {'paused' if paused else 'resumed'}")
 
     def trigger_cycle(self):
         """Manually trigger a single processing cycle."""

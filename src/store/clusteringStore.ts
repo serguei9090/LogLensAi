@@ -1,11 +1,12 @@
 import { create } from "zustand";
 import { callSidecar } from "../lib/hooks/useSidecarBridge";
 
-export type ClusteringMode = "auto" | "manual" | "burst";
+export type ClusteringMode = "auto" | "burst";
 
 interface ClusteringStatus {
   mode: ClusteringMode;
   running: boolean;
+  paused: boolean;
   backlog: number;
   processed_session: number;
 }
@@ -18,6 +19,7 @@ interface ClusteringState {
   // Actions
   fetchStatus: (workspaceId?: string) => Promise<void>;
   setMode: (mode: ClusteringMode, workspaceId?: string) => Promise<void>;
+  setPaused: (paused: boolean, workspaceId?: string) => Promise<void>;
   startPolling: (workspaceId?: string) => void;
   stopPolling: () => void;
 }
@@ -45,12 +47,25 @@ export const useClusteringStore = create<ClusteringState>((set, get) => ({
       // Proactively update local state
       const currentStatus = get().status;
       if (currentStatus) {
-        set({ status: { ...currentStatus, mode } });
+        set({ status: { ...currentStatus, mode, paused: false } });
       }
       // Re-fetch to confirm
       await get().fetchStatus(workspaceId);
     } catch (err: any) {
       set({ error: err.message || "Failed to set clustering mode" });
+    }
+  },
+
+  setPaused: async (paused, workspaceId) => {
+    try {
+      await callSidecar("set_clustering_paused", { paused, workspace_id: workspaceId });
+      const currentStatus = get().status;
+      if (currentStatus) {
+        set({ status: { ...currentStatus, paused } });
+      }
+      await get().fetchStatus(workspaceId);
+    } catch (err: any) {
+      set({ error: err.message || "Failed to toggle clustering" });
     }
   },
 

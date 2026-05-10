@@ -460,16 +460,6 @@ export function VirtualLogTable({
                 </div>
               )}
 
-              {/* Background Fetch Indicator (Silent Loader) */}
-              {isTransitioning && !activeJob && (
-                <div className="absolute top-2 right-6 z-[60] flex items-center gap-2 px-3 py-1 bg-primary/10 border border-primary/20 rounded-full animate-in fade-in slide-in-from-top-2 duration-300">
-                  <div className="size-1.5 bg-primary rounded-full animate-pulse" />
-                  <span className="text-[9px] font-bold uppercase tracking-widest text-primary/80">
-                    Syncing logs...
-                  </span>
-                </div>
-              )}
-
               <div
                 style={{
                   height: `${rowVirtualizer.getTotalSize()}px`,

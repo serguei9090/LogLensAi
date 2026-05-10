@@ -168,60 +168,33 @@ export function LogToolbar({
         <div className="h-5 w-px bg-zinc-800 shrink-0" />
 
         {/* Clustering Status & Controls */}
-        <div className="flex items-center gap-2 px-2 py-1 rounded-md bg-zinc-900/50 border border-zinc-800/50">
-          <div className="flex flex-col items-start leading-tight pr-1">
-            <span className="text-[10px] uppercase font-bold text-zinc-500 tracking-wider">
-              Clustering
+        <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-zinc-900/50 border border-zinc-800/50 shrink-0">
+          <div className="flex items-center gap-2 group cursor-help" title="Clustering Engine Status">
+            <StatusDot active={!!clusteringStatus?.running && !clusteringStatus?.paused} />
+            <span className="text-[11px] font-mono text-zinc-400">
+              {clusteringStatus?.backlog?.toLocaleString() ?? 0}
             </span>
-            <div className="flex items-center gap-1.5">
-              <StatusDot active={!!clusteringStatus?.running} />
-              <span className="text-[11px] font-mono text-zinc-400">
-                {clusteringStatus?.backlog ?? 0} backlog
-              </span>
-            </div>
           </div>
 
-          <div className="flex items-center gap-1 ml-1 border-l border-zinc-800 pl-2">
-            <button
-              type="button"
-              onClick={() =>
-                setMode(clusteringStatus?.mode === "burst" ? "auto" : "burst", activeWorkspaceId)
-              }
-              className={cn(
-                "p-1.5 rounded-md transition-all group shrink-0 border",
-                clusteringStatus?.mode === "burst"
-                  ? "bg-amber-500/10 border-amber-500/20 text-amber-400 shadow-[0_0_12px_rgba(245,158,11,0.1)]"
-                  : "bg-zinc-800 border-zinc-700 text-zinc-500 hover:text-zinc-300 hover:border-zinc-600",
-              )}
-              title={
-                clusteringStatus?.mode === "burst" ? "Deactivate Burst Mode" : "Activate Burst Mode"
-              }
-            >
-              {clusteringStatus?.mode === "burst" ? (
-                <Zap className="size-3.5 fill-current" />
-              ) : (
-                <ZapOff className="size-3.5" />
-              )}
-            </button>
+          <div className="w-px h-3 bg-zinc-800 mx-1" />
 
-            {clusteringStatus?.mode === "manual" ? (
-              <button
-                type="button"
-                onClick={() => setMode("auto", activeWorkspaceId)}
-                className="px-2 py-1 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[10px] font-bold hover:bg-emerald-500/20 transition-colors"
-              >
-                AUTO
-              </button>
-            ) : (
-              <button
-                type="button"
-                onClick={() => setMode("manual", activeWorkspaceId)}
-                className="px-2 py-1 rounded bg-zinc-800 text-zinc-400 border border-zinc-700 text-[10px] font-bold hover:bg-zinc-700 transition-colors"
-              >
-                MANUAL
-              </button>
+          <button
+            type="button"
+            onClick={() =>
+              setMode(clusteringStatus?.mode === "burst" ? "auto" : "burst", activeWorkspaceId)
+            }
+            className={cn(
+              "p-1 rounded-md transition-all group shrink-0",
+              clusteringStatus?.mode === "burst"
+                ? "bg-amber-500/20 text-amber-400 shadow-[0_0_12px_rgba(245,158,11,0.2)] border border-amber-500/30"
+                : "text-zinc-500 hover:text-zinc-300 hover:bg-white/5",
             )}
-          </div>
+            title={
+              clusteringStatus?.mode === "burst" ? "Burst Mode Active (High CPU)" : "Activate Burst Mode"
+            }
+          >
+            <Zap className={cn("size-3.5", clusteringStatus?.mode === "burst" && "fill-current")} />
+          </button>
         </div>
       </div>
 
