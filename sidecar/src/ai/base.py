@@ -4,11 +4,14 @@ from pydantic import BaseModel
 
 
 class AIChatMessage(BaseModel):
-    role: str  # 'user' | 'assistant' | 'system'
+    role: str  # 'user' | 'assistant' | 'system' | 'tool'
     content: str
     context_logs: list[int] | None = None
     timestamp: str | None = None
     provider_session_id: str | None = None  # E.g. A2A taskId
+    tool_calls: list[dict] | None = None
+    tool_call_id: str | None = None
+    name: str | None = None
 
 
 class AIProvider(ABC):
@@ -30,6 +33,7 @@ class AIProvider(ABC):
         model: str | None = None,
         session_id: str | None = None,
         provider_session_id: str | None = None,
+        tools: list[dict] | None = None,
         **kwargs,
     ) -> AIChatMessage:
         """Execute a chat session with memory/context."""
@@ -42,6 +46,7 @@ class AIProvider(ABC):
         model: str | None = None,
         session_id: str | None = None,
         provider_session_id: str | None = None,
+        tools: list[dict] | None = None,
         **kwargs,
     ):
         """Streaming version of chat."""

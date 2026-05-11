@@ -1,21 +1,23 @@
+import json
 import os
 import sys
 import time
-import json
-import duckdb
 from concurrent.futures import ProcessPoolExecutor, as_completed
+
+import duckdb
 
 # Add sidecar/src to path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "sidecar", "src")))
 
-from metadata_extractor import extract_log_metadata
+import contextlib
+
 from drain3.template_miner import TemplateMiner
-from drain3.template_miner_config import TemplateMinerConfig
+from metadata_extractor import extract_log_metadata
 
 LOG_FILE = "apache_logs.log"
 
 def read_logs():
-    with open(LOG_FILE, 'r', encoding='utf-8') as f:
+    with open(LOG_FILE, encoding='utf-8') as f:
         return [line.strip() for line in f if line.strip()]
 
 def time_it(name, func, *args, **kwargs):
@@ -66,10 +68,8 @@ def step4_drain3_match_and_extract(metas):
         if match:
             # this simulates what we do
             template = match.get_template()
-            try:
-                params = miner.extract_parameters(template, meta["message"], exact_matching=False)
-            except Exception:
-                pass
+            with contextlib.suppress(Exception):
+                miner.extract_parameters(template, meta["message"], exact_matching=False)
         results.append(match)
     return results
 
@@ -106,7 +106,7 @@ def step5_duckdb_insert(metas):
             i, 'ws1', 'src1', i, meta["message"], meta["timestamp"], meta["level"], cluster_id, False, '', '{}', True
         ))
 
-    t0 = time.time()
+    t0 = time.time()  # noqa: F841
     cursor.executemany(
         "INSERT INTO logs (id, workspace_id, source_id, line_id, raw_text, timestamp, level, cluster_id, has_comment, comment, facets, processed) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         batch

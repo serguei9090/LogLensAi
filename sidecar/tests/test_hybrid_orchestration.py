@@ -64,7 +64,9 @@ async def test_tool_registry_get_clusters():
     registry = ToolRegistry(app)
     ctx = MagicMock()
 
-    result = await registry.get_clusters(ctx, "ws1")
+    from ai.tools import GetClustersParams
+    params = GetClustersParams(workspace_id="ws1")
+    result = await registry.get_clusters(ctx, params)
     assert len(result) == 1
     assert result[0]["id"] == 1
 
@@ -123,6 +125,9 @@ async def test_graph_manager_nodes():
     assert len(new_state["messages"]) == 1
     assert "thought" in new_state["messages"][0]["content"]
     assert new_state["next_node"] == "tool_execution"
+    
+    # inject tool calls
+    new_state["messages"][-1]["tool_calls"] = [{"id": "call1", "function": {"name": "search_logs", "arguments": "{}"}}]
 
     # Test router
     assert manager._should_continue(new_state) == "continue"
@@ -135,7 +140,8 @@ async def test_graph_manager_nodes():
 
     # Test tool execution node
     tool_state = await manager._node_tool_execution(state)
-    assert tool_state == state
+    assert len(tool_state["messages"]) == 2
+    assert tool_state["messages"][-1]["role"] == "tool"
 
     # Test lifecycle
     await manager.close()
@@ -152,21 +158,28 @@ async def test_tool_registry_additional_tools():
     ctx = MagicMock()
 
     # Test search_memory
-    mem_res = await registry.search_memory(ctx, "ws1", "query")
+    from ai.tools import SearchMemoryParams
+    params = SearchMemoryParams(workspace_id="ws1", query="query")
+    mem_res = await registry.search_memory(ctx, params)
     assert mem_res[0]["id"] == "mem1"
 
     # Test get_facets
-    facet_res = await registry.get_facets(ctx, "ws1")
+    from ai.tools import GetFacetsParams
+    params = GetFacetsParams(workspace_id="ws1")
+    facet_res = await registry.get_facets(ctx, params)
     assert "ips" in facet_res
 
     # Test get_hierarchy
     app.method_get_hierarchy.return_value = {"root": {}}
-    hier_res = await registry.get_hierarchy(ctx, "ws1")
+    from ai.tools import GetHierarchyParams
+    params = GetHierarchyParams(workspace_id="ws1")
+    hier_res = await registry.get_hierarchy(ctx, params)
     assert "root" in hier_res
 
 
 @pytest.mark.asyncio
 async def test_tool_registry_errors_extended():
+    from ai.tools import GetFacetsParams, GetHierarchyParams, SearchMemoryParams
     app = MagicMock()
     app.method_search_memory.side_effect = Exception("Mem error")
     app.method_get_metadata_facets.side_effect = Exception("Facet error")
@@ -176,20 +189,24 @@ async def test_tool_registry_errors_extended():
     ctx = MagicMock()
 
     # Test search_memory error
-    res1 = await registry.search_memory(ctx, "ws1", "q")
+    params = SearchMemoryParams(workspace_id="ws1", query="q")
+    res1 = await registry.search_memory(ctx, params)
     assert "error" in res1[0]
 
     # Test get_facets error
-    res2 = await registry.get_facets(ctx, "ws1")
+    params = GetFacetsParams(workspace_id="ws1")
+    res2 = await registry.get_facets(ctx, params)
     assert "error" in res2
 
     # Test get_hierarchy error
-    res3 = await registry.get_hierarchy(ctx, "ws1")
+    params = GetHierarchyParams(workspace_id="ws1")
+    res3 = await registry.get_hierarchy(ctx, params)
     assert "error" in res3
 
 
 @pytest.mark.asyncio
 async def test_tool_registry_errors():
+    from ai.tools import GetClustersParams
     app = MagicMock()
     app._get_logs_internal.side_effect = Exception("Search error")
     app.get_drain_parser.side_effect = Exception("Cluster error")
@@ -203,5 +220,6 @@ async def test_tool_registry_errors():
     assert "error" in res1
 
     # Test get_clusters error
-    res2 = await registry.get_clusters(ctx, "ws1")
+    params = GetClustersParams(workspace_id="ws1")
+    res2 = await registry.get_clusters(ctx, params)
     assert "error" in res2[0]

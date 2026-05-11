@@ -88,7 +88,17 @@ class OllamaProvider(AIProvider):
             content = (
                 clean_thinking_markers(msg.content) if msg.role == "assistant" else msg.content
             )
-            ollama_messages.append({"role": msg.role, "content": content})
+            message_dict = {"role": msg.role, "content": content}
+
+            if msg.tool_calls:
+                message_dict["tool_calls"] = msg.tool_calls
+            if msg.role == "tool":
+                message_dict["tool_call_id"] = msg.tool_call_id
+                if msg.name:
+                    message_dict["name"] = msg.name
+
+            ollama_messages.append(message_dict)
+
         return ollama_messages
 
     async def chat(
@@ -97,6 +107,7 @@ class OllamaProvider(AIProvider):
         model: str | None = None,
         session_id: str | None = None,
         provider_session_id: str | None = None,
+        tools: list[dict] | None = None,
         reasoning: bool | None = True,
         **kwargs,
     ) -> AIChatMessage:
@@ -109,6 +120,8 @@ class OllamaProvider(AIProvider):
             "messages": self._format_messages(messages, reasoning=reasoning),
             "stream": False,
         }
+        if tools:
+            payload["tools"] = tools
 
         logger.debug("Ollama Request Payload: %s", json.dumps(payload, indent=2))
 
@@ -125,6 +138,7 @@ class OllamaProvider(AIProvider):
                 msg = data.get("message", {})
                 raw_content = msg.get("content", "")
                 native_thinking = msg.get("thinking") or msg.get("thought")
+                tool_calls = msg.get("tool_calls")
 
                 if native_thinking:
                     # Ollama pre-extracted the thinking field — wrap and return.
@@ -133,11 +147,12 @@ class OllamaProvider(AIProvider):
                     return AIChatMessage(
                         role="assistant",
                         content=f"{THINK_OPEN}{clean_thought}{THINK_CLOSE}{clean_answer}",
+                        tool_calls=tool_calls,
                     )
 
                 # Fallback: parse raw content for channel markers (or pass through)
                 clean_content = parse_completed_response(raw_content, mode)
-                return AIChatMessage(role="assistant", content=clean_content)
+                return AIChatMessage(role="assistant", content=clean_content, tool_calls=tool_calls)
         except Exception as e:
             return AIChatMessage(role="assistant", content=f"Ollama Connection Error: {str(e)}")
 
@@ -147,6 +162,7 @@ class OllamaProvider(AIProvider):
         model: str | None = None,
         session_id: str | None = None,
         provider_session_id: str | None = None,
+        tools: list[dict] | None = None,
         reasoning: bool | None = True,
         **kwargs,
     ):
@@ -164,6 +180,8 @@ class OllamaProvider(AIProvider):
             "stream": True,
             "options": {"temperature": 1.0, "top_p": 0.95, "top_k": 64},
         }
+        if tools:
+            payload["tools"] = tools
 
         try:
             async with (

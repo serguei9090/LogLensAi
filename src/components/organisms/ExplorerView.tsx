@@ -88,7 +88,7 @@ export function ExplorerView({
             <button
               type="button"
               onClick={() => onSelectFolder(child.id)}
-              className="group w-full flex flex-col p-5 bg-white/[0.02] border border-white/[0.05] rounded-3xl hover:bg-white/[0.05] hover:border-primary/30 transition-all text-left outline-none cursor-pointer"
+              className="group w-full flex flex-col p-5 bg-bg-surface-bright/40 border border-border-subtle rounded-3xl hover:bg-bg-hover hover:border-primary/30 transition-all text-left outline-none cursor-pointer"
             >
               <div className="flex items-start justify-between mb-4">
                 <div className="p-3 bg-primary/10 rounded-2xl">
@@ -109,11 +109,11 @@ export function ExplorerView({
             <button
               type="button"
               onClick={() => onSelectSource(source.id)}
-              className="group w-full flex flex-col p-5 bg-white/[0.02] border border-white/[0.05] rounded-3xl hover:bg-white/[0.05] hover:border-primary/30 transition-all text-left outline-none cursor-pointer"
+              className="group w-full flex flex-col p-5 bg-bg-surface-bright/40 border border-border-subtle rounded-3xl hover:bg-bg-hover hover:border-primary/30 transition-all text-left outline-none cursor-pointer"
             >
               <div className="flex items-start justify-between mb-4">
-                <div className="p-3 bg-zinc-400/10 rounded-2xl">
-                  <FileText className="size-6 text-zinc-400" />
+                <div className="p-3 bg-text-muted/10 rounded-2xl">
+                  <FileText className="size-6 text-text-muted" />
                 </div>
                 <MoreVertical className="size-4 text-text-muted opacity-0 group-hover:opacity-40 transition-opacity" />
               </div>
@@ -126,7 +126,7 @@ export function ExplorerView({
         ))}
 
         {currentFolder.children.length === 0 && currentFolder.sources.length === 0 && (
-          <div className="col-span-full py-20 flex flex-col items-center justify-center text-text-muted opacity-30 border-2 border-dashed border-white/[0.05] rounded-[3rem]">
+          <div className="col-span-full py-20 flex flex-col items-center justify-center text-text-muted opacity-30 border-2 border-dashed border-border-subtle rounded-[3rem]">
             <Folder className="size-16 mb-4" />
             <p className="text-sm font-medium">This folder is empty</p>
           </div>

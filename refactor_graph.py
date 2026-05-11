@@ -1,18 +1,13 @@
+
+with open('sidecar/src/ai/graph.py', encoding='utf-8') as f:
+    content = f.read()
+
+new_graph = '''import logging
 import json
-import logging
 from typing import Any, Literal, TypedDict
 
 from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 from langgraph.graph import END, StateGraph
-
-from .base import AIChatMessage
-from .tools import (
-    GetClustersParams,
-    GetFacetsParams,
-    GetHierarchyParams,
-    SearchLogsParams,
-    SearchMemoryParams,
-)
 
 logger = logging.getLogger(__name__)
 
@@ -82,6 +77,8 @@ class GraphManager:
         """Node for AI reasoning and decision making."""
         logger.info("Node: reasoning")
 
+        from .base import AIChatMessage
+
         adk_messages = []
         for m in state["messages"]:
             msg = AIChatMessage(role=m["role"], content=m.get("content", ""))
@@ -95,22 +92,22 @@ class GraphManager:
 
         model = state.get("model")
         reasoning = state.get("reasoning", True)
-
+        
         # Get schemas
         tool_schemas = self.tools.get_tool_schemas()
 
         response = await self.provider.chat(
-            adk_messages,
-            session_id=state["session_id"],
-            model=model,
+            adk_messages, 
+            session_id=state["session_id"], 
+            model=model, 
             reasoning=reasoning,
-            tools=tool_schemas,
+            tools=tool_schemas
         )
 
         msg_dict = {"role": "assistant", "content": response.content}
         if response.tool_calls:
             msg_dict["tool_calls"] = response.tool_calls
-
+            
         state["messages"].append(msg_dict)
 
         if response.tool_calls:
@@ -126,63 +123,60 @@ class GraphManager:
     async def _node_tool_execution(self, state: MissionState):
         """Node for executing tools based on AI decision."""
         logger.info("Node: tool_execution")
-
+        
         last_msg = state["messages"][-1]
-
-        if last_msg.get("tool_calls"):
-            ctx = None
-
+        
+        if "tool_calls" in last_msg and last_msg["tool_calls"]:
+            from pydantic_ai import RunContext
+            ctx = RunContext(deps={}, retry=0, tool_name="", prompt=None)
+            
             for call in last_msg["tool_calls"]:
                 try:
                     name = call["function"]["name"]
                     args = json.loads(call["function"]["arguments"])
                     call_id = call["id"]
-
+                    
                     logger.info("Executing tool: %s with args: %s", name, args)
-
+                    
                     result = {"error": f"Tool {name} not found"}
                     if name == "search_logs":
+                        from .tools import SearchLogsParams
                         params = SearchLogsParams(**args)
                         result = await self.tools.search_logs(ctx, params)
                     elif name == "get_clusters":
+                        from .tools import GetClustersParams
                         params = GetClustersParams(**args)
                         result = await self.tools.get_clusters(ctx, params)
                     elif name == "search_memory":
+                        from .tools import SearchMemoryParams
                         params = SearchMemoryParams(**args)
                         result = await self.tools.search_memory(ctx, params)
                     elif name == "get_facets":
+                        from .tools import GetFacetsParams
                         params = GetFacetsParams(**args)
                         result = await self.tools.get_facets(ctx, params)
                     elif name == "get_hierarchy":
+                        from .tools import GetHierarchyParams
                         params = GetHierarchyParams(**args)
                         result = await self.tools.get_hierarchy(ctx, params)
-
-                    state["messages"].append(
-                        {
-                            "role": "tool",
-                            "content": json.dumps(result),
-                            "tool_call_id": call_id,
-                            "name": name,
-                        }
-                    )
+                        
+                    state["messages"].append({
+                        "role": "tool",
+                        "content": json.dumps(result),
+                        "tool_call_id": call_id,
+                        "name": name
+                    })
                 except Exception as e:
-                    logger.exception("Failed to execute tool call %s:", call)
-                    state["messages"].append(
-                        {
-                            "role": "tool",
-                            "content": json.dumps({"error": str(e)}),
-                            "tool_call_id": call.get("id", "unknown"),
-                            "name": call.get("function", {}).get("name", "unknown"),
-                        }
-                    )
+                    logger.error("Failed to execute tool call %s: %s", call, e)
+                    state["messages"].append({
+                        "role": "tool",
+                        "content": json.dumps({"error": str(e)}),
+                        "tool_call_id": call.get("id", "unknown"),
+                        "name": call.get("function", {}).get("name", "unknown")
+                    })
         else:
             # Fallback handling for heuristic tool calls
-            state["messages"].append(
-                {
-                    "role": "system",
-                    "content": "No tool_calls array provided by model, but tool execution triggered.",  # noqa: E501
-                }
-            )
+            state["messages"].append({"role": "system", "content": "No tool_calls array provided by model, but tool execution triggered."})
 
         return state
 
@@ -200,3 +194,9 @@ class GraphManager:
     async def run(self, config: dict, initial_state: MissionState):
         """Execute the graph."""
         return await self.workflow.ainvoke(initial_state, config)
+'''
+
+with open('sidecar/src/ai/graph.py', 'w', encoding='utf-8') as f:
+    f.write(new_graph)
+
+print("Updated graph.py")

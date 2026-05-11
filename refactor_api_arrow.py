@@ -1,6 +1,5 @@
-import re
 
-with open("sidecar/src/api.py", "r", encoding="utf-8") as f:
+with open("sidecar/src/api.py", encoding="utf-8") as f:
     content = f.read()
 
 start_idx = content.find("def _bg_ingest_local_file(")

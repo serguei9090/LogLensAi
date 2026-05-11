@@ -12,6 +12,7 @@ Usage:
     result = generate_design_system("SaaS dashboard", "My Project", persist=True, page="dashboard")
 """
 
+import contextlib
 import csv
 import json
 from datetime import datetime
@@ -101,10 +102,8 @@ class DesignSystemGenerator:
 
         # Parse decision rules JSON
         decision_rules = {}
-        try:
+        with contextlib.suppress(json.JSONDecodeError):
             decision_rules = json.loads(rule.get("Decision_Rules", "{}"))
-        except json.JSONDecodeError:
-            pass
 
         return {
             "pattern": rule.get("Recommended_Pattern", ""),
@@ -981,9 +980,9 @@ def _generate_intelligent_overrides(page_name: str, page_query: str, design_syst
     # Extract style-based overrides
     if style_results:
         style = style_results[0]
-        style_name = style.get("Style Category", "")
+        style.get("Style Category", "")
         keywords = style.get("Keywords", "")
-        best_for = style.get("Best For", "")
+        style.get("Best For", "")
         effects = style.get("Effects & Animation", "")
 
         # Infer layout from style keywords
@@ -1076,7 +1075,7 @@ def _detect_page_type(context: str, style_results: list) -> str:
 
     # Fallback: try to infer from style results
     if style_results:
-        style_name = style_results[0].get("Style Category", "").lower()
+        style_results[0].get("Style Category", "").lower()
         best_for = style_results[0].get("Best For", "").lower()
 
         if "dashboard" in best_for or "data" in best_for:

@@ -6,9 +6,9 @@ import tempfile
 sidecar_src = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "src"))
 sys.path.insert(0, sidecar_src)
 
-import pytest
-from api import App, JSONRPCRequest
-from db import Database
+import pytest  # noqa: E402
+from api import App, JSONRPCRequest  # noqa: E402
+from db import Database  # noqa: E402
 
 
 @pytest.fixture

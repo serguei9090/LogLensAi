@@ -285,7 +285,7 @@ export function CustomParserModal({
   return (
     <TooltipProvider delay={200}>
       <div className="fixed inset-0 z-[200] flex flex-col overflow-y-auto py-8 px-4 bg-black/85 backdrop-blur-md animate-in fade-in duration-300">
-        <div className="max-w-5xl w-full my-auto mx-auto min-h-[520px] flex flex-col bg-[#0D1110] border border-border/60 rounded-2xl shadow-2xl overflow-hidden ring-1 ring-white/10">
+        <div className="max-w-5xl w-full my-auto mx-auto min-h-[520px] flex flex-col bg-bg-app border border-border-subtle rounded-2xl shadow-2xl overflow-hidden ring-1 ring-white/10">
           <div className="flex items-center justify-between px-8 py-6 border-b border-border/40 bg-white/5">
             <div className="flex items-center gap-4">
               <div className="p-2.5 rounded-xl bg-primary/10 text-primary border border-primary/20">
@@ -339,7 +339,7 @@ export function CustomParserModal({
               <section
                 ref={sampleContainerRef}
                 aria-label="Log sample container"
-                className="flex-1 overflow-auto p-0 font-mono text-xs select-text custom-scrollbar bg-surface-base/20 divide-y divide-white/5"
+                className="flex-1 overflow-auto p-0 font-mono text-xs select-text custom-scrollbar bg-bg-surface/20 divide-y divide-white/5"
               >
                 {!isLoading && samples.length > 0 ? (
                   samples.map((line, idx) => (
@@ -432,7 +432,7 @@ export function CustomParserModal({
                         </TooltipTrigger>
                         <TooltipContent
                           side="left"
-                          className="bg-[#111613] border-white/20 text-white p-3 text-[11px] max-w-[280px] space-y-2 text-wrap"
+                          className="bg-bg-surface border-border-subtle text-text-primary p-3 text-[11px] max-w-[280px] space-y-2 text-wrap"
                         >
                           <p className="font-bold text-primary">Python Regex Protocol</p>
                           <p>LogLens uses Python-style named groups:</p>
@@ -459,7 +459,7 @@ export function CustomParserModal({
                   </label>
                   <div
                     id={previewId}
-                    className="bg-black/40 rounded-xl border border-white/5 divide-y divide-white/5 overflow-hidden text-wrap"
+                    className="bg-black/40 rounded-xl border border-border-subtle/40 divide-y divide-white/5 overflow-hidden text-wrap"
                   >
                     {previewResults.length > 0 ? (
                       previewResults.slice(0, 2).map((res, i) => (
@@ -547,7 +547,7 @@ export function CustomParserModal({
             left: (activeSelection.rect?.left || 0) + (activeSelection.rect?.width || 0) / 2,
             transform: "translateX(-50%)",
           }}
-          className="z-[999] flex items-center gap-1 p-1 bg-[#111613] border border-white/20 rounded-lg shadow-2xl animate-in zoom-in-95 duration-200"
+          className="z-[999] flex items-center gap-1 p-1 bg-bg-surface border border-border-subtle rounded-lg shadow-2xl animate-in zoom-in-95 duration-200"
         >
           <button
             type="button"

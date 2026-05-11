@@ -3,6 +3,7 @@ import {
   DashboardModeToggle,
 } from "@/components/molecules/DashboardModeToggle";
 import { type TimeRange, TimeRangePicker } from "@/components/molecules/TimeRangePicker";
+import { Button } from "@/components/ui/button";
 import {
   Select,
   SelectContent,
@@ -18,9 +19,7 @@ import {
   Activity,
   AlertCircle,
   AlertTriangle,
-  BarChart3,
   Database,
-  History,
   Layers,
   RefreshCcw,
   Sparkles,
@@ -28,15 +27,11 @@ import {
 } from "lucide-react";
 import type React from "react";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import {
-  Area,
-  AreaChart,
-  CartesianGrid,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from "recharts";
+
+// Atomic/Molecule Imports
+import { StatCard } from "@/components/atoms/StatCard";
+import { ClusterRow } from "@/components/molecules/ClusterRow";
+import { DashboardCharts } from "@/components/organisms/DashboardCharts";
 
 interface DashboardStats {
   total_logs: number;
@@ -78,20 +73,21 @@ function DashboardHeader({
   return (
     <div className="flex justify-between items-start mb-6">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight text-text-base mb-1 font-mono uppercase italic flex items-center gap-3">
+        <h1 className="text-3xl font-bold tracking-tight text-text-primary mb-1 font-mono uppercase italic flex items-center gap-3">
           {title}
-          {mode === "ai" && <Sparkles className="size-6 text-primary-green" />}
+          {mode === "ai" && <Sparkles className="size-6 text-primary" />}
         </h1>
         <p className="text-text-muted text-sm">{description}</p>
       </div>
-      <button
-        type="button"
+      <Button
+        variant="outline"
+        size="icon"
         onClick={onRefresh}
-        className="p-2 rounded-lg bg-bg-surface border border-border hover:bg-bg-elevated transition-colors text-text-muted hover:text-primary-green"
         title="Refresh Data"
+        className="text-text-muted hover:text-primary"
       >
         <RefreshCcw className={cn("h-4 w-4", loading && "animate-spin")} />
-      </button>
+      </Button>
     </div>
   );
 }
@@ -273,7 +269,7 @@ export default function DashboardPage() {
     return (
       <div className="space-y-3">
         <div className="flex items-center gap-2 mb-2">
-          <RefreshCcw className="size-3 text-primary-green animate-spin" />
+          <RefreshCcw className="size-3 text-primary animate-spin" />
           <span className="text-[10px] font-bold uppercase tracking-widest text-text-muted">
             Background Processing
           </span>
@@ -287,7 +283,7 @@ export default function DashboardPage() {
           >
             <div className="flex justify-between items-center mb-2">
               <div className="flex items-center gap-3">
-                <span className="text-[10px] font-mono text-primary-green bg-primary-green/10 px-1.5 py-0.5 rounded uppercase font-bold">
+                <span className="text-[10px] font-mono text-primary bg-primary/10 px-1.5 py-0.5 rounded uppercase font-bold">
                   Job #{job.id}
                 </span>
                 <span className="text-[11px] font-medium text-text-primary uppercase tracking-tight">
@@ -300,7 +296,7 @@ export default function DashboardPage() {
             </div>
             <div className="h-1.5 bg-bg-base/50 rounded-full overflow-hidden border border-white/5">
               <motion.div
-                className="h-full bg-primary-green shadow-[0_0_10px_rgba(16,185,129,0.4)]"
+                className="h-full bg-primary shadow-[0_0_10px_var(--primary-glow)]"
                 initial={{ width: 0 }}
                 animate={{ width: `${(job.processed_lines / job.total_lines) * 100}%` }}
                 transition={{ type: "spring", stiffness: 50 }}
@@ -308,127 +304,6 @@ export default function DashboardPage() {
             </div>
           </motion.div>
         ))}
-      </div>
-    );
-  };
-
-  /**
-   * Renders the main analytics charts.
-   */
-  const renderMainCharts = () => {
-    return (
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Ingestion Timeline */}
-        <section className="lg:col-span-2 bg-bg-surface/50 border border-border rounded-xl p-6 backdrop-blur-sm relative overflow-hidden h-[300px] flex flex-col">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-2">
-              <History className="h-4 w-4 text-primary-green" />
-              <h2 className="text-xs font-bold uppercase tracking-widest text-text-muted">
-                Ingestion Volume
-              </h2>
-            </div>
-          </div>
-          <div className="flex-1 w-full min-h-0">
-            {stats && stats.time_series.length > 0 ? (
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={stats.time_series}>
-                  <defs>
-                    <linearGradient id="colorIngest" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#10b981" stopOpacity={0.3} />
-                      <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid
-                    strokeDasharray="3 3"
-                    vertical={false}
-                    stroke="rgba(255,255,255,0.05)"
-                  />
-                  <XAxis
-                    dataKey="timestamp"
-                    axisLine={false}
-                    tickLine={false}
-                    tick={{
-                      fontSize: 9,
-                      fill: "rgba(255,255,255,0.4)",
-                      fontFamily: "JetBrains Mono",
-                    }}
-                    minTickGap={30}
-                    tickFormatter={(val) => val.split(" ")[1]}
-                  />
-                  <YAxis
-                    axisLine={false}
-                    tickLine={false}
-                    tick={{
-                      fontSize: 9,
-                      fill: "rgba(255,255,255,0.4)",
-                      fontFamily: "JetBrains Mono",
-                    }}
-                  />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: "#111",
-                      border: "1px solid #333",
-                      fontSize: "10px",
-                      fontFamily: "JetBrains Mono",
-                    }}
-                    itemStyle={{ color: "#10b981" }}
-                  />
-                  <Area
-                    type="monotone"
-                    dataKey="INFO"
-                    stackId="1"
-                    stroke="#10b981"
-                    fillOpacity={1}
-                    fill="url(#colorIngest)"
-                  />
-                  <Area
-                    type="monotone"
-                    dataKey="WARN"
-                    stackId="1"
-                    stroke="#f59e0b"
-                    fill="#f59e0b"
-                    fillOpacity={0.1}
-                  />
-                  <Area
-                    type="monotone"
-                    dataKey="ERROR"
-                    stackId="1"
-                    stroke="#ef4444"
-                    fill="#ef4444"
-                    fillOpacity={0.1}
-                  />
-                </AreaChart>
-              </ResponsiveContainer>
-            ) : (
-              <div className="h-full flex items-center justify-center text-[10px] font-mono text-text-muted uppercase tracking-widest">
-                No Time Data
-              </div>
-            )}
-          </div>
-        </section>
-
-        {/* Severity Summary */}
-        <section className="lg:col-span-1 bg-bg-surface/50 border border-border rounded-xl p-6 backdrop-blur-sm relative overflow-hidden flex flex-col">
-          <div className="flex items-center gap-2 mb-6">
-            <BarChart3 className="h-4 w-4 text-primary-green" />
-            <h2 className="text-xs font-bold uppercase tracking-widest text-text-muted">
-              Severity Distribution
-            </h2>
-          </div>
-          <div className="space-y-4 relative z-10 overflow-y-auto pr-2 custom-scrollbar">
-            {stats && Object.keys(stats.level_counts).length > 0 ? (
-              Object.entries(stats.level_counts)
-                .sort((a, b) => b[1] - a[1])
-                .map(([level, count]) => (
-                  <LevelBar key={level} level={level} count={count} total={stats.total_logs} />
-                ))
-            ) : (
-              <div className="py-10 text-center text-[10px] font-mono text-text-muted uppercase tracking-widest">
-                No Data
-              </div>
-            )}
-          </div>
-        </section>
       </div>
     );
   };
@@ -467,7 +342,7 @@ export default function DashboardPage() {
                         key={`${d.source_name}-${d.timestamp}`}
                         className="h-full flex-1 rounded-sm border border-white/5 transition-all hover:scale-110"
                         style={{
-                          backgroundColor: `rgba(16, 185, 129, ${0.1 + intensity * 0.9})`,
+                          backgroundColor: `color-mix(in srgb, var(--primary) ${intensity * 100}%, transparent)`,
                           minWidth: "4px",
                         }}
                         title={`${d.timestamp}: ${d.count} logs`}
@@ -488,7 +363,7 @@ export default function DashboardPage() {
     return (
       <div className="flex-1 flex items-center justify-center bg-bg-base">
         <div className="flex flex-col items-center gap-4">
-          <RefreshCcw className="h-8 w-8 text-primary-green animate-spin" />
+          <RefreshCcw className="h-8 w-8 text-primary animate-spin" />
           <p className="text-sm text-text-muted font-mono uppercase tracking-widest">
             {loadingText}
           </p>
@@ -533,13 +408,13 @@ export default function DashboardPage() {
               <motion.section
                 initial={{ opacity: 0, y: -10 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="bg-primary-green/5 border border-primary-green/20 rounded-2xl p-6 backdrop-blur-md relative overflow-hidden group"
+                className="bg-primary/5 border border-primary/20 rounded-2xl p-6 backdrop-blur-md relative overflow-hidden group"
               >
                 <div className="flex items-start justify-between gap-6 relative z-10">
                   <div className="flex-1">
                     <div className="flex items-center gap-2 mb-3">
-                      <Sparkles className="size-4 text-primary-green animate-pulse" />
-                      <span className="text-[10px] font-bold uppercase tracking-widest text-primary-green">
+                      <Sparkles className="size-4 text-primary animate-pulse" />
+                      <span className="text-[10px] font-bold uppercase tracking-widest text-primary">
                         Latest AI Observation
                       </span>
                     </div>
@@ -547,15 +422,14 @@ export default function DashboardPage() {
                       &quot;{stats.latest_ai_insight}&quot;
                     </p>
                   </div>
-                  <button
-                    type="button"
+                  <Button
                     onClick={() => setMode("ai")}
-                    className="shrink-0 px-4 py-2 bg-primary-green text-bg-base text-[10px] font-bold uppercase tracking-widest rounded-lg hover:bg-primary-green/90 transition-all hover:scale-105 shadow-[0_0_15px_rgba(16,185,129,0.3)]"
+                    className="shrink-0 text-[10px] uppercase tracking-widest shadow-[0_0_15px_var(--primary-glow)] hover:scale-105"
                   >
                     Deep Dive
-                  </button>
+                  </Button>
                 </div>
-                <div className="absolute -top-20 -right-20 size-64 bg-primary-green/10 rounded-full blur-[80px] pointer-events-none" />
+                <div className="absolute -top-20 -right-20 size-64 bg-primary/10 rounded-full blur-[80px] pointer-events-none" />
               </motion.section>
             )}
 
@@ -568,7 +442,7 @@ export default function DashboardPage() {
                 subValue="Records in context"
               />
               <StatCard
-                icon={<Layers className="h-4 w-4 text-accent-violet" />}
+                icon={<Layers className="h-4 w-4 text-debug" />}
                 label="Patterns"
                 value={stats?.total_clusters.toLocaleString() ?? "0"}
                 subValue="Drain3 Templates"
@@ -586,7 +460,7 @@ export default function DashboardPage() {
                 subValue="Active workspaces"
               />
               <StatCard
-                icon={<TrendingUp className="h-4 w-4 text-primary-green" />}
+                icon={<TrendingUp className="h-4 w-4 text-primary" />}
                 label="Drift"
                 value={stats?.new_patterns_count.toString() ?? "0"}
                 subValue="New Patterns"
@@ -595,24 +469,24 @@ export default function DashboardPage() {
             </div>
 
             {/* Main Charts Row */}
-            {renderMainCharts()}
+            <DashboardCharts stats={stats} />
 
             {/* Patterns Row */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
               {/* Critical Clusters */}
               <section className="bg-bg-surface/50 border border-border rounded-xl p-6 backdrop-blur-sm relative overflow-hidden">
                 <div className="flex items-center gap-2 mb-6">
-                  <AlertTriangle className="h-4 w-4 text-red-500" />
+                  <AlertTriangle className="h-4 w-4 text-error" />
                   <h2 className="text-xs font-bold uppercase tracking-widest text-text-muted">
                     Top Error Clusters
                   </h2>
                 </div>
                 <div className="space-y-2 relative z-10">
                   {stats && stats.top_error_clusters.length > 0 ? (
-                    stats.top_error_clusters.map((c) => (
+                    stats.top_error_clusters.map((c, idx) => (
                       <ClusterRow
                         key={c.template}
-                        index={stats.top_error_clusters.indexOf(c)}
+                        index={idx}
                         template={c.template}
                         count={c.count}
                         total={stats.total_logs}
@@ -630,17 +504,17 @@ export default function DashboardPage() {
               {/* General Clusters */}
               <section className="bg-bg-surface/50 border border-border rounded-xl p-6 backdrop-blur-sm relative overflow-hidden">
                 <div className="flex items-center gap-2 mb-6">
-                  <AlertCircle className="h-4 w-4 text-violet-400" />
+                  <AlertCircle className="h-4 w-4 text-debug" />
                   <h2 className="text-xs font-bold uppercase tracking-widest text-text-muted">
                     Top Noise Generators
                   </h2>
                 </div>
                 <div className="space-y-2 relative z-10">
                   {stats && stats.top_clusters.length > 0 ? (
-                    stats.top_clusters.map((c) => (
+                    stats.top_clusters.map((c, idx) => (
                       <ClusterRow
                         key={c.template}
-                        index={stats.top_clusters.indexOf(c)}
+                        index={idx}
                         template={c.template}
                         count={c.count}
                         total={stats.total_logs}
@@ -677,10 +551,10 @@ export default function DashboardPage() {
             exit={{ opacity: 0, x: -10 }}
             className="flex flex-col items-center justify-center py-20 bg-bg-surface/20 rounded-3xl border border-dashed border-border/50"
           >
-            <div className="size-20 bg-primary-green/10 rounded-full flex items-center justify-center mb-6 animate-pulse">
-              <Sparkles className="size-10 text-primary-green" />
+            <div className="size-20 bg-primary/10 rounded-full flex items-center justify-center mb-6 animate-pulse">
+              <Sparkles className="size-10 text-primary" />
             </div>
-            <h3 className="text-lg font-bold text-text-base mb-2 font-mono uppercase">
+            <h3 className="text-lg font-bold text-text-primary mb-2 font-mono uppercase">
               AI Insight Engine
             </h3>
             <p className="text-text-muted text-sm max-w-md text-center px-6 font-mono leading-relaxed">
@@ -700,153 +574,6 @@ export default function DashboardPage() {
       </AnimatePresence>
 
       <DashboardModeToggle mode={mode} onModeChange={setMode} />
-    </div>
-  );
-}
-
-function StatCard({
-  icon,
-  label,
-  value,
-  subValue,
-  trend,
-}: Readonly<{
-  icon: React.ReactNode;
-  label: string;
-  value: string;
-  subValue: string;
-  trend?: "up" | "down" | "stable";
-}>) {
-  let trendColor = "text-text-muted opacity-40";
-  if (trend === "up") {
-    trendColor = "text-red-400";
-  } else if (trend === "down") {
-    trendColor = "text-green-400";
-  }
-  let trendSymbol = "•";
-  if (trend === "up") {
-    trendSymbol = "↑";
-  } else if (trend === "down") {
-    trendSymbol = "↓";
-  }
-
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      className="bg-bg-surface/40 border border-white/5 rounded-xl p-4 relative overflow-hidden group hover:border-primary/20 transition-all hover:bg-bg-surface/60"
-    >
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex-1">
-          <p className="text-[10px] font-bold uppercase tracking-wider text-text-muted mb-1">
-            {label}
-          </p>
-          <div className="flex items-baseline gap-2">
-            <h3 className="text-xl font-mono font-bold text-text-primary tracking-tight">
-              {value}
-            </h3>
-            {trend && (
-              <span className={cn("text-[10px] font-bold", trendColor)}>{trendSymbol}</span>
-            )}
-          </div>
-          <p className="text-[9px] text-text-muted mt-1 font-medium opacity-60 group-hover:opacity-100 transition-opacity uppercase tracking-tighter">
-            {subValue}
-          </p>
-        </div>
-        <div className="p-2 rounded-lg bg-bg-base/50 border border-white/5 group-hover:border-primary/10 transition-colors">
-          {icon}
-        </div>
-      </div>
-
-      {/* Subtle accent line */}
-      <div className="absolute bottom-0 left-0 h-0.5 w-0 bg-primary group-hover:w-full transition-all duration-500 opacity-30" />
-    </motion.div>
-  );
-}
-
-function LevelBar({
-  level,
-  count,
-  total,
-}: Readonly<{ level: string; count: number; total: number }>) {
-  const colors: Record<string, string> = {
-    ERROR: "bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.3)]",
-    WARN: "bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.3)]",
-    INFO: "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.3)]",
-    DEBUG: "bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.3)]",
-    FATAL: "bg-red-700 shadow-[0_0_8px_rgba(185,28,28,0.3)]",
-    CRITICAL: "bg-purple-600 shadow-[0_0_8px_rgba(147,51,234,0.3)]",
-  };
-
-  const pct = total > 0 ? (count / total) * 100 : 0;
-  const color = colors[level.toUpperCase()] || "bg-zinc-500";
-
-  return (
-    <div className="group">
-      <div className="flex justify-between items-end mb-1.5">
-        <span className="text-[10px] font-bold uppercase tracking-tight text-text-base group-hover:text-primary-green transition-colors">
-          {level}
-        </span>
-        <span className="text-[10px] font-mono text-text-muted bg-bg-base/50 px-1.5 py-0.5 rounded border border-border/30">
-          {count.toLocaleString()}
-        </span>
-      </div>
-      <div className="h-2 bg-bg-elevated rounded-full overflow-hidden border border-white/5">
-        <motion.div
-          initial={{ width: 0 }}
-          animate={{ width: `${pct}%` }}
-          transition={{ duration: 1, ease: "easeOut" }}
-          className={`h-full ${color} rounded-full`}
-        />
-      </div>
-    </div>
-  );
-}
-
-function ClusterRow({
-  index,
-  template,
-  count,
-  total,
-  type,
-}: Readonly<{
-  index: number;
-  template: string;
-  count: number;
-  total: number;
-  type: "error" | "noise";
-}>) {
-  const barColor = type === "error" ? "bg-red-500" : "bg-violet-500";
-  const glow =
-    type === "error"
-      ? "shadow-[0_0_8px_rgba(239,68,68,0.3)]"
-      : "shadow-[0_0_8px_rgba(139,92,246,0.3)]";
-
-  return (
-    <div className="group flex items-start gap-4 p-3 rounded-lg hover:bg-bg-elevated transition-all border border-transparent hover:border-border/50 bg-bg-base/30">
-      <span className="text-[10px] font-mono text-text-muted py-1 w-6">#{index + 1}</span>
-      <div className="flex-1 overflow-hidden">
-        <p
-          className={cn(
-            "text-[11px] font-mono text-text-base truncate mb-1.5 leading-relaxed group-hover:text-primary-green transition-colors",
-            type === "error" && "text-red-400/90",
-          )}
-        >
-          {template}
-        </p>
-        <div className="flex items-center gap-3">
-          <div className="h-1 bg-white/5 rounded-full flex-1 overflow-hidden border border-white/5">
-            <motion.div
-              initial={{ width: 0 }}
-              animate={{ width: `${(count / total) * 100}%` }}
-              className={cn("h-full rounded-full", barColor, glow)}
-            />
-          </div>
-          <span className="text-[10px] font-mono text-text-muted shrink-0 w-16 text-right">
-            {count.toLocaleString()} hits
-          </span>
-        </div>
-      </div>
     </div>
   );
 }

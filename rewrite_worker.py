@@ -1,6 +1,5 @@
-import re
 
-with open("sidecar/src/workers/clustering.py", "r", encoding="utf-8") as f:
+with open("sidecar/src/workers/clustering.py", encoding="utf-8") as f:
     content = f.read()
 
 # We want to replace the entire `def _tag_log_batch` down to `except Exception as exc:` block

@@ -1,8 +1,10 @@
-import time
-import os
 import json
+import os
+import time
+
 from drain3 import TemplateMiner
 from drain3.template_miner_config import TemplateMinerConfig
+
 
 def process_apache_logs_pro():
     log_file_path = "apache_logs.log"
@@ -24,30 +26,31 @@ def process_apache_logs_pro():
     miner = TemplateMiner(config=config)
 
     # 2. Phase 1: Training Pass (Sampling)
-    TRAIN_SAMPLE_SIZE = 5000
-    print(f"--- Phase 1: Training on first {TRAIN_SAMPLE_SIZE} lines ---")
+    train_sample_size = 5000
+    print(f"--- Phase 1: Training on first {train_sample_size} lines ---")
     
     lines = []
-    with open(log_file_path, "r", encoding="utf-8", errors="ignore") as f:
+    with open(log_file_path, encoding="utf-8", errors="ignore") as f:
         for i, line in enumerate(f):
-            if i >= 10000: break # Load a buffer
+            if i >= 10000:
+                break  # Load a buffer
             lines.append(line.strip())
 
     train_start = time.time()
-    for i in range(min(TRAIN_SAMPLE_SIZE, len(lines))):
+    for i in range(min(train_sample_size, len(lines))):
         miner.add_log_message(lines[i])
     train_end = time.time()
     
     print(f"Training took: {train_end - train_start:.4f}s ({len(miner.drain.clusters)} clusters)")
 
     # 3. Phase 2: Inference Pass (Tagging)
-    print(f"\n--- Phase 2: Inference (Tagging) benchmark ---")
+    print("\n--- Phase 2: Inference (Tagging) benchmark ---")
     tag_start = time.time()
     match_count = 0
     fail_count = 0
     
     # We use a larger set for tagging test
-    test_lines = lines[TRAIN_SAMPLE_SIZE:10000]
+    test_lines = lines[train_sample_size:10000]
     for line in test_lines:
         result = miner.match(line)
         if result:
@@ -63,24 +66,21 @@ def process_apache_logs_pro():
         print(f"Tagging Speed: {len(test_lines) / tag_duration:.2f} lines/sec")
 
     # 4. Phase 3: Facet Extraction Test (100 lines)
-    print(f"\n--- Phase 3: Facet Extraction Test (Sample of 5) ---")
-    facet_test_count = 0
-    for line in lines[0:100]:
+    print("\n--- Phase 3: Facet Extraction Test (Sample of 5) ---")
+    for i, line in enumerate(lines[0:100]):
         result = miner.add_log_message(line) # Ensure it exists in tree
         params = miner.extract_parameters(result["template_mined"], line, exact_matching=True)
         
-        if facet_test_count < 5:
+        if i < 5:
             print(f"\nLog: {line[:80]}...")
             print(f"Template: {result['template_mined']}")
             param_list = [p.value for p in params]
             print(f"Extracted Facets (Slots): {param_list}")
-        
-        facet_test_count += 1
 
     # Write a small sample to verify the idea
     test_results = {
         "summary": {
-            "training_speed": TRAIN_SAMPLE_SIZE / (train_end - train_start),
+            "training_speed": train_sample_size / (train_end - train_start),
             "tagging_speed": len(test_lines) / tag_duration if tag_duration > 0 else 0,
             "match_rate": match_count / len(test_lines) if len(test_lines) > 0 else 0
         },
@@ -98,7 +98,7 @@ def process_apache_logs_pro():
 
     with open("bench_results_pro.json", "w") as f:
         json.dump(test_results, f, indent=2)
-    print(f"\nDetailed results saved to bench_results_pro.json")
+    print("\nDetailed results saved to bench_results_pro.json")
 
 if __name__ == "__main__":
     process_apache_logs_pro()

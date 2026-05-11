@@ -174,7 +174,6 @@ function ModelSelector({
  * Safely parse a raw settings string value that may be JSON or a
  * Python repr-style string (single quotes, True/False/None).
  *
- * Ref: docs/Documentation/architecture/gemini.md — Sidecar serialization rules
  * @param raw - Raw string value from the sidecar settings store
  * @returns Parsed value, or null if unparseable
  */
@@ -204,7 +203,6 @@ function safeParse(raw: string | null): unknown {
  * Returns a short human-readable label for the active AI provider.
  * Extracted from JSX to eliminate nested ternary (Biome complexity rule).
  *
- * Ref: docs/Documentation/design/ui-components.md — Status Banner
  */
 function getProviderLabel(provider: string): string {
   if (provider === "gemini-cli") {
@@ -226,7 +224,6 @@ function getProviderLabel(provider: string): string {
  * Returns a descriptive sentence for the active AI provider.
  * Extracted from JSX to eliminate nested ternary (Biome complexity rule).
  *
- * Ref: docs/Documentation/design/ui-components.md — Status Banner
  */
 function getProviderDescription(provider: string): string {
   if (provider === "gemini-cli") {
@@ -249,7 +246,7 @@ function getProviderDescription(provider: string): string {
  * Hoisted to module scope to reduce SettingsPanel's cognitive complexity below the 15-point
  * Biome threshold. Relies on the module-level `safeParse` for JSON fields.
  *
- * Ref: docs/Documentation/architecture/gemini.md — Sidecar serialization rules
+
  * @param remoteSettings - Raw key/value pairs from the `get_settings` JSON-RPC method
  * @param prev - Previous AppSettings to spread as base (preserves fields not in remote)
  * @returns Fully typed AppSettings object

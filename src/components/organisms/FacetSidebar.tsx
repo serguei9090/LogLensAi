@@ -26,7 +26,7 @@ export function FacetSidebar() {
       }}
       transition={{ type: "spring", stiffness: 400, damping: 40 }}
       className={cn(
-        "border-r border-border-subtle bg-bg-base flex flex-col h-full overflow-hidden select-none relative",
+        "border-r border-border-subtle bg-bg-app flex flex-col h-full overflow-hidden select-none relative",
         facetSidebarCollapsed ? "pointer-events-none" : "",
       )}
     >
@@ -36,23 +36,25 @@ export function FacetSidebar() {
         </span>
         <div className="flex items-center gap-1">
           {hasFacetFilters && (
-            <button
-              type="button"
+            <Button
+              variant="ghost"
+              size="icon"
               onClick={clearFacetFilters}
-              className="p-1 hover:bg-primary/10 text-text-muted hover:text-primary rounded transition-colors"
+              className="h-7 w-7 text-text-muted hover:text-primary hover:bg-primary/10 transition-colors"
               title="Clear Facet Filters"
             >
               <FilterX className="h-3.5 w-3.5" />
-            </button>
+            </Button>
           )}
-          <button
-            type="button"
+          <Button
+            variant="ghost"
+            size="icon"
             onClick={toggleFacetSidebar}
-            className="p-1 hover:bg-primary/10 text-text-muted hover:text-primary rounded transition-colors"
+            className="h-7 w-7 text-text-muted hover:text-primary hover:bg-primary/10 transition-colors"
             title="Collapse Facets"
           >
             <PanelLeftClose className="h-3.5 w-3.5" />
-          </button>
+          </Button>
         </div>
       </div>
 

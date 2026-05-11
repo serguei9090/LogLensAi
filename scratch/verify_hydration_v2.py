@@ -13,8 +13,8 @@ sys.path.append(SIDECAR_SRC)
 # Mock some environment variables if needed
 os.environ["PROJECT_ROOT"] = PROJECT_ROOT
 
-from api import App
-from models import IngestLogEntry
+from api import App  # noqa: E402
+from models import IngestLogEntry  # noqa: E402
 
 
 def test_hydration():

@@ -31,8 +31,6 @@ class OpenAICompatibleProvider(AIProvider):
         try:
             logger.debug("Sending models list request to: %s", self.host)
 
-            # Use raw httpx/aiohttp or the underlying httpx client from openai
-            # to log the exact request if possible.
             import httpx
 
             async with httpx.AsyncClient() as client:
@@ -49,7 +47,6 @@ class OpenAICompatibleProvider(AIProvider):
                 if response.status_code == 200:
                     data = response.json()
                     models = []
-                    # Handle both standard {"data": [{"id": ...}]} and LM Studio {"models": [{"key": ...}]}
                     items = data.get("data") or data.get("models") or []
                     for m in items:
                         if "id" in m:
@@ -64,29 +61,66 @@ class OpenAICompatibleProvider(AIProvider):
             logger.error("Error fetching models from %s: %s", self.host, e)
             return []
 
+    def _format_messages(self, messages: list[AIChatMessage]) -> list[dict]:
+        chat_messages = []
+        if self.system_prompt:
+            chat_messages.append({"role": "system", "content": self.system_prompt})
+
+        for m in messages:
+            msg = {"role": m.role, "content": m.content}
+            if m.tool_calls:
+                msg["tool_calls"] = m.tool_calls
+            if m.role == "tool":
+                msg["tool_call_id"] = m.tool_call_id
+                if m.name:
+                    msg["name"] = m.name
+            chat_messages.append(msg)
+
+        return chat_messages
+
     async def chat(
         self,
         messages: list[AIChatMessage],
         model: str | None = None,
         session_id: str | None = None,
         provider_session_id: str | None = None,
+        tools: list[dict] | None = None,
         **kwargs,
     ) -> AIChatMessage:
         """Execute a chat session."""
         if not self._client:
             return AIChatMessage(role="assistant", content="Error: OpenAI Provider not configured.")
 
-        # Construct messages including system prompt
-        chat_messages = [{"role": "system", "content": self.system_prompt}]
-        for m in messages:
-            chat_messages.append({"role": m.role, "content": m.content})
+        chat_messages = self._format_messages(messages)
+
+        create_kwargs = {
+            "model": model or self.active_model,
+            "messages": chat_messages,
+        }
+        if tools:
+            create_kwargs["tools"] = tools
 
         try:
-            res = await self._client.chat.completions.create(
-                model=model or self.active_model, messages=chat_messages
+            res = await self._client.chat.completions.create(**create_kwargs)
+            message = res.choices[0].message
+
+            tool_calls = None
+            if message.tool_calls:
+                tool_calls = [
+                    {
+                        "id": call.id,
+                        "type": call.type,
+                        "function": {
+                            "name": call.function.name,
+                            "arguments": call.function.arguments,
+                        },
+                    }
+                    for call in message.tool_calls
+                ]
+
+            return AIChatMessage(
+                role="assistant", content=message.content or "", tool_calls=tool_calls
             )
-            content = res.choices[0].message.content
-            return AIChatMessage(role="assistant", content=content)
         except Exception as e:
             return AIChatMessage(role="assistant", content=f"OpenAI Compatible Error: {str(e)}")
 
@@ -96,6 +130,7 @@ class OpenAICompatibleProvider(AIProvider):
         model: str | None = None,
         session_id: str | None = None,
         provider_session_id: str | None = None,
+        tools: list[dict] | None = None,
         **kwargs,
     ):
         """Streaming chat."""
@@ -103,14 +138,18 @@ class OpenAICompatibleProvider(AIProvider):
             yield "Error: OpenAI Provider not configured."
             return
 
-        chat_messages = [{"role": "system", "content": self.system_prompt}]
-        for m in messages:
-            chat_messages.append({"role": m.role, "content": m.content})
+        chat_messages = self._format_messages(messages)
+
+        create_kwargs = {
+            "model": model or self.active_model,
+            "messages": chat_messages,
+            "stream": True,
+        }
+        if tools:
+            create_kwargs["tools"] = tools
 
         try:
-            stream = await self._client.chat.completions.create(
-                model=model or self.active_model, messages=chat_messages, stream=True
-            )
+            stream = await self._client.chat.completions.create(**create_kwargs)
             async for chunk in stream:
                 if chunk.choices and chunk.choices[0].delta.content:
                     yield chunk.choices[0].delta.content

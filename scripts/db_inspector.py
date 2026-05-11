@@ -58,7 +58,7 @@ def get_db_inspector(verbose=False):
             try:
                 cursor.execute(f"SELECT COUNT(*) FROM {table}")
                 table_counts[table] = cursor.fetchone()[0]
-            except:
+            except Exception:
                 table_counts[table] = "missing/error"
 
         summary = {
@@ -97,7 +97,7 @@ def get_db_inspector(verbose=False):
                 cursor.execute(f"SELECT * FROM logs WHERE workspace_id = '{ws_id}' LIMIT 5")
                 cols = [d[0] for d in cursor.description]
                 rows = cursor.fetchall()
-                samples[ws_id] = [dict(zip(cols, r)) for r in rows]
+                samples[ws_id] = [dict(zip(cols, r, strict=False)) for r in rows]
             details["log_samples"] = samples
 
             summary["details"] = details

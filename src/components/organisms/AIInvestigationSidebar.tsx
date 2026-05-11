@@ -378,7 +378,7 @@ export function AIInvestigationSidebar({
 
   return (
     <div
-      className="flex flex-col border-l border-zinc-800/60 bg-[#0D0F0E] h-full relative shrink-0 overflow-hidden"
+      className="flex flex-col border-l border-border-subtle bg-bg-app h-full relative shrink-0 overflow-hidden"
       style={{
         width: `${sidebarWidth}px`,
         minWidth: `${sidebarWidth}px`,
@@ -393,7 +393,7 @@ export function AIInvestigationSidebar({
         className="absolute left-[-2px] top-0 w-[4px] h-full cursor-col-resize hover:bg-emerald-500/50 transition-colors z-[100] border-none bg-transparent block p-0"
       />
 
-      <div className="p-4 border-b border-zinc-800/60 flex items-center justify-between shrink-0 h-[65px]">
+      <div className="p-4 border-b border-border-subtle flex items-center justify-between shrink-0 h-[65px]">
         <div className="flex items-center gap-3 overflow-hidden">
           <div className="bg-violet-500/10 p-2 rounded-xl shrink-0">
             <Sparkles className="h-4 w-4 text-violet-400" />
@@ -401,7 +401,7 @@ export function AIInvestigationSidebar({
           <div className="min-w-0">
             {isEditingTitle ? (
               <input
-                className="bg-zinc-900 border border-emerald-500/30 rounded px-2 py-0.5 text-[13px] font-bold text-white focus:outline-none w-full"
+                className="bg-bg-surface border border-primary/30 rounded px-2 py-0.5 text-[13px] font-bold text-text-primary focus:outline-none w-full"
                 value={editedTitle}
                 onChange={(e) => setEditedTitle(e.target.value)}
                 onBlur={handleRename}
@@ -420,13 +420,13 @@ export function AIInvestigationSidebar({
                 className="flex items-center gap-2 group/title cursor-pointer outline-none focus-visible:ring-1 focus-visible:ring-emerald-500/50 rounded bg-transparent p-0 border-none text-left"
                 onClick={() => setIsEditingTitle(true)}
               >
-                <h2 className="text-sm font-bold text-white leading-tight truncate">
+                <h2 className="text-sm font-bold text-text-primary leading-tight truncate">
                   {displayTitle}
                 </h2>
-                <Pencil className="h-3 w-3 text-zinc-500 opacity-0 group-hover/title:opacity-100 transition-opacity hover:text-emerald-400" />
+                <Pencil className="h-3 w-3 text-text-muted opacity-0 group-hover/title:opacity-100 transition-opacity hover:text-primary" />
               </button>
             )}
-            <p className="text-[10px] text-zinc-500 uppercase tracking-widest opacity-60 font-medium">
+            <p className="text-[10px] text-text-muted uppercase tracking-widest opacity-60 font-medium">
               {currentSessionId ? "Active Session" : "New Investigation"}
             </p>
           </div>
@@ -435,7 +435,7 @@ export function AIInvestigationSidebar({
           <Button
             variant="ghost"
             size="icon"
-            className="h-8 w-8 text-zinc-500 hover:text-emerald-400 hover:bg-emerald-500/10"
+            className="h-8 w-8 text-text-muted hover:text-primary hover:bg-primary/10"
             onClick={handleNewSession}
             title="New Investigation"
           >
@@ -445,7 +445,7 @@ export function AIInvestigationSidebar({
           <Button
             variant="ghost"
             size="icon"
-            className="h-8 w-8 text-zinc-500 hover:text-amber-400 hover:bg-amber-500/10"
+            className="h-8 w-8 text-text-muted hover:text-amber-400 hover:bg-amber-500/10"
             onClick={onEngineSettingsOpen}
             title="Engine Settings"
           >
@@ -455,7 +455,7 @@ export function AIInvestigationSidebar({
           <Button
             variant="ghost"
             size="icon"
-            className="h-8 w-8 rounded-lg text-zinc-500 hover:text-white hover:bg-zinc-800/80"
+            className="h-8 w-8 rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-hover"
             onClick={() => setSidebarOpen(false)}
           >
             <X className="h-4 w-4" />
@@ -468,12 +468,12 @@ export function AIInvestigationSidebar({
           {messages.length === 0 ? (
             <div className="space-y-12">
               <div className="flex flex-col items-center justify-center pt-10 text-center space-y-4">
-                <div className="w-16 h-16 bg-emerald-500/5 rounded-full flex items-center justify-center text-emerald-500/20 border border-emerald-500/10">
+                <div className="w-16 h-16 bg-primary/5 rounded-full flex items-center justify-center text-primary/20 border border-primary/10">
                   <MessageSquare className="size-8" />
                 </div>
                 <div>
-                  <h4 className="font-bold text-sm text-zinc-100">AI Investigator Ready</h4>
-                  <p className="text-xs text-zinc-500 mt-2 px-10 leading-relaxed max-w-sm mx-auto">
+                  <h4 className="font-bold text-sm text-text-primary">AI Investigator Ready</h4>
+                  <p className="text-xs text-text-muted mt-2 px-10 leading-relaxed max-w-sm mx-auto">
                     Select logs to start a context-aware analysis or resume a previous
                     investigation.
                   </p>
@@ -483,7 +483,7 @@ export function AIInvestigationSidebar({
               {sessions.length > 0 && (
                 <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-700">
                   <div className="flex items-center justify-between px-1">
-                    <h3 className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">
+                    <h3 className="text-[10px] font-bold text-text-muted uppercase tracking-widest">
                       Recent Investigations
                     </h3>
                   </div>
@@ -493,9 +493,9 @@ export function AIInvestigationSidebar({
                         key={s.session_id}
                         type="button"
                         onClick={() => setSession(s.session_id)}
-                        className="flex flex-col items-start p-4 text-left bg-zinc-900/40 border border-zinc-800/60 rounded-2xl hover:border-emerald-500/30 hover:bg-emerald-500/[0.02] transition-all group"
+                        className="flex flex-col items-start p-4 text-left bg-bg-surface-bright/40 border border-border-subtle rounded-2xl hover:border-primary/30 hover:bg-primary/[0.02] transition-all group"
                       >
-                        <span className="text-xs font-bold text-zinc-200 group-hover:text-emerald-400 transition-colors mb-1 truncate w-full">
+                        <span className="text-xs font-bold text-text-primary group-hover:text-primary transition-colors mb-1 truncate w-full">
                           {s.name}
                         </span>
                         <div className="flex items-center gap-2 text-[10px] text-zinc-500">
@@ -509,13 +509,14 @@ export function AIInvestigationSidebar({
                   </div>
 
                   {sessions.length > 4 && (
-                    <button
-                      type="button"
+                    <Button
+                      variant="ghost"
+                      size="sm"
                       onClick={() => setIsSearchModalOpen(true)}
-                      className="w-full mt-2 py-2 text-[10px] font-bold text-zinc-500 uppercase tracking-widest hover:text-emerald-400 hover:bg-emerald-400/5 rounded-lg transition-all"
+                      className="w-full mt-2 text-[10px] font-bold text-text-muted uppercase tracking-widest hover:text-primary hover:bg-primary/5 rounded-lg transition-all"
                     >
                       Show {sessions.length - 4} more...
-                    </button>
+                    </Button>
                   )}
                 </div>
               )}
@@ -552,13 +553,13 @@ export function AIInvestigationSidebar({
                     className={cn(
                       "w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 border transition-transform group-hover:scale-105",
                       isUser
-                        ? "bg-zinc-900 border-zinc-800"
-                        : "bg-violet-500/10 border-violet-500/20",
+                        ? "bg-bg-surface-bright border-border-subtle"
+                        : "bg-primary/10 border-primary/20",
                       isSameRoleAsPrev && "opacity-0 pointer-events-none", // Hide redundant avatars
                     )}
                   >
                     {isUser ? (
-                      <User className="size-4 text-zinc-400" />
+                      <User className="size-4 text-text-muted" />
                     ) : (
                       <Bot className="size-4 text-violet-400" />
                     )}
@@ -571,7 +572,7 @@ export function AIInvestigationSidebar({
                   >
                     {m.context_logs && m.context_logs.length > 0 && (
                       <div className="flex flex-wrap gap-1 mb-1">
-                        <span className="bg-emerald-500/10 px-2 py-0.5 rounded text-[9px] text-emerald-400 border border-emerald-500/20 font-medium">
+                        <span className="bg-primary/10 px-2 py-0.5 rounded text-[9px] text-primary border border-primary/20 font-medium">
                           {m.context_logs.length} logs attached
                         </span>
                       </div>
@@ -580,8 +581,8 @@ export function AIInvestigationSidebar({
                       className={cn(
                         "px-4 py-3 rounded-2xl text-[13px] leading-relaxed shadow-sm overflow-hidden w-full break-words transition-all duration-300",
                         isUser
-                          ? "bg-zinc-800 text-zinc-100 border border-zinc-700/50 rounded-tr-none"
-                          : "bg-[#111312] text-zinc-300 border border-zinc-800/60 rounded-tl-none",
+                          ? "bg-bg-surface text-text-primary border border-border-subtle rounded-tr-none"
+                          : "bg-bg-app text-text-secondary border border-border-subtle rounded-tl-none",
                       )}
                     >
                       {showTypingIndicator ? (
@@ -606,7 +607,7 @@ export function AIInvestigationSidebar({
                               <p className="whitespace-pre-wrap">{m.content}</p>
                             ) : (
                               <>
-                                <MarkdownContent content={response} className="text-zinc-200" />
+                                <MarkdownContent content={response} className="text-text-primary" />
                                 {m.a2ui_payload && (
                                   <A2UIRenderer
                                     payload={m.a2ui_payload}
@@ -620,7 +621,7 @@ export function AIInvestigationSidebar({
                       )}
                     </div>
                     {!isSameRoleAsPrev && (
-                      <span className="text-[9px] text-zinc-600 font-medium px-1 tracking-tight">
+                      <span className="text-[9px] text-text-muted font-medium px-1 tracking-tight">
                         {new Date(m.timestamp).toLocaleTimeString([], {
                           hour: "2-digit",
                           minute: "2-digit",
@@ -636,32 +637,33 @@ export function AIInvestigationSidebar({
         </div>
       </ScrollArea>
 
-      <div className="p-4 bg-[#0d0f0e]/50 backdrop-blur-md border-t border-zinc-800/60 space-y-4 shrink-0">
+      <div className="p-4 bg-bg-app/50 backdrop-blur-md border-t border-border-subtle space-y-4 shrink-0">
         {selectedLogIds.length > 0 && (
-          <div className="flex items-center justify-between px-3 py-2 bg-emerald-500/5 border border-emerald-500/10 rounded-xl">
-            <span className="text-[10px] font-bold text-emerald-400/80 uppercase tracking-widest">
+          <div className="flex items-center justify-between px-3 py-2 bg-primary/5 border border-primary/10 rounded-xl">
+            <span className="text-[10px] font-bold text-primary/80 uppercase tracking-widest">
               Context: {selectedLogIds.length} logs
             </span>
-            <button
-              type="button"
+            <Button
+              variant="ghost"
+              size="sm"
               onClick={clearSelection}
-              className="text-[10px] text-emerald-500 hover:text-emerald-400 transition-colors font-bold decoration-dotted underline underline-offset-2"
+              className="h-auto p-0 text-[10px] text-primary hover:text-primary-hover transition-colors font-bold decoration-dotted underline underline-offset-2"
             >
               Clear Selection
-            </button>
+            </Button>
           </div>
         )}
 
         <div className="relative group/input">
           {showCommands && (
-            <div className="absolute bottom-full left-0 mb-2 w-full bg-[#111312] border border-zinc-800 rounded-xl overflow-hidden shadow-2xl z-50 animate-in fade-in slide-in-from-bottom-2">
+            <div className="absolute bottom-full left-0 mb-2 w-full bg-bg-surface border border-border-subtle rounded-xl overflow-hidden shadow-2xl z-50 animate-in fade-in slide-in-from-bottom-2">
               <div className="p-2 space-y-1">
                 {AI_COMMANDS.filter((c) => c.cmd.startsWith(inputValue.toLowerCase())).map(
                   (cmd) => (
                     <button
                       key={cmd.cmd}
                       type="button"
-                      className="w-full flex flex-col items-start px-3 py-2 text-left rounded-lg bg-transparent hover:bg-emerald-500/10 focus:bg-emerald-500/10 outline-none transition-colors group"
+                      className="w-full flex flex-col items-start px-3 py-2 text-left rounded-lg bg-transparent hover:bg-primary/10 focus:bg-primary/10 outline-none transition-colors group"
                       onClick={() => {
                         setInputValue(`${cmd.cmd} `);
                         setShowCommands(false);
@@ -671,7 +673,7 @@ export function AIInvestigationSidebar({
                       <span className="text-xs font-bold text-emerald-400 font-mono">
                         {cmd.cmd}
                       </span>
-                      <span className="text-[10px] text-zinc-500 group-hover:text-zinc-400 mt-0.5">
+                      <span className="text-[10px] text-text-muted group-hover:text-text-secondary mt-0.5">
                         {cmd.desc}
                       </span>
                     </button>
@@ -703,15 +705,15 @@ export function AIInvestigationSidebar({
               }
             }}
             placeholder="Search patterns or analyze errors..."
-            className="min-h-[72px] max-h-[300px] bg-zinc-900/50 border-zinc-800 rounded-2xl resize-none py-3 pr-12 focus:ring-emerald-500/20 text-zinc-100 placeholder:text-zinc-600 transition-all focus:border-emerald-500/30"
+            className="min-h-[72px] max-h-[300px] bg-bg-surface-bright/50 border-border-subtle rounded-2xl resize-none py-3 pr-12 focus:ring-primary/20 text-text-primary placeholder:text-text-muted transition-all focus:border-primary/30"
           />
           <Button
             size="icon"
             className={cn(
               "absolute bottom-3 right-3 rounded-xl transition-all shadow-lg",
               inputValue.trim()
-                ? "bg-emerald-600 hover:bg-emerald-500 text-white"
-                : "bg-zinc-800 text-zinc-600 opacity-50",
+                ? "bg-primary hover:bg-primary-hover text-bg-app"
+                : "bg-bg-surface text-text-muted opacity-50",
             )}
             disabled={!inputValue.trim() || isLoading}
             onClick={handleSend}
@@ -721,14 +723,15 @@ export function AIInvestigationSidebar({
         </div>
 
         <div className="flex items-center px-1">
-          <button
-            type="button"
+          <Button
+            variant="ghost"
+            size="sm"
             onClick={() => setIsReasoningEnabled(!isReasoningEnabled)}
             className={cn(
-              "flex items-center gap-2 px-3 py-1.5 rounded-xl transition-all border",
+              "flex items-center gap-2 px-3 py-1.5 h-auto rounded-xl transition-all border",
               isReasoningEnabled
                 ? "bg-amber-500/10 border-amber-500/20 text-amber-300 hover:bg-amber-500/20 shadow-[0_0_15px_-5px_rgba(245,158,11,0.4)]"
-                : "bg-transparent border-zinc-800/60 text-zinc-500 hover:bg-zinc-800/80",
+                : "bg-transparent border-border-subtle/60 text-text-muted hover:bg-bg-hover",
             )}
             title={isReasoningEnabled ? "Deep Reasoning Active" : "Deep Reasoning Disabled"}
           >
@@ -740,7 +743,7 @@ export function AIInvestigationSidebar({
             <span className="text-[10px] font-bold uppercase tracking-widest whitespace-nowrap">
               Think
             </span>
-          </button>
+          </Button>
         </div>
       </div>
       <AIHistorySearchModal open={isSearchModalOpen} onOpenChange={setIsSearchModalOpen} />

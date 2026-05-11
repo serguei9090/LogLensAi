@@ -1437,15 +1437,15 @@ class App:
     ):
         import json
 
-        TRAIN_SAMPLE_SIZE = 200
+        train_sample_size = 200
         cluster_increments = {}
         batch_data = []
 
-        train_lines = chunk_lines[:TRAIN_SAMPLE_SIZE]
-        train_ids = line_ids[:TRAIN_SAMPLE_SIZE]
+        train_lines = chunk_lines[:train_sample_size]
+        train_ids = line_ids[:train_sample_size]
 
-        tag_lines = chunk_lines[TRAIN_SAMPLE_SIZE:]
-        tag_ids = line_ids[TRAIN_SAMPLE_SIZE:]
+        tag_lines = chunk_lines[train_sample_size:]
+        tag_ids = line_ids[train_sample_size:]
 
         # Phase 1: Train on sample
         for i, raw_text in enumerate(train_lines):
@@ -1525,8 +1525,8 @@ class App:
         cursor.execute("BEGIN TRANSACTION")
 
         # PyArrow logs table
-        cols = list(zip(*batch_data))
-        arrow_logs = pa.Table.from_arrays(
+        cols = list(zip(*batch_data, strict=False))
+        arrow_logs = pa.Table.from_arrays(  # noqa: F841
             [pa.array(c) for c in cols],
             names=[
                 "workspace_id",
@@ -1548,8 +1548,8 @@ class App:
         # PyArrow clusters table
         cluster_data = [(w, c, t, count) for (w, c, t), count in cluster_increments.items()]
         if cluster_data:
-            c_cols = list(zip(*cluster_data))
-            arrow_clusters = pa.Table.from_arrays(
+            c_cols = list(zip(*cluster_data, strict=False))
+            arrow_clusters = pa.Table.from_arrays(  # noqa: F841
                 [pa.array(c) for c in c_cols],
                 names=["workspace_id", "cluster_id", "template", "count"],
             )

@@ -4,6 +4,7 @@ import { FilterBuilder, type FilterEntry } from "@/components/molecules/FilterBu
 import { HighlightBuilder, type HighlightEntry } from "@/components/molecules/HighlightBuilder";
 import { SearchBar } from "@/components/molecules/SearchBar";
 import { TimeRangePicker } from "@/components/molecules/TimeRangePicker";
+import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -94,7 +95,7 @@ export function LogToolbar({
   }, [activeWorkspaceId, startPolling, stopPolling]);
 
   return (
-    <div className="sticky top-0 z-10 flex flex-nowrap items-center gap-3 bg-bg-base/95 backdrop-blur-sm border-b border-border/60 px-4 py-2.5 shadow-sm overflow-x-auto scrollbar-none">
+    <div className="sticky top-0 z-10 flex flex-nowrap items-center gap-3 bg-bg-app/95 backdrop-blur-sm border-b border-border-subtle px-4 py-2.5 shadow-sm overflow-x-auto scrollbar-none">
       {/* ... previous buttons ... */}
       <SaveTemplateModal
         isOpen={isSaveTemplateModalOpen}
@@ -117,46 +118,43 @@ export function LogToolbar({
       <div className="flex items-center gap-3 shrink-0">
         <StatusDot active={status} />
 
-        <button
-          type="button"
-          onClick={onImportOpen}
-          className="inline-flex items-center gap-2 rounded-md bg-primary hover:bg-primary/90 active:bg-primary/80 text-bg-app text-xs font-semibold px-3 py-1.5 transition-colors shadow-[0_0_12px_rgba(var(--color-primary-rgb),0.2)] shrink-0"
-        >
+        <Button onClick={onImportOpen} className="gap-2 text-xs font-semibold px-3 py-1.5 shrink-0">
           <Upload className="h-3.5 w-3.5" />
           Import
-        </button>
+        </Button>
 
-        <button
-          type="button"
+        <Button
+          variant="secondary"
           onClick={onExport}
-          className="inline-flex items-center gap-2 rounded-md bg-bg-surface hover:bg-bg-hover active:bg-bg-base text-text-secondary text-xs font-semibold px-3 py-1.5 transition-colors border border-border shrink-0"
+          className="gap-2 text-xs font-semibold px-3 py-1.5 shrink-0"
         >
           <Download className="h-3.5 w-3.5" />
           Export
-        </button>
+        </Button>
 
-        <button
-          type="button"
+        <Button
+          variant="outline"
           onClick={onOrchestrateOpen}
-          className="inline-flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-bold transition-all shadow-sm shrink-0 bg-violet-500/10 text-violet-400 hover:bg-violet-500/20 border border-violet-500/20 hover:border-violet-500/40"
+          className="gap-2 px-3 py-1.5 text-xs font-bold shrink-0 border-violet-500/20 bg-violet-500/10 text-violet-400 hover:bg-violet-500/20 hover:border-violet-500/40"
         >
           <Cpu className="size-3.5" />
           Orchestrate
-        </button>
+        </Button>
 
-        <button
-          type="button"
+        <Button
+          variant="outline"
+          size="icon"
           onClick={toggleFacetSidebar}
           className={cn(
-            "p-1.5 rounded-md transition-all shrink-0 border",
+            "size-8 shrink-0",
             facetSidebarCollapsed
-              ? "bg-zinc-800 border-zinc-700 text-zinc-300 hover:text-white"
-              : "bg-emerald-500/10 border-emerald-500/20 text-emerald-400 hover:text-emerald-300 shadow-[0_0_12px_rgba(52,211,153,0.15)]",
+              ? "bg-bg-surface-bright/50 border-border-subtle text-text-muted hover:text-text-primary"
+              : "bg-primary/10 border-primary/20 text-primary hover:text-primary-hover shadow-[0_0_12px_rgba(var(--color-primary-rgb),0.15)]",
           )}
           title={facetSidebarCollapsed ? "Show Facets" : "Hide Facets"}
         >
           <Columns className="size-4" />
-        </button>
+        </Button>
 
         <div className="h-5 w-px bg-zinc-800 shrink-0" />
 
@@ -168,18 +166,18 @@ export function LogToolbar({
         <div className="h-5 w-px bg-zinc-800 shrink-0" />
 
         {/* Clustering Status & Controls */}
-        <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-zinc-900/50 border border-zinc-800/50 shrink-0">
+        <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-bg-surface-bright/50 border border-border-subtle shrink-0">
           <div
             className="flex items-center gap-2 group cursor-help"
             title="Clustering Engine Status"
           >
             <StatusDot active={!!clusteringStatus?.running && !clusteringStatus?.paused} />
-            <span className="text-[11px] font-mono text-zinc-400">
+            <span className="text-[11px] font-mono text-text-muted">
               {clusteringStatus?.backlog?.toLocaleString() ?? 0}
             </span>
           </div>
 
-          <div className="w-px h-3 bg-zinc-800 mx-1" />
+          <div className="w-px h-3 bg-border-subtle mx-1" />
 
           <button
             type="button"
@@ -190,7 +188,7 @@ export function LogToolbar({
               "p-1 rounded-md transition-all group shrink-0",
               clusteringStatus?.mode === "burst"
                 ? "bg-amber-500/20 text-amber-400 shadow-[0_0_12px_rgba(245,158,11,0.2)] border border-amber-500/30"
-                : "text-zinc-500 hover:text-zinc-300 hover:bg-white/5",
+                : "text-text-muted hover:text-text-primary hover:bg-bg-hover",
             )}
             title={
               clusteringStatus?.mode === "burst"
@@ -226,7 +224,7 @@ export function LogToolbar({
 
           <DropdownMenu>
             <DropdownMenuTrigger
-              className="p-1.5 rounded-md hover:bg-white/5 text-text-muted hover:text-text-primary transition-colors ml-1"
+              className="p-1.5 rounded-md hover:bg-bg-hover text-text-muted hover:text-text-primary transition-colors ml-1"
               title="Template Actions"
             >
               <LayoutTemplate className="size-4" />
@@ -251,7 +249,7 @@ export function LogToolbar({
                   <div className="h-px bg-border/50 my-1" />
                   <DropdownMenuItem
                     onClick={onEngineSettingsOpen}
-                    className="gap-2 text-xs py-2 text-emerald-400 hover:text-emerald-300"
+                    className="gap-2 text-xs py-2 text-primary hover:text-primary-hover"
                   >
                     <Cpu className="size-3.5" />
                     Engine Settings
@@ -261,16 +259,17 @@ export function LogToolbar({
             </DropdownMenuContent>
           </DropdownMenu>
 
-          <div className="h-5 w-px bg-zinc-800 shrink-0 mx-1" />
+          <div className="h-5 w-px bg-border-subtle shrink-0 mx-1" />
 
-          <button
-            type="button"
+          <Button
+            variant="outline"
+            size="icon"
             onClick={() => setSidebarOpen(!isSidebarOpen)}
             className={cn(
-              "p-1.5 rounded-md transition-all ml-1 group shrink-0 border",
+              "size-8 shrink-0",
               isSidebarOpen
-                ? "bg-violet-500/10 border-violet-500/20 text-violet-400 ring-1 ring-violet-500/30 shadow-[0_0_12px_rgba(139,92,246,0.1)]"
-                : "bg-zinc-900 border-zinc-700 text-zinc-400 hover:border-zinc-600 hover:text-zinc-300",
+                ? "bg-primary/10 border-primary/20 text-primary ring-1 ring-primary/30 shadow-[0_0_12px_rgba(var(--color-primary-rgb),0.1)]"
+                : "bg-bg-surface-bright/50 border-border-subtle text-text-muted hover:text-text-primary",
             )}
             title={isSidebarOpen ? "Close AI Assistant" : "Open AI Assistant"}
           >
@@ -280,7 +279,7 @@ export function LogToolbar({
                 isSidebarOpen ? "scale-110" : "group-hover:scale-110",
               )}
             />
-          </button>
+          </Button>
         </div>
       </div>
     </div>

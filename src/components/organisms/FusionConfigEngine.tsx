@@ -5,6 +5,7 @@ import { Check, ChevronDown, Clock, Globe, Save, Settings2, Sparkles, X } from "
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { toast } from "sonner";
+import { Button } from "../ui/button";
 import { CustomParserModal } from "./CustomParserModal";
 
 /** UTC offset entry for the custom timezone picker. */
@@ -43,7 +44,6 @@ interface FusionConfigEngineProps {
  *
  * Uses createPortal to render the dropdown at document.body level,
  * escaping any overflow:hidden/auto ancestor that would clip it.
- * Position is calculated from the trigger button's bounding rect.
  */
 function TimezoneSelect({
   value,
@@ -58,7 +58,11 @@ function TimezoneSelect({
   const listRef = useRef<HTMLDivElement>(null);
   const selected = TIMEZONE_OPTIONS.find((o) => o.value === value) ?? TIMEZONE_OPTIONS[12];
 
-  // Compute panel position from trigger rect each time it opens
+  // Layout Constants
+  const DROPDOWN_GAP = 4;
+  const MIN_DROPDOWN_WIDTH = 148;
+  const MAX_Z_INDEX = 9999;
+
   const updatePosition = () => {
     if (!triggerRef.current) {
       return;
@@ -66,10 +70,10 @@ function TimezoneSelect({
     const rect = triggerRef.current.getBoundingClientRect();
     setPanelStyle({
       position: "fixed",
-      top: rect.bottom + 4,
+      top: rect.bottom + DROPDOWN_GAP,
       left: rect.left,
-      width: Math.max(rect.width, 148),
-      zIndex: 9999,
+      width: Math.max(rect.width, MIN_DROPDOWN_WIDTH),
+      zIndex: MAX_Z_INDEX,
     });
   };
 
@@ -78,7 +82,6 @@ function TimezoneSelect({
     setOpen((o) => !o);
   };
 
-  // Close on outside click
   useEffect(() => {
     if (!open) {
       return;
@@ -96,7 +99,6 @@ function TimezoneSelect({
     return () => document.removeEventListener("mousedown", handler);
   }, [open]);
 
-  // Scroll selected item into view when the list opens
   useEffect(() => {
     if (open && listRef.current) {
       const selectedEl = listRef.current.querySelector("[data-selected='true']");
@@ -110,29 +112,30 @@ function TimezoneSelect({
           ref={listRef}
           style={panelStyle}
           className={cn(
-            "bg-[#111613] border border-white/10 rounded-xl shadow-2xl",
-            "max-h-52 overflow-y-auto",
+            "bg-bg-surface-bright border border-border rounded-xl shadow-2xl",
+            "max-h-52 overflow-y-auto custom-scrollbar",
             "animate-in fade-in slide-in-from-top-2 duration-150",
           )}
         >
           {TIMEZONE_OPTIONS.map((opt) => (
-            <button
+            <Button
               key={opt.value}
-              type="button"
+              variant="ghost"
+              size="sm"
               data-selected={opt.value === value ? "true" : "false"}
               onClick={() => {
                 onChange(opt.value);
                 setOpen(false);
               }}
               className={cn(
-                "w-full text-left px-3 py-2 text-[11px] font-mono transition-colors",
+                "w-full justify-start px-3 h-9 text-[11px] font-mono",
                 opt.value === value
                   ? "bg-primary/20 text-primary font-bold"
-                  : "text-white/70 hover:bg-white/5 hover:text-white",
+                  : "text-text-muted hover:bg-bg-hover hover:text-text-primary",
               )}
             >
               {opt.label}
-            </button>
+            </Button>
           ))}
         </div>,
         document.body,
@@ -141,16 +144,17 @@ function TimezoneSelect({
 
   return (
     <>
-      <button
+      <Button
         ref={triggerRef}
-        type="button"
+        variant="ghost"
+        size="sm"
         onClick={handleOpen}
         className={cn(
-          "flex items-center gap-2 h-8 px-3 rounded-md text-[11px] font-mono font-semibold transition-all",
-          "bg-[#0D0F0E] border text-white",
+          "flex items-center gap-2 h-8 px-3 rounded-md text-[11px] font-mono font-semibold",
+          "bg-bg-surface border border-border-subtle text-text-primary",
           open
             ? "border-primary ring-1 ring-primary/40 text-primary"
-            : "border-white/10 hover:border-primary/40 hover:text-primary",
+            : "hover:border-primary/40 hover:text-primary",
         )}
       >
         <Clock className="size-3 opacity-60" />
@@ -161,7 +165,7 @@ function TimezoneSelect({
             open && "rotate-180",
           )}
         />
-      </button>
+      </Button>
       {panel}
     </>
   );
@@ -175,11 +179,8 @@ export function FusionConfigEngine({
   const [configs, setConfigs] = useState<FusionSourceConfig[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
-
-  // Parser Modal State — tracks which source has the parser open
   const [activeParserSource, setActiveParserSource] = useState<string | null>(null);
 
-  // 1. Fetch current config from sidecar on mount
   useEffect(() => {
     async function loadConfig() {
       try {
@@ -212,7 +213,6 @@ export function FusionConfigEngine({
     loadConfig();
   }, [workspaceId, availableSources]);
 
-  // 2. Local state updaters
   const toggleSource = (sourceId: string) => {
     setConfigs((prev) =>
       prev.map((c) => (c.source_id === sourceId ? { ...c, enabled: !c.enabled } : c)),
@@ -232,7 +232,6 @@ export function FusionConfigEngine({
     toast.success("Extraction pattern updated locally.");
   };
 
-  // 3. Persist to backend
   const handleSave = async () => {
     setIsSaving(true);
     try {
@@ -252,7 +251,7 @@ export function FusionConfigEngine({
 
   if (isLoading) {
     return (
-      <div className="flex-1 flex items-center justify-center text-text-muted animate-pulse">
+      <div className="flex-1 flex items-center justify-center text-text-muted animate-pulse font-mono uppercase tracking-widest text-xs">
         Initializing Fusion Engine...
       </div>
     );
@@ -260,14 +259,14 @@ export function FusionConfigEngine({
 
   return (
     <div className="flex-1 flex flex-col items-center justify-center p-6 space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <div className="max-w-3xl w-full flex flex-col space-y-6 bg-surface-base/40 border border-border/40 rounded-xl p-8 backdrop-blur-sm shadow-2xl">
+      <div className="max-w-3xl w-full flex flex-col space-y-6 bg-bg-surface/40 border border-border-subtle rounded-xl p-8 backdrop-blur-sm shadow-2xl">
         {/* Header */}
         <div className="flex items-center gap-4 border-b border-border/40 pb-6">
           <div className="p-3 rounded-xl bg-primary/10 text-primary ring-1 ring-primary/20">
             <Globe className="size-6" />
           </div>
           <div>
-            <h2 className="text-xl font-bold text-text-primary tracking-tight">
+            <h2 className="text-xl font-bold text-text-primary tracking-tight uppercase italic font-mono">
               Fusion Orchestration
             </h2>
             <p className="text-sm text-text-muted mt-0.5">
@@ -290,20 +289,23 @@ export function FusionConfigEngine({
                   "flex items-center gap-4 p-4 rounded-lg border transition-all duration-200",
                   config.enabled
                     ? "bg-primary/5 border-primary/20"
-                    : "bg-black/20 border-border/20 grayscale opacity-60",
+                    : "bg-bg-base/40 border-border-subtle grayscale opacity-60",
                 )}
               >
                 {/* Enabled toggle */}
-                <button
-                  type="button"
+                <Button
+                  variant="ghost"
+                  size="icon"
                   onClick={() => toggleSource(config.source_id)}
                   className={cn(
-                    "size-5 rounded flex-shrink-0 flex items-center justify-center transition-colors",
-                    config.enabled ? "bg-primary text-black" : "bg-white/5 border border-white/10",
+                    "size-5 rounded flex-shrink-0 flex items-center justify-center p-0",
+                    config.enabled
+                      ? "bg-primary text-text-inverse hover:bg-primary/90"
+                      : "bg-bg-surface-bright/5 border border-border-subtle",
                   )}
                 >
                   {config.enabled && <Check className="size-3.5 stroke-[3]" />}
-                </button>
+                </Button>
 
                 {/* Source label + path */}
                 <div className="flex-1 min-w-0">
@@ -315,7 +317,7 @@ export function FusionConfigEngine({
                   </span>
                 </div>
 
-                {/* Custom dark timezone selector */}
+                {/* Timezone selector */}
                 <div className="flex flex-col gap-1 items-end">
                   <span className="text-[9px] text-text-muted font-bold uppercase tracking-widest">
                     Sync Drift
@@ -326,25 +328,26 @@ export function FusionConfigEngine({
                   />
                 </div>
 
-                {/* Parser Trigger — green when a pattern is defined */}
-                <button
-                  type="button"
+                {/* Parser Trigger */}
+                <Button
+                  variant="ghost"
+                  size="icon"
                   onClick={() => setActiveParserSource(config.source_id)}
                   className={cn(
-                    "p-2.5 rounded-lg border transition-all relative flex-shrink-0 flex items-center justify-center",
+                    "p-2.5 rounded-lg border transition-all relative flex-shrink-0",
                     hasParser
-                      ? "bg-primary text-black border-primary shadow-[0_0_10px_rgba(34,197,94,0.3)]"
-                      : "bg-white/5 border-white/10 text-text-muted hover:text-text-primary hover:border-white/20",
+                      ? "bg-primary text-text-inverse border-primary shadow-[0_0_10px_var(--primary-glow)] hover:bg-primary/90"
+                      : "bg-bg-surface-bright/5 border-border-subtle text-text-muted hover:text-text-primary hover:border-border",
                   )}
                   title="Configure Extraction Parser"
                 >
                   <Settings2 className="size-4" />
                   {hasParser && (
-                    <div className="absolute -top-1 -right-1 bg-white text-black p-0.5 rounded-full ring-2 ring-primary">
+                    <div className="absolute -top-1 -right-1 bg-text-primary text-text-inverse p-0.5 rounded-full ring-2 ring-primary">
                       <Sparkles className="size-2 fill-current" />
                     </div>
                   )}
-                </button>
+                </Button>
               </div>
             );
           })}
@@ -363,25 +366,23 @@ export function FusionConfigEngine({
             <span className="text-[11px] text-text-muted font-medium uppercase tracking-wider">
               Sync Strategy
             </span>
-            <span className="text-sm font-bold text-primary">Interleaved Timestamp Alignment</span>
+            <span className="text-sm font-bold text-primary italic font-mono">
+              Interleaved Timestamp Alignment
+            </span>
           </div>
 
-          <button
-            type="button"
+          <Button
             onClick={handleSave}
             disabled={isSaving || configs.length === 0}
-            className={cn(
-              "flex items-center gap-2 px-6 py-2.5 rounded-lg font-bold text-sm transition-all shadow-lg active:scale-95",
-              "bg-primary text-black hover:bg-primary-hover disabled:opacity-50 disabled:active:scale-100",
-            )}
+            className="px-6 py-2.5 font-bold shadow-[0_0_20px_var(--primary-glow)]"
           >
             {isSaving ? (
-              <div className="animate-spin size-4 border-2 border-black border-t-transparent rounded-full" />
+              <div className="animate-spin size-4 border-2 border-text-inverse border-t-transparent rounded-full" />
             ) : (
               <Save className="size-4" />
             )}
             Deploy Fusion
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -394,7 +395,7 @@ export function FusionConfigEngine({
         </p>
       </div>
 
-      {/* Parser Modal — rendered at root level to avoid clipping */}
+      {/* Parser Modal */}
       {activeParserSource && (
         <CustomParserModal
           workspaceId={workspaceId}

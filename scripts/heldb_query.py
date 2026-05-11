@@ -60,7 +60,7 @@ def run_diagnostic():
             result["tables"][table] = {
                 "count": count,
                 "columns": columns,
-                "samples": [dict(zip(columns, r)) for r in rows],
+                "samples": [dict(zip(columns, r, strict=False)) for r in rows],
             }
 
             # Special aggregation for logs and log_sources

@@ -1,6 +1,6 @@
 import re
 
-with open("sidecar/src/ingestion.py", "r", encoding="utf-8") as f:
+with open("sidecar/src/ingestion.py", encoding="utf-8") as f:
     content = f.read()
 
 # We want to add a queue and a flush worker

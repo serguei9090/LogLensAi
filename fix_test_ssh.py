@@ -1,6 +1,6 @@
 import re
 
-with open("sidecar/tests/test_ssh.py", "r", encoding="utf-8") as f:
+with open("sidecar/tests/test_ssh.py", encoding="utf-8") as f:
     content = f.read()
 
 # Replace SSHLoader kwargs:

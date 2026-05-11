@@ -1,7 +1,6 @@
-import os
 import sys
 
-with open("sidecar/src/api.py", "r", encoding="utf-8") as f:
+with open("sidecar/src/api.py", encoding="utf-8") as f:
     content = f.read()
 
 # Make sure _tag_log_batch is available
@@ -16,10 +15,7 @@ if start_idx == -1:
     sys.exit(1)
 
 end_idx = content.find("    def method_cleanup_ingestion_jobs", start_idx)
-if end_idx == -1:
-    end_idx = len(content)
-else:
-    end_idx = content.rfind("\n\n", start_idx, end_idx) + 2
+end_idx = len(content) if end_idx == -1 else content.rfind("\n\n", start_idx, end_idx) + 2
 
 new_method = '''    def _bg_ingest_local_file(self, workspace_id: str, source_id: str, filepath: str, job_id: int):
         """Background worker for local file ingestion.

@@ -485,9 +485,9 @@ export function VirtualLogTable({
                             selectedLogIds.length === logs.length ? "Deselect All" : "Select All"
                           }
                         >
-                          <button
-                            type="button"
-                            className="w-full h-10 flex items-center justify-center hover:bg-white/5 outline-none focus-visible:bg-white/10"
+                          <Button
+                            variant="ghost"
+                            className="w-full h-10 flex items-center justify-center hover:bg-white/5 outline-none focus-visible:bg-white/10 rounded-none border-none p-0"
                             onClick={(e) => {
                               e.stopPropagation();
                               if (selectedLogIds.length === logs.length) {
@@ -508,46 +508,46 @@ export function VirtualLogTable({
                                   : "bg-white/10 group-hover/select-all:bg-white/30",
                               )}
                             />
-                          </button>
+                          </Button>
                         </th>
                         <th className="p-0 text-center flex items-center justify-center">
-                          <button
-                            type="button"
-                            className="w-full h-10 px-3 flex items-center justify-center gap-1.5 hover:text-text-primary transition-colors focus-visible:bg-primary/5 outline-none"
+                          <Button
+                            variant="ghost"
+                            className="w-full h-10 px-3 flex items-center justify-center gap-1.5 hover:text-text-primary transition-colors focus-visible:bg-primary/5 outline-none rounded-none border-none font-bold uppercase tracking-widest text-[10px]"
                             onClick={() => onSort("id")}
                           >
                             ID {renderSortIcon("id")}
-                          </button>
+                          </Button>
                         </th>
                         <th className="p-0 text-left flex items-center">
-                          <button
-                            type="button"
-                            className="w-full h-10 px-3 flex items-center gap-1.5 hover:text-text-primary transition-colors focus-visible:bg-primary/5 outline-none"
+                          <Button
+                            variant="ghost"
+                            className="w-full h-10 px-3 flex items-center gap-1.5 hover:text-text-primary transition-colors focus-visible:bg-primary/5 outline-none rounded-none border-none font-bold uppercase tracking-widest text-[10px]"
                             onClick={() => onSort("timestamp")}
                           >
                             Timestamp {renderSortIcon("timestamp")}
-                          </button>
+                          </Button>
                         </th>
                         <th className="p-0 text-left flex items-center">
-                          <button
-                            type="button"
-                            className="w-full h-10 px-3 flex items-center gap-1.5 hover:text-text-primary transition-colors focus-visible:bg-primary/5 outline-none"
+                          <Button
+                            variant="ghost"
+                            className="w-full h-10 px-3 flex items-center gap-1.5 hover:text-text-primary transition-colors focus-visible:bg-primary/5 outline-none rounded-none border-none font-bold uppercase tracking-widest text-[10px]"
                             onClick={() => onSort("level")}
                           >
                             Level {renderSortIcon("level")}
-                          </button>
+                          </Button>
                         </th>
                         <th className="p-0 text-left min-w-0 flex items-center">
                           <div className="px-3 py-1 text-left w-full">Message</div>
                         </th>
                         <th className="p-0 text-center flex items-center justify-center">
-                          <button
-                            type="button"
-                            className="w-full h-10 px-3 flex items-center justify-center gap-1.5 hover:text-text-primary transition-colors focus-visible:bg-primary/5 outline-none"
+                          <Button
+                            variant="ghost"
+                            className="w-full h-10 px-3 flex items-center justify-center gap-1.5 hover:text-text-primary transition-colors focus-visible:bg-primary/5 outline-none rounded-none border-none font-bold uppercase tracking-widest text-[10px]"
                             onClick={() => onSort("cluster_id")}
                           >
                             Cluster {renderSortIcon("cluster_id")}
-                          </button>
+                          </Button>
                         </th>
                         <th className="p-0 text-center flex items-center justify-center">
                           <div className="w-full h-10 px-3 flex items-center justify-center gap-1.5">
@@ -695,33 +695,37 @@ export function VirtualLogTable({
             }}
             onMouseDown={(e) => e.preventDefault()} // Keep selection
           >
-            <button
-              type="button"
+            <Button
+              variant="ghost"
+              size="xs"
               onClick={() => handleAddFilter("contains")}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-full bg-violet-500/10 text-violet-400 hover:bg-violet-500/20 transition-colors cursor-pointer"
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-full bg-violet-500/10 text-violet-400 hover:bg-violet-500/20 transition-colors cursor-pointer border-none"
             >
               <Plus className="size-3" /> Include
-            </button>
+            </Button>
             <div className="w-px h-4 bg-white/10" />
-            <button
-              type="button"
+            <Button
+              variant="ghost"
+              size="xs"
               onClick={() => handleAddFilter("not_contains")}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-full bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-colors cursor-pointer"
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-full bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-colors cursor-pointer border-none"
             >
               <Minus className="size-3" /> Exclude
-            </button>
+            </Button>
             <div className="w-px h-4 bg-white/10" />
-            <button
-              type="button"
+            <Button
+              variant="ghost"
+              size="xs"
               onClick={() => handleAddFacet(true)}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-full bg-amber-500/10 text-amber-400 hover:bg-amber-500/20 transition-colors cursor-pointer"
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-full bg-amber-500/10 text-amber-400 hover:bg-amber-500/20 transition-colors cursor-pointer border-none"
               title="Use AI to generate a smart extraction regex"
             >
               <Sparkles className="size-3" /> AI Facet
-            </button>
+            </Button>
             <div className="w-px h-4 bg-white/10" />
-            <button
-              type="button"
+            <Button
+              variant="ghost"
+              size="xs"
               onClick={() => {
                 if (selectionInfo?.sourceId && onOpenParser) {
                   onOpenParser(selectionInfo.sourceId, null);
@@ -731,10 +735,10 @@ export function VirtualLogTable({
                   toast.info("Select a specific log source to use the parser map.");
                 }
               }}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-full bg-white/5 text-text-muted hover:text-text-primary hover:bg-white/10 transition-colors cursor-pointer"
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-full bg-white/5 text-text-muted hover:text-text-primary hover:bg-white/10 transition-colors cursor-pointer border-none"
             >
               <Settings2 className="size-3" /> Map Field
-            </button>
+            </Button>
           </div>,
           document.body,
         )}
@@ -915,10 +919,10 @@ function LogTableRow({
               log.cluster_id !== "unknown" && "animate-in fade-in zoom-in-95 duration-500",
             )}
           >
-            <button
-              type="button"
+            <Button
+              variant="ghost"
               className={cn(
-                "inline-flex items-center justify-center border h-5 px-1.5 rounded-md text-[9px] font-bold transition-colors outline-none focus-visible:ring-1 focus-visible:ring-primary",
+                "inline-flex items-center justify-center border h-5 px-1.5 rounded-md text-[9px] font-bold transition-colors outline-none focus-visible:ring-1 focus-visible:ring-primary p-0 min-w-0",
                 getClusterStyles(log.cluster_id, anomalousClusters),
               )}
               title={log.cluster_template || "Click to analyze with AI"}
@@ -930,7 +934,7 @@ function LogTableRow({
               }}
             >
               #{log.cluster_id}
-            </button>
+            </Button>
             {log.cluster_percent !== undefined && (
               <span className="text-[8px] text-text-muted/60 font-medium whitespace-nowrap">
                 {Number(log.cluster_percent).toFixed(1)}%

@@ -1,6 +1,5 @@
-import re
 
-with open('sidecar/src/workers/clustering.py', 'r', encoding='utf-8') as f:
+with open('sidecar/src/workers/clustering.py', encoding='utf-8') as f:
     content = f.read()
 
 # Update Phase 1: Train

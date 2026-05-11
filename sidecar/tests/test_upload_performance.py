@@ -6,10 +6,11 @@ import time
 sidecar_src = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "src"))
 sys.path.insert(0, sidecar_src)
 
-import pytest
-import tempfile
-from api import App
-from db import Database
+import tempfile  # noqa: E402
+
+import pytest  # noqa: E402
+from api import App  # noqa: E402
+from db import Database  # noqa: E402
 
 
 @pytest.fixture
@@ -100,7 +101,7 @@ def test_upload_and_clustering_performance(e2e_api):
     clusters = e2e_api.method_get_clusters(workspace_id=workspace_id)
     total_clusters = len(clusters)
 
-    print(f"\n--- Final Results ---")
+    print("\n--- Final Results ---")
     print(f"Total time taken: {total_time:.2f} seconds")
     if total_time > 0:
         print(f"Average speed: {final_processed_logs / total_time:.2f} lines/sec")

@@ -1,7 +1,9 @@
-import time
 import os
+import time
+
 from drain3 import TemplateMiner
 from drain3.template_miner_config import TemplateMinerConfig
+
 
 def process_apache_logs():
     log_file_path = "apache_logs.log"
@@ -23,7 +25,7 @@ def process_apache_logs():
     start_time = time.time()
     line_count = 0
     
-    with open(log_file_path, "r", encoding="utf-8", errors="ignore") as f:
+    with open(log_file_path, encoding="utf-8", errors="ignore") as f:
         for line in f:
             line = line.strip()
             if not line:

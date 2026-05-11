@@ -44,8 +44,8 @@ export function FacetList({ onApplyFilter, className }: FacetListProps) {
   if (Object.entries(availableFacets).length === 0) {
     return (
       <div className={cn("px-6 py-10 text-center", className)}>
-        <Database className="h-8 w-8 text-[#1D2420] mx-auto mb-3" />
-        <p className="text-[11px] text-[#4d6057]">No metadata facets detected in current view.</p>
+        <Database className="h-8 w-8 text-text-muted/40 mx-auto mb-3" />
+        <p className="text-[11px] text-text-muted">No metadata facets detected in current view.</p>
       </div>
     );
   }
@@ -57,15 +57,15 @@ export function FacetList({ onApplyFilter, className }: FacetListProps) {
           <button
             type="button"
             onClick={() => toggleKey(key)}
-            className="w-full flex items-center gap-2 px-2 py-1.5 hover:bg-[#1E2520] rounded text-[#E8F5EC] transition-colors group"
+            className="w-full flex items-center gap-2 px-2 py-1.5 hover:bg-bg-hover rounded text-text-secondary transition-colors group"
           >
             {expandedKeys.has(key) ? (
-              <ChevronDown className="h-3.5 w-3.5 text-[#4D6057]" />
+              <ChevronDown className="h-3.5 w-3.5 text-text-muted" />
             ) : (
-              <ChevronRight className="h-3.5 w-3.5 text-[#4D6057]" />
+              <ChevronRight className="h-3.5 w-3.5 text-text-muted" />
             )}
             <span className="text-xs font-medium capitalize flex-1 text-left">{key}</span>
-            <span className="text-[10px] text-[#4D6057] group-hover:text-[#22C55E]">
+            <span className="text-[10px] text-text-muted group-hover:text-primary">
               {values.length}
             </span>
           </button>
@@ -92,8 +92,8 @@ export function FacetList({ onApplyFilter, className }: FacetListProps) {
                         className={cn(
                           "w-full flex items-center justify-between group py-1 px-2 rounded text-[11px] transition-all",
                           isActive
-                            ? "bg-[#22C55E15] text-[#22C55E]"
-                            : "text-[#8FA898] hover:bg-[#1E2520] hover:text-[#E8F5EC]",
+                            ? "bg-primary/10 text-primary"
+                            : "text-text-muted hover:bg-bg-hover hover:text-text-primary",
                         )}
                       >
                         <span className="truncate max-w-[140px] font-mono">{v.value}</span>

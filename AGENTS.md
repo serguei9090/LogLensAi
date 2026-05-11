@@ -9,9 +9,6 @@ LogLensAi is a **Tauri v2 desktop application** for professional log analysis. I
 - **Tracking**: `.agents/rules/ProjectTracking.md` (Session Sync + Boot Sequence)
 - **Software Standards**: `.agents/rules/SoftwareStandards.md` (DRY, KISS, SOLID)
 - **Quality**: `.agents/rules/Quality.md` (TODO(ID) + Atomic Design)
-- **Architecture Docs**: `docs/Documentation/architecture/gemini.md` (Main roadmap & personas)
-- **AI Parsing**: `docs/Documentation/architecture/ai_parsing.md` (Gemma 4 Reasoning logic)
-- **Test Tracking**: `docs/Documentation/architecture/testing.md` (Coverage matrix & QA standards)
 - **Arch Mandate**: `.agents/rules/ArchitectureDocs.md` (Mandatory documentation rule)
 - **Design Standard**: `DESIGN.md` (Unified design tokens & rationale)
 
@@ -95,16 +92,12 @@ sidecar/
 
 ## 🎨 Design System
 - **Source of Truth**: `DESIGN.md` (Unified tokens for colors, typography, and spacing)
-- See `docs/Documentation/design/theme.md` for the full color palette (CSS token names + hex values)
-- See `docs/Documentation/design/ui-components.md` for all shadcn components and their atomic layer
 - Dark theme: `#0D0F0E` base, `#22C55E` primary green accent
 - **Hard rule**: No hardcoded hex in component files. Use CSS custom properties only.
 
 ## ⚡ Boot Sequence (for AI agents)
 1. Read `docs/track/TODO.md` — understand sprint status
-2. Read `docs/Documentation/design/theme.md` & `docs/Documentation/design/ui-components.md`
 3. Check `.agents/rules/` for constraints
-4. Read `docs/Documentation/meta/jules_instruct.md` for the active implementation prompt
 
 ## 🔌 JSON-RPC API Contract
 All methods are called via `useSidecarBridge.ts`. Never change the transport.
@@ -126,7 +119,6 @@ All methods are called via `useSidecarBridge.ts`. Never change the transport.
 
 ## Golden Standards
 - **Contract → Interface → Mock → Impl**: define boundaries before writing logic
-- **Design Conformity**: You MUST strictly use `docs/Documentation/design/theme.md` for all CSS variables and `docs/Documentation/design/ui-components.md` for shadcn implementation.
 - **shadcn/ui Standards**: Always use the `shadcn` skill for UI tasks. Use `bunx --bun shadcn@latest` for all component management. Follow the critical rules in the skill (e.g. `cn()` for classes, `gap` over `space-x/y`, `data-icon` for button icons).
 - **Pydantic API Validation**: All JSON-RPC methods MUST receive inputs and return outputs validated by strict `Pydantic` models. 
 - **Thread-safe Database**: every DuckDB query uses `self.db.get_cursor()` for thread isolation.
@@ -145,7 +137,6 @@ When running `/smith_orchestra_auto`, Jules orchestrates work based on `docs/tra
 |---|---|---|
 | **@pm** | Roadmap & Logic Specs | `docs/track/TODO.md`, `docs/track/specs/*.md` |
 | **@critique** | Investigative Root Cause & Solution Review | `docs/track/LessonsLearned.md`, All codebase |
-| **@architect** | API Contract & Standards | `docs/Documentation/reference/API_SPEC.md`, `sidecar/src/api.py` (models) |
 | **@backend** | Sidecar, DB, & Logic | `sidecar/src/*.py` |
 | **@frontend** | UI, Layout, & State | `src/components/*`, `src/store/*`, `src/styles/` |
 | **@qa** | Auditing & Bug Fixes | All codebase |

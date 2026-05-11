@@ -27,7 +27,7 @@ BATCH_SIZE = 5000
 
 
 def read_logs():
-    with open(LOG_FILE, "r", encoding="utf-8") as f:
+    with open(LOG_FILE, encoding="utf-8") as f:
         return [line.strip() for line in f if line.strip()]
 
 
@@ -168,7 +168,7 @@ def insert_executemany(conn, batch_data, cluster_increments):
 
 
 def insert_pandas(conn, batch_data, cluster_increments):
-    df_logs = pd.DataFrame(
+    df_logs = pd.DataFrame(  # noqa: F841
         batch_data,
         columns=[
             "workspace_id",
@@ -209,9 +209,9 @@ def insert_pandas(conn, batch_data, cluster_increments):
 def insert_arrow(conn, batch_data, cluster_increments):
     # PyArrow is generally the fastest for DuckDB
     # Convert list of tuples to list of columns
-    cols = list(zip(*batch_data))
+    cols = list(zip(*batch_data, strict=False))
 
-    arrow_logs = pa.Table.from_arrays(
+    arrow_logs = pa.Table.from_arrays(  # noqa: F841
         [pa.array(c) for c in cols],
         names=[
             "workspace_id",
@@ -228,7 +228,7 @@ def insert_arrow(conn, batch_data, cluster_increments):
 
     cluster_data = [(w, c, t, count) for (w, c, t), count in cluster_increments.items()]
     if cluster_data:
-        c_cols = list(zip(*cluster_data))
+        c_cols = list(zip(*cluster_data, strict=False))
         arrow_clusters = pa.Table.from_arrays(
             [pa.array(c) for c in c_cols], names=["workspace_id", "cluster_id", "template", "count"]
         )

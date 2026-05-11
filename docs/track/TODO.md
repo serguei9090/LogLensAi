@@ -8,6 +8,9 @@
 ## 🔵 Active Tasks
 
 - [ ] **LLQL-Verification**: Audit `docs/track/LLQL_Professional_Spec.md` against current implementation in `sidecar/src/`.
+- [ ] **FRONT-DEBT-001**: Comprehensive cleanup of hardcoded hex values in `DashboardPage.tsx` and `FusionConfigEngine.tsx`.
+- [ ] **FRONT-DEBT-002**: Refactor `Sidebar.tsx` and `InvestigationPage.tsx` to extract oversized components and utilities.
+- [ ] **FRONT-DEBT-003**: Universal replacement of raw `<button>` elements with `Button` atom across all organisms and pages.
 - [x] **PERF-001**: Optimize Ingestion Pipeline (FastPath caching, incremental job updates, removal of per-line DB queries). (Done 2026-05-08)
 
 ---

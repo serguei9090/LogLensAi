@@ -6,8 +6,8 @@ import sys
 SIDE_CAR_DIR = os.path.join(os.getcwd(), "sidecar", "src")
 sys.path.append(SIDE_CAR_DIR)
 
-from api import App
-from models import GetLogsRequest
+from api import App  # noqa: E402
+from models import GetLogsRequest  # noqa: E402
 
 # Setup logging to stdout for scratch script
 logging.basicConfig(level=logging.INFO, stream=sys.stdout)
@@ -52,7 +52,7 @@ def test_hydration():
         ),
     ]
 
-    request_params = IngestLogsRequest(logs=logs_to_ingest)
+    IngestLogsRequest(logs=logs_to_ingest)
     app.method_ingest_logs(logs=logs_to_ingest)
 
     # 2. Fetch logs
@@ -68,7 +68,7 @@ def test_hydration():
         )
         if not log["message"] or log["message"] == "<Missing log content>":
             print("❌ ERROR: Message is empty or missing!")
-        elif log["message"] in [l["message"] for l in logs_to_ingest]:
+        elif log["message"] in [entry["message"] for entry in logs_to_ingest]:
             print("✅ SUCCESS: Message matches ingested content.")
         else:
             print(f"❌ ERROR: Message mismatch! Got '{log['message']}'")
