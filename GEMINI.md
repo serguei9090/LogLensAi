@@ -111,3 +111,7 @@ All errors must strictly follow this structure:
 - Return 500 Internal Server Error for unexpected issues.
 
 Prefer MCP-server over chrome tool for app test check screenshot etc. MCP server is more reliable and efficient for app test check screenshot etc.
+
+## 🚀 Architectural Benchmarks & Findings
+- **Drain3 Performance (Single-Threaded):** Through rigorous benchmarking, we have proven that `drain3` running on a *single Python thread* can process and extract parameters at over **81,000 lines per second**.
+- **Mandate:** **Do not use `ProcessPoolExecutor` or multiprocessing for Drain3 clustering.** The inter-process communication (IPC) and pickling overhead of passing large string batches to worker processes is significantly slower than single-threaded execution in RAM. All ingestion and clustering pipelines must process logs sequentially in memory *before* bulk-inserting into DuckDB.

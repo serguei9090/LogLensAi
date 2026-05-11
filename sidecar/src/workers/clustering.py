@@ -36,84 +36,107 @@ MAX_PARALLEL_WORKERS = max(1, (os.cpu_count() or 4) - 1)  # leave one core for I
 # ---------------------------------------------------------------------------
 # Top-level picklable worker function (must live at module scope)
 # ---------------------------------------------------------------------------
-def _tag_log_row(  # noqa: PLR0913
-    row: tuple,
+def _tag_log_batch(  # noqa: PLR0913
+    rows: list[tuple],
     cluster_map: dict,
     miner_config: Any,
     rules: list,
     p_config: dict,
     p_tz: int,
     _now: float,
-) -> dict:
+) -> list[dict]:
     """
     Pure, picklable function executed in a child process.
 
     Performs metadata extraction and cluster-matching against a snapshot of
-    the Drain tree. It reconstructs a temporary, in-memory TemplateMiner
+    the Drain tree for a batch of rows. It reconstructs a temporary, in-memory TemplateMiner
     from the cluster map to leverage the official `match` logic.
 
     Never writes to the Drain tree or the database.
 
-    Returns a result dict with keys:
+    Returns a list of result dicts with keys:
       - log_id, ws_id, source_id, cluster_id, template, timestamp, level,
         facets_json, status ('ok' | 'missing' | 'error')
     """
-    log_id, ws_id, source_id, _line_id, facets_json, raw_text = row
-    try:
-        if not raw_text:
-            return {"status": "missing", "log_id": log_id, "ws_id": ws_id, "source_id": source_id}
+    results = []
 
-        meta = extract_log_metadata(
-            raw_text, custom_rules=rules, parser_config=p_config, tz_offset=p_tz
-        )
+    # Reconstruct miner once per batch
+    temp_miner = None
+    if cluster_map:
+        temp_miner = TemplateMiner(config=miner_config)
+        for c in cluster_map.values():
+            temp_miner.drain.id_to_cluster[c.cluster_id] = c
+            temp_miner.drain.add_seq_to_prefix_tree(temp_miner.drain.root_node, c)
 
-        # Merge pre-existing facets
-        existing_facets = json.loads(facets_json) if facets_json else {}
-        meta["facets"].update(existing_facets)
+    for row in rows:
+        log_id, ws_id, source_id, _line_id, facets_json, raw_text = row
+        try:
+            if not raw_text:
+                results.append(
+                    {"status": "missing", "log_id": log_id, "ws_id": ws_id, "source_id": source_id}
+                )  # noqa: E501
+                continue
 
-        message = meta["message"]
+            meta = extract_log_metadata(
+                raw_text, custom_rules=rules, parser_config=p_config, tz_offset=p_tz
+            )
 
-        # Read-only Drain match: reconstruct a temporary miner and use its
-        # official .match() method. This is safer and more accurate than
-        # re-implementing the matching logic manually.
-        cluster_id = None
-        template = None
-        if cluster_map:
-            # Create a new, temporary, in-memory miner for this one-off task.
-            # This avoids any pickling issues with locks from the main parser.
-            temp_miner = TemplateMiner(config=miner_config)
-            for c in cluster_map.values():
-                # Manually reconstruct the cluster in the temporary miner.
-                temp_miner.drain.id_to_cluster[c.cluster_id] = c
-                temp_miner.drain.add_seq_to_prefix_tree(temp_miner.drain.root_node, c)
+            # Merge pre-existing facets
+            existing_facets = json.loads(facets_json) if facets_json else {}
+            meta["facets"].update(existing_facets)
 
-            # Now use the official, optimized match method.
-            match_result = temp_miner.match(message)
-            if match_result:
-                cluster_id = str(match_result.cluster_id)
-                template = match_result.get_template()
+            message = meta["message"]
 
-        return {
-            "status": "ok",
-            "log_id": log_id,
-            "ws_id": ws_id,
-            "source_id": source_id,
-            "cluster_id": cluster_id,
-            "template": template,
-            "timestamp": meta["timestamp"],
-            "level": meta["level"],
-            "facets_json": json.dumps(meta["facets"]),
-        }
+            cluster_id = None
+            template = None
+            if temp_miner:
+                match_result = temp_miner.match(message)
+                if match_result:
+                    cluster_id = str(match_result.cluster_id)
+                    template = match_result.get_template()
+                    try:
+                        params = temp_miner.extract_parameters(
+                            template, message, exact_matching=False
+                        )
+                        if params:
+                            for param in params:
+                                mask_key = param.mask_name.strip("<>").lower()
+                                meta["facets"][mask_key] = param.value
+                    except Exception:
+                        pass
 
-    except Exception as exc:
-        return {
-            "status": "error",
-            "log_id": log_id,
-            "ws_id": ws_id,
-            "source_id": source_id,
-            "error": str(exc),
-            "facets_json": facets_json,
-        }
+            results.append(
+                {
+                    "status": "ok",
+                    "log_id": log_id,
+                    "ws_id": ws_id,
+                    "source_id": source_id,
+                    "line_id": _line_id,
+                    "raw_text": raw_text,
+                    "cluster_id": cluster_id,
+                    "template": template,
+                    "timestamp": meta["timestamp"],
+                    "level": meta["level"],
+                    "facets_json": json.dumps(meta["facets"]),
+                }
+            )
+
+        except Exception as exc:
+            results.append(
+                {
+                    "status": "error",
+                    "log_id": log_id,
+                    "ws_id": ws_id,
+                    "source_id": source_id,
+                    "line_id": _line_id,
+                    "raw_text": raw_text,
+                    "error": str(exc),
+                    "facets_json": facets_json,
+                }
+            )
+            logger.debug("Failed to parse", exc_info=True)
+
+    return results
 
 
 # ---------------------------------------------------------------------------
@@ -214,11 +237,16 @@ class ClusteringWorker:
         if not hasattr(self, "_quarantine"):
             self._quarantine = {}
 
+        t0 = time.time()
         cursor.execute(
             "SELECT id, workspace_id, source_id, line_id, facets, raw_text FROM logs WHERE processed = FALSE ORDER BY id ASC LIMIT ?",  # noqa: E501
             (limit,),
         )
         batch = cursor.fetchall()
+        t_select = time.time()
+        if t_select - t0 > 0.05:
+            logger.info(f"[Clustering] SELECT took {t_select - t0:.3f}s for limit {limit}")
+
         if not batch:
             return 0
 
@@ -230,21 +258,39 @@ class ClusteringWorker:
         parser_configs: dict = {}
         now = time.time()
 
-        # ----------------------------------------------------------------
         # Phase 0: Hydrate — resolve any missing raw_text from fast_path.
-        # We do this synchronously as it may involve per-source I/O that
-        # we want quarantine logic to handle correctly.
-        # ----------------------------------------------------------------
         hydrated_rows: list = []
+        
+        # Group by source for efficient batch reading
+        sources_to_hydrate: dict[str, list[tuple]] = {}
         for row in batch:
-            log_id, ws_id, source_id, _line_id, facets_json, raw_text = row
-            hydrated = self._hydrate_log_text(source_id, _line_id, raw_text, now)
-            if hydrated is False:
-                continue  # quarantined — skip this cycle
-            if hydrated is None:
-                updates.append((None, "MISSING", "{}", None, log_id))
+            if row[5] is None:
+                if row[2] not in sources_to_hydrate:
+                    sources_to_hydrate[row[2]] = []
+                sources_to_hydrate[row[2]].append(row)
+            else:
+                hydrated_rows.append(row)
+        
+        for source_id, rows in sources_to_hydrate.items():
+            # Check quarantine once per source
+            if self._quarantine.get(source_id, 0) > now:
                 continue
-            hydrated_rows.append((log_id, ws_id, source_id, _line_id, facets_json, hydrated))
+                
+            line_ids = [r[3] for r in rows]
+            raw_texts = self.app.fast_path.get_lines(source_id, line_ids)
+            
+            for i, raw in enumerate(raw_texts):
+                row = rows[i]
+                if raw is None:
+                    # Missing from disk — quarantine source for 5s
+                    self._quarantine[source_id] = now + 5.0
+                    updates.append((None, "MISSING", "{}", None, row[0]))
+                    continue
+                hydrated_rows.append((row[0], row[1], row[2], row[3], row[4], raw))
+
+        t_hydrate_end = time.time()
+        if t_hydrate_end - t_select > 0.05:
+            logger.info(f"[Clustering] Hydration took {t_hydrate_end - t_select:.3f}s")
 
         if not hydrated_rows:
             if updates:
@@ -302,32 +348,26 @@ class ClusteringWorker:
         # We build a cluster-map snapshot (plain dict) from the live Drain
         # tree — fully picklable, no locks passed across process boundaries.
         # ----------------------------------------------------------------
-        if tag_rows and self._executor is not None:
-            # Group tag rows by (ws_id, source_id) to reuse parser + config
-            ws_source_groups: dict[tuple, list] = {}
-            for row in tag_rows:
-                key = (row[1], row[2])  # (ws_id, source_id)
-                ws_source_groups.setdefault(key, []).append(row)
-
-            futures = []
-            for (ws_id, source_id), rows in ws_source_groups.items():
+        if tag_rows:
+            bypass_parallel = os.environ.get("BYPASS_PARALLEL_TAG") == "1"
+            
+            if bypass_parallel:
+                t_tag_start = time.time()
+                # Synchronous Bypass: Call the tag batch function directly in the main thread
+                # This helps isolate if ProcessPoolExecutor/Pickling is the bottleneck.
                 parser = self.app.get_drain_parser(ws_id)
                 cluster_map = {c.cluster_id: c for c in parser.get_clusters()}
-                rules = self.app._get_facet_rules_for_workspace(  # noqa: SLF001
-                    cursor, ws_id, rules_cache, global_rules
-                )
-                p_config, p_tz = self._get_parser_config(cursor, ws_id, source_id, parser_configs)
-
                 miner_config = parser.miner.config
-                for row in rows:
-                    fut = self._executor.submit(
-                        _tag_log_row, row, cluster_map, miner_config, rules, p_config, p_tz, now
-                    )
-                    futures.append(fut)
-
-            for fut in as_completed(futures):
-                try:
-                    result = fut.result()
+                
+                # Re-fetch rules and config just in case multiple workspaces exist in tag_rows
+                # (Though usually it's one file at a time)
+                ws_id = tag_rows[0][1] 
+                rules = self.app._get_facet_rules_for_workspace(cursor, ws_id, rules_cache, global_rules)
+                p_config, p_tz = self._get_parser_config(cursor, ws_id, tag_rows[0][2], parser_configs)
+                
+                batch_results = _tag_log_batch(tag_rows, cluster_map, miner_config, rules, p_config, p_tz, now)
+                
+                for result in batch_results:
                     status = result["status"]
                     log_id = result["log_id"]
                     ws_id = result["ws_id"]
@@ -336,40 +376,99 @@ class ClusteringWorker:
                     if status == "ok":
                         cluster_id = result["cluster_id"]
                         template = result["template"]
-
                         if cluster_id and template:
                             key = (ws_id, cluster_id, template)
                             cluster_increments[key] = cluster_increments.get(key, 0) + 1
-
-                        updates.append(
-                            (
-                                result["timestamp"],
-                                result["level"],
-                                result["facets_json"],
-                                cluster_id,
-                                log_id,
-                            )
-                        )
+                        updates.append((result["timestamp"], result["level"], result["facets_json"], cluster_id, log_id))
                         job_key = (ws_id, source_id)
                         batch_counts[job_key] = batch_counts.get(job_key, 0) + 1
+                
+                t_tag_total = time.time() - t_tag_start
+                logger.info("[Worker] SYNC Tagging Phase: %d lines in %.4fs (%.2f lines/sec)", 
+                            len(tag_rows), t_tag_total, len(tag_rows)/t_tag_total if t_tag_total > 0 else 0)
+            
+            elif self._executor is not None:
+                t_tag_start = time.time()
+                # Group tag rows by (ws_id, source_id) to reuse parser + config
+                ws_source_groups: dict[tuple, list] = {}
+                for row in tag_rows:
+                    key = (row[1], row[2])  # (ws_id, source_id)
+                    ws_source_groups.setdefault(key, []).append(row)
 
-                    elif status == "missing":
-                        updates.append((None, "MISSING", "{}", None, log_id))
+                futures = []
+                for (ws_id, source_id), rows in ws_source_groups.items():
+                    parser = self.app.get_drain_parser(ws_id)
+                    cluster_map = {c.cluster_id: c for c in parser.get_clusters()}
+                    rules = self.app._get_facet_rules_for_workspace(  # noqa: SLF001
+                        cursor, ws_id, rules_cache, global_rules
+                    )
+                    p_config, p_tz = self._get_parser_config(cursor, ws_id, source_id, parser_configs)
 
-                    else:
-                        logger.error(
-                            "[Worker] Tag worker error for log %s: %s", log_id, result.get("error")
+                    miner_config = parser.miner.config
+                    # Split rows into chunks for parallel processing
+                    chunk_size = max(100, len(rows) // MAX_PARALLEL_WORKERS)
+                    for i in range(0, len(rows), chunk_size):
+                        chunk = rows[i : i + chunk_size]
+                        fut = self._executor.submit(
+                            _tag_log_batch, chunk, cluster_map, miner_config, rules, p_config, p_tz, now
                         )
-                        updates.append((None, "ERROR", result.get("facets_json"), None, log_id))
+                        futures.append(fut)
 
-                except Exception:
-                    logger.exception("[Worker] Future resolution failed:")
+                for fut in as_completed(futures):
+                    try:
+                        batch_results = fut.result()
+                        for result in batch_results:
+                            status = result["status"]
+                            log_id = result["log_id"]
+                            ws_id = result["ws_id"]
+                            source_id = result["source_id"]
+
+                            if status == "ok":
+                                cluster_id = result["cluster_id"]
+                                template = result["template"]
+
+                                if cluster_id and template:
+                                    key = (ws_id, cluster_id, template)
+                                    cluster_increments[key] = cluster_increments.get(key, 0) + 1
+
+                                updates.append(
+                                    (
+                                        result["timestamp"],
+                                        result["level"],
+                                        result["facets_json"],
+                                        cluster_id,
+                                        log_id,
+                                    )
+                                )
+                                job_key = (ws_id, source_id)
+                                batch_counts[job_key] = batch_counts.get(job_key, 0) + 1
+
+                            elif status == "missing":
+                                updates.append((None, "MISSING", "{}", None, log_id))
+
+                            else:
+                                logger.error(
+                                    "[Worker] Tag worker error for log %s: %s",
+                                    log_id,
+                                    result.get("error"),
+                                )  # noqa: E501
+                                updates.append((None, "ERROR", result.get("facets_json"), None, log_id))
+
+                    except Exception:
+                        logger.exception("[Worker] Future resolution failed:")
+                
+                t_tag_total = time.time() - t_tag_start
+                logger.info("[Worker] PARALLEL Tagging Phase: %d lines in %.4fs (%.2f lines/sec)", 
+                            len(tag_rows), t_tag_total, len(tag_rows)/t_tag_total if t_tag_total > 0 else 0)
 
         # ----------------------------------------------------------------
         # Aggregation: single atomic commit for the entire batch
         # ----------------------------------------------------------------
         if updates:
+            t_agg_start = time.time()
             self._apply_batch_updates(cursor, updates, cluster_increments)
+            t_agg_total = time.time() - t_agg_start
+            logger.info("[Worker] Aggregation Phase: %.4fs for %d updates", t_agg_total, len(updates))
 
         self._update_ingestion_jobs(cursor, batch_counts)
         self.db.commit()
@@ -381,12 +480,39 @@ class ClusteringWorker:
 
     def _apply_batch_updates(self, cursor: Any, updates: list, cluster_increments: dict):
         """Applies batch updates to logs and clusters tables atomically."""
+        if not updates and not cluster_increments:
+            return
+
+        t_start = time.time()
+        
+        # Performance Trick: In DuckDB, row-by-row updates are slow.
+        # Vectorized updates via a temporary table are significantly faster.
         cursor.execute("BEGIN TRANSACTION")
         try:
-            cursor.executemany(
-                "UPDATE logs SET timestamp = COALESCE(?, timestamp), level = ?, facets = ?, cluster_id = ?, processed = TRUE WHERE id = ?",  # noqa: E501
-                updates,
-            )
+            if updates:
+                # 1. Create a schema-matched temporary table (use VARCHAR for flexible inputs)
+                cursor.execute("CREATE TEMPORARY TABLE updates_temp (ts VARCHAR, lvl VARCHAR, fcts VARCHAR, cid VARCHAR, lid BIGINT)")
+                
+                # 2. Bulk insert into the temp table (no indexes = fast)
+                cursor.executemany("INSERT INTO updates_temp VALUES (?, ?, ?, ?, ?)", updates)
+                
+                # 3. Perform a vectorized JOIN update
+                cursor.execute("""
+                    UPDATE logs 
+                    SET timestamp = COALESCE(updates_temp.ts, logs.timestamp),
+                        level = updates_temp.lvl,
+                        facets = updates_temp.fcts::JSON,
+                        cluster_id = updates_temp.cid,
+                        processed = TRUE
+                    FROM updates_temp
+                    WHERE logs.id = updates_temp.lid
+                """)
+                
+                # 4. Clean up
+                cursor.execute("DROP TABLE updates_temp")
+
+            t_logs_end = time.time()
+            
             for (ws_id, cluster_id, template), count in cluster_increments.items():
                 cursor.execute(
                     """
@@ -402,6 +528,13 @@ class ClusteringWorker:
             cursor.execute("ROLLBACK")
             logger.exception("[Worker] Transaction failed:")
             raise
+            
+        t_end = time.time()
+        if t_end - t_start > 0.1:
+            logger.info(
+                f"[Clustering] Aggregation Phase: {t_end - t_start:.4f}s for {len(updates)} updates "
+                f"(Logs: {t_logs_end - t_start:.4f}s, Clusters: {t_end - t_logs_end:.4f}s)"
+            )
 
     def _update_ingestion_jobs(self, cursor: Any, batch_counts: dict):
         """Updates ingestion job progress."""

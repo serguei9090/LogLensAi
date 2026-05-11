@@ -52,7 +52,6 @@ from models import (
     GetTemporalOffsetsRequest,
     GetWorkspaceSourcesRequest,
     IngestLocalFileRequest,
-    IngestLogEntry,
     IngestLogsRequest,
     JSONRPCRequest,
     JSONRPCResponse,
@@ -302,7 +301,11 @@ class App:
         """Set clustering worker mode (auto, manual, burst)."""
         logger.info("RPC Dispatch: set_clustering_mode (mode=%s)", mode)
         self.clustering_worker.set_mode(mode)
-        return {"status": "success", "mode": self.clustering_worker.mode, "paused": self.clustering_worker.paused}
+        return {
+            "status": "success",
+            "mode": self.clustering_worker.mode,
+            "paused": self.clustering_worker.paused,
+        }
 
     def method_set_clustering_paused(self, paused: bool, workspace_id: str | None = None) -> dict:
         """Explicitly pause or resume the clustering worker."""
@@ -1162,55 +1165,22 @@ class App:
         with open(abs_path, encoding="utf-8", errors="replace") as f:
             return f.read()
 
-    def _ingest_single_log(self, _cursor: Any, log: dict, custom_rules: list = None) -> list[Any]:
-        """Extracts clustering logic into a reusable helper"""
-        workspace_id = log.get("workspace_id")
-        source_id = log.get("source_id", "manual")
-        raw_text = log.get("raw_text", "")
+    def method_ingest_logs(self, logs: list[any]) -> dict:
+        """High-speed synchronous batch ingestion — RAM-First / PyArrow.
 
-        # 1. Advanced Metadata Extraction (Shared Logic)
-        metadata = extract_log_metadata(
-            workspace_id, source_id, raw_text, custom_rules=custom_rules
-        )
-
-        # Override metadata with provided values if they explicitly exist (important for manual ingest)
-        timestamp = log.get("timestamp") or metadata["timestamp"]
-        level = log.get("level") or metadata["level"]
-        raw_message = metadata["message"]
-        message = log.get("message") or raw_message
-
-        # 2. Pattern Clustering (Drain3) - ASYNC REMOVAL
-        # We no longer process Drain3 here. We leave cluster_id as NULL
-        # and let the background worker handle it.
-        cluster_id = None
-
-        facets = log.get("facets") or metadata.get("facets", {})
-        facets_json = json.dumps(facets) if facets else None
-
-        return [
-            workspace_id,
-            source_id,
-            raw_text,
-            timestamp,
-            level,
-            message,
-            cluster_id,
-            facets_json,
-            False,  # processed = FALSE
-        ]
-
-    def method_ingest_logs(self, logs: list[IngestLogEntry]) -> dict:
-        """High-speed batch ingestion — Disk-First / Fast-Path.
-
-        Raw text is appended to the per-source flat file under ``data/storage/``.
-        DuckDB receives only the skinny index row (line_id, metadata).
+        Designed for streaming data (HTTP/Syslog). Runs synchronously as it is
+        expected to be called from a background flush worker.
+        Does NOT create ingestion jobs.
         """
+        import json
+        import time
+
         log_dicts = [log.model_dump() if hasattr(log, "model_dump") else log for log in logs]
 
         if not log_dicts:
-            return {"status": "ok", "count": 0, "job_id": None}
+            return {"status": "ok", "count": 0}
 
-        # --- Group by (workspace_id, source_id) for job creation & batch write ---
+        # --- Group by (workspace_id, source_id) ---
         from collections import defaultdict
 
         grouped: dict[tuple[str, str], list[dict]] = defaultdict(list)
@@ -1219,82 +1189,70 @@ class App:
             src = log.get("source_id") or "manual"
             grouped[(ws, src)].append(log)
 
-        job_id = None
-        for (ws_id, src_id), src_logs in grouped.items():
-            # 1. Create ingestion job record
-            job_id = self.db.create_ingestion_job(ws_id, src_id, len(src_logs))
-            
-            # 2. Launch background ingestion for this batch
-            thread = threading.Thread(
-                target=self._bg_ingest_logs,
-                args=(ws_id, src_id, src_logs, job_id),
-                daemon=True,
-            )
-            thread.start()
+        now = time.time()
+        now_ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-        return {"status": "ok", "job_id": job_id}
+        db_instance = self.db
+        cursor = db_instance.get_cursor()
 
-    def _bg_ingest_logs(self, workspace_id: str, source_id: str, logs: list[dict], job_id: int):
-        """Background worker for batch ingestion."""
-        try:
-            db_instance = self.db
-            cursor = db_instance.get_cursor()
-            
-            # 1. Disk-First: write raw lines in a single batch call
-            raw_lines = [log.get("raw_text") or log.get("message") or "" for log in logs]
-            line_ids = self.log_store.append_batch(source_id, raw_lines)
-
-            # 2. Build skinny DB rows
-            now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            batch_data = [
-                (
-                    workspace_id,
-                    source_id,
-                    line_ids[i],
-                    raw_lines[i],
-                    log.get("timestamp") or now,
-                    log.get("level") or "INFO",
-                    None,
-                    json.dumps(log.get("facets") or {}),
-                    False,
-                )
-                for i, log in enumerate(logs)
-            ]
-
-            cursor.executemany(
-                "INSERT INTO logs (workspace_id, source_id, line_id, raw_text, timestamp, level, cluster_id, facets, processed)"
-                " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                batch_data,
-            )
-
-            # 3. Mark job completed
-            cursor.execute(
-                "UPDATE ingestion_jobs SET status = 'completed', processed_lines = total_lines, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
-                (job_id,),
-            )
-            db_instance.commit()
-
-            # 4. Broadcast to active overlays
+        # Pre-fetch rules
+        cursor.execute("SELECT value FROM settings WHERE key = 'facet_extractions'")
+        gr = cursor.fetchone()
+        global_rules = []
+        if gr and gr[0]:
             try:
-                shared_src = self.shared_source_mgr.get_source(source_id)
-                shared_src.push_batch(raw_lines, line_ids)
-            except Exception as e:
-                logger.error("[Ingestion] Broadcast failed for %s: %s", source_id, e)
-
-        except Exception as exc:
-            logger.error("[Ingestion] Failed background batch job %d: %s", job_id, exc)
-            try:
-                self.db.get_cursor().execute(
-                    "UPDATE ingestion_jobs SET status = 'failed', updated_at = CURRENT_TIMESTAMP WHERE id = ?",
-                    (job_id,),
-                )
-                self.db.commit()
+                parsed = json.loads(gr[0])
+                global_rules = parsed if isinstance(parsed, list) else []
             except Exception:
                 pass
 
+        rules_cache = {}
+
+        for (ws_id, src_id), src_logs in grouped.items():
+            try:
+                rules = self._get_facet_rules_for_workspace(cursor, ws_id, rules_cache, global_rules)
+
+                cursor.execute(
+                    "SELECT parser_config, tz_offset FROM fusion_configs WHERE workspace_id = ? AND source_id = ?",
+                    (ws_id, src_id),
+                )
+                row = cursor.fetchone()
+                p_config = json.loads(row[0]) if row and row[0] else {}
+                p_tz = row[1] if row and row[1] else 0
+
+                parser = self.get_drain_parser(ws_id)
+
+                # 1. Disk-First: write raw lines
+                raw_lines = [log.get("raw_text") or log.get("message") or "" for log in src_logs]
+                line_ids = self.log_store.append_batch(src_id, raw_lines)
+
+                # 2. Process Chunk in RAM
+                batch_data, cluster_increments = self._process_chunk_ram_first(
+                    ws_id, src_id, line_ids, raw_lines,
+                    parser, rules, p_config, p_tz, now, now_ts
+                )
+
+                # 3. Bulk Insert via PyArrow
+                if batch_data:
+                    self._insert_arrow_batch(cursor, batch_data, cluster_increments)
+
+                db_instance.commit()
+
+                # 4. Broadcast to active overlays
+                try:
+                    shared_src = self.shared_source_mgr.get_source(src_id)
+                    shared_src.push_batch(raw_lines, line_ids)
+                except Exception as e:
+                    logger.error("[Ingestion] Broadcast failed for %s: %s", src_id, e)
+
+            except Exception as exc:
+                logger.exception("[Ingestion] Stream batch failed: %s", exc)
+
+        return {"status": "ok", "count": len(log_dicts)}
+
     def method_ingest_local_file(self, workspace_id: str, source_id: str, filepath: str) -> dict:
         """Optimised ingestion — Disk-First / Fast-Path.
-        
+
         Now runs in a background thread to prevent blocking the UI.
         """
         if not os.path.exists(filepath):
@@ -1323,24 +1281,58 @@ class App:
         return {"status": "ok", "job_id": job_id, "total_lines": total_lines}
 
     def _bg_ingest_local_file(self, workspace_id: str, source_id: str, filepath: str, job_id: int):
-        """Background worker for local file ingestion."""
-        # Speed Optimization: 
-        # 1. Increase initial chunk size (was 100, now 1000)
-        # 2. Batch commits (only commit every 5000 lines) to reduce DuckDB WAL overhead
-        initial_chunk_size = 1000
-        max_chunk_size = 5000
-        commit_interval = 5000 
-        
+        """Background worker for local file ingestion.
+
+        RAM-First Bulk-Insert Pipeline (PyArrow Optimized):
+        1. Read chunk
+        2. Write FastPath
+        3. Train & Tag Drain3 in RAM (Single Thread)
+        4. Bulk Insert fully processed rows via PyArrow
+        """
+        import json
+        import time
+
+
+        initial_chunk_size = 5000
+        max_chunk_size = 10000
+        commit_interval = 10000
+
         current_chunk_size = initial_chunk_size
         processed_count = 0
         uncommitted_count = 0
+        now = time.time()
         now_ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
         try:
-            # We need a fresh cursor for the background thread
-            db_instance = self.db 
+            db_instance = self.db
             cursor = db_instance.get_cursor()
-            
+
+            # Pre-fetch rules and configs
+            cursor.execute("SELECT value FROM settings WHERE key = 'facet_extractions'")
+            gr = cursor.fetchone()
+            global_rules = []
+            if gr and gr[0]:
+                try:
+                    parsed = json.loads(gr[0])
+                    global_rules = parsed if isinstance(parsed, list) else []
+                except Exception:
+                    pass
+
+            rules_cache = {}
+            rules = self._get_facet_rules_for_workspace(
+                cursor, workspace_id, rules_cache, global_rules
+            )
+
+            cursor.execute(
+                "SELECT parser_config, tz_offset FROM fusion_configs WHERE workspace_id = ? AND source_id = ?",
+                (workspace_id, source_id),
+            )
+            row = cursor.fetchone()
+            p_config = json.loads(row[0]) if row and row[0] else {}
+            p_tz = row[1] if row and row[1] else 0
+
+            parser = self.get_drain_parser(workspace_id)
+
             with open(filepath, encoding="utf-8", errors="replace") as f:
                 chunk_lines: list[str] = []
 
@@ -1351,33 +1343,30 @@ class App:
                     chunk_lines.append(clean)
 
                     if len(chunk_lines) >= current_chunk_size:
-                        # --- Disk-First: batch-write chunk to flat file ---
+                        # 1. Write FastPath
                         line_ids = self.log_store.append_batch(source_id, chunk_lines)
 
-                        batch_data = [
-                            (
-                                workspace_id,
-                                source_id,
-                                line_ids[i],
-                                chunk_lines[i],
-                                now_ts,
-                                "INFO",
-                                None,
-                                "{}",
-                                False,
-                            )
-                            for i in range(len(chunk_lines))
-                        ]
-                        cursor.executemany(
-                            "INSERT INTO logs"
-                            " (workspace_id, source_id, line_id, raw_text, timestamp, level, cluster_id, facets, processed)"
-                            " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                            batch_data,
+                        # 2. Process Chunk in RAM
+                        batch_data, cluster_increments = self._process_chunk_ram_first(
+                            workspace_id,
+                            source_id,
+                            line_ids,
+                            chunk_lines,
+                            parser,
+                            rules,
+                            p_config,
+                            p_tz,
+                            now,
+                            now_ts,
                         )
+
+                        # 3. Bulk Insert via PyArrow
+                        if batch_data:
+                            self._insert_arrow_batch(cursor, batch_data, cluster_increments)
+
                         processed_count += len(chunk_lines)
                         uncommitted_count += len(chunk_lines)
-                        
-                        # Only commit every few chunks or at the end
+
                         if uncommitted_count >= commit_interval:
                             cursor.execute(
                                 "UPDATE ingestion_jobs SET processed_lines = ?, status = 'processing', updated_at = CURRENT_TIMESTAMP WHERE id = ?",
@@ -1385,34 +1374,27 @@ class App:
                             )
                             db_instance.commit()
                             uncommitted_count = 0
-                            
+
                         chunk_lines = []
-                        # Scale up chunk size for better performance on large files
                         current_chunk_size = min(max_chunk_size, current_chunk_size * 2)
 
                 # Final chunk
                 if chunk_lines:
                     line_ids = self.log_store.append_batch(source_id, chunk_lines)
-                    batch_data = [
-                        (
-                            workspace_id,
-                            source_id,
-                            line_ids[i],
-                            chunk_lines[i],
-                            now_ts,
-                            "INFO",
-                            None,
-                            "{}",
-                            False,
-                        )
-                        for i in range(len(chunk_lines))
-                    ]
-                    cursor.executemany(
-                        "INSERT INTO logs"
-                        " (workspace_id, source_id, line_id, raw_text, timestamp, level, cluster_id, facets, processed)"
-                        " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                        batch_data,
+                    batch_data, cluster_increments = self._process_chunk_ram_first(
+                        workspace_id,
+                        source_id,
+                        line_ids,
+                        chunk_lines,
+                        parser,
+                        rules,
+                        p_config,
+                        p_tz,
+                        now,
+                        now_ts,
                     )
+                    if batch_data:
+                        self._insert_arrow_batch(cursor, batch_data, cluster_increments)
                     processed_count += len(chunk_lines)
 
             # Mark job completed
@@ -1429,8 +1411,7 @@ class App:
             )
 
         except Exception as exc:
-            logger.error("[Ingestion] Failed background job %d: %s", job_id, exc)
-            # Try to mark as failed
+            logger.exception("[Ingestion] Failed background job %d: %s", job_id, exc)
             try:
                 cursor = self.db.get_cursor()
                 cursor.execute(
@@ -1441,6 +1422,148 @@ class App:
             except Exception:
                 pass
 
+    def _process_chunk_ram_first(
+        self,
+        workspace_id: str,
+        source_id: str,
+        line_ids: list[int],
+        chunk_lines: list[str],
+        parser,
+        rules,
+        p_config,
+        p_tz,
+        now,
+        now_ts,
+    ):
+        import json
+
+
+        TRAIN_SAMPLE_SIZE = 200
+        cluster_increments = {}
+        batch_data = []
+
+        train_lines = chunk_lines[:TRAIN_SAMPLE_SIZE]
+        train_ids = line_ids[:TRAIN_SAMPLE_SIZE]
+
+        tag_lines = chunk_lines[TRAIN_SAMPLE_SIZE:]
+        tag_ids = line_ids[TRAIN_SAMPLE_SIZE:]
+
+        # Phase 1: Train on sample
+        for i, raw_text in enumerate(train_lines):
+            meta = extract_log_metadata(
+                raw_text, custom_rules=rules, parser_config=p_config, tz_offset=p_tz
+            )
+            res = parser.parse(meta["message"])
+            cluster_id, template = res["cluster_id"], res["template"]
+
+            if "facets" in res:
+                meta["facets"].update(res["facets"])
+
+            key = (workspace_id, cluster_id, template)
+            cluster_increments[key] = cluster_increments.get(key, 0) + 1
+
+            batch_data.append(
+                (
+                    workspace_id,
+                    source_id,
+                    train_ids[i],
+                    raw_text,
+                    meta["timestamp"] or now_ts,
+                    meta["level"] or "INFO",
+                    cluster_id,
+                    json.dumps(meta["facets"]),
+                    True,  # processed = True
+                )
+            )
+
+        # Phase 2: Tag remaining sequentially
+        if tag_lines:
+            for i, raw_text in enumerate(tag_lines):
+                meta = extract_log_metadata(
+                    raw_text, custom_rules=rules, parser_config=p_config, tz_offset=p_tz
+                )
+                match = parser.match(meta["message"])
+
+                cluster_id = None
+                template = None
+
+                if match:
+                    cluster_id = str(match["cluster_id"])
+                    template = match["template"]
+
+                    try:
+                        params = parser.miner.extract_parameters(
+                            template, meta["message"], exact_matching=False
+                        )
+                        if params:
+                            for p in params:
+                                meta["facets"][p.mask_name.strip("<>").lower()] = p.value
+                    except Exception:
+                        pass
+
+                    key = (workspace_id, cluster_id, template)
+                    cluster_increments[key] = cluster_increments.get(key, 0) + 1
+
+                batch_data.append(
+                    (
+                        workspace_id,
+                        source_id,
+                        tag_ids[i],
+                        raw_text,
+                        meta["timestamp"] or now_ts,
+                        meta["level"] or "INFO",
+                        cluster_id,
+                        json.dumps(meta["facets"]),
+                        True,  # processed = True
+                    )
+                )
+
+        return batch_data, cluster_increments
+
+    def _insert_arrow_batch(self, cursor, batch_data, cluster_increments):
+        import pyarrow as pa
+
+        cursor.execute("BEGIN TRANSACTION")
+
+        # PyArrow logs table
+        cols = list(zip(*batch_data))
+        arrow_logs = pa.Table.from_arrays(
+            [pa.array(c) for c in cols],
+            names=[
+                "workspace_id",
+                "source_id",
+                "line_id",
+                "raw_text",
+                "timestamp",
+                "level",
+                "cluster_id",
+                "facets",
+                "processed",
+            ],
+        )
+
+        cursor.execute(
+            "INSERT INTO logs (workspace_id, source_id, line_id, raw_text, timestamp, level, cluster_id, facets, processed) SELECT * FROM arrow_logs"
+        )
+
+        # PyArrow clusters table
+        cluster_data = [(w, c, t, count) for (w, c, t), count in cluster_increments.items()]
+        if cluster_data:
+            c_cols = list(zip(*cluster_data))
+            arrow_clusters = pa.Table.from_arrays(
+                [pa.array(c) for c in c_cols],
+                names=["workspace_id", "cluster_id", "template", "count"],
+            )
+            cursor.execute("CREATE TEMP TABLE temp_clusters AS SELECT * FROM arrow_clusters")
+            cursor.execute("""
+                INSERT INTO clusters (workspace_id, cluster_id, template, count)
+                SELECT workspace_id, cluster_id, template, count FROM temp_clusters
+                ON CONFLICT (workspace_id, cluster_id)
+                DO UPDATE SET count = clusters.count + excluded.count, template = excluded.template
+            """)
+            cursor.execute("DROP TABLE temp_clusters")
+
+        cursor.execute("COMMIT")
 
     def method_cleanup_ingestion_jobs(self, workspace_id: str) -> dict:
         """Removes stalled ingestion jobs with no progress."""
@@ -1466,9 +1589,9 @@ class App:
         cursor = self.db.get_cursor()
         # Automatically toggle has_comment flag based on whether text is provided
         query = """
-            UPDATE logs 
-            SET comment = ?, 
-                has_comment = CASE WHEN length(?) > 0 THEN TRUE ELSE FALSE END 
+            UPDATE logs
+            SET comment = ?,
+                has_comment = CASE WHEN length(?) > 0 THEN TRUE ELSE FALSE END
             WHERE id = ?
         """
         cursor.execute(query, (comment, comment, log_id))
@@ -1540,8 +1663,6 @@ class App:
         return [
             {"id": c.cluster_id, "template": c.get_template(), "size": c.size} for c in clusters
         ]
-
-
 
     async def method_analyze_cluster(self, **kwargs) -> dict:
         params = AnalyzeClusterRequest(**kwargs)
@@ -1772,7 +1893,7 @@ class App:
         cursor = self.db.get_cursor()
         cursor.execute(
             """
-            SELECT m.context_logs, s.session_id 
+            SELECT m.context_logs, s.session_id
             FROM ai_messages m
             JOIN ai_sessions s ON m.session_id = s.session_id
             WHERE s.workspace_id = ? AND m.context_logs IS NOT NULL
@@ -1824,7 +1945,7 @@ class App:
         """Save a learned resolution to the workspace memory."""
         cursor = self.db.get_cursor()
         cursor.execute(
-            """INSERT INTO ai_memory (workspace_id, issue_signature, resolution) 
+            """INSERT INTO ai_memory (workspace_id, issue_signature, resolution)
                VALUES (?, ?, ?)
                ON CONFLICT (workspace_id, issue_signature) DO UPDATE SET
                resolution = excluded.resolution, created_at = CURRENT_TIMESTAMP
@@ -1839,8 +1960,8 @@ class App:
         cursor = self.db.get_cursor()
         # Simple ILIKE search
         cursor.execute(
-            """SELECT issue_signature, resolution, created_at 
-               FROM ai_memory 
+            """SELECT issue_signature, resolution, created_at
+               FROM ai_memory
                WHERE workspace_id = ? AND (issue_signature ILIKE ? OR resolution ILIKE ?)
                ORDER BY created_at DESC LIMIT ?
             """,
@@ -2308,7 +2429,7 @@ class App:
             else " WHERE l.cluster_id IS NOT NULL"
         )
         cluster_query = f"""
-            SELECT 
+            SELECT
                 COALESCE(c.template, 'Pattern ' || l.cluster_id) as template,
                 COUNT(*) as count
             FROM logs l
@@ -2335,7 +2456,7 @@ class App:
         # 6. Time Series (Log Volume & Severity over time)
         bucket_format = "%Y-%m-%d %H:%M:00"
         ts_query = f"""
-            SELECT 
+            SELECT
                 strftime('{bucket_format}', l.timestamp::TIMESTAMP) as bucket,
                 l.level,
                 COUNT(*) as count
@@ -2361,7 +2482,7 @@ class App:
             else " WHERE l.level IN ('ERROR', 'FATAL', 'CRITICAL') AND l.cluster_id IS NOT NULL"
         )
         error_cluster_query = f"""
-            SELECT 
+            SELECT
                 COALESCE(c.template, 'Pattern ' || l.cluster_id) as template,
                 COUNT(*) as count
             FROM logs l
@@ -2392,7 +2513,7 @@ class App:
         source_heatmap = []
         try:
             sh_query = f"""
-                SELECT 
+                SELECT
                     strftime('{bucket_format}', l.timestamp::TIMESTAMP) as bucket,
                     l.source_id,
                     s.name as source_name,
@@ -2431,6 +2552,7 @@ class App:
             if row:
                 content = row[0].strip()
                 import re
+
                 clean_content = re.sub(r"<think>.*?</think>", "", content, flags=re.DOTALL).strip()
                 latest_insight = (
                     (clean_content[:150] + "...") if len(clean_content) > 150 else clean_content

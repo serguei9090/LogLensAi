@@ -152,14 +152,10 @@ class FastPathService:
         if not source:
             return None
 
-        # Synchronize with DiskLogStore writers
-        lock = self.log_store.get_lock(source_id) if self.log_store else None
-
-        if lock:
-            with lock:
-                res = source.get_line(line_id)
-        else:
-            res = source.get_line(line_id)
+        # BUG-002 Resolution: Removed DiskLogStore lock. 
+        # mmap handles concurrent reads safely, and we only read lines 
+        # that were already committed to the DB, so they must exist on disk.
+        res = source.get_line(line_id)
 
         if res is None:
             self.hydrate_misses += 1
@@ -170,22 +166,12 @@ class FastPathService:
         if not source:
             return [None] * len(line_ids)
 
-        lock = self.log_store.get_lock(source_id) if self.log_store else None
         results = []
-
-        if lock:
-            with lock:
-                for lid in line_ids:
-                    res = source.get_line(lid)
-                    if res is None:
-                        self.hydrate_misses += 1
-                    results.append(res)
-        else:
-            for lid in line_ids:
-                res = source.get_line(lid)
-                if res is None:
-                    self.hydrate_misses += 1
-                results.append(res)
+        for lid in line_ids:
+            res = source.get_line(lid)
+            if res is None:
+                self.hydrate_misses += 1
+            results.append(res)
 
         return results
 

@@ -31,34 +31,49 @@ class LogDatabase:
         return cls._instance
 
     def _init_db(self, db_path):
-        self.conn: Any = None
-        # Memory mode is allowed for tests, else absolute path
+        self.db_path = db_path
         if db_path != MEMORY_DB:
-            db_path = os.path.abspath(db_path)
+            self.db_path = os.path.abspath(db_path)
+            
+        self._local = threading.local()
+        # Initialize the first connection to create tables
+        conn = self._get_conn()
+        self._create_tables(conn)
 
-        try:
-            self.conn = duckdb.connect(db_path)
-        except Exception as e:
-            # BUG-001 / STAB-003 Resolution: Robust WAL Recovery
-            if db_path != MEMORY_DB:
-                wal_path = f"{db_path}.wal"
-                if os.path.exists(wal_path):
-                    logger.warning("[DB] WAL replay failed: %s", e)
-                    logger.info("[DB] Attempting recovery by removing WAL file: %s", wal_path)
-                    try:
-                        os.remove(wal_path)
-                        self.conn = duckdb.connect(db_path)
-                        logger.info("[DB] Recovery successful.")
-                        self._create_tables()
-                        return
-                    except Exception as retry_err:
-                        logger.error("[DB] Recovery failed: %s", retry_err)
-            raise e
+    def _get_conn(self):
+        # Memory DBs MUST share the same connection object to see the same data.
+        # File-based DBs should use thread-local connections to avoid transaction interference.
+        if self.db_path == MEMORY_DB:
+            if not hasattr(self, "_shared_conn") or self._shared_conn is None:
+                self._shared_conn = duckdb.connect(self.db_path)
+            return self._shared_conn
 
-        self._create_tables()
+        if not hasattr(self._local, "conn"):
+            try:
+                # Use the same db_path for all connections
+                self._local.conn = duckdb.connect(self.db_path)
+            except Exception as e:
+                if self.db_path != MEMORY_DB:
+                    wal_path = f"{self.db_path}.wal"
+                    if os.path.exists(wal_path):
+                        logger.warning("[DB] WAL replay failed: %s", e)
+                        try:
+                            os.remove(wal_path)
+                            self._local.conn = duckdb.connect(self.db_path)
+                            return self._local.conn
+                        except Exception:
+                            pass
+                raise e
+        return self._local.conn
 
-    def _create_tables(self):
-        cursor = self.get_cursor()
+    def get_cursor(self):
+        return self._get_conn().cursor()
+
+    def commit(self):
+        self._get_conn().commit()
+
+    def _create_tables(self, conn):
+        cursor = conn.cursor()
         self._setup_schema(cursor)
         self._run_migrations(cursor)
         self._initialize_cluster_cache(cursor)
@@ -234,6 +249,7 @@ class LogDatabase:
             CREATE INDEX IF NOT EXISTS idx_logs_source_id ON logs (source_id);
             CREATE INDEX IF NOT EXISTS idx_logs_timestamp ON logs (timestamp);
             CREATE INDEX IF NOT EXISTS idx_logs_cluster_id ON logs (cluster_id);
+            CREATE INDEX IF NOT EXISTS idx_logs_processed ON logs (processed);
             CREATE INDEX IF NOT EXISTS idx_ai_messages_session_id ON ai_messages (session_id);
         """)
 
@@ -343,6 +359,9 @@ class LogDatabase:
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_logs_source_id ON logs (source_id);")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_logs_timestamp ON logs (timestamp);")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_logs_cluster_id ON logs (cluster_id);")
+        cursor.execute(
+            "CREATE INDEX IF NOT EXISTS idx_logs_processed ON logs (processed);"
+        )
         cursor.execute(
             "CREATE INDEX IF NOT EXISTS idx_ai_messages_session_id ON ai_messages (session_id);"
         )
@@ -471,18 +490,18 @@ class LogDatabase:
         except Exception as e:
             logger.error("[DB] Cluster cache initialization failure: %s", e)
 
-    def get_cursor(self):
-        return self.conn.cursor()
-
-    def commit(self):
-        self.conn.commit()
-
     @classmethod
     def reset(cls):
         with cls._lock:
             if cls._instance is not None:
-                if hasattr(cls._instance, "conn"):
-                    cls._instance.conn.close()
+                # Close all connections in all threads is hard, but we can at least
+                # close the one in the current thread if it exists.
+                # Usually reset is called during shutdown/cleanup.
+                if hasattr(cls._instance, "_shared_conn") and cls._instance._shared_conn:
+                    cls._instance._shared_conn.close()
+                    cls._instance._shared_conn = None
+                if hasattr(cls._instance, "_local") and hasattr(cls._instance._local, "conn"):
+                    cls._instance._local.conn.close()
                 cls._instance = None
 
     def _get_filter_condition(self, field: str, op: str, value: Any) -> tuple[str, Any]:

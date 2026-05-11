@@ -1,7 +1,7 @@
 {
   "summary": {
-    "training_speed": 37659.49805341263,
-    "tagging_speed": 33125.391923802905,
+    "training_speed": 47104.887816733266,
+    "tagging_speed": 58034.81836722834,
     "match_rate": 0.952
   },
   "sample_extractions": [

@@ -17,6 +17,7 @@ class IngestionServer:
     def __init__(
         self, app, syslog_port=514, http_port=5001, syslog_enabled=True, http_enabled=True
     ):
+        import queue
         self.app = app
         self.syslog_port = syslog_port
         self.http_port = http_port
@@ -28,6 +29,7 @@ class IngestionServer:
         self._http_runner = None
         self._http_loop = None
         self._streams_cache = []  # List of dicts: {workspace_id, name, type, port}
+        self._log_queue = queue.Queue()
 
     def start(self):
         if self.running:
@@ -110,6 +112,28 @@ class IngestionServer:
         except Exception as e:
             logger.error(f"Failed to refresh log streams: {e}")
 
+    def _run_flush_worker(self):
+        import time
+        batch = []
+        last_flush = time.time()
+
+        while not self._stop_event.is_set() or not self._log_queue.empty():
+            try:
+                import queue
+                log = self._log_queue.get(timeout=0.5)
+                batch.append(log)
+            except queue.Empty:
+                pass
+
+            now = time.time()
+            if batch and (len(batch) >= 1000 or (now - last_flush) >= 1.0):
+                try:
+                    self.app.method_ingest_logs(batch)
+                except Exception as e:
+                    logger.error(f"Failed to bulk ingest streams: {e}")
+                batch = []
+                last_flush = now
+
     def _run_syslog(self):
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         try:
@@ -147,14 +171,7 @@ class IngestionServer:
                         "level": "INFO",
                         "facets": {"source_ip": addr[0]},
                     }
-                    try:
-                        self.app.method_ingest_logs([log_entry])
-                    except Exception as ingest_err:
-                        logger.error(
-                            "Syslog ingestion processing error (WS: %s): %s",
-                            stream["workspace_id"],
-                            ingest_err,
-                        )
+                    self._log_queue.put(log_entry)
             except TimeoutError:
                 continue
             except Exception as e:
@@ -221,12 +238,8 @@ class IngestionServer:
                             entry["raw_text"] = entry["message"]
                         workspace_logs.append(entry)
 
-                    try:
-                        self.app.method_ingest_logs(workspace_logs)
-                    except Exception as ingest_err:
-                        logger.error(
-                            f"HTTP ingestion processing error (WS: {stream['workspace_id']}): {ingest_err}"
-                        )
+                    for entry in workspace_logs:
+                        self._log_queue.put(entry)
 
                 return web.json_response({"status": "ok", "count": len(logs)})
             except Exception as e:

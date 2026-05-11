@@ -63,10 +63,25 @@ class DrainParser:
         """Returns a dict with cluster_id and template for the given log line (updates tree)."""
         with self.lock:
             result = self.miner.add_log_message(log_line)
+            cluster_id = str(result["cluster_id"])
+            template = result["template_mined"]
+
+            facets = {}
+            try:
+                params = self.miner.extract_parameters(template, log_line, exact_matching=False)
+                if params:
+                    for param in params:
+                        # Clean up mask name e.g., <IP> -> ip, <NUM> -> num
+                        mask_key = param.mask_name.strip("<>").lower()
+                        facets[mask_key] = param.value
+            except Exception:
+                pass
+
             return {
-                "cluster_id": str(result["cluster_id"]),
-                "template": result["template_mined"],
+                "cluster_id": cluster_id,
+                "template": template,
                 "change_type": result["change_type"],
+                "facets": facets,
             }
 
     def match(self, log_line: str) -> dict | None:
