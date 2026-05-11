@@ -445,7 +445,6 @@ export function InvestigationPage() {
         },
       });
 
-      setTransitioningSourceId(null);
       fetchLogs();
 
       if (tail) {
@@ -506,7 +505,6 @@ export function InvestigationPage() {
         folder_id: folderId,
       });
 
-      setTransitioningSourceId(null);
       fetchLogs();
 
       setTailingSourceIds((prev) => new Set(prev).add(newSource.id));
@@ -543,7 +541,6 @@ export function InvestigationPage() {
       setLogs([], 0);
       // Lean INSERT — fast because Drain3/metadata are deferred to background worker
       await callSidecar({ method: "ingest_logs", params: { logs: entries } });
-      setTransitioningSourceId(null);
       fetchLogs();
     } catch (error) {
       setTransitioningSourceId(null);

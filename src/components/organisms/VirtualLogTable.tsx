@@ -339,126 +339,253 @@ export function VirtualLogTable({
         aria-label="Log Table"
         tabIndex={-1}
       >
-        {/* Full-screen Loading/Ingestion Overlay — only when table is empty */}
-        {(activeJob || isTransitioning) && logs.length === 0 && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center p-8 text-center animate-in fade-in zoom-in-95 duration-500 bg-bg-base/50 backdrop-blur-sm z-50">
-            <div className="flex flex-col items-center gap-6 max-w-md w-full">
-              <div className="relative">
-                <div className="absolute -inset-4 bg-primary/20 rounded-full blur-2xl animate-pulse" />
-                <div className="relative bg-bg-surface border border-border shadow-2xl rounded-2xl p-6">
-                  <Sparkles className="size-12 text-primary animate-pulse" />
-                </div>
-              </div>
-              <div className="space-y-2">
-                <h3 className="text-xl font-bold text-text-primary">
-                  {activeJob ? "Indexing Dataset..." : "Retrieving Logs..."}
-                </h3>
-                <p className="text-sm text-text-muted leading-relaxed">
-                  {activeJob
-                    ? "Building database indices and mapping patterns for the complete file. Almost ready."
-                    : "Hydrating log records from storage and applying active filters."}
-                </p>
-              </div>
-              {activeJob && (
-                <div className="w-full space-y-3">
-                  <div className="flex justify-between text-[10px] font-bold uppercase tracking-widest text-text-muted">
-                    <span>
-                      {activeJob.processed_lines.toLocaleString()} /{" "}
-                      {activeJob.total_lines.toLocaleString()} lines
-                    </span>
-                    <span className="text-primary">
-                      {Math.round((activeJob.processed_lines / activeJob.total_lines) * 100)}%
-                    </span>
-                  </div>
-                  <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden border border-white/5">
-                    <div
-                      className="h-full bg-primary transition-all duration-500 ease-out shadow-[0_0_10px_rgba(34,197,94,0.5)]"
-                      style={{
-                        width: `${(activeJob.processed_lines / activeJob.total_lines) * 100}%`,
-                      }}
-                    />
-                  </div>
-                </div>
-              )}
-            </div>
-            <div className="mt-12 flex items-center gap-6 text-[10px] font-bold uppercase tracking-widest text-text-muted/30">
-              <div className="flex items-center gap-1.5">
-                <Download className="size-3" /> local files
-              </div>
-              <div className="w-1 h-1 rounded-full bg-current" />
-              <div className="flex items-center gap-1.5">
-                <Rocket className="size-3" /> live streams
-              </div>
-              <div className="w-1 h-1 rounded-full bg-current" />
-              <div className="flex items-center gap-1.5">
-                <Sparkles className="size-3" /> ssh tailing
-              </div>
-            </div>
-          </div>
-        )}
+        {/* ─── State Management Overlays ────────────────────────────────────── */}
+        {(() => {
+          const showOverlay = (activeJob || isTransitioning) && (logs.length === 0 || !isTailing);
+          const isEmpty = logs.length === 0 && !activeJob && !isTransitioning;
 
-        {/* Empty State */}
-        {logs.length === 0 && !activeJob && !isTransitioning ? (
-          <div className="absolute inset-0 flex flex-col items-center justify-center p-8 text-center animate-in fade-in zoom-in-95 duration-500">
-            <div className="relative mb-6">
-              <div className="absolute -inset-4 bg-primary/10 rounded-full blur-2xl animate-pulse" />
-              <div className="relative bg-bg-surface border border-border shadow-2xl rounded-2xl p-6">
-                <FileUp className="size-12 text-primary" />
+          if (showOverlay) {
+            return (
+              <div className="absolute inset-0 flex flex-col items-center justify-center p-8 text-center animate-in fade-in zoom-in-95 duration-500 bg-bg-base/50 backdrop-blur-sm z-50">
+                <div className="flex flex-col items-center gap-6 max-w-md w-full">
+                  <div className="relative">
+                    <div className="absolute -inset-4 bg-primary/20 rounded-full blur-2xl animate-pulse" />
+                    <div className="relative bg-bg-surface border border-border shadow-2xl rounded-2xl p-6">
+                      <Sparkles className="size-12 text-primary animate-pulse" />
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <h3 className="text-xl font-bold text-text-primary">
+                      {activeJob ? "Indexing Dataset..." : "Retrieving Logs..."}
+                    </h3>
+                    <p className="text-sm text-text-muted leading-relaxed">
+                      {activeJob
+                        ? "Building database indices and mapping patterns for the complete file. Almost ready."
+                        : "Hydrating log records from storage and applying active filters."}
+                    </p>
+                  </div>
+                  {activeJob && (
+                    <div className="w-full space-y-3">
+                      <div className="flex justify-between text-[10px] font-bold uppercase tracking-widest text-text-muted">
+                        <span>
+                          {activeJob.processed_lines.toLocaleString()} /{" "}
+                          {activeJob.total_lines.toLocaleString()} lines
+                        </span>
+                        <span className="text-primary">
+                          {Math.round((activeJob.processed_lines / activeJob.total_lines) * 100)}%
+                        </span>
+                      </div>
+                      <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden border border-white/5">
+                        <div
+                          className="h-full bg-primary transition-all duration-500 ease-out shadow-[0_0_10px_rgba(34,197,94,0.5)]"
+                          style={{
+                            width: `${(activeJob.processed_lines / activeJob.total_lines) * 100}%`,
+                          }}
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+                <div className="mt-12 flex items-center gap-6 text-[10px] font-bold uppercase tracking-widest text-text-muted/30">
+                  <div className="flex items-center gap-1.5">
+                    <Download className="size-3" /> local files
+                  </div>
+                  <div className="w-1 h-1 rounded-full bg-current" />
+                  <div className="flex items-center gap-1.5">
+                    <Rocket className="size-3" /> live streams
+                  </div>
+                  <div className="w-1 h-1 rounded-full bg-current" />
+                  <div className="flex items-center gap-1.5">
+                    <Sparkles className="size-3" /> ssh tailing
+                  </div>
+                </div>
               </div>
-            </div>
-            <h3 className="text-xl font-bold text-text-primary">No logs detected</h3>
-            <p className="text-sm text-text-muted mt-2 max-w-[280px] leading-relaxed">
-              This workspace is currently empty. Connect a data source or upload a log file to begin
-              analysis.
-            </p>
-            <Button
-              onClick={onImport}
-              className="mt-8 px-8 py-6 rounded-2xl bg-primary hover:bg-primary-hover text-white font-bold shadow-xl shadow-primary/20 transition-all active:scale-95 group"
-            >
-              <Rocket className="size-5 mr-2 group-hover:animate-bounce" />
-              Import First Log
-            </Button>
-            <div className="mt-12 flex items-center gap-6 text-[10px] font-bold uppercase tracking-widest text-text-muted/30">
-              <div className="flex items-center gap-1.5">
-                <Download className="size-3" /> local files
+            );
+          }
+
+          if (isEmpty) {
+            return (
+              <div className="absolute inset-0 flex flex-col items-center justify-center p-8 text-center animate-in fade-in zoom-in-95 duration-500">
+                <div className="relative mb-6">
+                  <div className="absolute -inset-4 bg-primary/10 rounded-full blur-2xl animate-pulse" />
+                  <div className="relative bg-bg-surface border border-border shadow-2xl rounded-2xl p-6">
+                    <FileUp className="size-12 text-primary" />
+                  </div>
+                </div>
+                <h3 className="text-xl font-bold text-text-primary">No logs detected</h3>
+                <p className="text-sm text-text-muted mt-2 max-w-[280px] leading-relaxed">
+                  This workspace is currently empty. Connect a data source or upload a log file to
+                  begin analysis.
+                </p>
+                <Button
+                  onClick={onImport}
+                  className="mt-8 px-8 py-6 rounded-2xl bg-primary hover:bg-primary-hover text-white font-bold shadow-xl shadow-primary/20 transition-all active:scale-95 group"
+                >
+                  <Rocket className="size-5 mr-2 group-hover:animate-bounce" />
+                  Import First Log
+                </Button>
+                <div className="mt-12 flex items-center gap-6 text-[10px] font-bold uppercase tracking-widest text-text-muted/30">
+                  <div className="flex items-center gap-1.5">
+                    <Download className="size-3" /> local files
+                  </div>
+                  <div className="w-1 h-1 rounded-full bg-current" />
+                  <div className="flex items-center gap-1.5">
+                    <Rocket className="size-3" /> live streams
+                  </div>
+                  <div className="w-1 h-1 rounded-full bg-current" />
+                  <div className="flex items-center gap-1.5">
+                    <Sparkles className="size-3" /> ssh tailing
+                  </div>
+                </div>
               </div>
-              <div className="w-1 h-1 rounded-full bg-current" />
-              <div className="flex items-center gap-1.5">
-                <Rocket className="size-3" /> live streams
-              </div>
-              <div className="w-1 h-1 rounded-full bg-current" />
-              <div className="flex items-center gap-1.5">
-                <Sparkles className="size-3" /> ssh tailing
-              </div>
-            </div>
-          </div>
-        ) : (
-          logs.length > 0 && (
-            <>
-              {/* Subtle background Ingestion Progress for "Streaming" feel */}
-              {activeJob && (
-                <div className="sticky top-10 left-0 w-full z-40 px-6 py-2 bg-bg-surface/80 backdrop-blur-md border-b border-white/5 animate-in slide-in-from-top duration-300">
-                  <div className="flex items-center justify-between gap-4">
-                    <div className="flex items-center gap-2">
-                      <Sparkles className="size-3 text-primary animate-pulse" />
-                      <span className="text-[10px] font-bold uppercase tracking-widest text-text-muted">
-                        Ingesting: {activeJob.processed_lines.toLocaleString()} lines
+            );
+          }
+
+          return (
+            logs.length > 0 && (
+              <>
+                {/* Subtle background Ingestion Progress for "Streaming" feel */}
+                {activeJob && (
+                  <div className="sticky top-10 left-0 w-full z-40 px-6 py-2 bg-bg-surface/80 backdrop-blur-md border-b border-white/5 animate-in slide-in-from-top duration-300">
+                    <div className="flex items-center justify-between gap-4">
+                      <div className="flex items-center gap-2">
+                        <Sparkles className="size-3 text-primary animate-pulse" />
+                        <span className="text-[10px] font-bold uppercase tracking-widest text-text-muted">
+                          Ingesting: {activeJob.processed_lines.toLocaleString()} lines
+                        </span>
+                      </div>
+                      <div className="flex-1 max-w-xs h-1 bg-white/5 rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-primary transition-all duration-300"
+                          style={{
+                            width: `${(activeJob.processed_lines / activeJob.total_lines) * 100}%`,
+                          }}
+                        />
+                      </div>
+                      <span className="text-[10px] font-bold text-primary">
+                        {Math.round((activeJob.processed_lines / activeJob.total_lines) * 100)}%
                       </span>
                     </div>
-                    <div className="flex-1 max-w-xs h-1 bg-white/5 rounded-full overflow-hidden">
-                      <div
-                        className="h-full bg-primary transition-all duration-300"
-                        style={{
-                          width: `${(activeJob.processed_lines / activeJob.total_lines) * 100}%`,
-                        }}
-                      />
-                    </div>
-                    <span className="text-[10px] font-bold text-primary">
-                      {Math.round((activeJob.processed_lines / activeJob.total_lines) * 100)}%
-                    </span>
                   </div>
+                )}
+
+                <div
+                  style={{
+                    height: `${rowVirtualizer.getTotalSize()}px`,
+                    width: "100%",
+                    position: "relative",
+                  }}
+                >
+                  <table className="w-full text-left text-sm border-separate border-spacing-0 block">
+                    <thead className="sticky top-0 bg-bg-surface border-b border-border z-10 text-text-muted text-[10px] font-bold uppercase tracking-widest h-10 select-none block">
+                      <tr className="grid grid-cols-[12px_80px_180px_90px_1fr_110px_100px] w-full items-center">
+                        <th
+                          className="p-0 transition-colors group/select-all"
+                          title={
+                            selectedLogIds.length === logs.length ? "Deselect All" : "Select All"
+                          }
+                        >
+                          <button
+                            type="button"
+                            className="w-full h-10 flex items-center justify-center hover:bg-white/5 outline-none focus-visible:bg-white/10"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (selectedLogIds.length === logs.length) {
+                                clearSelection();
+                              } else {
+                                setSelectedLogIds(logs.map((l) => l.id));
+                              }
+                            }}
+                            aria-label={
+                              selectedLogIds.length === logs.length ? "Deselect All" : "Select All"
+                            }
+                          >
+                            <div
+                              className={cn(
+                                "w-1 h-4 rounded-full transition-all",
+                                selectedLogIds.length === logs.length
+                                  ? "bg-emerald-500"
+                                  : "bg-white/10 group-hover/select-all:bg-white/30",
+                              )}
+                            />
+                          </button>
+                        </th>
+                        <th className="p-0 text-center flex items-center justify-center">
+                          <button
+                            type="button"
+                            className="w-full h-10 px-3 flex items-center justify-center gap-1.5 hover:text-text-primary transition-colors focus-visible:bg-primary/5 outline-none"
+                            onClick={() => onSort("id")}
+                          >
+                            ID {renderSortIcon("id")}
+                          </button>
+                        </th>
+                        <th className="p-0 text-left flex items-center">
+                          <button
+                            type="button"
+                            className="w-full h-10 px-3 flex items-center gap-1.5 hover:text-text-primary transition-colors focus-visible:bg-primary/5 outline-none"
+                            onClick={() => onSort("timestamp")}
+                          >
+                            Timestamp {renderSortIcon("timestamp")}
+                          </button>
+                        </th>
+                        <th className="p-0 text-left flex items-center">
+                          <button
+                            type="button"
+                            className="w-full h-10 px-3 flex items-center gap-1.5 hover:text-text-primary transition-colors focus-visible:bg-primary/5 outline-none"
+                            onClick={() => onSort("level")}
+                          >
+                            Level {renderSortIcon("level")}
+                          </button>
+                        </th>
+                        <th className="p-0 text-left min-w-0 flex items-center">
+                          <div className="px-3 py-1 text-left w-full">Message</div>
+                        </th>
+                        <th className="p-0 text-center flex items-center justify-center">
+                          <button
+                            type="button"
+                            className="w-full h-10 px-3 flex items-center justify-center gap-1.5 hover:text-text-primary transition-colors focus-visible:bg-primary/5 outline-none"
+                            onClick={() => onSort("cluster_id")}
+                          >
+                            Cluster {renderSortIcon("cluster_id")}
+                          </button>
+                        </th>
+                        <th className="p-0 text-center flex items-center justify-center">
+                          <div className="w-full h-10 px-3 flex items-center justify-center gap-1.5">
+                            Actions
+                          </div>
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="font-mono text-[12px] relative z-0 block">
+                      {rowVirtualizer.getVirtualItems().map((virtualRow) => {
+                        const log = logs[virtualRow.index];
+                        const isExpanded = expandedRow === log.id;
+                        const isSelected = selectedLogIds.includes(log.id);
+
+                        return (
+                          <LogTableRow
+                            key={virtualRow.key}
+                            log={log}
+                            content={getHighlightedElements(log.message, highlights)}
+                            virtualRow={virtualRow}
+                            isExpanded={isExpanded}
+                            isSelected={isSelected}
+                            measureElement={rowVirtualizer.measureElement}
+                            onSelect={handleSelectRow}
+                            onToggleView={handleToggleView}
+                            onAnalyzeCluster={onAnalyzeCluster}
+                            anomalousClusters={anomalousClusters}
+                            logSessionMap={logSessionMap}
+                          />
+                        );
+                      })}
+                    </tbody>
+                  </table>
                 </div>
-              )}
+              </>
+            )
+          );
+        })()}
 
               <div
                 style={{
