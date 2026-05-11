@@ -18,6 +18,7 @@ class IngestionServer:
         self, app, syslog_port=514, http_port=5001, syslog_enabled=True, http_enabled=True
     ):
         import queue
+
         self.app = app
         self.syslog_port = syslog_port
         self.http_port = http_port
@@ -38,6 +39,12 @@ class IngestionServer:
         self._stop_event.clear()
         self._threads = []
         self.refresh_streams()
+
+        flush_thread = threading.Thread(
+            target=self._run_flush_worker, name="IngestionFlush", daemon=True
+        )
+        flush_thread.start()
+        self._threads.append(flush_thread)
 
         if self.syslog_enabled:
             syslog_thread = threading.Thread(
@@ -114,12 +121,14 @@ class IngestionServer:
 
     def _run_flush_worker(self):
         import time
+
         batch = []
         last_flush = time.time()
 
         while not self._stop_event.is_set() or not self._log_queue.empty():
             try:
                 import queue
+
                 log = self._log_queue.get(timeout=0.5)
                 batch.append(log)
             except queue.Empty:

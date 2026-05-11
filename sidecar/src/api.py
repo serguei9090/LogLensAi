@@ -1210,7 +1210,9 @@ class App:
 
         for (ws_id, src_id), src_logs in grouped.items():
             try:
-                rules = self._get_facet_rules_for_workspace(cursor, ws_id, rules_cache, global_rules)
+                rules = self._get_facet_rules_for_workspace(
+                    cursor, ws_id, rules_cache, global_rules
+                )
 
                 cursor.execute(
                     "SELECT parser_config, tz_offset FROM fusion_configs WHERE workspace_id = ? AND source_id = ?",
@@ -1228,8 +1230,7 @@ class App:
 
                 # 2. Process Chunk in RAM
                 batch_data, cluster_increments = self._process_chunk_ram_first(
-                    ws_id, src_id, line_ids, raw_lines,
-                    parser, rules, p_config, p_tz, now, now_ts
+                    ws_id, src_id, line_ids, raw_lines, parser, rules, p_config, p_tz, now, now_ts
                 )
 
                 # 3. Bulk Insert via PyArrow
@@ -1240,7 +1241,7 @@ class App:
 
                 # 4. Broadcast to active overlays
                 try:
-                    shared_src = self.shared_source_mgr.get_source(src_id)
+                    shared_src = self.shared_manager.get_source(src_id)
                     shared_src.push_batch(raw_lines, line_ids)
                 except Exception as e:
                     logger.error("[Ingestion] Broadcast failed for %s: %s", src_id, e)
@@ -1291,7 +1292,6 @@ class App:
         """
         import json
         import time
-
 
         initial_chunk_size = 5000
         max_chunk_size = 10000
@@ -1436,7 +1436,6 @@ class App:
         now_ts,
     ):
         import json
-
 
         TRAIN_SAMPLE_SIZE = 200
         cluster_increments = {}
@@ -1942,7 +1941,12 @@ class App:
         return {"status": "ok"}
 
     def method_save_memory(self, workspace_id: str, issue_signature: str, resolution: str) -> dict:
-        """Save a learned resolution to the workspace memory."""
+        """Save a learned resolution to the workspace memory.
+
+        TODO(RAG): See docs/track/RAG_feature.md.
+        Currently using simple relational table. Future implementation will
+        embed issue_signature and use LanceDB for semantic vector search.
+        """
         cursor = self.db.get_cursor()
         cursor.execute(
             """INSERT INTO ai_memory (workspace_id, issue_signature, resolution)
@@ -1956,7 +1960,12 @@ class App:
         return {"status": "ok"}
 
     def method_search_memory(self, workspace_id: str, query: str, limit: int = 5) -> list:
-        """Search the workspace memory for an issue signature or resolution."""
+        """Search the workspace memory for an issue signature or resolution.
+
+        TODO(RAG): See docs/track/RAG_feature.md.
+        Currently using simple ILIKE search. Future implementation will
+        embed the query and query LanceDB for the nearest semantic neighbors.
+        """
         cursor = self.db.get_cursor()
         # Simple ILIKE search
         cursor.execute(

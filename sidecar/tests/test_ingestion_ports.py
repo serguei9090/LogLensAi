@@ -70,8 +70,14 @@ def test_http_ingestion(app):
     )
     assert response.status_code == 200
 
+    # Wait for ingestion with retries
+    for _ in range(5):
+        time.sleep(1.0)
+        logs = app.method_get_logs(workspace_id=workspace_id)
+        if logs["total"] >= 1:
+            break
+
     # Check DB
-    logs = app.method_get_logs(workspace_id=workspace_id)
     assert logs["total"] == 1
     assert logs["logs"][0]["message"] == "2023-10-01 12:05:00 [INFO] HTTP test message"
     assert logs["logs"][0]["source_id"] == "http-ingest"

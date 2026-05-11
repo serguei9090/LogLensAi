@@ -21,9 +21,7 @@ def test_ssh_loader_initialization(mock_parser, mock_db):
         username="user",
         password="password",
         filepath="/var/log/syslog",
-        workspace_id="test_ws",
-        parser=mock_parser,
-        db=mock_db,
+        log_store=mock_db,
         source_id="test_src",
     )
     assert loader.host == "localhost"
@@ -32,7 +30,6 @@ def test_ssh_loader_initialization(mock_parser, mock_db):
     assert loader.password == "password"
     # FileTailer normalizes the path, so just check it ends with syslog
     assert str(loader.filepath).endswith("syslog")
-    assert loader.workspace_id == "test_ws"
     assert loader.source_id == "test_src"
 
 
@@ -53,9 +50,8 @@ def test_ssh_loader_tail_success(mock_ssh_client_cls, mock_parser, mock_db):
         username="user",
         password="password",
         filepath="/var/log/syslog",
-        workspace_id="test_ws",
-        parser=mock_parser,
-        db=mock_db,
+        log_store=mock_db,
+        source_id="test_src",
     )
 
     # We want to mock recv_ready to be True once, then False, then terminate
@@ -74,20 +70,23 @@ def test_ssh_loader_tail_success(mock_ssh_client_cls, mock_parser, mock_db):
     mock_channel.recv_ready.side_effect = side_effect_recv_ready
     mock_channel.recv.return_value = b"line1\nline2\n"
 
-    # Mock _process_line to ensure it's called
-    loader._process_line = MagicMock()
-
     loader.running = True
-    loader._tail()
+
+    mock_manager = MagicMock()
+    mock_shared_src = MagicMock()
+    mock_manager.get_source.return_value = mock_shared_src
+    loader._manager = mock_manager
+
+    loader._tail_loop()
 
     mock_ssh_client.connect.assert_called_once_with("localhost", 22, "user", "password")
     import shlex
 
     expected_command = f"tail -n 0 -f {shlex.quote(str(loader.filepath))}"
     mock_channel.exec_command.assert_called_once_with(expected_command)
-    assert loader._process_line.call_count == 2
-    loader._process_line.assert_any_call("line1")
-    loader._process_line.assert_any_call("line2")
+    assert mock_shared_src.push_line.call_count == 2
+    mock_shared_src.push_line.assert_any_call("line1")
+    mock_shared_src.push_line.assert_any_call("line2")
 
 
 @patch("paramiko.SSHClient")
@@ -104,13 +103,12 @@ def test_ssh_loader_tail_exception(mock_ssh_client_cls, mock_parser, mock_db):
         username="user",
         password="password",
         filepath="/var/log/syslog",
-        workspace_id="test_ws",
-        parser=mock_parser,
-        db=mock_db,
+        log_store=mock_db,
+        source_id="test_src",
     )
 
     loader.running = True
-    loader._tail()
+    loader._tail_loop()
 
     # If exception occurs, running should be set to False
     assert loader.running is False
@@ -127,9 +125,8 @@ def test_ssh_loader_stop(mock_ssh_client_cls, mock_parser, mock_db):
         username="user",
         password="password",
         filepath="/var/log/syslog",
-        workspace_id="test_ws",
-        parser=mock_parser,
-        db=mock_db,
+        log_store=mock_db,
+        source_id="test_src",
     )
 
     mock_thread = MagicMock()
