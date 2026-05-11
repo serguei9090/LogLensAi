@@ -587,123 +587,6 @@ export function VirtualLogTable({
           );
         })()}
 
-              <div
-                style={{
-                  height: `${rowVirtualizer.getTotalSize()}px`,
-                  width: "100%",
-                  position: "relative",
-                }}
-              >
-                <table className="w-full text-left text-sm border-separate border-spacing-0 block">
-                  <thead className="sticky top-0 bg-bg-surface border-b border-border z-10 text-text-muted text-[10px] font-bold uppercase tracking-widest h-10 select-none block">
-                    <tr className="grid grid-cols-[12px_80px_180px_90px_1fr_110px_100px] w-full items-center">
-                      <th
-                        className="p-0 transition-colors group/select-all"
-                        title={
-                          selectedLogIds.length === logs.length ? "Deselect All" : "Select All"
-                        }
-                      >
-                        <button
-                          type="button"
-                          className="w-full h-10 flex items-center justify-center hover:bg-white/5 outline-none focus-visible:bg-white/10"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            if (selectedLogIds.length === logs.length) {
-                              clearSelection();
-                            } else {
-                              setSelectedLogIds(logs.map((l) => l.id));
-                            }
-                          }}
-                          aria-label={
-                            selectedLogIds.length === logs.length ? "Deselect All" : "Select All"
-                          }
-                        >
-                          <div
-                            className={cn(
-                              "w-1 h-4 rounded-full transition-all",
-                              selectedLogIds.length === logs.length
-                                ? "bg-emerald-500"
-                                : "bg-white/10 group-hover/select-all:bg-white/30",
-                            )}
-                          />
-                        </button>
-                      </th>
-                      <th className="p-0 text-center flex items-center justify-center">
-                        <button
-                          type="button"
-                          className="w-full h-10 px-3 flex items-center justify-center gap-1.5 hover:text-text-primary transition-colors focus-visible:bg-primary/5 outline-none"
-                          onClick={() => onSort("id")}
-                        >
-                          ID {renderSortIcon("id")}
-                        </button>
-                      </th>
-                      <th className="p-0 text-left flex items-center">
-                        <button
-                          type="button"
-                          className="w-full h-10 px-3 flex items-center gap-1.5 hover:text-text-primary transition-colors focus-visible:bg-primary/5 outline-none"
-                          onClick={() => onSort("timestamp")}
-                        >
-                          Timestamp {renderSortIcon("timestamp")}
-                        </button>
-                      </th>
-                      <th className="p-0 text-left flex items-center">
-                        <button
-                          type="button"
-                          className="w-full h-10 px-3 flex items-center gap-1.5 hover:text-text-primary transition-colors focus-visible:bg-primary/5 outline-none"
-                          onClick={() => onSort("level")}
-                        >
-                          Level {renderSortIcon("level")}
-                        </button>
-                      </th>
-                      <th className="p-0 text-left min-w-0 flex items-center">
-                        <div className="px-3 py-1 text-left w-full">Message</div>
-                      </th>
-                      <th className="p-0 text-center flex items-center justify-center">
-                        <button
-                          type="button"
-                          className="w-full h-10 px-3 flex items-center justify-center gap-1.5 hover:text-text-primary transition-colors focus-visible:bg-primary/5 outline-none"
-                          onClick={() => onSort("cluster_id")}
-                        >
-                          Cluster {renderSortIcon("cluster_id")}
-                        </button>
-                      </th>
-                      <th className="p-0 text-center flex items-center justify-center">
-                        <div className="w-full h-10 px-3 flex items-center justify-center gap-1.5">
-                          Actions
-                        </div>
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="font-mono text-[12px] relative z-0 block">
-                    {rowVirtualizer.getVirtualItems().map((virtualRow) => {
-                      const log = logs[virtualRow.index];
-                      const isExpanded = expandedRow === log.id;
-                      const isSelected = selectedLogIds.includes(log.id);
-
-                      return (
-                        <LogTableRow
-                          key={virtualRow.key}
-                          log={log}
-                          content={getHighlightedElements(log.message, highlights)}
-                          virtualRow={virtualRow}
-                          isExpanded={isExpanded}
-                          isSelected={isSelected}
-                          measureElement={rowVirtualizer.measureElement}
-                          onSelect={handleSelectRow}
-                          onToggleView={handleToggleView}
-                          onAnalyzeCluster={onAnalyzeCluster}
-                          anomalousClusters={anomalousClusters}
-                          logSessionMap={logSessionMap}
-                        />
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            </>
-          )
-        )}
-
         {expandedRow !== null && (
           <div
             id={`row-details-${expandedRow}`}
@@ -772,8 +655,6 @@ export function VirtualLogTable({
           </div>
         )}
       </section>
-
-      {/* Batch Selection Action Pill */}
       {selectedLogIds.length > 0 && expandedRow === null && (
         <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-[100] animate-in slide-in-from-bottom-4 duration-300">
           <div className="bg-bg-tooltip border border-white/10 shadow-2xl rounded-full p-1.5 flex items-center gap-2 backdrop-blur-xl">
@@ -801,8 +682,6 @@ export function VirtualLogTable({
           </div>
         </div>
       )}
-
-      {/* Floating Selection Tooltip (for text) */}
       {selectionInfo &&
         createPortal(
           <div
