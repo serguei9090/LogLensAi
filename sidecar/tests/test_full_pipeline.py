@@ -54,11 +54,12 @@ async def test_full_ingestion_pipeline(tmp_path):
 
         # 3. Verify in DuckDB via RPC methods
         # Wait for async ingestion to settle (it's threaded in IngestionServer)
-        time.sleep(0.5)
-
-        logs_res = app.method_get_logs(workspace_id="e2e-ws", source_ids=["e2e-col"])
+        for _ in range(10):
+            logs_res = app.method_get_logs(workspace_id="e2e-ws", source_ids=["e2e-col"])
+            if logs_res["total"] >= 2:
+                break
+            time.sleep(0.5)
         assert logs_res["total"] == 2
-
         # Verify facets were extracted and stored correctly
         first_log = logs_res["logs"][0]  # DESC order, so this is the 12:05 one
         assert first_log["level"] == "INFO"

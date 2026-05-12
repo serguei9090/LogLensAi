@@ -10,11 +10,11 @@ async def test_get_dashboard_stats(tmp_path):
     # 1. Seed some data
     cursor = app.db.get_cursor()
     cursor.execute("""
-        INSERT INTO logs (workspace_id, source_id, timestamp, level, message, cluster_id) 
+        INSERT INTO logs (workspace_id, source_id, timestamp, level, raw_text, cluster_id) 
         VALUES ('ws1', 'src1', '2024-01-01 10:00:00', 'ERROR', 'Failure', 'c1')
     """)
     cursor.execute("""
-        INSERT INTO logs (workspace_id, source_id, timestamp, level, message, cluster_id) 
+        INSERT INTO logs (workspace_id, source_id, timestamp, level, raw_text, cluster_id) 
         VALUES ('ws1', 'src1', '2024-01-01 10:01:00', 'INFO', 'Success', 'c2')
     """)
     cursor.execute("""

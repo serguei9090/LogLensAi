@@ -8,6 +8,7 @@ def api():
     # Use memory DB for isolation
     app = App(db_path=":memory:")
     yield app
+    app.stop()
     from db import Database
 
     Database.reset()

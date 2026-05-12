@@ -34,6 +34,7 @@ def app(monkeypatch):
     a.test_syslog_port = syslog_port
     a.test_http_port = http_port
     yield a
+    a.stop()
     a.ingestion_server.stop()
     LogDatabase.reset()
 

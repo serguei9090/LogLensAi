@@ -6,6 +6,7 @@ from api import App, JSONRPCRequest
 def api():
     app = App(db_path=":memory:")
     yield app
+    app.stop()
     from db import Database
 
     Database.reset()

@@ -42,7 +42,7 @@ def test_llql_complex():
 
 def test_llql_implicit_and():
     sql, params = parse_llql("error connection")
-    # Result: ( (l.message ILIKE ? OR l.raw_text ILIKE ?) AND (l.message ILIKE ? OR l.raw_text ILIKE ?) )
+    # Result: ( (l.raw_text ILIKE ? OR l.raw_text ILIKE ?) AND (l.raw_text ILIKE ? OR l.raw_text ILIKE ?) )
     assert "AND" in sql
     assert sql.count("ILIKE ?") == 4
     assert "%error%" in params
@@ -65,7 +65,7 @@ def test_llql_complex_implicit():
     sql, params = parse_llql("level:ERROR Connection timeout")
     assert "l.level = ?" in sql
     assert "AND" in sql
-    assert "(l.message ILIKE ? OR l.raw_text ILIKE ?)" in sql
+    assert "(l.raw_text ILIKE ? OR l.raw_text ILIKE ?)" in sql
 
 
 def test_llql_field_mappings():
@@ -81,7 +81,7 @@ def test_llql_field_mappings():
 
     # Test proposed content and raw mappings
     s4, p4 = parse_llql("content:hello")
-    assert "l.message =" in s4
+    assert "l.raw_text =" in s4
 
     s5, p5 = parse_llql("raw:world")
     assert "l.raw_text =" in s5

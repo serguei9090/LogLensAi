@@ -32,8 +32,8 @@ class FieldNode(Node):
             "level": "l.level",
             "source": "l.source_id",
             "cluster": "l.cluster_id",
-            "content": "l.message",
-            "message": "l.message",
+            "content": "l.raw_text",
+            "message": "l.raw_text",
             "raw": "l.raw_text",
             "id": "l.id",
             "timestamp": "l.timestamp",
@@ -108,10 +108,10 @@ class SearchNode(Node):
                 .replace("___X_AST_X___", "*")
                 .replace("___X_QM_X___", "?")
             )
-            return "(l.message ILIKE ? OR l.raw_text ILIKE ?)", [processed, processed]
+            return "(l.raw_text ILIKE ? OR l.raw_text ILIKE ?)", [processed, processed]
 
         final_term = self.term.replace("\\*", "*").replace("\\?", "?")
-        return "(l.message ILIKE ? OR l.raw_text ILIKE ?)", [
+        return "(l.raw_text ILIKE ? OR l.raw_text ILIKE ?)", [
             f"%{final_term}%",
             f"%{final_term}%",
         ]
@@ -301,4 +301,4 @@ def parse_llql(query: str):
         return "", []
     except Exception as e:
         logger.error("[LLQL] Parsing error: %s, falling back to text search", e)
-        return "(l.message ILIKE ? OR l.raw_text ILIKE ?)", [f"%{query}%", f"%{query}%"]
+        return "(l.raw_text ILIKE ? OR l.raw_text ILIKE ?)", [f"%{query}%", f"%{query}%"]

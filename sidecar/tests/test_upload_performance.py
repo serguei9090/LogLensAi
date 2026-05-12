@@ -24,6 +24,7 @@ def e2e_api():
     # We must explicitly start the clustering worker for it to process the logs
     app.clustering_worker.start()
     yield app
+    app.stop()
     app.clustering_worker.stop()
     app.stop()
     Database.reset()

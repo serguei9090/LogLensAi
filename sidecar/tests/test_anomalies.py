@@ -15,7 +15,7 @@ def app():
     """)
     # Simulate time distribution for anomaly
     cursor.execute("""
-        INSERT INTO logs (workspace_id, source_id, timestamp, level, message, cluster_id) VALUES
+        INSERT INTO logs (workspace_id, source_id, timestamp, level, raw_text, cluster_id) VALUES
         ('ws1', 'src1', '2023-10-25 09:00:00', 'INFO', 'msg1', 'c1'),
         ('ws1', 'src1', '2023-10-25 09:00:15', 'INFO', 'msg2', 'c1'),
         ('ws1', 'src1', '2023-10-25 10:00:00', 'INFO', 'msg3', 'c1'),

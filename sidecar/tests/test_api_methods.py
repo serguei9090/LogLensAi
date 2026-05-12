@@ -17,6 +17,7 @@ def api():
         "recommended_actions": [],
     }
     yield app
+    app.stop()
     from db import LogDatabase
 
     LogDatabase.reset()

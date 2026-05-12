@@ -206,6 +206,11 @@ class App:
         self.db = LogDatabase(db_path)
         logger.info("Database initialized at: %s", os.path.abspath(db_path))
 
+        # --- RAG Memory Service ---
+        from services.rag_service import RagService
+
+        self.rag_service = RagService(os.path.join(PROJECT_ROOT, "data"))
+
         # --- Disk-First / Fast-Path store ---
         # All raw log text lives here; DuckDB only stores line_id pointers.
         storage_dir = os.path.join(PROJECT_ROOT, "data", "storage")
@@ -1230,9 +1235,18 @@ class App:
 
                 # 2. Process Chunk in RAM
                 batch_data, cluster_increments = self._process_chunk_ram_first(
-                    ws_id, src_id, line_ids, raw_lines, parser, rules, p_config, p_tz, now, now_ts
+                    ws_id,
+                    src_id,
+                    line_ids,
+                    raw_lines,
+                    parser,
+                    rules,
+                    p_config,
+                    p_tz,
+                    now,
+                    now_ts,
+                    original_logs=src_logs,
                 )
-
                 # 3. Bulk Insert via PyArrow
                 if batch_data:
                     self._insert_arrow_batch(cursor, batch_data, cluster_increments)
@@ -1434,6 +1448,7 @@ class App:
         p_tz,
         now,
         now_ts,
+        original_logs=None,
     ):
         import json
 
@@ -1461,14 +1476,21 @@ class App:
             key = (workspace_id, cluster_id, template)
             cluster_increments[key] = cluster_increments.get(key, 0) + 1
 
+            og_log = original_logs[i] if original_logs else {}
+            ts = og_log.get("timestamp") or meta["timestamp"] or now_ts
+            lvl = og_log.get("level") or meta["level"] or "INFO"
+
+            og_facets = og_log.get("facets") or {}
+            meta["facets"].update(og_facets)
+
             batch_data.append(
                 (
                     workspace_id,
                     source_id,
                     train_ids[i],
                     raw_text,
-                    meta["timestamp"] or now_ts,
-                    meta["level"] or "INFO",
+                    ts,
+                    lvl,
                     cluster_id,
                     json.dumps(meta["facets"]),
                     True,  # processed = True
@@ -1503,14 +1525,21 @@ class App:
                     key = (workspace_id, cluster_id, template)
                     cluster_increments[key] = cluster_increments.get(key, 0) + 1
 
+                og_log = original_logs[train_sample_size + i] if original_logs else {}
+                ts = og_log.get("timestamp") or meta["timestamp"] or now_ts
+                lvl = og_log.get("level") or meta["level"] or "INFO"
+
+                og_facets = og_log.get("facets") or {}
+                meta["facets"].update(og_facets)
+
                 batch_data.append(
                     (
                         workspace_id,
                         source_id,
                         tag_ids[i],
                         raw_text,
-                        meta["timestamp"] or now_ts,
-                        meta["level"] or "INFO",
+                        ts,
+                        lvl,
                         cluster_id,
                         json.dumps(meta["facets"]),
                         True,  # processed = True
@@ -1941,45 +1970,12 @@ class App:
         return {"status": "ok"}
 
     def method_save_memory(self, workspace_id: str, issue_signature: str, resolution: str) -> dict:
-        """Save a learned resolution to the workspace memory.
-
-        TODO(RAG): See docs/track/RAG_feature.md.
-        Currently using simple relational table. Future implementation will
-        embed issue_signature and use LanceDB for semantic vector search.
-        """
-        cursor = self.db.get_cursor()
-        cursor.execute(
-            """INSERT INTO ai_memory (workspace_id, issue_signature, resolution)
-               VALUES (?, ?, ?)
-               ON CONFLICT (workspace_id, issue_signature) DO UPDATE SET
-               resolution = excluded.resolution, created_at = CURRENT_TIMESTAMP
-            """,
-            (workspace_id, issue_signature, resolution),
-        )
-        self.db.commit()
-        return {"status": "ok"}
+        """Save a learned resolution to the workspace memory via LanceDB."""
+        return self.rag_service.save_memory(workspace_id, issue_signature, resolution)
 
     def method_search_memory(self, workspace_id: str, query: str, limit: int = 5) -> list:
-        """Search the workspace memory for an issue signature or resolution.
-
-        TODO(RAG): See docs/track/RAG_feature.md.
-        Currently using simple ILIKE search. Future implementation will
-        embed the query and query LanceDB for the nearest semantic neighbors.
-        """
-        cursor = self.db.get_cursor()
-        # Simple ILIKE search
-        cursor.execute(
-            """SELECT issue_signature, resolution, created_at
-               FROM ai_memory
-               WHERE workspace_id = ? AND (issue_signature ILIKE ? OR resolution ILIKE ?)
-               ORDER BY created_at DESC LIMIT ?
-            """,
-            (workspace_id, f"%{query}%", f"%{query}%", limit),
-        )
-        return [
-            {"issue_signature": row[0], "resolution": row[1], "created_at": str(row[2])}
-            for row in cursor.fetchall()
-        ]
+        """Search the workspace memory for an issue signature or resolution via LanceDB."""
+        return self.rag_service.search_memory(workspace_id, query, limit)
 
     def _sync_ai_sessions_to_json(self):
         """No-op for DuckDB implementation, handled by DB persistence."""

@@ -26,6 +26,7 @@ async def e2e_api():
     app = App(db_path=":memory:")
     yield app
     app.stop()
+    app.stop()
     import asyncio
 
     await asyncio.sleep(0.2)

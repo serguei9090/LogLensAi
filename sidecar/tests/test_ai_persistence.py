@@ -22,6 +22,8 @@ def api():
     app.hybrid_runner.run_investigation = mock_run_investigation
 
     yield app
+
+    app.stop()
     from db import Database
 
     Database.reset()

@@ -15,7 +15,7 @@ async def test_export_logs_csv(tmp_path):
     app = App(db_path=":memory:")
     # Seed some data
     app.db.get_cursor().execute(
-        "INSERT INTO logs (workspace_id, timestamp, level, message) VALUES (?, ?, ?, ?)",
+        "INSERT INTO logs (workspace_id, timestamp, level, raw_text) VALUES (?, ?, ?, ?)",
         ("ws1", "2024-01-01 10:00:00", "INFO", "Hello World"),
     )
 
@@ -39,7 +39,7 @@ async def test_export_logs_json(tmp_path):
     LogDatabase.reset()
     app = App(db_path=":memory:")
     app.db.get_cursor().execute(
-        "INSERT INTO logs (workspace_id, timestamp, level, message) VALUES (?, ?, ?, ?)",
+        "INSERT INTO logs (workspace_id, timestamp, level, raw_text) VALUES (?, ?, ?, ?)",
         ("ws1", "2024-01-01 10:00:00", "INFO", "Hello World"),
     )
 

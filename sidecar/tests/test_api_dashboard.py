@@ -15,7 +15,7 @@ async def test_dashboard_stats_filtering(app):
 
     # Logs for workspace A
     cursor.execute("""
-        INSERT INTO logs (workspace_id, source_id, timestamp, level, message, cluster_id)
+        INSERT INTO logs (workspace_id, source_id, timestamp, level, raw_text, cluster_id)
         VALUES 
         ('ws_a', 'src_1', '2026-05-01 10:00:00', 'INFO', 'Log 1', '1'),
         ('ws_a', 'src_1', '2026-05-01 11:00:00', 'ERROR', 'Log 2', '1'),
@@ -24,7 +24,7 @@ async def test_dashboard_stats_filtering(app):
 
     # Logs for workspace B
     cursor.execute("""
-        INSERT INTO logs (workspace_id, source_id, timestamp, level, message, cluster_id)
+        INSERT INTO logs (workspace_id, source_id, timestamp, level, raw_text, cluster_id)
         VALUES 
         ('ws_b', 'src_3', '2026-05-01 10:00:00', 'INFO', 'Log 4', '1')
     """)
@@ -70,7 +70,7 @@ async def test_dashboard_stats_filtering(app):
     # Add more variety for Top 10
     for i in range(3, 15):
         cursor.execute(
-            "INSERT INTO logs (workspace_id, source_id, timestamp, level, message, cluster_id) VALUES (?, ?, ?, ?, ?, ?)",
+            "INSERT INTO logs (workspace_id, source_id, timestamp, level, raw_text, cluster_id) VALUES (?, ?, ?, ?, ?, ?)",
             ("ws_a", "src_1", "2026-05-03 10:00:00", "INFO", f"Log {i}", str(i)),
         )
     app.db.commit()

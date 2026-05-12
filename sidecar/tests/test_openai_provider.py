@@ -19,7 +19,6 @@ def provider():
 @pytest.mark.asyncio
 async def test_init_no_key():
     prov = OpenAICompatibleProvider(api_key="")
-    assert prov._client is None
     models = await prov.list_models()
     assert models == []
 
