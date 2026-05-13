@@ -1,6 +1,9 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { callSidecar } from "@/lib/hooks/useSidecarBridge";
+import { useWorkspaceStore } from "@/store/workspaceStore";
 import type React from "react";
+import { useEffect, useState } from "react";
 
 interface A2UIComponent {
   type: string;
@@ -19,6 +22,113 @@ interface A2UIRendererProps {
   onAction?: (action: unknown) => void;
 }
 
+const LiveMetric = ({ label, query }: { label: string; query: string }) => {
+  const [total, setTotal] = useState<number | null>(null);
+  const activeWorkspaceId = useWorkspaceStore((state) => state.activeWorkspaceId);
+
+  useEffect(() => {
+    let active = true;
+    const fetchIt = async () => {
+      try {
+        const res = await callSidecar<{ total: number }>({
+          method: "get_logs",
+          params: {
+            workspace_id: activeWorkspaceId || "default",
+            query,
+            limit: 1,
+          },
+        });
+        if (active) {
+          setTotal(res.total);
+        }
+      } catch (e) {
+        console.error(e);
+      }
+    };
+    fetchIt();
+    const interval = setInterval(fetchIt, 5000);
+    return () => {
+      active = false;
+      clearInterval(interval);
+    };
+  }, [query, activeWorkspaceId]);
+
+  return (
+    <Card className="bg-bg-surface/50 border-border/60 mb-4 overflow-hidden p-4 flex flex-col items-center justify-center">
+      <h3 className="text-xs font-bold text-text-muted uppercase tracking-widest">{label}</h3>
+      <div className="text-4xl font-black text-primary mt-2">
+        {total !== null ? total.toLocaleString() : "..."}
+      </div>
+    </Card>
+  );
+};
+
+const LiveDataTable = ({ title, query }: { title: string; query: string }) => {
+  const [logs, setLogs] = useState<any[]>([]);
+  const activeWorkspaceId = useWorkspaceStore((state) => state.activeWorkspaceId);
+
+  useEffect(() => {
+    let active = true;
+    const fetchIt = async () => {
+      try {
+        const res = await callSidecar<{ logs: any[] }>({
+          method: "get_logs",
+          params: {
+            workspace_id: activeWorkspaceId || "default",
+            query,
+            limit: 5,
+          },
+        });
+        if (active) {
+          setLogs(res.logs);
+        }
+      } catch (e) {
+        console.error(e);
+      }
+    };
+    fetchIt();
+    const interval = setInterval(fetchIt, 5000);
+    return () => {
+      active = false;
+      clearInterval(interval);
+    };
+  }, [query, activeWorkspaceId]);
+
+  return (
+    <Card className="bg-bg-surface/50 border-border/60 mb-4 overflow-hidden">
+      <CardHeader className="py-3 px-4 border-b border-border/60">
+        <CardTitle className="text-[11px] font-bold text-text-primary uppercase tracking-widest">
+          {title}
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="p-0">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-[11px]">
+            <tbody>
+              {logs.map((log) => (
+                <tr
+                  key={log.id}
+                  className="border-b border-border/40 hover:bg-bg-surface-bright/30"
+                >
+                  <td className="p-2 whitespace-nowrap text-text-muted font-mono">
+                    {log.timestamp.split(" ")[1]}
+                  </td>
+                  <td
+                    className="p-2 font-bold"
+                    style={{ color: `var(--${log.level.toLowerCase()})` }}
+                  >
+                    {log.level}
+                  </td>
+                  <td className="p-2 truncate max-w-[200px] text-text-secondary">{log.raw_text}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </CardContent>
+    </Card>
+  );
+};
 /**
  * Simple parser for A2UI Markup format (e.g. button label="Text" action={...})
  * Returns a JSON object compatible with the standard renderer.
@@ -57,6 +167,45 @@ function parseA2UIMarkup(raw: string): A2UIComponent | null {
       return {
         type: "text",
         text: textMatch[1],
+      };
+    }
+  }
+
+  // Handle Metric Tag: metric label="..." query="..."
+  if (trimmed.startsWith("metric")) {
+    const labelMatch = /label=["']([^"']+)["']/.exec(trimmed);
+    const queryMatch = /query=["']([^"']+)["']/.exec(trimmed);
+    if (labelMatch && queryMatch) {
+      return {
+        type: "metric",
+        label: labelMatch[1],
+        props: { query: queryMatch[1] },
+      };
+    }
+  }
+
+  // Handle Chart Area Tag: chart_area title="..." query="..."
+  if (trimmed.startsWith("chart_area")) {
+    const titleMatch = /title=["']([^"']+)["']/.exec(trimmed);
+    const queryMatch = /query=["']([^"']+)["']/.exec(trimmed);
+    if (titleMatch && queryMatch) {
+      return {
+        type: "chart_area",
+        label: titleMatch[1],
+        props: { query: queryMatch[1] },
+      };
+    }
+  }
+
+  // Handle Data Table Tag: data_table title="..." query="..."
+  if (trimmed.startsWith("data_table")) {
+    const titleMatch = /title=["']([^"']+)["']/.exec(trimmed);
+    const queryMatch = /query=["']([^"']+)["']/.exec(trimmed);
+    if (titleMatch && queryMatch) {
+      return {
+        type: "data_table",
+        label: titleMatch[1],
+        props: { query: queryMatch[1] },
       };
     }
   }
@@ -111,6 +260,34 @@ export const A2UIRenderer: React.FC<A2UIRendererProps> = ({ payload, onAction })
           >
             {comp.label}
           </Button>
+        );
+
+      case "metric":
+        return (
+          <LiveMetric
+            key={index}
+            label={comp.label || "Metric"}
+            query={(comp.props?.query as string) || ""}
+          />
+        );
+
+      case "chart_area":
+        // Fallback to metric if backend doesn't support query-based stats yet
+        return (
+          <LiveMetric
+            key={index}
+            label={comp.label || "Chart Data"}
+            query={(comp.props?.query as string) || ""}
+          />
+        );
+
+      case "data_table":
+        return (
+          <LiveDataTable
+            key={index}
+            title={comp.label || "Data Table"}
+            query={(comp.props?.query as string) || ""}
+          />
         );
 
       case "card":

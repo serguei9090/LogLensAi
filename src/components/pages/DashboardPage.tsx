@@ -25,13 +25,17 @@ import {
   Sparkles,
   TrendingUp,
 } from "lucide-react";
-import type React from "react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 // Atomic/Molecule Imports
 import { StatCard } from "@/components/atoms/StatCard";
 import { ClusterRow } from "@/components/molecules/ClusterRow";
 import { DashboardCharts } from "@/components/organisms/DashboardCharts";
+
+import { A2UIRenderer } from "@/components/atoms/A2UIRenderer";
+import { AIInvestigationSidebar } from "@/components/organisms/AIInvestigationSidebar";
+// AI Mode Imports
+import { useAiStore } from "@/store/aiStore";
 
 interface DashboardStats {
   total_logs: number;
@@ -40,7 +44,12 @@ interface DashboardStats {
   top_clusters: { template: string; count: number }[];
   top_error_clusters: { template: string; count: number }[];
   time_series: any[];
-  source_heatmap: { timestamp: string; source_id: string; source_name: string; count: number }[];
+  source_heatmap: {
+    timestamp: string;
+    source_id: string;
+    source_name: string;
+    count: number;
+  }[];
   latest_ai_insight: string | null;
   new_patterns_count: number;
   workspace_count: number;
@@ -178,12 +187,21 @@ export default function DashboardPage() {
   // Global State
   const workspaces = useWorkspaceStore((state) => state.workspaces);
   const activeWorkspace = useWorkspaceStore(selectActiveWorkspace);
+  const { dashboardWidgets, isSidebarOpen, setSidebarOpen } = useAiStore();
 
   // Local State
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [ingestionJobs, setIngestionJobs] = useState<IngestionJob[]>([]);
   const [loading, setLoading] = useState(true);
   const [mode, setMode] = useState<DashboardMode>("static");
+
+  // Handle Mode Change with Sidebar auto-open
+  const handleModeChange = (newMode: DashboardMode) => {
+    setMode(newMode);
+    if (newMode === "ai") {
+      setSidebarOpen(true);
+    }
+  };
 
   // Filter State
   const [selectedWorkspaceId, setSelectedWorkspaceId] = useState<string>("all");
@@ -298,7 +316,9 @@ export default function DashboardPage() {
               <motion.div
                 className="h-full bg-primary shadow-[0_0_10px_var(--primary-glow)]"
                 initial={{ width: 0 }}
-                animate={{ width: `${(job.processed_lines / job.total_lines) * 100}%` }}
+                animate={{
+                  width: `${(job.processed_lines / job.total_lines) * 100}%`,
+                }}
                 transition={{ type: "spring", stiffness: 50 }}
               />
             </div>
@@ -374,206 +394,235 @@ export default function DashboardPage() {
 
   return (
     <div className="flex-1 bg-bg-base overflow-y-auto p-8 custom-scrollbar pb-32">
-      <header className="mb-10">
-        <DashboardHeader mode={mode} loading={loading} onRefresh={fetchStats} />
-        <DashboardFilters
-          selectedWorkspaceId={selectedWorkspaceId}
-          onWorkspaceChange={(v) => {
-            setSelectedWorkspaceId(v || "all");
-            setSelectedSourceId("all");
-          }}
-          workspaces={workspaces}
-          selectedSourceId={selectedSourceId}
-          onSourceChange={(v) => setSelectedSourceId(v || "all")}
-          sources={sources}
-          timeRange={timeRange}
-          onTimeRangeChange={setTimeRange}
-        />
-      </header>
+      <div
+        className={cn(
+          "mx-auto flex flex-col h-full transition-all duration-300",
+          mode === "ai" ? "max-w-full px-6" : "max-w-6xl w-full",
+        )}
+      >
+        <header className="mb-10">
+          <DashboardHeader mode={mode} loading={loading} onRefresh={fetchStats} />
+          <DashboardFilters
+            selectedWorkspaceId={selectedWorkspaceId}
+            onWorkspaceChange={(v) => {
+              setSelectedWorkspaceId(v || "all");
+              setSelectedSourceId("all");
+            }}
+            workspaces={workspaces}
+            selectedSourceId={selectedSourceId}
+            onSourceChange={(v) => setSelectedSourceId(v || "all")}
+            sources={sources}
+            timeRange={timeRange}
+            onTimeRangeChange={setTimeRange}
+          />
+        </header>
 
-      <AnimatePresence mode="wait">
-        {mode === "static" ? (
-          <motion.div
-            key="static"
-            initial={{ opacity: 0, x: -10 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: 10 }}
-            className="space-y-10"
-          >
-            {/* Processing HUD */}
-            {renderProcessingHUD()}
+        <AnimatePresence mode="wait">
+          {mode === "static" ? (
+            <motion.div
+              key="static"
+              initial={{ opacity: 0, x: -10 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: 10 }}
+              className="space-y-10"
+            >
+              {/* Processing HUD */}
+              {renderProcessingHUD()}
 
-            {/* AI Insight Snippet */}
-            {stats?.latest_ai_insight && (
-              <motion.section
-                initial={{ opacity: 0, y: -10 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="bg-primary/5 border border-primary/20 rounded-2xl p-6 backdrop-blur-md relative overflow-hidden group"
-              >
-                <div className="flex items-start justify-between gap-6 relative z-10">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-3">
-                      <Sparkles className="size-4 text-primary animate-pulse" />
-                      <span className="text-[10px] font-bold uppercase tracking-widest text-primary">
-                        Latest AI Observation
-                      </span>
+              {/* AI Insight Snippet */}
+              {stats?.latest_ai_insight && (
+                <motion.section
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="bg-primary/5 border border-primary/20 rounded-2xl p-6 backdrop-blur-md relative overflow-hidden group"
+                >
+                  <div className="flex items-start justify-between gap-6 relative z-10">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-3">
+                        <Sparkles className="size-4 text-primary animate-pulse" />
+                        <span className="text-[10px] font-bold uppercase tracking-widest text-primary">
+                          Latest AI Observation
+                        </span>
+                      </div>
+                      <p className="text-sm font-mono text-text-primary leading-relaxed italic">
+                        &quot;{stats.latest_ai_insight}&quot;
+                      </p>
                     </div>
-                    <p className="text-sm font-mono text-text-primary leading-relaxed italic">
-                      &quot;{stats.latest_ai_insight}&quot;
+                    <Button
+                      onClick={() => setMode("ai")}
+                      className="shrink-0 text-[10px] uppercase tracking-widest shadow-[0_0_15px_var(--primary-glow)] hover:scale-105"
+                    >
+                      Deep Dive
+                    </Button>
+                  </div>
+                  <div className="absolute -top-20 -right-20 size-64 bg-primary/10 rounded-full blur-[80px] pointer-events-none" />
+                </motion.section>
+              )}
+
+              {/* Stat Cards Grid */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+                <StatCard
+                  icon={<Database className="h-4 w-4 text-primary" />}
+                  label="Total Index"
+                  value={stats?.total_logs.toLocaleString() ?? "0"}
+                  subValue="Records in context"
+                />
+                <StatCard
+                  icon={<Layers className="h-4 w-4 text-debug" />}
+                  label="Patterns"
+                  value={stats?.total_clusters.toLocaleString() ?? "0"}
+                  subValue="Drain3 Templates"
+                />
+                <StatCard
+                  icon={<Activity className="h-4 w-4 text-primary" />}
+                  label="Live Streams"
+                  value={stats?.active_tailers.toString() ?? "0"}
+                  subValue="Active ingestion"
+                />
+                <StatCard
+                  icon={<Database className="h-4 w-4 text-info" />}
+                  label="Catalogs"
+                  value={stats?.workspace_count.toString() ?? "0"}
+                  subValue="Active workspaces"
+                />
+                <StatCard
+                  icon={<TrendingUp className="h-4 w-4 text-primary" />}
+                  label="Drift"
+                  value={stats?.new_patterns_count.toString() ?? "0"}
+                  subValue="New Patterns"
+                  trend={
+                    stats?.new_patterns_count && stats.new_patterns_count > 0 ? "up" : "stable"
+                  }
+                />
+              </div>
+
+              {/* Main Charts Row */}
+              <DashboardCharts stats={stats} />
+
+              {/* Patterns Row */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                {/* Critical Clusters */}
+                <section className="bg-bg-surface/50 border border-border rounded-xl p-6 backdrop-blur-sm relative overflow-hidden">
+                  <div className="flex items-center gap-2 mb-6">
+                    <AlertTriangle className="h-4 w-4 text-error" />
+                    <h2 className="text-xs font-bold uppercase tracking-widest text-text-muted">
+                      Top Error Clusters
+                    </h2>
+                  </div>
+                  <div className="space-y-2 relative z-10">
+                    {stats && stats.top_error_clusters.length > 0 ? (
+                      stats.top_error_clusters.map((c, idx) => (
+                        <ClusterRow
+                          key={c.template}
+                          index={idx}
+                          template={c.template}
+                          count={c.count}
+                          total={stats.total_logs}
+                          type="error"
+                        />
+                      ))
+                    ) : (
+                      <div className="py-20 text-center text-[10px] font-mono text-text-muted uppercase tracking-widest">
+                        No Errors Detected
+                      </div>
+                    )}
+                  </div>
+                </section>
+
+                {/* General Clusters */}
+                <section className="bg-bg-surface/50 border border-border rounded-xl p-6 backdrop-blur-sm relative overflow-hidden">
+                  <div className="flex items-center gap-2 mb-6">
+                    <AlertCircle className="h-4 w-4 text-debug" />
+                    <h2 className="text-xs font-bold uppercase tracking-widest text-text-muted">
+                      Top Noise Generators
+                    </h2>
+                  </div>
+                  <div className="space-y-2 relative z-10">
+                    {stats && stats.top_clusters.length > 0 ? (
+                      stats.top_clusters.map((c, idx) => (
+                        <ClusterRow
+                          key={c.template}
+                          index={idx}
+                          template={c.template}
+                          count={c.count}
+                          total={stats.total_logs}
+                          type="noise"
+                        />
+                      ))
+                    ) : (
+                      <div className="py-20 text-center text-[10px] font-mono text-text-muted uppercase tracking-widest">
+                        No Clusters
+                      </div>
+                    )}
+                  </div>
+                </section>
+              </div>
+
+              {/* Source Heatmap Row */}
+              <section className="bg-bg-surface/50 border border-border rounded-xl p-6 backdrop-blur-sm relative overflow-hidden">
+                <div className="flex items-center gap-2 mb-6">
+                  <Activity className="h-4 w-4 text-primary" />
+                  <h2 className="text-xs font-bold uppercase tracking-widest text-text-muted">
+                    Source Activity Heatmap
+                  </h2>
+                </div>
+
+                {renderSourceHeatmap()}
+                <Activity className="absolute -bottom-4 -right-4 size-32 text-text-muted/5 opacity-5 pointer-events-none" />
+              </section>
+            </motion.div>
+          ) : (
+            <motion.div
+              key="ai"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              className="flex h-full w-full gap-4"
+            >
+              {/* The Canvas */}
+              <div className="flex-1 flex flex-col min-w-0">
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-xl font-bold font-mono tracking-tight flex items-center gap-2">
+                    <Sparkles className="size-5 text-primary" />
+                    AI Dashboard Canvas
+                  </h2>
+                  {!isSidebarOpen && (
+                    <Button variant="outline" size="sm" onClick={() => setSidebarOpen(true)}>
+                      Open Chat
+                    </Button>
+                  )}
+                </div>
+
+                {dashboardWidgets.length === 0 ? (
+                  <div className="flex-1 flex items-center justify-center border border-dashed border-border/60 rounded-xl bg-bg-surface/20 min-h-[400px]">
+                    <p className="text-sm text-text-muted text-center max-w-sm">
+                      No widgets pinned yet. Ask the AI to create a dashboard card.
+                      <br />
+                      <br />
+                      Try asking: "Create a metric for ERROR logs"
                     </p>
                   </div>
-                  <Button
-                    onClick={() => setMode("ai")}
-                    className="shrink-0 text-[10px] uppercase tracking-widest shadow-[0_0_15px_var(--primary-glow)] hover:scale-105"
-                  >
-                    Deep Dive
-                  </Button>
-                </div>
-                <div className="absolute -top-20 -right-20 size-64 bg-primary/10 rounded-full blur-[80px] pointer-events-none" />
-              </motion.section>
-            )}
-
-            {/* Stat Cards Grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-              <StatCard
-                icon={<Database className="h-4 w-4 text-primary" />}
-                label="Total Index"
-                value={stats?.total_logs.toLocaleString() ?? "0"}
-                subValue="Records in context"
-              />
-              <StatCard
-                icon={<Layers className="h-4 w-4 text-debug" />}
-                label="Patterns"
-                value={stats?.total_clusters.toLocaleString() ?? "0"}
-                subValue="Drain3 Templates"
-              />
-              <StatCard
-                icon={<Activity className="h-4 w-4 text-primary" />}
-                label="Live Streams"
-                value={stats?.active_tailers.toString() ?? "0"}
-                subValue="Active ingestion"
-              />
-              <StatCard
-                icon={<Database className="h-4 w-4 text-info" />}
-                label="Catalogs"
-                value={stats?.workspace_count.toString() ?? "0"}
-                subValue="Active workspaces"
-              />
-              <StatCard
-                icon={<TrendingUp className="h-4 w-4 text-primary" />}
-                label="Drift"
-                value={stats?.new_patterns_count.toString() ?? "0"}
-                subValue="New Patterns"
-                trend={stats?.new_patterns_count && stats.new_patterns_count > 0 ? "up" : "stable"}
-              />
-            </div>
-
-            {/* Main Charts Row */}
-            <DashboardCharts stats={stats} />
-
-            {/* Patterns Row */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-              {/* Critical Clusters */}
-              <section className="bg-bg-surface/50 border border-border rounded-xl p-6 backdrop-blur-sm relative overflow-hidden">
-                <div className="flex items-center gap-2 mb-6">
-                  <AlertTriangle className="h-4 w-4 text-error" />
-                  <h2 className="text-xs font-bold uppercase tracking-widest text-text-muted">
-                    Top Error Clusters
-                  </h2>
-                </div>
-                <div className="space-y-2 relative z-10">
-                  {stats && stats.top_error_clusters.length > 0 ? (
-                    stats.top_error_clusters.map((c, idx) => (
-                      <ClusterRow
-                        key={c.template}
-                        index={idx}
-                        template={c.template}
-                        count={c.count}
-                        total={stats.total_logs}
-                        type="error"
-                      />
-                    ))
-                  ) : (
-                    <div className="py-20 text-center text-[10px] font-mono text-text-muted uppercase tracking-widest">
-                      No Errors Detected
-                    </div>
-                  )}
-                </div>
-              </section>
-
-              {/* General Clusters */}
-              <section className="bg-bg-surface/50 border border-border rounded-xl p-6 backdrop-blur-sm relative overflow-hidden">
-                <div className="flex items-center gap-2 mb-6">
-                  <AlertCircle className="h-4 w-4 text-debug" />
-                  <h2 className="text-xs font-bold uppercase tracking-widest text-text-muted">
-                    Top Noise Generators
-                  </h2>
-                </div>
-                <div className="space-y-2 relative z-10">
-                  {stats && stats.top_clusters.length > 0 ? (
-                    stats.top_clusters.map((c, idx) => (
-                      <ClusterRow
-                        key={c.template}
-                        index={idx}
-                        template={c.template}
-                        count={c.count}
-                        total={stats.total_logs}
-                        type="noise"
-                      />
-                    ))
-                  ) : (
-                    <div className="py-20 text-center text-[10px] font-mono text-text-muted uppercase tracking-widest">
-                      No Clusters
-                    </div>
-                  )}
-                </div>
-              </section>
-            </div>
-
-            {/* Source Heatmap Row */}
-            <section className="bg-bg-surface/50 border border-border rounded-xl p-6 backdrop-blur-sm relative overflow-hidden">
-              <div className="flex items-center gap-2 mb-6">
-                <Activity className="h-4 w-4 text-primary" />
-                <h2 className="text-xs font-bold uppercase tracking-widest text-text-muted">
-                  Source Activity Heatmap
-                </h2>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 auto-rows-max overflow-y-auto custom-scrollbar pr-2 pb-20">
+                    {dashboardWidgets.map((widget, i) => (
+                      <A2UIRenderer key={i} payload={widget} />
+                    ))}
+                  </div>
+                )}
               </div>
 
-              {renderSourceHeatmap()}
-              <Activity className="absolute -bottom-4 -right-4 size-32 text-text-muted/5 opacity-5 pointer-events-none" />
-            </section>
-          </motion.div>
-        ) : (
-          <motion.div
-            key="ai"
-            initial={{ opacity: 0, x: 10 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -10 }}
-            className="flex flex-col items-center justify-center py-20 bg-bg-surface/20 rounded-3xl border border-dashed border-border/50"
-          >
-            <div className="size-20 bg-primary/10 rounded-full flex items-center justify-center mb-6 animate-pulse">
-              <Sparkles className="size-10 text-primary" />
-            </div>
-            <h3 className="text-lg font-bold text-text-primary mb-2 font-mono uppercase">
-              AI Insight Engine
-            </h3>
-            <p className="text-text-muted text-sm max-w-md text-center px-6 font-mono leading-relaxed">
-              Heuristic engine is warming up. This mode will automatically identify anomalous
-              patterns and root cause correlations in the current filter window.
-            </p>
-            <div className="mt-8 flex gap-3">
-              <div className="px-4 py-2 bg-bg-base border border-border rounded-lg text-[10px] font-bold text-text-muted uppercase tracking-widest">
-                Anomaly Detection: STANDBY
-              </div>
-              <div className="px-4 py-2 bg-bg-base border border-border rounded-lg text-[10px] font-bold text-text-muted uppercase tracking-widest">
-                Root Cause: OFFLINE
-              </div>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+              {/* The Chatbox Sidebar */}
+              {isSidebarOpen && (
+                <div className="w-[450px] shrink-0 border border-border/50 rounded-xl overflow-hidden bg-bg-base/80 backdrop-blur shadow-2xl flex flex-col h-[calc(100vh-150px)]">
+                  <AIInvestigationSidebar onEngineSettingsOpen={() => {}} />
+                </div>
+              )}
+            </motion.div>
+          )}
+        </AnimatePresence>
 
-      <DashboardModeToggle mode={mode} onModeChange={setMode} />
+        <DashboardModeToggle mode={mode} onModeChange={handleModeChange} />
+      </div>
     </div>
   );
 }

@@ -30,6 +30,7 @@ interface AiStore {
   sidebarWidth: number;
   error: string | null;
   logSessionMap: Record<number, string>; // log_id -> session_id
+  dashboardWidgets: Record<string, unknown>[]; // Array of A2UI payloads pinned to the dashboard
 
   // Actions
   setSidebarOpen: (open: boolean) => void;
@@ -49,6 +50,8 @@ interface AiStore {
     reasoning?: boolean;
   }) => Promise<void>;
   clearError: () => void;
+  addDashboardWidget: (widget: Record<string, unknown>) => void;
+  clearDashboardWidgets: () => void;
 }
 
 export const useAiStore = create<AiStore>((set, get) => ({
@@ -60,6 +63,7 @@ export const useAiStore = create<AiStore>((set, get) => ({
   sidebarWidth: 450,
   error: null,
   logSessionMap: {},
+  dashboardWidgets: [],
 
   setSidebarOpen: (isSidebarOpen) => set({ isSidebarOpen }),
   setSidebarWidth: (sidebarWidth) => set({ sidebarWidth }),
@@ -231,6 +235,27 @@ export const useAiStore = create<AiStore>((set, get) => ({
                     if (lastMsg) {
                       lastMsg.a2ui_payload = parsed.a2ui_payload;
                     }
+
+                    // Auto-pin specific widgets to dashboard
+                    const payload = parsed.a2ui_payload as any;
+                    if (
+                      payload &&
+                      typeof payload.raw === "string" &&
+                      (payload.raw.startsWith("metric") ||
+                        payload.raw.startsWith("chart_area") ||
+                        payload.raw.startsWith("data_table"))
+                    ) {
+                      const isAlreadyPinned = state.dashboardWidgets.some(
+                        (w) => (w as any).raw === payload.raw,
+                      );
+                      if (!isAlreadyPinned) {
+                        return {
+                          messages,
+                          dashboardWidgets: [...state.dashboardWidgets, payload],
+                        };
+                      }
+                    }
+
                     return { messages };
                   });
                 }
@@ -275,4 +300,7 @@ export const useAiStore = create<AiStore>((set, get) => ({
   },
 
   clearError: () => set({ error: null }),
+  addDashboardWidget: (widget) =>
+    set((state) => ({ dashboardWidgets: [...state.dashboardWidgets, widget] })),
+  clearDashboardWidgets: () => set({ dashboardWidgets: [] }),
 }));
