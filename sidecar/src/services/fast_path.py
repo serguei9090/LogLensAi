@@ -1,3 +1,13 @@
+import logging
+import mmap
+import os
+import struct
+import threading
+import time
+from collections.abc import Sequence
+
+from services.log_file_store import _safe_name
+
 """
 services/fast_path.py
 ---------------------
@@ -8,13 +18,6 @@ without reading the entire file. It uses the companion ``.index`` files generate
 DiskLogStore to find the exact byte offsets of each line.
 """
 
-import logging
-import mmap
-import os
-import struct
-import threading
-import time
-from collections.abc import Sequence
 
 logger = logging.getLogger(__name__)
 
@@ -179,8 +182,7 @@ class FastPathService:
         with self._lock:
             if source_id not in self._sources:
                 # Need to match the filename logic in DiskLogStore
-                from services.log_file_store import _safe_name
-
+                pass # 
                 safe = _safe_name(source_id)
                 log_path = os.path.join(self.storage_dir, f"{safe}.log")
                 idx_path = os.path.join(self.storage_dir, f"{safe}.index")

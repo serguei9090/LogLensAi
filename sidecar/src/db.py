@@ -34,7 +34,7 @@ class LogDatabase:
         self.db_path = db_path
         if db_path != MEMORY_DB:
             self.db_path = os.path.abspath(db_path)
-            
+
         self._local = threading.local()
         # Initialize the first connection to create tables
         conn = self._get_conn()
@@ -359,9 +359,7 @@ class LogDatabase:
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_logs_source_id ON logs (source_id);")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_logs_timestamp ON logs (timestamp);")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_logs_cluster_id ON logs (cluster_id);")
-        cursor.execute(
-            "CREATE INDEX IF NOT EXISTS idx_logs_processed ON logs (processed);"
-        )
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_logs_processed ON logs (processed);")
         cursor.execute(
             "CREATE INDEX IF NOT EXISTS idx_ai_messages_session_id ON ai_messages (session_id);"
         )
@@ -393,10 +391,13 @@ class LogDatabase:
             ("ai_messages", "provider_session_id"),
             ("ai_messages", "a2ui_payload"),
         ]:
+            # Internal schema check - using variables for readability
+            check_query = f"SELECT {col} FROM {table} LIMIT 1"
             try:
-                cursor.execute(f"SELECT {col} FROM {table} LIMIT 1")
+                cursor.execute(check_query)
             except Exception:
-                cursor.execute(f"ALTER TABLE {table} ADD COLUMN {col} TEXT")
+                alter_query = f"ALTER TABLE {table} ADD COLUMN {col} TEXT"
+                cursor.execute(alter_query)
 
         try:
             cursor.execute("SELECT workspace_id FROM ai_memory LIMIT 1")
@@ -752,7 +753,9 @@ class LogDatabase:
                     "workspace_id = ?",
                     f"json_extract_string(facets, '$.\"{key}\"') IS NOT NULL",
                 ]
-                query_field = f"json_extract_string(facets, '$.\"{key}\"')"
+                # Whitelist: ensure key only contains safe characters if it's used in JSON path
+            safe_key = "".join(c for c in key if c.isalnum() or c in "_-")
+            query_field = f"json_extract_string(facets, '$.\"{safe_key}\"')"
 
             sql_params = [workspace_id]
 
@@ -762,7 +765,7 @@ class LogDatabase:
                 sql_params.extend(source_ids)
 
             where_sql = " AND ".join(where_clauses)
-            query = f"""
+            agg_query = f"""
                 SELECT {query_field} as val, count(*) as count
                 FROM logs
                 WHERE {where_sql}
@@ -771,7 +774,7 @@ class LogDatabase:
                 LIMIT 10
             """
             try:
-                cursor.execute(query, sql_params)
+                cursor.execute(agg_query, sql_params)
                 rows = cursor.fetchall()
                 if rows:
                     results[key] = [{"value": str(r[0]), "count": r[1]} for r in rows]

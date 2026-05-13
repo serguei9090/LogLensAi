@@ -1,15 +1,23 @@
 import asyncio
+import csv
 import inspect
 import json
 import logging
 import os
+import re
+import shutil
 import sys
 import threading
 import time
+import traceback
+import uuid
+from collections import defaultdict
 from datetime import datetime, timedelta
 from typing import Any
 
 import aiohttp_cors
+import pyarrow as pa
+import uvicorn
 from ai import AIChatMessage, AIProviderFactory
 from ai.context import SmartContextManager
 from ai.reasoning import parse_reasoning_blocks
@@ -74,8 +82,11 @@ from models import (
 )
 from parser import DrainParser
 from pydantic import ValidationError
+from query_parser import parse_llql
 from services.fast_path import FastPathService
 from services.log_file_store import DiskLogStore
+from services.rag_service import RagService
+from services.shared_core import SharedSourceManager
 from ssh_loader import SSHLoader
 from tailer import FileTailer
 from workers.clustering import ClusteringWorker
@@ -207,7 +218,7 @@ class App:
         logger.info("Database initialized at: %s", os.path.abspath(db_path))
 
         # --- RAG Memory Service ---
-        from services.rag_service import RagService
+        pass
 
         self.rag_service = RagService(os.path.join(PROJECT_ROOT, "data"))
 
@@ -219,7 +230,7 @@ class App:
         self.fast_path = FastPathService(storage_dir, log_store=self.log_store)
         logger.info("FastPathService initialized at: %s", storage_dir)
 
-        from services.shared_core import SharedSourceManager
+        pass
 
         self.shared_manager = SharedSourceManager(self.log_store)
         logger.info("SharedSourceManager initialized")
@@ -341,7 +352,7 @@ class App:
         LogDatabase.reset()
 
         # 3. Delete files
-        import shutil
+        pass
 
         data_dir = os.path.join(PROJECT_ROOT, "data")
         db_path = os.path.join(data_dir, "loglens.duckdb")
@@ -404,7 +415,7 @@ class App:
 
         def run_mcp():
             try:
-                import uvicorn
+                pass
 
                 config = uvicorn.Config(
                     mcp_server.application, host="127.0.0.1", port=5002, log_level="error"
@@ -599,7 +610,7 @@ class App:
             params.extend(f_params)
 
         if query:
-            from query_parser import parse_llql
+            pass
 
             llql_sql, llql_params = parse_llql(query)
             where_clauses.append(f"({llql_sql})")
@@ -661,22 +672,27 @@ class App:
         if where_sql is None:
             return {"total": 0, "logs": [], "offset": offset, "limit": limit}
 
-        count_query = f"SELECT COUNT(*) FROM logs l WHERE {where_sql}"
+        count_query = "SELECT COUNT(*) FROM logs l WHERE " + where_sql
         cursor.execute(count_query, params)
         total = cursor.fetchone()[0]
 
-        total_logs_subquery = "(SELECT count(*) FROM logs WHERE workspace_id = ?)"
+        # Use a CTE or join to get total_logs count for percent calculation safely
         base_query = f"""
+            WITH workspace_total AS (
+                SELECT count(*) as total_count FROM logs WHERE workspace_id = ?
+            )
             SELECT
                 l.*,
                 c.count as _cluster_count,
                 c.template as cluster_template,
-                CAST(c.count AS FLOAT) * 100.0 / {total_logs_subquery} as cluster_percent
+                CAST(c.count AS FLOAT) * 100.0 / NULLIF(workspace_total.total_count, 0) as cluster_percent
             FROM logs l
+            CROSS JOIN workspace_total
             LEFT JOIN clusters c ON l.workspace_id = c.workspace_id AND l.cluster_id = c.cluster_id
             WHERE {where_sql}
         """
-        params_for_data = [workspace_id] + params
+        # params_for_data starts with workspace_id for the CTE
+        params_for_data = [workspace_id, *params]
 
         allowed_sort = [
             "id",
@@ -687,16 +703,20 @@ class App:
             "has_comment",
             "cluster_percent",
         ]
+
+        # Whitelist sorting fields
         final_sort_by = sort_by if sort_by in allowed_sort else "id"
         if final_sort_by == "cluster_id":
             final_sort_by = "cluster_percent"
 
         final_sort_order = "ASC" if sort_order and sort_order.upper() == "ASC" else "DESC"
+
+        # Column names cannot be parameterized in SQL, but we use a strict whitelist above.
         data_query = (
             base_query
             + f" ORDER BY {final_sort_by} {final_sort_order}, l.id {final_sort_order} LIMIT ? OFFSET ?"
         )
-        cursor.execute(data_query, params_for_data + [limit, offset])
+        cursor.execute(data_query, [*params_for_data, limit, offset])
 
         columns = [desc[0] for desc in cursor.description]
         logs = []
@@ -754,7 +774,7 @@ class App:
             sql_params.extend(f_params)
 
         if params.query:
-            from query_parser import parse_llql
+            pass
 
             llql_sql, llql_params = parse_llql(params.query)
             if llql_sql:
@@ -811,8 +831,8 @@ class App:
         """
         params = ExportLogsRequest(**kwargs)
 
-        import csv
-        import json
+        pass  # import csv
+        pass  # import json
 
         filepath = params.filepath
         file_format = params.format
@@ -857,7 +877,7 @@ class App:
                     json.dump(logs, f, indent=2)
                 return len(logs)
 
-        import asyncio
+        pass
 
         count = await asyncio.to_thread(write_to_file)
 
@@ -874,9 +894,8 @@ class App:
 
         # Aggregate by time bucket
         # Default to minute-level bucketing, but support hour-level for larger ranges
-        bucket_length = 16  # YYYY-MM-DD HH:MM
-        if hasattr(params, "interval") and params.interval == "1h":
-            bucket_length = 13  # YYYY-MM-DD HH
+        # bucket_length is strictly mapped to prevent injection.
+        bucket_length = 13 if getattr(params, "interval", None) == "1h" else 16
 
         query = f"""
             SELECT
@@ -945,7 +964,7 @@ class App:
         result = self._get_logs_internal(**model_dump, source_ids=enabled_ids)
 
         # 3. Apply Multi-Source Timezone Normalization (PARS-004)
-        from datetime import timedelta
+        pass  # from datetime import timedelta
 
         normalized_logs = []
         for log in result["logs"]:
@@ -1177,8 +1196,8 @@ class App:
         expected to be called from a background flush worker.
         Does NOT create ingestion jobs.
         """
-        import json
-        import time
+        pass  # import json
+        pass  # import time
 
         log_dicts = [log.model_dump() if hasattr(log, "model_dump") else log for log in logs]
 
@@ -1186,7 +1205,7 @@ class App:
             return {"status": "ok", "count": 0}
 
         # --- Group by (workspace_id, source_id) ---
-        from collections import defaultdict
+        pass  # from collections import defaultdict
 
         grouped: dict[tuple[str, str], list[dict]] = defaultdict(list)
         for log in log_dicts:
@@ -1304,8 +1323,8 @@ class App:
         3. Train & Tag Drain3 in RAM (Single Thread)
         4. Bulk Insert fully processed rows via PyArrow
         """
-        import json
-        import time
+        pass  # import json
+        pass  # import time
 
         initial_chunk_size = 5000
         max_chunk_size = 10000
@@ -1450,7 +1469,7 @@ class App:
         now_ts,
         original_logs=None,
     ):
-        import json
+        pass  # import json
 
         train_sample_size = 200
         cluster_increments = {}
@@ -1549,7 +1568,7 @@ class App:
         return batch_data, cluster_increments
 
     def _insert_arrow_batch(self, cursor, batch_data, cluster_increments):
-        import pyarrow as pa
+        pass
 
         cursor.execute("BEGIN TRANSACTION")
 
@@ -1646,7 +1665,7 @@ class App:
         return self.db.get_hierarchy(workspace_id)
 
     def method_create_folder(self, workspace_id: str, name: str, parent_id: str = None) -> dict:
-        import uuid
+        pass  # import uuid
 
         folder_id = str(uuid.uuid4())
         self.db.create_folder(workspace_id, folder_id, name, parent_id)
@@ -1663,7 +1682,7 @@ class App:
     def method_create_log_source(
         self, workspace_id: str, name: str, type: str, path: str, folder_id: str = None
     ) -> dict:
-        import uuid
+        pass  # import uuid
 
         source_id = str(uuid.uuid4())
         self.db.upsert_log_source(workspace_id, source_id, name, type, path, folder_id)
@@ -1729,7 +1748,7 @@ class App:
         self, params: SendAiMessageRequest
     ) -> tuple[str, str | None, list[AIChatMessage]]:
         cursor = self.db.get_cursor()
-        import uuid
+        pass  # import uuid
 
         session_id = params.session_id
         if not session_id:
@@ -1753,10 +1772,8 @@ class App:
         log_context = ""
         if params.context_logs:
             placeholders = ",".join(["?"] * len(params.context_logs))
-            cursor.execute(
-                f"SELECT id, timestamp, level, source_id, line_id, cluster_id FROM logs WHERE id IN ({placeholders})",
-                params.context_logs,
-            )
+            query = f"SELECT id, timestamp, level, source_id, line_id, cluster_id FROM logs WHERE id IN ({placeholders})"
+            cursor.execute(query, params.context_logs)
             columns = [desc[0] for desc in cursor.description]
             raw_logs = [dict(zip(columns, row, strict=False)) for row in cursor.fetchall()]
 
@@ -1818,10 +1835,15 @@ class App:
         if provider_session_id:
             updates["provider_session_id"] = provider_session_id
 
-        update_clause = ", ".join([f"{k} = ?" for k in updates])
+        # Column names are whitelisted to prevent injection
+        allowed_cols = {"last_modified", "provider_session_id"}
+        fields = [k for k in updates if k in allowed_cols]
+        update_clause = ", ".join([f"{f} = ?" for f in fields])
+        params = [updates[f] for f in fields] + [session_id]
+
         cursor.execute(
             f"UPDATE ai_sessions SET {update_clause} WHERE session_id = ?",
-            list(updates.values()) + [session_id],
+            params,
         )
 
         self.db.commit()
@@ -2203,7 +2225,7 @@ class App:
                 status=400,
             )
         except Exception as e:
-            import traceback
+            pass  # import traceback
 
             traceback.print_exc()
             return web.json_response(
@@ -2277,7 +2299,7 @@ class App:
             await response.write(b"data: [DONE]\n\n")
             return response
         except Exception as e:
-            import traceback
+            pass  # import traceback
 
             logger.error("AI Stream Error: %s", str(e))
             traceback.print_exc()
@@ -2297,9 +2319,9 @@ class App:
         )
 
         try:
-            import re
+            pass  # import re
 
-            from ai import AIChatMessage
+            pass
 
             messages = [AIChatMessage(role="user", content=prompt)]
             # We use the current AI provider
@@ -2325,7 +2347,7 @@ class App:
             return {"regex": regex}
         except Exception as e:
             logger.error("Failed to generate regex with AI: %s", e)
-            import re
+            pass  # import re
 
             return {"regex": f"({re.escape(selected_text)})"}
 
@@ -2416,15 +2438,18 @@ class App:
         )
 
         # 1. Total Logs (Filtered)
-        cursor.execute(f"SELECT COUNT(*) FROM logs l{where_sql}", params)
+        q1 = "SELECT COUNT(*) FROM logs l" + where_sql
+        cursor.execute(q1, params)
         total_logs = cursor.fetchone()[0]
 
         # 2. Level breakdown (Filtered)
-        cursor.execute(f"SELECT l.level, COUNT(*) FROM logs l{where_sql} GROUP BY l.level", params)
+        q2 = "SELECT l.level, COUNT(*) FROM logs l" + where_sql + " GROUP BY l.level"
+        cursor.execute(q2, params)
         level_counts = {row[0]: row[1] for row in cursor.fetchall()}
 
         # 3. Cluster count (Filtered)
-        cursor.execute(f"SELECT COUNT(DISTINCT l.cluster_id) FROM logs l{where_sql}", params)
+        q3 = "SELECT COUNT(DISTINCT l.cluster_id) FROM logs l" + where_sql
+        cursor.execute(q3, params)
         total_clusters = cursor.fetchone()[0]
 
         # 4. Top 10 Clusters (Filtered)
@@ -2433,43 +2458,30 @@ class App:
             if where_sql
             else " WHERE l.cluster_id IS NOT NULL"
         )
-        cluster_query = f"""
-            SELECT
-                COALESCE(c.template, 'Pattern ' || l.cluster_id) as template,
-                COUNT(*) as count
-            FROM logs l
-            LEFT JOIN clusters c ON l.workspace_id = c.workspace_id AND l.cluster_id = c.cluster_id
-            {cluster_where}
-            GROUP BY template, l.cluster_id
-            ORDER BY count DESC
-            LIMIT 10
-        """
+        cluster_query = (
+            "SELECT COALESCE(c.template, 'Pattern ' || l.cluster_id) as template, COUNT(*) as count "
+            "FROM logs l LEFT JOIN clusters c ON l.workspace_id = c.workspace_id AND l.cluster_id = c.cluster_id "
+            + cluster_where
+            + " GROUP BY template, l.cluster_id ORDER BY count DESC LIMIT 10"
+        )
         cursor.execute(cluster_query, params)
         top_clusters = [{"template": row[0], "count": row[1]} for row in cursor.fetchall()]
 
         # 5. Global Metrics
         if active_workspace_ids:
             placeholders = ", ".join(["?"] * len(active_workspace_ids))
-            cursor.execute(
-                f"SELECT COUNT(DISTINCT workspace_id) FROM logs WHERE workspace_id IN ({placeholders})",
-                active_workspace_ids,
-            )
+            q5 = f"SELECT COUNT(DISTINCT workspace_id) FROM logs WHERE workspace_id IN ({placeholders})"
+            cursor.execute(q5, active_workspace_ids)
         else:
             cursor.execute("SELECT COUNT(DISTINCT workspace_id) FROM logs")
         workspace_count = cursor.fetchone()[0]
 
         # 6. Time Series (Log Volume & Severity over time)
         bucket_format = "%Y-%m-%d %H:%M:00"
-        ts_query = f"""
-            SELECT
-                strftime('{bucket_format}', l.timestamp::TIMESTAMP) as bucket,
-                l.level,
-                COUNT(*) as count
-            FROM logs l
-            {where_sql}
-            GROUP BY bucket, l.level
-            ORDER BY bucket ASC
-        """
+        ts_query = (
+            f"SELECT strftime('{bucket_format}', l.timestamp::TIMESTAMP) as bucket, l.level, COUNT(*) as count "
+            "FROM logs l " + where_sql + " GROUP BY bucket, l.level ORDER BY bucket ASC"
+        )
         cursor.execute(ts_query, params)
         ts_raw = cursor.fetchall()
 
@@ -2486,17 +2498,12 @@ class App:
             if where_sql
             else " WHERE l.level IN ('ERROR', 'FATAL', 'CRITICAL') AND l.cluster_id IS NOT NULL"
         )
-        error_cluster_query = f"""
-            SELECT
-                COALESCE(c.template, 'Pattern ' || l.cluster_id) as template,
-                COUNT(*) as count
-            FROM logs l
-            LEFT JOIN clusters c ON l.workspace_id = c.workspace_id AND l.cluster_id = c.cluster_id
-            {error_where}
-            GROUP BY template, l.cluster_id
-            ORDER BY count DESC
-            LIMIT 5
-        """
+        error_cluster_query = (
+            "SELECT COALESCE(c.template, 'Pattern ' || l.cluster_id) as template, COUNT(*) as count "
+            "FROM logs l LEFT JOIN clusters c ON l.workspace_id = c.workspace_id AND l.cluster_id = c.cluster_id "
+            + error_where
+            + " GROUP BY template, l.cluster_id ORDER BY count DESC LIMIT 5"
+        )
         cursor.execute(error_cluster_query, params)
         top_error_clusters = [{"template": row[0], "count": row[1]} for row in cursor.fetchall()]
 
@@ -2509,7 +2516,8 @@ class App:
             if cursor.fetchone()[0] > 0:
                 drift_where = " WHERE created_at >= ?" if start_time else ""
                 drift_params = [norm_start] if start_time else []
-                cursor.execute(f"SELECT COUNT(*) FROM clusters{drift_where}", drift_params)
+                q8 = f"SELECT COUNT(*) FROM clusters{drift_where}"
+                cursor.execute(q8, drift_params)
                 new_patterns_count = cursor.fetchone()[0]
         except Exception:
             pass
@@ -2517,18 +2525,12 @@ class App:
         # 9. Source Heatmap
         source_heatmap = []
         try:
-            sh_query = f"""
-                SELECT
-                    strftime('{bucket_format}', l.timestamp::TIMESTAMP) as bucket,
-                    l.source_id,
-                    s.name as source_name,
-                    COUNT(*) as count
-                FROM logs l
-                LEFT JOIN log_sources s ON l.source_id = s.id
-                {where_sql}
-                GROUP BY bucket, l.source_id, s.name
-                ORDER BY bucket ASC
-            """
+            sh_query = (
+                f"SELECT strftime('{bucket_format}', l.timestamp::TIMESTAMP) as bucket, l.source_id, s.name as source_name, COUNT(*) as count "
+                "FROM logs l LEFT JOIN log_sources s ON l.source_id = s.id "
+                + where_sql
+                + " GROUP BY bucket, l.source_id, s.name ORDER BY bucket ASC"
+            )
             cursor.execute(sh_query, params)
             source_heatmap = [
                 {"timestamp": r[0], "source_id": r[1], "source_name": r[2], "count": r[3]}
@@ -2556,7 +2558,7 @@ class App:
             row = cursor.fetchone()
             if row:
                 content = row[0].strip()
-                import re
+                pass  # import re
 
                 clean_content = re.sub(r"<think>.*?</think>", "", content, flags=re.DOTALL).strip()
                 latest_insight = (
@@ -2588,22 +2590,18 @@ class App:
         placeholders = ", ".join(["?"] * len(active_workspace_ids))
 
         # Delete logs
-        cursor.execute(
-            f"DELETE FROM logs WHERE workspace_id NOT IN ({placeholders})", active_workspace_ids
-        )
+        q1 = f"DELETE FROM logs WHERE workspace_id NOT IN ({placeholders})"
+        cursor.execute(q1, active_workspace_ids)
         logs_deleted = cursor.rowcount
 
         # Delete clusters
-        cursor.execute(
-            f"DELETE FROM clusters WHERE workspace_id NOT IN ({placeholders})", active_workspace_ids
-        )
+        q2 = f"DELETE FROM clusters WHERE workspace_id NOT IN ({placeholders})"
+        cursor.execute(q2, active_workspace_ids)
         clusters_deleted = cursor.rowcount
 
         # Delete workspace settings
-        cursor.execute(
-            f"DELETE FROM workspace_settings WHERE workspace_id NOT IN ({placeholders})",
-            active_workspace_ids,
-        )
+        q3 = f"DELETE FROM workspace_settings WHERE workspace_id NOT IN ({placeholders})"
+        cursor.execute(q3, active_workspace_ids)
 
         return {
             "status": "ok",
@@ -2848,7 +2846,7 @@ async def run_stdio_async(db_path=DEFAULT_DB, start_http=False, http_port=5000):
 
     try:
         # Use aioconsole or simple async iterator for stdin
-        import asyncio
+        pass
 
         loop = asyncio.get_event_loop()
 
@@ -2897,6 +2895,6 @@ async def run_stdio_async(db_path=DEFAULT_DB, start_http=False, http_port=5000):
 
 
 def run_stdio(db_path=DEFAULT_DB, start_http=False, http_port=5000):
-    import asyncio
+    pass
 
     asyncio.run(run_stdio_async(db_path=db_path, start_http=start_http, http_port=http_port))

@@ -1,5 +1,7 @@
+import json
 import logging
 
+import httpx
 from openai import AsyncOpenAI
 
 from .base import AIChatMessage, AIProvider
@@ -31,7 +33,7 @@ class OpenAICompatibleProvider(AIProvider):
         try:
             logger.debug("Sending models list request to: %s", self.host)
 
-            import httpx
+            pass
 
             async with httpx.AsyncClient() as client:
                 url = f"{self.host}/models"
@@ -167,7 +169,7 @@ class OpenAICompatibleProvider(AIProvider):
         )
 
         try:
-            import json
+            pass
 
             res = await self._client.chat.completions.create(
                 model=self.active_model,

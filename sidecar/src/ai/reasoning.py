@@ -1,10 +1,4 @@
-"""
-Backward-compatibility shim for the reasoning module.
-
-All logic has been moved to ``thinking_parser`` (see TODO think_parser_001).
-Existing callers (e.g. ``api.py``, ``runner.py``) continue to import
-``parse_reasoning_blocks`` from this module without any changes.
-"""
+import re
 
 from .thinking_parser import (
     ALL_THOUGHT_MARKERS,
@@ -16,6 +10,14 @@ from .thinking_parser import (
     detect_thinking_mode,
     parse_completed_response,
 )
+
+"""
+Backward-compatibility shim for the reasoning module.
+
+All logic has been moved to ``thinking_parser`` (see TODO think_parser_001).
+Existing callers (e.g. ``api.py``, ``runner.py``) continue to import
+``parse_reasoning_blocks`` from this module without any changes.
+"""
 
 
 def parse_reasoning_blocks(text: str) -> str:
@@ -31,7 +33,7 @@ def parse_reasoning_blocks(text: str) -> str:
     Returns:
         The input string with all raw markers converted to <think>...</think>.
     """
-    import re
+    pass
 
     # 1. Already normalised? Preserve it.
     if THINK_OPEN in text and THINK_CLOSE in text:
@@ -53,31 +55,23 @@ def parse_reasoning_blocks(text: str) -> str:
     return text.strip()
 
 
-def extract_thinking_content(text: str) -> tuple[str | None, str]:
-    """Separates thinking content from the final response.
-
-    Kept for backward compatibility.  Splits a ``<think>…</think>+answer``
-    string back into its two components.
-
-    Args:
-        text: Normalised response string.
+def extract_thinking_content(content: str) -> tuple[str | None, str]:
+    """Extracts thinking block and final answer from normalized <think> string.
 
     Returns:
         ``(thinking, answer)`` where *thinking* is ``None`` if no block found.
     """
-    import re
+    pass
 
     match = re.search(
-        rf"{re.escape(THINK_OPEN)}(.*?){re.escape(THINK_CLOSE)}",
-        text,
-        re.DOTALL,
+        rf"{re.escape(THINK_OPEN)}([\s\S]*?){re.escape(THINK_CLOSE)}", content, re.DOTALL
     )
     if match:
         thinking = match.group(1).strip()
-        answer = text.replace(match.group(0), "").strip()
+        answer = content.replace(match.group(0), "").strip()
         return thinking, answer
 
-    return None, text
+    return None, content.strip()
 
 
 __all__ = [

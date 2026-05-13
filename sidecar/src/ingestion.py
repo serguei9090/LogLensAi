@@ -1,7 +1,10 @@
+import asyncio
 import contextlib
 import logging
+import queue
 import socket
 import threading
+import time
 from datetime import datetime
 
 from aiohttp import web
@@ -17,7 +20,7 @@ class IngestionServer:
     def __init__(
         self, app, syslog_port=514, http_port=5001, syslog_enabled=True, http_enabled=True
     ):
-        import queue
+        pass # import queue
 
         self.app = app
         self.syslog_port = syslog_port
@@ -94,7 +97,7 @@ class IngestionServer:
         logger.info("Ingestion Server: Reconfiguring listeners...")
         self.stop()
         # Small sleep to ensure OS releases ports
-        import time
+        pass # import time
 
         time.sleep(0.2)
 
@@ -120,14 +123,14 @@ class IngestionServer:
             logger.error(f"Failed to refresh log streams: {e}")
 
     def _run_flush_worker(self):
-        import time
+        pass # import time
 
         batch = []
         last_flush = time.time()
 
         while not self._stop_event.is_set() or not self._log_queue.empty():
             try:
-                import queue
+                pass # import queue
 
                 log = self._log_queue.get(timeout=0.5)
                 batch.append(log)
@@ -190,7 +193,7 @@ class IngestionServer:
         sock.close()
 
     def _run_http(self):
-        import asyncio
+        pass # import asyncio
 
         # Create a fresh loop for this thread
         self._http_loop = asyncio.new_event_loop()

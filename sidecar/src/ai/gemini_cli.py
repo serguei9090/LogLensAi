@@ -2,6 +2,7 @@ import asyncio
 import json
 import logging
 import os
+import subprocess
 import sys
 
 import aiohttp
@@ -403,7 +404,7 @@ class GeminiCLIProvider(AIProvider):
         except Exception:
             # Fallback to cold mode check
             try:
-                import subprocess
+                pass
 
                 res = subprocess.run(
                     ["gemini", "--version"], capture_output=True, text=True, check=False
