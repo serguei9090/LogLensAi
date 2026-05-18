@@ -10,6 +10,7 @@ interface ExplorerViewProps {
   readonly onSelectSource: (id: string) => void;
   readonly onCreateFolder?: (name: string) => void;
   readonly onImportOpen?: () => void;
+  readonly workspaceName?: string;
 }
 
 export function ExplorerView({
@@ -19,6 +20,7 @@ export function ExplorerView({
   onSelectSource,
   onCreateFolder,
   onImportOpen,
+  workspaceName,
 }: ExplorerViewProps) {
   const findFolder = (node: HierarchyNode, id: string): HierarchyNode | null => {
     if (node.id === id) {
@@ -49,7 +51,7 @@ export function ExplorerView({
       <div className="flex items-center justify-between mb-8">
         <div>
           <h1 className="text-2xl font-black text-text-primary tracking-tight mb-1">
-            {folderId ? currentFolder.name : "Workspace Root"}
+            {folderId ? currentFolder.name : `${workspaceName || "Workspace"} Workspace`}
           </h1>
           <p className="text-xs text-text-muted opacity-60">
             {currentFolder.children.length} folders, {currentFolder.sources.length} sources

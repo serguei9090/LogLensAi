@@ -518,6 +518,7 @@ export function InvestigationPage() {
             onSelectSource={(id) => setActiveSource(activeWorkspaceId ?? "", id)}
             onCreateFolder={(name) => createFolder(activeWorkspaceId ?? "", name)}
             onImportOpen={() => setIsImportOpen(true)}
+            workspaceName={activeWorkspace?.name}
           />
         )}
       </InvestigationLayout>
