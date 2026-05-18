@@ -2,7 +2,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import type { LogSource } from "@/store/workspaceStore";
 import { Check, FileText, Pencil, Trash2 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { memo, useEffect, useState } from "react";
 
 interface SourceItemProps {
   source: LogSource;
@@ -14,7 +14,7 @@ interface SourceItemProps {
   onRenamingChange: (renaming: boolean) => void;
 }
 
-export function SourceItem({
+function SourceItemImpl({
   source,
   active,
   onClick,
@@ -104,3 +104,5 @@ export function SourceItem({
     </div>
   );
 }
+
+export const SourceItem = memo(SourceItemImpl);

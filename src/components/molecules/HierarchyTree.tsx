@@ -4,7 +4,7 @@ import { DraggableItem, DroppableArea } from "@/lib/dnd-wrappers";
 import { cn } from "@/lib/utils";
 import { type HierarchyNode, useWorkspaceStore } from "@/store/workspaceStore";
 import { Check, ChevronDown, ChevronRight, Folder, FolderPlus, Pencil, Trash2 } from "lucide-react";
-import { useState } from "react";
+import { memo, useState } from "react";
 import { ConfirmationDialog } from "../molecules/ConfirmationDialog";
 import { SourceItem } from "./SourceItem";
 
@@ -17,7 +17,7 @@ interface HierarchyTreeProps {
   onNavSelect: (nav: NavTab) => void;
 }
 
-export function HierarchyTree({
+function HierarchyTreeImpl({
   node,
   workspaceId,
   activeSourceId,
@@ -302,3 +302,5 @@ export function HierarchyTree({
     </div>
   );
 }
+
+export const HierarchyTree = memo(HierarchyTreeImpl);

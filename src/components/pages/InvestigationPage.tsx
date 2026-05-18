@@ -16,7 +16,7 @@ import { useInvestigationStore } from "@/store/investigationStore";
 import { useSettingsStore } from "@/store/settingsStore";
 import { type LogSource, selectActiveWorkspace, useWorkspaceStore } from "@/store/workspaceStore";
 import type { LogEntry } from "@/types/log";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { useLogIngestion } from "@/lib/hooks/useLogIngestion";
@@ -24,7 +24,7 @@ import { parseManualLogs } from "@/lib/log-utils";
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-export function InvestigationPage() {
+function InvestigationPageImpl() {
   const {
     searchQuery,
     setSearchQuery,
@@ -170,6 +170,14 @@ export function InvestigationPage() {
 
   // Search Bar Ref
   const searchRef = useRef<HTMLInputElement>(null);
+
+  // Reset job tracking refs when activeWorkspaceId changes to prevent phantom notifications
+  useEffect(() => {
+    if (activeWorkspaceId) {
+      lastJobId.current = null;
+      prevJobStatus.current = null;
+    }
+  }, [activeWorkspaceId]);
 
   useEffect(() => {
     if (!lastJob) {
@@ -582,3 +590,5 @@ export function InvestigationPage() {
     </>
   );
 }
+
+export const InvestigationPage = memo(InvestigationPageImpl);

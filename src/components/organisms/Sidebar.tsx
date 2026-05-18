@@ -22,7 +22,7 @@ import {
   Trash2,
   X,
 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { memo, useEffect, useRef, useState } from "react";
 import { HierarchyTree } from "../molecules/HierarchyTree";
 
 interface SidebarProps {
@@ -37,7 +37,7 @@ interface SidebarProps {
   readonly activeFolderId?: string | null;
 }
 
-export function Sidebar({
+function SidebarImpl({
   workspaces,
   activeWorkspaceId,
   onWorkspaceSelect,
@@ -369,6 +369,8 @@ export function Sidebar({
     </motion.div>
   );
 }
+
+export const Sidebar = memo(SidebarImpl);
 
 interface SidebarNavItemProps {
   icon: React.ReactNode;
