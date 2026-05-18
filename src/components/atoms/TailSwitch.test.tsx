@@ -6,7 +6,7 @@ test("renders TailSwitch and responds to clicks", () => {
   const handleChange = vi.fn();
   render(<TailSwitch checked={false} onCheckedChange={handleChange} />);
 
-  const label = screen.getByText("Live Tail");
+  const label = screen.getByText("Tail");
   expect(label).toBeDefined();
 
   const switchRole = screen.getByRole("switch");

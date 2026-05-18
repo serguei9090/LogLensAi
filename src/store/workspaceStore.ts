@@ -182,10 +182,14 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
                 return w;
               }
 
+              const remainingSources = w.sources.filter((s) => s.id !== sourceId);
               return {
                 ...w,
-                sources: w.sources.filter((s) => s.id !== sourceId),
-                activeSourceId: w.activeSourceId === sourceId ? null : w.activeSourceId,
+                sources: remainingSources,
+                activeSourceId:
+                  w.activeSourceId === sourceId
+                    ? (remainingSources[0]?.id ?? null)
+                    : w.activeSourceId,
               };
             }),
           }));

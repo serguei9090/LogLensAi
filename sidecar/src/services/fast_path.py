@@ -155,8 +155,8 @@ class FastPathService:
         if not source:
             return None
 
-        # BUG-002 Resolution: Removed DiskLogStore lock. 
-        # mmap handles concurrent reads safely, and we only read lines 
+        # BUG-002 Resolution: Removed DiskLogStore lock.
+        # mmap handles concurrent reads safely, and we only read lines
         # that were already committed to the DB, so they must exist on disk.
         res = source.get_line(line_id)
 
@@ -182,7 +182,7 @@ class FastPathService:
         with self._lock:
             if source_id not in self._sources:
                 # Need to match the filename logic in DiskLogStore
-                pass # 
+                pass  #
                 safe = _safe_name(source_id)
                 log_path = os.path.join(self.storage_dir, f"{safe}.log")
                 idx_path = os.path.join(self.storage_dir, f"{safe}.index")

@@ -216,15 +216,15 @@ class ClusteringWorker:
                 if processed_count == 0:
                     self._force_cycle.clear()
                     self._sync_job_statuses()
-                    time.sleep(current_interval)
+                    self._stop_event.wait(current_interval)
                 elif self.mode == "burst":
-                    time.sleep(current_interval)
+                    self._stop_event.wait(current_interval)
                 else:
-                    time.sleep(0.1)
+                    self._stop_event.wait(0.1)
 
             except Exception:
                 logger.exception("[Worker] Error in clustering cycle:")
-                time.sleep(self.interval * 2)
+                self._stop_event.wait(self.interval * 2)
 
     # ------------------------------------------------------------------
     # Batch processing — Train-then-Tag
@@ -238,10 +238,15 @@ class ClusteringWorker:
             self._quarantine = {}
 
         t0 = time.time()
-        cursor.execute(
-            "SELECT id, workspace_id, source_id, line_id, facets, raw_text FROM logs WHERE processed = FALSE ORDER BY id ASC LIMIT ?",  # noqa: E501
-            (limit,),
-        )
+        try:
+            cursor.execute(
+                "SELECT id, workspace_id, source_id, line_id, facets, raw_text FROM logs WHERE processed = FALSE ORDER BY id ASC LIMIT ?",  # noqa: E501
+                (limit,),
+            )
+        except Exception as e:
+            if "Table with name logs does not exist" in str(e):
+                return 0
+            raise e
         batch = cursor.fetchall()
         t_select = time.time()
         if t_select - t0 > 0.05:
@@ -260,7 +265,7 @@ class ClusteringWorker:
 
         # Phase 0: Hydrate — resolve any missing raw_text from fast_path.
         hydrated_rows: list = []
-        
+
         # Group by source for efficient batch reading
         sources_to_hydrate: dict[str, list[tuple]] = {}
         for row in batch:
@@ -270,15 +275,15 @@ class ClusteringWorker:
                 sources_to_hydrate[row[2]].append(row)
             else:
                 hydrated_rows.append(row)
-        
+
         for source_id, rows in sources_to_hydrate.items():
             # Check quarantine once per source
             if self._quarantine.get(source_id, 0) > now:
                 continue
-                
+
             line_ids = [r[3] for r in rows]
             raw_texts = self.app.fast_path.get_lines(source_id, line_ids)
-            
+
             for i, raw in enumerate(raw_texts):
                 row = rows[i]
                 if raw is None:
@@ -350,7 +355,7 @@ class ClusteringWorker:
         # ----------------------------------------------------------------
         if tag_rows:
             bypass_parallel = os.environ.get("BYPASS_PARALLEL_TAG") == "1"
-            
+
             if bypass_parallel:
                 t_tag_start = time.time()
                 # Synchronous Bypass: Call the tag batch function directly in the main thread
@@ -358,15 +363,21 @@ class ClusteringWorker:
                 parser = self.app.get_drain_parser(ws_id)
                 cluster_map = {c.cluster_id: c for c in parser.get_clusters()}
                 miner_config = parser.miner.config
-                
+
                 # Re-fetch rules and config just in case multiple workspaces exist in tag_rows
                 # (Though usually it's one file at a time)
-                ws_id = tag_rows[0][1] 
-                rules = self.app._get_facet_rules_for_workspace(cursor, ws_id, rules_cache, global_rules)
-                p_config, p_tz = self._get_parser_config(cursor, ws_id, tag_rows[0][2], parser_configs)
-                
-                batch_results = _tag_log_batch(tag_rows, cluster_map, miner_config, rules, p_config, p_tz, now)
-                
+                ws_id = tag_rows[0][1]
+                rules = self.app._get_facet_rules_for_workspace(
+                    cursor, ws_id, rules_cache, global_rules
+                )
+                p_config, p_tz = self._get_parser_config(
+                    cursor, ws_id, tag_rows[0][2], parser_configs
+                )
+
+                batch_results = _tag_log_batch(
+                    tag_rows, cluster_map, miner_config, rules, p_config, p_tz, now
+                )
+
                 for result in batch_results:
                     status = result["status"]
                     log_id = result["log_id"]
@@ -379,14 +390,26 @@ class ClusteringWorker:
                         if cluster_id and template:
                             key = (ws_id, cluster_id, template)
                             cluster_increments[key] = cluster_increments.get(key, 0) + 1
-                        updates.append((result["timestamp"], result["level"], result["facets_json"], cluster_id, log_id))
+                        updates.append(
+                            (
+                                result["timestamp"],
+                                result["level"],
+                                result["facets_json"],
+                                cluster_id,
+                                log_id,
+                            )
+                        )
                         job_key = (ws_id, source_id)
                         batch_counts[job_key] = batch_counts.get(job_key, 0) + 1
-                
+
                 t_tag_total = time.time() - t_tag_start
-                logger.info("[Worker] SYNC Tagging Phase: %d lines in %.4fs (%.2f lines/sec)", 
-                            len(tag_rows), t_tag_total, len(tag_rows)/t_tag_total if t_tag_total > 0 else 0)
-            
+                logger.info(
+                    "[Worker] SYNC Tagging Phase: %d lines in %.4fs (%.2f lines/sec)",
+                    len(tag_rows),
+                    t_tag_total,
+                    len(tag_rows) / t_tag_total if t_tag_total > 0 else 0,
+                )
+
             elif self._executor is not None:
                 t_tag_start = time.time()
                 # Group tag rows by (ws_id, source_id) to reuse parser + config
@@ -402,7 +425,9 @@ class ClusteringWorker:
                     rules = self.app._get_facet_rules_for_workspace(  # noqa: SLF001
                         cursor, ws_id, rules_cache, global_rules
                     )
-                    p_config, p_tz = self._get_parser_config(cursor, ws_id, source_id, parser_configs)
+                    p_config, p_tz = self._get_parser_config(
+                        cursor, ws_id, source_id, parser_configs
+                    )
 
                     miner_config = parser.miner.config
                     # Split rows into chunks for parallel processing
@@ -410,7 +435,14 @@ class ClusteringWorker:
                     for i in range(0, len(rows), chunk_size):
                         chunk = rows[i : i + chunk_size]
                         fut = self._executor.submit(
-                            _tag_log_batch, chunk, cluster_map, miner_config, rules, p_config, p_tz, now
+                            _tag_log_batch,
+                            chunk,
+                            cluster_map,
+                            miner_config,
+                            rules,
+                            p_config,
+                            p_tz,
+                            now,
                         )
                         futures.append(fut)
 
@@ -452,14 +484,20 @@ class ClusteringWorker:
                                     log_id,
                                     result.get("error"),
                                 )  # noqa: E501
-                                updates.append((None, "ERROR", result.get("facets_json"), None, log_id))
+                                updates.append(
+                                    (None, "ERROR", result.get("facets_json"), None, log_id)
+                                )
 
                     except Exception:
                         logger.exception("[Worker] Future resolution failed:")
-                
+
                 t_tag_total = time.time() - t_tag_start
-                logger.info("[Worker] PARALLEL Tagging Phase: %d lines in %.4fs (%.2f lines/sec)", 
-                            len(tag_rows), t_tag_total, len(tag_rows)/t_tag_total if t_tag_total > 0 else 0)
+                logger.info(
+                    "[Worker] PARALLEL Tagging Phase: %d lines in %.4fs (%.2f lines/sec)",
+                    len(tag_rows),
+                    t_tag_total,
+                    len(tag_rows) / t_tag_total if t_tag_total > 0 else 0,
+                )
 
         # ----------------------------------------------------------------
         # Aggregation: single atomic commit for the entire batch
@@ -468,7 +506,9 @@ class ClusteringWorker:
             t_agg_start = time.time()
             self._apply_batch_updates(cursor, updates, cluster_increments)
             t_agg_total = time.time() - t_agg_start
-            logger.info("[Worker] Aggregation Phase: %.4fs for %d updates", t_agg_total, len(updates))
+            logger.info(
+                "[Worker] Aggregation Phase: %.4fs for %d updates", t_agg_total, len(updates)
+            )
 
         self._update_ingestion_jobs(cursor, batch_counts)
         self.db.commit()
@@ -484,18 +524,20 @@ class ClusteringWorker:
             return
 
         t_start = time.time()
-        
+
         # Performance Trick: In DuckDB, row-by-row updates are slow.
         # Vectorized updates via a temporary table are significantly faster.
         cursor.execute("BEGIN TRANSACTION")
         try:
             if updates:
                 # 1. Create a schema-matched temporary table (use VARCHAR for flexible inputs)
-                cursor.execute("CREATE TEMPORARY TABLE updates_temp (ts VARCHAR, lvl VARCHAR, fcts VARCHAR, cid VARCHAR, lid BIGINT)")
-                
+                cursor.execute(
+                    "CREATE TEMPORARY TABLE updates_temp (ts VARCHAR, lvl VARCHAR, fcts VARCHAR, cid VARCHAR, lid BIGINT)"
+                )
+
                 # 2. Bulk insert into the temp table (no indexes = fast)
                 cursor.executemany("INSERT INTO updates_temp VALUES (?, ?, ?, ?, ?)", updates)
-                
+
                 # 3. Perform a vectorized JOIN update
                 cursor.execute("""
                     UPDATE logs 
@@ -507,12 +549,12 @@ class ClusteringWorker:
                     FROM updates_temp
                     WHERE logs.id = updates_temp.lid
                 """)
-                
+
                 # 4. Clean up
                 cursor.execute("DROP TABLE updates_temp")
 
             t_logs_end = time.time()
-            
+
             for (ws_id, cluster_id, template), count in cluster_increments.items():
                 cursor.execute(
                     """
@@ -528,7 +570,7 @@ class ClusteringWorker:
             cursor.execute("ROLLBACK")
             logger.exception("[Worker] Transaction failed:")
             raise
-            
+
         t_end = time.time()
         if t_end - t_start > 0.1:
             logger.info(
@@ -564,9 +606,14 @@ class ClusteringWorker:
         """
         try:
             cursor = self.db.get_cursor()
-            cursor.execute(
-                "SELECT workspace_id, source_id FROM ingestion_jobs WHERE status IN ('pending', 'processing')"  # noqa: E501
-            )
+            try:
+                cursor.execute(
+                    "SELECT workspace_id, source_id FROM ingestion_jobs WHERE status IN ('pending', 'processing')"  # noqa: E501
+                )
+            except Exception as e:
+                if "Table with name ingestion_jobs does not exist" in str(e):
+                    return
+                raise e
             active_jobs = cursor.fetchall()
 
             for ws_id, src_id in active_jobs:

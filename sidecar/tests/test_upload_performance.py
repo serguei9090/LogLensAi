@@ -65,27 +65,29 @@ def test_upload_and_clustering_performance(e2e_api):
     clustering_complete = False
 
     print(f"\nStrict Performance Window: {max_wait_seconds}s")
-    
+
     while elapsed < max_wait_seconds:
         jobs = e2e_api.method_get_ingestion_jobs(workspace_id=workspace_id)
         job = next((j for j in jobs if j.get("id") == job_id), None) if jobs else None
 
         if job:
-            total_target_lines = job.get('total_lines', 0)
-            processed = job.get('processed_lines', 0)
-            status = job['status']
+            total_target_lines = job.get("total_lines", 0)
+            processed = job.get("processed_lines", 0)
+            status = job["status"]
             progress_pct = (processed / total_target_lines * 100) if total_target_lines > 0 else 0
-            print(f"[{elapsed:4.1f}s] Ingestion: {processed}/{total_target_lines} ({progress_pct:4.1f}%) | Status: {status}")
-            
+            print(
+                f"[{elapsed:4.1f}s] Ingestion: {processed}/{total_target_lines} ({progress_pct:4.1f}%) | Status: {status}"
+            )
+
             if status == "completed":
                 ingestion_complete = True
             elif status == "failed":
                 pytest.fail(f"Job failed unexpectedly: {job}")
-        
+
         status_clustering = e2e_api.method_get_clustering_status()
         backlog = status_clustering["backlog"]
         print(f"[{elapsed:4.1f}s] Clustering Backlog: {backlog}")
-        
+
         if ingestion_complete and backlog == 0:
             clustering_complete = True
             break
@@ -114,8 +116,10 @@ def test_upload_and_clustering_performance(e2e_api):
         completion_pct = (final_processed_logs / total_target_lines) * 100
         print(f"Final Completion: {completion_pct:.1f}%")
         if completion_pct < 50:
-            pytest.fail(f"Performance too slow! Only {completion_pct:.1f}% of logs processed in {max_wait_seconds}s.")
-    
+            pytest.fail(
+                f"Performance too slow! Only {completion_pct:.1f}% of logs processed in {max_wait_seconds}s."
+            )
+
     assert ingestion_complete, "Ingestion did not complete within the strict timeout."
     assert clustering_complete, "Clustering did not complete within the strict timeout."
     assert total_clusters > 0, "No clusters were formed"

@@ -40,7 +40,7 @@ class DrainParser:
     def _apply_masking_instructions(self, masking_instructions):
         if not isinstance(masking_instructions, (list, tuple)):
             return
-        pass # import re
+        pass  # import re
 
         for mi in masking_instructions:
             if not isinstance(mi, dict) or not mi.get("enabled", True):
