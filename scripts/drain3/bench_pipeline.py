@@ -7,7 +7,9 @@ from concurrent.futures import ProcessPoolExecutor, as_completed
 import duckdb
 
 # Add sidecar/src to path
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "sidecar", "src")))
+sys.path.insert(
+    0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "sidecar", "src"))
+)
 
 import contextlib
 
@@ -16,9 +18,11 @@ from metadata_extractor import extract_log_metadata
 
 LOG_FILE = "apache_logs.log"
 
+
 def read_logs():
-    with open(LOG_FILE, encoding='utf-8') as f:
+    with open(LOG_FILE, encoding="utf-8") as f:
         return [line.strip() for line in f if line.strip()]
+
 
 def time_it(name, func, *args, **kwargs):
     print(f"--- Running: {name} ---")
@@ -27,15 +31,17 @@ def time_it(name, func, *args, **kwargs):
     end = time.time()
     elapsed = end - start
     print(f"Time taken: {elapsed:.4f} seconds")
-    if hasattr(result, '__len__'):
+    if hasattr(result, "__len__"):
         print(f"Processed items: {len(result)}")
         if elapsed > 0:
             print(f"Speed: {len(result) / elapsed:.2f} items/sec")
     print()
     return result
 
+
 def step1_baseline_read():
     return read_logs()
+
 
 def step2_metadata_extraction(lines):
     results = []
@@ -43,6 +49,7 @@ def step2_metadata_extraction(lines):
         meta = extract_log_metadata(line, custom_rules=[], parser_config={}, tz_offset=0)
         results.append(meta)
     return results
+
 
 def step3_drain3_match(metas):
     miner = TemplateMiner()
@@ -55,6 +62,7 @@ def step3_drain3_match(metas):
         match = miner.match(meta["message"])
         results.append(match)
     return results
+
 
 def step4_drain3_match_and_extract(metas):
     miner = TemplateMiner()
@@ -73,8 +81,9 @@ def step4_drain3_match_and_extract(metas):
         results.append(match)
     return results
 
+
 def step5_duckdb_insert(metas):
-    conn = duckdb.connect(':memory:')
+    conn = duckdb.connect(":memory:")
     cursor = conn.cursor()
     cursor.execute("""
         CREATE TABLE logs (
@@ -102,14 +111,27 @@ def step5_duckdb_insert(metas):
         match = miner.match(meta["message"])
         cluster_id = str(match.cluster_id) if match else None
 
-        batch.append((
-            i, 'ws1', 'src1', i, meta["message"], meta["timestamp"], meta["level"], cluster_id, False, '', '{}', True
-        ))
+        batch.append(
+            (
+                i,
+                "ws1",
+                "src1",
+                i,
+                meta["message"],
+                meta["timestamp"],
+                meta["level"],
+                cluster_id,
+                False,
+                "",
+                "{}",
+                True,
+            )
+        )
 
     t0 = time.time()  # noqa: F841
     cursor.executemany(
         "INSERT INTO logs (id, workspace_id, source_id, line_id, raw_text, timestamp, level, cluster_id, has_comment, comment, facets, processed) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-        batch
+        batch,
     )
     conn.commit()
     return batch
@@ -139,6 +161,7 @@ def _worker_task(chunk, config, cluster_map_data):
         results.append((match.cluster_id if match else None, json.dumps(facets)))
     return results
 
+
 def step6_multiprocess_tagging(metas):
     miner = TemplateMiner()
     for meta in metas[:200]:
@@ -150,7 +173,7 @@ def step6_multiprocess_tagging(metas):
     chunks = []
     chunk_size = 1000
     for i in range(200, len(metas), chunk_size):
-        chunks.append(metas[i:i+chunk_size])
+        chunks.append(metas[i : i + chunk_size])
 
     results = []
     with ProcessPoolExecutor(max_workers=6) as executor:
@@ -162,6 +185,7 @@ def step6_multiprocess_tagging(metas):
             results.extend(fut.result())
 
     return results
+
 
 if __name__ == "__main__":
     print("Starting Incremental Pipeline Benchmark...")
@@ -180,7 +204,9 @@ if __name__ == "__main__":
     time_it("3. Drain3 Tagging (Single Thread)", step3_drain3_match, metas)
 
     # 4. Drain3 Tagging + Param Extraction
-    time_it("4. Drain3 Tagging + Param Extract (Single Thread)", step4_drain3_match_and_extract, metas)
+    time_it(
+        "4. Drain3 Tagging + Param Extract (Single Thread)", step4_drain3_match_and_extract, metas
+    )
 
     # 5. Full flow + DuckDB Insert
     time_it("5. Drain3 + DuckDB Bulk Insert", step5_duckdb_insert, metas)

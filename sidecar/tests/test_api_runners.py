@@ -1,4 +1,4 @@
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from api import App, on_cleanup, run_stdio_async, start_background_http
@@ -7,12 +7,12 @@ from api import App, on_cleanup, run_stdio_async, start_background_http
 def test_extract_a2ui_payload():
     app = App(db_path=":memory:", start_ingestion=False, start_anomalies=False, start_mcp=False)
     # Valid payload
-    text1 = 'Some text <a2ui>{"type":"chart"}</a2ui> more text'
+    text1 = 'Some text [[A2UI]]{"type":"chart"}[[/A2UI]] more text'
     res1 = app._extract_a2ui_payload(text1)
     assert res1 == {"type": "chart"}
 
     # Invalid JSON payload
-    text2 = "Some text <a2ui>not json</a2ui> more text"
+    text2 = "Some text [[A2UI]]not json[[/A2UI]] more text"
     res2 = app._extract_a2ui_payload(text2)
     assert res2 == {"type": "markup", "raw": "not json"}
 
@@ -26,7 +26,7 @@ def test_extract_a2ui_payload():
 async def test_on_cleanup():
     server_app = {}
     app = App(db_path=":memory:", start_ingestion=False, start_anomalies=False, start_mcp=False)
-    app.stop_async = pytest.AsyncMock()
+    app.stop_async = AsyncMock()
     server_app["sidecar_app"] = app
     await on_cleanup(server_app)
     app.stop_async.assert_called_once()
@@ -44,10 +44,8 @@ async def test_start_background_http():
 @pytest.mark.asyncio
 async def test_run_stdio_async(monkeypatch):
     app_mock = MagicMock()
-    app_mock.dispatch = pytest.AsyncMock(
-        return_value=MagicMock(model_dump=lambda: {"jsonrpc": "2.0"})
-    )
-    app_mock.stop_async = pytest.AsyncMock()
+    app_mock.dispatch = AsyncMock(return_value=MagicMock(model_dump=lambda: {"jsonrpc": "2.0"}))
+    app_mock.stop_async = AsyncMock()
 
     with patch("api.App", return_value=app_mock):
 

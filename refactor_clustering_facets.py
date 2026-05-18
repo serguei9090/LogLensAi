@@ -1,16 +1,15 @@
-
-with open('sidecar/src/workers/clustering.py', encoding='utf-8') as f:
+with open("sidecar/src/workers/clustering.py", encoding="utf-8") as f:
     content = f.read()
 
 # Update Phase 1: Train
-old_phase1 = '''                parser = self.app.get_drain_parser(ws_id)
+old_phase1 = """                parser = self.app.get_drain_parser(ws_id)
                 res = parser.parse(meta["message"])  # ? updates tree
                 cluster_id, template = res["cluster_id"], res["template"]
 
                 key = (ws_id, cluster_id, template)
-                cluster_increments[key] = cluster_increments.get(key, 0) + 1'''
+                cluster_increments[key] = cluster_increments.get(key, 0) + 1"""
 
-new_phase1 = '''                parser = self.app.get_drain_parser(ws_id)
+new_phase1 = """                parser = self.app.get_drain_parser(ws_id)
                 res = parser.parse(meta["message"])  # ? updates tree
                 cluster_id, template = res["cluster_id"], res["template"]
                 
@@ -18,18 +17,18 @@ new_phase1 = '''                parser = self.app.get_drain_parser(ws_id)
                     meta["facets"].update(res["facets"])
 
                 key = (ws_id, cluster_id, template)
-                cluster_increments[key] = cluster_increments.get(key, 0) + 1'''
+                cluster_increments[key] = cluster_increments.get(key, 0) + 1"""
 
 content = content.replace(old_phase1, new_phase1)
 
 # Update Phase 2: Tag
-old_phase2 = '''            if temp_miner:
+old_phase2 = """            if temp_miner:
                 match_result = temp_miner.match(message)
                 if match_result:
                     cluster_id = str(match_result.cluster_id)
-                    template = match_result.get_template()'''
+                    template = match_result.get_template()"""
 
-new_phase2 = '''            if temp_miner:
+new_phase2 = """            if temp_miner:
                 match_result = temp_miner.match(message)
                 if match_result:
                     cluster_id = str(match_result.cluster_id)
@@ -41,9 +40,9 @@ new_phase2 = '''            if temp_miner:
                                 mask_key = param.mask_name.strip("<>").lower()
                                 meta["facets"][mask_key] = param.value
                     except Exception:
-                        pass'''
+                        pass"""
 
 content = content.replace(old_phase2, new_phase2)
 
-with open('sidecar/src/workers/clustering.py', 'w', encoding='utf-8') as f:
+with open("sidecar/src/workers/clustering.py", "w", encoding="utf-8") as f:
     f.write(content)

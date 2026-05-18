@@ -1,5 +1,4 @@
-
-with open('sidecar/src/ai/graph.py', encoding='utf-8') as f:
+with open("sidecar/src/ai/graph.py", encoding="utf-8") as f:
     content = f.read()
 
 new_graph = '''import logging
@@ -196,7 +195,7 @@ class GraphManager:
         return await self.workflow.ainvoke(initial_state, config)
 '''
 
-with open('sidecar/src/ai/graph.py', 'w', encoding='utf-8') as f:
+with open("sidecar/src/ai/graph.py", "w", encoding="utf-8") as f:
     f.write(new_graph)
 
 print("Updated graph.py")

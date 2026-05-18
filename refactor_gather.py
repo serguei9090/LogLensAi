@@ -1,4 +1,3 @@
-
 with open("sidecar/src/workers/clustering.py", encoding="utf-8") as f:
     content = f.read()
 
