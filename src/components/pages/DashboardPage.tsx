@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/select";
 import { callSidecar } from "@/lib/hooks/useSidecarBridge";
 import { cn } from "@/lib/utils";
+import { type IngestionJob, useIngestionStore } from "@/store/ingestionStore";
 import { selectActiveWorkspace, useWorkspaceStore } from "@/store/workspaceStore";
 import { AnimatePresence, motion } from "framer-motion";
 import {
@@ -54,15 +55,6 @@ interface DashboardStats {
   new_patterns_count: number;
   workspace_count: number;
   active_tailers: number;
-}
-
-interface IngestionJob {
-  id: number;
-  workspace_id: string;
-  status: "pending" | "processing" | "completed" | "failed";
-  total_lines: number;
-  processed_lines: number;
-  created_at: string;
 }
 
 /**
@@ -188,10 +180,8 @@ export default function DashboardPage() {
   const workspaces = useWorkspaceStore((state) => state.workspaces);
   const activeWorkspace = useWorkspaceStore(selectActiveWorkspace);
   const { dashboardWidgets, isSidebarOpen, setSidebarOpen } = useAiStore();
-
-  // Local State
-  const [stats, setStats] = useState<DashboardStats | null>(null);
-  const [ingestionJobs, setIngestionJobs] = useState<IngestionJob[]>([]);
+  // Consume shared ingestion store — no independent polling
+  const ingestionJobs = useIngestionStore((state) => state.jobs);
   const [loading, setLoading] = useState(true);
   const [mode, setMode] = useState<DashboardMode>("static");
 
@@ -242,28 +232,6 @@ export default function DashboardPage() {
   useEffect(() => {
     fetchStats();
   }, [fetchStats]);
-
-  // Polling for Ingestion Jobs
-  const fetchJobs = useCallback(async () => {
-    try {
-      const res = await callSidecar<IngestionJob[]>({
-        method: "get_ingestion_jobs",
-        params: {
-          workspace_id: selectedWorkspaceId === "all" ? undefined : selectedWorkspaceId,
-        },
-        silent: true,
-      });
-      setIngestionJobs(res || []);
-    } catch (e) {
-      console.error("Failed to fetch ingestion jobs", e);
-    }
-  }, [selectedWorkspaceId]);
-
-  useEffect(() => {
-    const timer = setInterval(fetchJobs, 3000);
-    fetchJobs(); // Initial fetch
-    return () => clearInterval(timer);
-  }, [fetchJobs]);
 
   // Derived Options
   const currentWorkspace = useMemo(

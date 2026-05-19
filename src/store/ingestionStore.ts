@@ -26,7 +26,13 @@ interface IngestionState {
   clearState: () => void;
 }
 
-let pollingInterval: ReturnType<typeof setInterval> | null = null;
+/** Interval (ms) when an ingestion job is actively processing. */
+const POLL_ACTIVE_MS = 1_000;
+/** Interval (ms) when no jobs are active — prevents redundant RPC calls. */
+const POLL_IDLE_MS = 15_000;
+
+let pollingInterval: ReturnType<typeof setTimeout> | null = null;
+let pollSessionId = 0;
 
 export const useIngestionStore = create<IngestionState>((set, get) => ({
   jobs: [],
@@ -63,11 +69,12 @@ export const useIngestionStore = create<IngestionState>((set, get) => ({
   },
 
   startPolling: (workspaceId: string) => {
-    if (pollingInterval) {
+    if (get().isPolling) {
       return;
     }
 
     set({ isPolling: true });
+    const currentSession = ++pollSessionId;
 
     // Immediate fetch
     get().fetchJobs(workspaceId);
@@ -76,13 +83,13 @@ export const useIngestionStore = create<IngestionState>((set, get) => ({
     const poll = async () => {
       await get().fetchJobs(workspaceId);
 
-      const { activeJob, isPolling } = get();
-      if (!isPolling) {
+      if (currentSession !== pollSessionId || !get().isPolling) {
         return;
       }
 
-      // Adaptive frequency
-      const interval = activeJob ? 1000 : 5000;
+      const { activeJob } = get();
+      // Adaptive frequency: fast while processing, slow when idle
+      const interval = activeJob ? POLL_ACTIVE_MS : POLL_IDLE_MS;
       pollingInterval = setTimeout(poll, interval) as any;
     };
 
@@ -90,6 +97,7 @@ export const useIngestionStore = create<IngestionState>((set, get) => ({
   },
 
   stopPolling: () => {
+    pollSessionId++; // Invalidate any running async loop
     if (pollingInterval) {
       clearTimeout(pollingInterval);
       pollingInterval = null;

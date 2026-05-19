@@ -1,47 +1,27 @@
-import { callSidecar } from "@/lib/hooks/useSidecarBridge";
+import { type IngestionJob, useIngestionStore } from "@/store/ingestionStore";
 import { AnimatePresence, motion } from "framer-motion";
 import { RefreshCcw, Sparkles } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
 
-interface IngestionJob {
-  id: number;
-  workspace_id: string;
-  status: "pending" | "processing" | "completed" | "failed";
-  total_lines: number;
-  processed_lines: number;
-}
-
+/**
+ * Displays a floating processing indicator while Drain3 pattern mining is active.
+ * Reads from the shared ingestionStore — no independent polling.
+ */
 export function ProcessingNotification() {
-  const [activeJobs, setActiveJobs] = useState<IngestionJob[]>([]);
-
-  const fetchJobs = useCallback(async () => {
-    try {
-      const res = await callSidecar<IngestionJob[]>({
-        method: "get_ingestion_jobs",
-      });
-      const pending = (res || []).filter(
-        (j) => j.status === "processing" || j.status === "pending",
-      );
-      setActiveJobs(pending);
-    } catch (error) {
-      // Fail silently for background polling
-      console.debug("[ProcessingNotification] Fetch failed:", error);
-    }
-  }, []);
-
-  useEffect(() => {
-    const timer = setInterval(fetchJobs, 5000);
-    fetchJobs();
-    return () => clearInterval(timer);
-  }, [fetchJobs]);
+  const jobs = useIngestionStore((state) => state.jobs);
+  const activeJobs = jobs.filter(
+    (j: IngestionJob) => j.status === "processing" || j.status === "pending",
+  );
 
   if (activeJobs.length === 0) {
     return null;
   }
 
   // Aggregate progress for the primary notification
-  const totalProcessed = activeJobs.reduce((sum, j) => sum + j.processed_lines, 0);
-  const totalLines = activeJobs.reduce((sum, j) => sum + j.total_lines, 0);
+  const totalProcessed = activeJobs.reduce(
+    (sum: number, j: IngestionJob) => sum + j.processed_lines,
+    0,
+  );
+  const totalLines = activeJobs.reduce((sum: number, j: IngestionJob) => sum + j.total_lines, 0);
   const percent = totalLines > 0 ? Math.round((totalProcessed / totalLines) * 100) : 0;
 
   return (

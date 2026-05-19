@@ -3,6 +3,11 @@ import { callSidecar } from "../lib/hooks/useSidecarBridge";
 
 export type ClusteringMode = "auto" | "burst";
 
+/** Interval (ms) when the worker has a backlog to drain. */
+const POLL_ACTIVE_MS = 2_000;
+/** Interval (ms) when the worker is idle — no pending lines. */
+const POLL_IDLE_MS = 15_000;
+
 interface ClusteringStatus {
   mode: ClusteringMode;
   running: boolean;
@@ -24,7 +29,8 @@ interface ClusteringState {
   stopPolling: () => void;
 }
 
-let pollInterval: ReturnType<typeof setInterval> | null = null;
+let pollTimer: ReturnType<typeof setTimeout> | null = null;
+let pollSessionId = 0;
 
 export const useClusteringStore = create<ClusteringState>((set, get) => ({
   status: null,
@@ -75,17 +81,32 @@ export const useClusteringStore = create<ClusteringState>((set, get) => ({
     }
 
     set({ isPolling: true });
-    get().fetchStatus(workspaceId); // Initial fetch
+    const currentSession = ++pollSessionId;
 
-    pollInterval = setInterval(() => {
-      get().fetchStatus(workspaceId);
-    }, 2000); // Poll every 2 seconds
+    // Adaptive polling loop: fast when work is pending, slow when idle.
+    const schedule = async () => {
+      await get().fetchStatus(workspaceId);
+
+      if (currentSession !== pollSessionId || !get().isPolling) {
+        return;
+      }
+
+      const { status } = get();
+      // Active when worker is running with pending backlog
+      const isActive = status?.running && (status?.backlog ?? 0) > 0;
+      const delay = isActive ? POLL_ACTIVE_MS : POLL_IDLE_MS;
+      pollTimer = setTimeout(schedule, delay);
+    };
+
+    // Immediate first fetch, then schedule
+    schedule();
   },
 
   stopPolling: () => {
-    if (pollInterval) {
-      clearInterval(pollInterval);
-      pollInterval = null;
+    pollSessionId++; // Invalidate any running async loop instantly
+    if (pollTimer) {
+      clearTimeout(pollTimer);
+      pollTimer = null;
     }
     set({ isPolling: false });
   },
