@@ -31,6 +31,30 @@ interface AppLayoutProps {
   readonly activeFolderId?: string | null;
 }
 
+class CustomPointerSensor extends PointerSensor {
+  static activators = [
+    {
+      eventName: "onPointerDown" as const,
+      handler: ({ nativeEvent }: { nativeEvent: PointerEvent }) => {
+        let target = nativeEvent.target as HTMLElement | null;
+        while (target) {
+          if (["BUTTON", "INPUT", "TEXTAREA", "SELECT", "OPTION"].includes(target.tagName)) {
+            return false;
+          }
+          target = target.parentElement;
+        }
+        return true;
+      },
+    },
+  ];
+}
+
+const POINTER_SENSOR_OPTIONS = {
+  activationConstraint: {
+    distance: 10, // 10px dead-zone avoids triggering drag on accidental pointer jitter during normal clicks
+  },
+};
+
 export function AppLayout({
   workspaces,
   activeWorkspaceId,
@@ -49,20 +73,22 @@ export function AppLayout({
 }: AppLayoutProps) {
   const moveSource = useWorkspaceStore((state) => state.moveSource);
 
-  const sensors = useSensors(
-    useSensor(PointerSensor, {
-      activationConstraint: {
-        distance: 8, // 8px movement required to start dragging, fixes click issues
-      },
-    }),
-    useSensor(KeyboardSensor),
-  );
+  const pointerSensor = useSensor(CustomPointerSensor, POINTER_SENSOR_OPTIONS);
+  const keyboardSensor = useSensor(KeyboardSensor);
+  const sensors = useSensors(pointerSensor, keyboardSensor);
 
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
     if (over) {
-      const sourceId = active.id as string;
-      const targetFolderId = over.id === "root" ? null : (over.id as string);
+      // Strip prefixes to extract pure database IDs
+      const sourceId = (active.id as string).replace(/^(sidebar-source-|explorer-source-)/, "");
+
+      const rawOverId = over.id as string;
+      const targetFolderId =
+        rawOverId === "root" || rawOverId === "sidebar-folder-root"
+          ? null
+          : rawOverId.replace(/^(sidebar-folder-|explorer-folder-)/, "");
+
       moveSource(sourceId, targetFolderId);
     }
   };

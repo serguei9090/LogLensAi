@@ -36,7 +36,7 @@ export function DraggableItem({
       style={style}
       {...listeners}
       {...attributes}
-      className={cn("touch-none", isDragging && "opacity-50 grayscale", className)}
+      className={cn("touch-none select-none", isDragging && "opacity-50 grayscale", className)}
     >
       {children}
     </div>

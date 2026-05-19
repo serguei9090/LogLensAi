@@ -83,7 +83,7 @@ export function ExplorerView({
         {currentFolder.children.map((child) => (
           <DroppableArea
             key={child.id}
-            id={child.id}
+            id={`explorer-folder-${child.id}`}
             className="rounded-3xl transition-all"
             activeClassName="ring-2 ring-primary bg-primary/5"
           >
@@ -107,11 +107,19 @@ export function ExplorerView({
         ))}
 
         {currentFolder.sources.map((source) => (
-          <DraggableItem key={source.id} id={source.id}>
-            <button
-              type="button"
+          <DraggableItem key={source.id} id={`explorer-source-${source.id}`}>
+            {/* biome-ignore lint/a11y/useSemanticElements: custom role="button" container to prevent browser pointer capture in drag-and-drop hierarchy */}
+            <div
+              role="button"
+              tabIndex={0}
               onClick={() => onSelectSource(source.id)}
-              className="group w-full flex flex-col p-5 bg-bg-surface-bright/40 border border-border-subtle rounded-3xl hover:bg-bg-hover hover:border-primary/30 transition-all text-left outline-none cursor-pointer"
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  onSelectSource(source.id);
+                }
+              }}
+              className="group w-full flex flex-col p-5 bg-bg-surface-bright/40 border border-border-subtle rounded-3xl hover:bg-bg-hover hover:border-primary/30 transition-all text-left outline-none cursor-pointer select-none"
             >
               <div className="flex items-start justify-between mb-4">
                 <div className="p-3 bg-text-muted/10 rounded-2xl">
@@ -123,7 +131,7 @@ export function ExplorerView({
               <p className="text-[10px] text-text-muted uppercase tracking-widest font-semibold opacity-40">
                 {source.type} Source
               </p>
-            </button>
+            </div>
           </DraggableItem>
         ))}
 

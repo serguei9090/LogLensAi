@@ -62,21 +62,29 @@ function SourceItemImpl({
 
   return (
     <div className="group flex items-center px-1 py-0.5">
-      <button
-        type="button"
+      {/* biome-ignore lint/a11y/useSemanticElements: custom role="button" container to prevent browser pointer capture in drag-and-drop hierarchy */}
+      <div
+        role="button"
+        tabIndex={0}
         className={cn(
-          "flex-1 flex items-center gap-2 px-2 py-1.5 text-[12px] rounded transition-all text-left outline-none border-none bg-transparent cursor-pointer overflow-hidden",
+          "flex-1 flex items-center gap-2 px-2 py-1.5 text-[12px] rounded transition-all text-left outline-none border-none bg-transparent cursor-pointer overflow-hidden focus-visible:ring-1 focus-visible:ring-primary/40 select-none",
           active
             ? "text-primary font-medium bg-primary/5 shadow-[inset_1px_0_0_0_currentColor]"
             : "text-text-muted hover:text-text-secondary hover:bg-bg-hover",
         )}
         onClick={onClick}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            onClick?.();
+          }
+        }}
       >
         <FileText
           className={cn("h-3.5 w-3.5 shrink-0", active ? "text-primary" : "text-text-muted/60")}
         />
         <span className="truncate flex-1 min-w-0">{source.name}</span>
-      </button>
+      </div>
       <div className="hidden group-hover:flex items-center gap-0.5 shrink-0 pr-1">
         <Button
           variant="ghost"

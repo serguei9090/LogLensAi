@@ -3,6 +3,7 @@
 LogLensAi is a **Tauri v2 desktop application** for professional log analysis. It uses a Python sidecar for heavy lifting (DuckDB storage, Drain3 log clustering) and a React 19 frontend for the UI.
 
 ## 🗺️ Rule-Map (Laws of Physics)
+
 - **Architecture**: `.agents/rules/Architecture.md` (Hexagonal + Ports/Adapters)
 - **Jules CLI**: `.agents/rules/JulesCLI.md` (Remote & Task Delegation)
 - **UI Protocol**: `.agents/rules/UIReviewProtocol.md` (Mandatory Propose-First UI changes)
@@ -13,16 +14,20 @@ LogLensAi is a **Tauri v2 desktop application** for professional log analysis. I
 - **Design Standard**: `DESIGN.md` (Unified design tokens & rationale)
 
 ## 🎯 Product Scope (STRICT)
+
 The **only active modules** are:
+
 1. **Investigation Page** — the core log analysis view
 2. **Settings Page** — AI provider + Drain3 config + general preferences
 
 **Explicitly OUT of scope** (backlog only, no implementation):
+
 - Dashboard (placeholder nav item, grayed out)
 - Metrics views
 - Multi-file merge
 
 ## 🏗️ Tech Stack
+
 - **Frontend**: React 19, TypeScript, Vite, Zustand, TanStack Virtual, shadcn/ui
 - **Communication**: JSON-RPC 2.0 — HTTP on port 5000 in dev, stdin/stdout in prod
 - **Backend Sidecar**: Python 3.12, DuckDB, Drain3, aiohttp, LangGraph, PydanticAI
@@ -31,6 +36,7 @@ The **only active modules** are:
 - **Linter/Formatter**: Biome (TS/JS), Ruff (Python)
 
 ### Pinned Versions (Reproduce with `bun install` + `uv sync`)
+
 | Layer | Package | Version |
 |---|---|---|
 | Runtime | Node.js (via Bun) | `>=22` |
@@ -56,9 +62,9 @@ The **only active modules** are:
 | Sidecar | aiosqlite | `>=0.20.0` |
 | Sidecar | ruff | `>=0.9.0` |
 
-
 ## 📁 Mandatory Folder Structure
-```
+
+```text
 src/
   components/
     atoms/          ← smallest units (Badge, Switch, Dot, Tooltip)
@@ -91,15 +97,18 @@ sidecar/
 ```
 
 ## 🎨 Design System
+
 - **Source of Truth**: `DESIGN.md` (Unified tokens for colors, typography, and spacing)
 - Dark theme: `#0D0F0E` base, `#22C55E` primary green accent
 - **Hard rule**: No hardcoded hex in component files. Use CSS custom properties only.
 
 ## ⚡ Boot Sequence (for AI agents)
-1. Read `docs/track/TODO.md` — understand sprint status
-3. Check `.agents/rules/` for constraints
+
+1. Read `docs/track/TODO.md` — understand sprint status (the absolute single source of truth for planning and progress).
+2. Check `.agents/rules/` for constraints
 
 ## 🔌 JSON-RPC API Contract
+
 All methods are called via `useSidecarBridge.ts`. Never change the transport.
 
 | Method | Params | Returns |
@@ -118,6 +127,8 @@ All methods are called via `useSidecarBridge.ts`. Never change the transport.
 | `analyze_cluster` | `{ cluster_id, workspace_id }` | `{ summary, root_cause, recommended_actions[] }` |
 
 ## Golden Standards
+
+- **Markdown-Based Task Tracking (Single Source of Truth)**: All tasks, TODO checklists, sprint tracking, and specs MUST live strictly within local markdown files (specifically `docs/track/TODO.md` and detailed specifications in `docs/track/specs/<ID>.md`). Do not use, initialize, or depend on any database-backed task managers (such as SQLite task DBs, external tracking engines, or `beads` systems).
 - **Contract → Interface → Mock → Impl**: define boundaries before writing logic
 - **shadcn/ui Standards**: Always use the `shadcn` skill for UI tasks. Use `bunx --bun shadcn@latest` for all component management. Follow the critical rules in the skill (e.g. `cn()` for classes, `gap` over `space-x/y`, `data-icon` for button icons).
 - **Pydantic API Validation**: All JSON-RPC methods MUST receive inputs and return outputs validated by strict `Pydantic` models. 
@@ -130,9 +141,11 @@ All methods are called via `useSidecarBridge.ts`. Never change the transport.
 - **No silent gaps**: missing logic gets a `TODO(ID)` with a detail file in `docs/track/specs/`
 
 ## 🤖 Automated Development Pipeline (Jules)
+
 When running `/smith_orchestra_auto`, Jules orchestrates work based on `docs/track/TODO.md`.
 
 ### Role Mapping & Responsibility
+
 | Role | Responsibility | Primary Files |
 |---|---|---|
 | **@pm** | Roadmap & Logic Specs | `docs/track/TODO.md`, `docs/track/specs/*.md` |
@@ -143,6 +156,7 @@ When running `/smith_orchestra_auto`, Jules orchestrates work based on `docs/tra
 | **@devops** | Deployment & Packaging | `src-tauri/`, `Dockerfile`, `scripts/` |
 
 ### Working Protocol
+
 1. **Context First**: Always read `AGENTS.md` and `docs/track/TODO.md` before starting.
 2. **Spec Verification**: Before implementing a task, verify if its corresponding `docs/track/specs/<ID>.md` exists.
 3. **Atomic Commits**: Implement one task (TODO ID) at a time, verify, and document in `docs/track/LessonsLearned.md`.

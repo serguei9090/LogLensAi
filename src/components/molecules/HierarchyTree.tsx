@@ -77,7 +77,7 @@ function HierarchyTreeImpl({
     return (
       <>
         <DroppableArea
-          id="root"
+          id="sidebar-folder-root"
           className="min-h-[40px] rounded transition-colors duration-200"
           activeClassName="bg-primary/5 ring-1 ring-primary/20"
         >
@@ -96,7 +96,7 @@ function HierarchyTreeImpl({
             {node.sources?.map((source) => (
               <DraggableItem
                 key={source.id}
-                id={source.id}
+                id={`sidebar-source-${source.id}`}
                 disabled={renamingSourceId === source.id}
               >
                 <SourceItem
@@ -171,7 +171,7 @@ function HierarchyTreeImpl({
   return (
     <div className="space-y-0.5">
       <DroppableArea
-        id={node.id}
+        id={`sidebar-folder-${node.id}`}
         className="rounded transition-colors duration-200"
         activeClassName="bg-primary/10 ring-1 ring-primary/30"
       >
@@ -264,7 +264,11 @@ function HierarchyTreeImpl({
             />
           ))}
           {node.sources?.map((source) => (
-            <DraggableItem key={source.id} id={source.id} disabled={renamingSourceId === source.id}>
+            <DraggableItem
+              key={source.id}
+              id={`sidebar-source-${source.id}`}
+              disabled={renamingSourceId === source.id}
+            >
               <SourceItem
                 source={source}
                 active={isNavActive && activeSourceId === source.id}
