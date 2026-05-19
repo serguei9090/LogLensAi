@@ -1,3 +1,4 @@
+import { useIngestionStore } from "@/store/ingestionStore";
 import { useInvestigationStore } from "@/store/investigationStore";
 import { useSettingsStore } from "@/store/settingsStore";
 import { useWorkspaceStore } from "@/store/workspaceStore";
@@ -9,11 +10,18 @@ import { callSidecar } from "./useSidecarBridge";
 /**
  * useLogIngestion provides handlers for importing logs from various sources
  * (Local, SSH, Manual, Live) and manages the transition state during ingestion.
+ *
+ * This hook is the SINGLE authoritative trigger for ingestion polling.
+ * It calls ingestionStore.startPolling() after every ingest action so that
+ * the polling loop only runs when there is actual work to track.
+ * For live sources (tail, SSH, syslog, HTTP), it also calls addLiveSource()
+ * to keep the loop alive until the source is explicitly stopped.
  */
 export function useLogIngestion(workspaceId: string | null, fetchLogs: () => void) {
   const { createSource, setActiveSource } = useWorkspaceStore();
   const { setLogs, setTailing } = useInvestigationStore();
   const { settings } = useSettingsStore();
+  const { startPolling, addLiveSource, removeLiveSource } = useIngestionStore();
 
   const [transitioningSourceId, setTransitioningSourceId] = useState<string | null>(null);
   const [tailingSourceIds, setTailingSourceIds] = useState<Set<string>>(new Set());
@@ -49,6 +57,9 @@ export function useLogIngestion(workspaceId: string | null, fetchLogs: () => voi
           },
         });
 
+        // Fire polling NOW — the ingest job has just been enqueued.
+        startPolling(workspaceId);
+
         fetchLogs();
 
         if (tail) {
@@ -60,6 +71,8 @@ export function useLogIngestion(workspaceId: string | null, fetchLogs: () => voi
               source_id: newSource.id,
             },
           });
+          // Register live source so polling continues even between bursts.
+          addLiveSource();
           setTailingSourceIds((prev) => new Set(prev).add(newSource.id));
           setTailing(true);
           toast.success(`Live monitoring active for ${path}`);
@@ -69,7 +82,44 @@ export function useLogIngestion(workspaceId: string | null, fetchLogs: () => voi
         toast.error(e instanceof Error ? e.message : "Failed to import file.", { id: "ingest" });
       }
     },
-    [workspaceId, createSource, setActiveSource, setLogs, fetchLogs, setTailing],
+    [
+      workspaceId,
+      createSource,
+      setActiveSource,
+      setLogs,
+      fetchLogs,
+      setTailing,
+      startPolling,
+      addLiveSource,
+    ],
+  );
+
+  const handleStopTail = useCallback(
+    async (sourceId: string, filepath: string) => {
+      if (!workspaceId) {
+        return;
+      }
+      try {
+        await callSidecar({
+          method: "stop_tail",
+          params: { filepath, workspace_id: workspaceId },
+        });
+        // Release the live source slot — polling will self-terminate if no jobs remain.
+        removeLiveSource();
+        setTailingSourceIds((prev) => {
+          const next = new Set(prev);
+          next.delete(sourceId);
+          return next;
+        });
+        if (tailingSourceIds.size <= 1) {
+          setTailing(false);
+        }
+        toast.info("Live monitoring stopped.");
+      } catch (e: unknown) {
+        toast.error(e instanceof Error ? e.message : "Failed to stop tail.");
+      }
+    },
+    [workspaceId, removeLiveSource, setTailing, tailingSourceIds.size],
   );
 
   const handleImportSSH = useCallback(
@@ -121,6 +171,10 @@ export function useLogIngestion(workspaceId: string | null, fetchLogs: () => voi
           },
         });
 
+        // SSH tail is a persistent live source.
+        addLiveSource();
+        startPolling(workspaceId);
+
         fetchLogs();
         setTailingSourceIds((prev) => new Set(prev).add(newSource.id));
         setTailing(true);
@@ -129,7 +183,16 @@ export function useLogIngestion(workspaceId: string | null, fetchLogs: () => voi
         toast.error(e instanceof Error ? e.message : "SSH connection failed.");
       }
     },
-    [workspaceId, createSource, setActiveSource, setLogs, fetchLogs, setTailing],
+    [
+      workspaceId,
+      createSource,
+      setActiveSource,
+      setLogs,
+      fetchLogs,
+      setTailing,
+      addLiveSource,
+      startPolling,
+    ],
   );
 
   const handleIngestManual = useCallback(
@@ -166,6 +229,9 @@ export function useLogIngestion(workspaceId: string | null, fetchLogs: () => voi
         setLogs([], 0);
 
         await callSidecar({ method: "ingest_logs", params: { logs: entries } });
+
+        // One-shot ingest — starts polling which will self-terminate on completion.
+        startPolling(workspaceId);
         fetchLogs();
       } catch (error) {
         setTransitioningSourceId(null);
@@ -174,7 +240,7 @@ export function useLogIngestion(workspaceId: string | null, fetchLogs: () => voi
         });
       }
     },
-    [workspaceId, createSource, setActiveSource, setLogs, fetchLogs],
+    [workspaceId, createSource, setActiveSource, setLogs, fetchLogs, startPolling],
   );
 
   const handleImportLive = useCallback(
@@ -216,15 +282,18 @@ export function useLogIngestion(workspaceId: string | null, fetchLogs: () => voi
 
         const newSource = await createSource(
           workspaceId,
-          {
-            name: name,
-            type: "live",
-            path: name,
-          },
+          { name, type: "live", path: name },
           folderId,
         );
 
         setActiveSource(workspaceId, newSource.id);
+
+        // Each active stream keeps the polling loop alive.
+        const streamCount = [types.syslog, types.http].filter(Boolean).length;
+        for (let i = 0; i < streamCount; i++) {
+          addLiveSource();
+        }
+        startPolling(workspaceId);
 
         const listeningOn = [
           types.syslog && `UDP:${settings.ingestion_syslog_port}`,
@@ -243,7 +312,7 @@ export function useLogIngestion(workspaceId: string | null, fetchLogs: () => voi
         });
       }
     },
-    [workspaceId, createSource, setActiveSource, settings],
+    [workspaceId, createSource, setActiveSource, settings, addLiveSource, startPolling],
   );
 
   return {
@@ -252,6 +321,7 @@ export function useLogIngestion(workspaceId: string | null, fetchLogs: () => voi
     tailingSourceIds,
     setTailingSourceIds,
     handleImportLocal,
+    handleStopTail,
     handleImportSSH,
     handleIngestManual,
     handleImportLive,

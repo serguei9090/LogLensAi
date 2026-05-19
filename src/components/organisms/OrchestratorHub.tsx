@@ -94,7 +94,7 @@ export function OrchestratorHub({
   const setShowAnomalies = useInvestigationStore((s) => s.setShowAnomalies);
   const workspaceGlobalContext = useInvestigationStore((s) => s.workspaceGlobalContext);
   const setWorkspaceGlobalContext = useInvestigationStore((s) => s.setWorkspaceGlobalContext);
-  const { status: clusteringStatus, setMode, setPaused } = useClusteringStore();
+  const { status: clusteringStatus, fetchStatus, setMode, setPaused } = useClusteringStore();
 
   const [view, setView] = useState<
     "picker" | "fusion-form" | "ai-context-form" | "time-alignment-form"
@@ -117,6 +117,9 @@ export function OrchestratorHub({
       setActiveTimeShiftSource(null);
       return;
     }
+
+    // Fetch clustering status once when the hub opens so controls render correctly.
+    fetchStatus(workspaceId);
 
     if (editingFusionId) {
       setFusionName(editingFusionName ?? "");
@@ -152,7 +155,7 @@ export function OrchestratorHub({
       method: "get_temporal_offsets",
       params: { workspace_id: workspaceId },
     }).then((res) => setTemporalOffsets(res.offsets || {}));
-  }, [isOpen, editingFusionId, editingFusionName, workspaceId, availableSources]);
+  }, [isOpen, editingFusionId, editingFusionName, workspaceId, availableSources, fetchStatus]);
 
   const toggleSource = (sourceId: string) => {
     setConfigs((prev) =>

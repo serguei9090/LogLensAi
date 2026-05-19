@@ -17,21 +17,37 @@ interface IngestionState {
   activeJob: IngestionJob | null;
   lastJob: IngestionJob | null;
   isPolling: boolean;
+  /** Count of active live sources (tails, SSH streams, syslog/HTTP listeners). */
+  liveSourceCount: number;
   error: string | null;
 
   // Actions
   fetchJobs: (workspaceId: string) => Promise<void>;
+  /**
+   * Start (or restart) the polling loop for a workspace.
+   * Called explicitly by useLogIngestion when an ingest action is triggered.
+   * The loop self-terminates when no active jobs remain AND no live sources are open.
+   */
   startPolling: (workspaceId: string) => void;
-  stopPolling: () => void;
+  /**
+   * Increment the live source counter (tail / SSH / syslog / HTTP listener opened).
+   * Keeps the polling loop alive even when no queued jobs exist.
+   */
+  addLiveSource: () => void;
+  /**
+   * Decrement the live source counter (tail / SSH / stream stopped).
+   * When it reaches zero and no active job is queued, polling stops automatically.
+   */
+  removeLiveSource: () => void;
   clearState: () => void;
 }
 
 /** Interval (ms) when an ingestion job is actively processing. */
 const POLL_ACTIVE_MS = 1_000;
-/** Interval (ms) when no jobs are active — prevents redundant RPC calls. */
-const POLL_IDLE_MS = 15_000;
+/** Interval (ms) when a live source is open but no job is queued yet. */
+const POLL_LIVE_MS = 3_000;
 
-let pollingInterval: ReturnType<typeof setTimeout> | null = null;
+let pollingTimer: ReturnType<typeof setTimeout> | null = null;
 let pollSessionId = 0;
 
 export const useIngestionStore = create<IngestionState>((set, get) => ({
@@ -39,13 +55,13 @@ export const useIngestionStore = create<IngestionState>((set, get) => ({
   activeJob: null,
   lastJob: null,
   isPolling: false,
+  liveSourceCount: 0,
   error: null,
 
   fetchJobs: async (workspaceId: string) => {
     if (!workspaceId) {
       return;
     }
-
     try {
       const fetchedJobs = await callSidecar<IngestionJob[]>({
         method: "get_ingestion_jobs",
@@ -54,12 +70,10 @@ export const useIngestionStore = create<IngestionState>((set, get) => ({
       });
 
       const active = fetchedJobs.find((j) => j.status === "processing" || j.status === "pending");
-      const mostRecent = fetchedJobs[0] || null;
-
       set({
         jobs: fetchedJobs,
-        activeJob: active || null,
-        lastJob: mostRecent,
+        activeJob: active ?? null,
+        lastJob: fetchedJobs[0] ?? null,
         error: null,
       });
     } catch (err) {
@@ -69,48 +83,57 @@ export const useIngestionStore = create<IngestionState>((set, get) => ({
   },
 
   startPolling: (workspaceId: string) => {
-    if (get().isPolling) {
-      return;
+    // Always create a new session — replaces any stale loop cleanly.
+    pollSessionId++;
+    const currentSession = pollSessionId;
+    if (pollingTimer) {
+      clearTimeout(pollingTimer);
+      pollingTimer = null;
     }
-
     set({ isPolling: true });
-    const currentSession = ++pollSessionId;
 
-    // Immediate fetch
-    get().fetchJobs(workspaceId);
-
-    // Dynamic polling loop using a safer approach
-    const poll = async () => {
+    const schedule = async () => {
       await get().fetchJobs(workspaceId);
 
-      if (currentSession !== pollSessionId || !get().isPolling) {
+      // Co-drive clustering status refresh while work is in-flight.
+      // Lazy import breaks the potential circular-dep at bundle time.
+      const { useClusteringStore } = await import("./clusteringStore");
+      useClusteringStore.getState().fetchStatus(workspaceId);
+
+      // Session was superseded — abort silently.
+      if (currentSession !== pollSessionId) {
         return;
       }
 
-      const { activeJob } = get();
-      // Adaptive frequency: fast while processing, slow when idle
-      const interval = activeJob ? POLL_ACTIVE_MS : POLL_IDLE_MS;
-      pollingInterval = setTimeout(poll, interval) as any;
+      const { activeJob, liveSourceCount } = get();
+
+      // Self-terminate: nothing left to watch.
+      if (!activeJob && liveSourceCount === 0) {
+        set({ isPolling: false });
+        pollingTimer = null;
+        return;
+      }
+
+      // Adaptive interval: fast during active processing, slower during live tail idle.
+      const delay = activeJob ? POLL_ACTIVE_MS : POLL_LIVE_MS;
+      pollingTimer = setTimeout(schedule, delay);
     };
 
-    pollingInterval = setTimeout(poll, 1000) as any;
+    // Fire immediately.
+    schedule();
   },
 
-  stopPolling: () => {
-    pollSessionId++; // Invalidate any running async loop
-    if (pollingInterval) {
-      clearTimeout(pollingInterval);
-      pollingInterval = null;
-    }
-    set({ isPolling: false });
+  addLiveSource: () => {
+    set((state) => ({ liveSourceCount: state.liveSourceCount + 1 }));
+  },
+
+  removeLiveSource: () => {
+    set((state) => ({
+      liveSourceCount: Math.max(0, state.liveSourceCount - 1),
+    }));
   },
 
   clearState: () => {
-    set({
-      jobs: [],
-      activeJob: null,
-      lastJob: null,
-      error: null,
-    });
+    set({ jobs: [], activeJob: null, lastJob: null, error: null });
   },
 }));

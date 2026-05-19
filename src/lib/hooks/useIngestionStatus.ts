@@ -1,23 +1,17 @@
 import { useIngestionStore } from "@/store/ingestionStore";
-import { useEffect } from "react";
 
 export type { IngestionJob } from "@/store/ingestionStore";
 
 /**
- * Hook to monitor the status of log ingestion jobs for a specific workspace.
- * Now uses the central ingestionStore for efficient, shared polling.
+ * Read-only hook to observe ingestion job state.
+ *
+ * Polling is NOT started here. It is driven exclusively by useLogIngestion
+ * when an explicit ingest action fires (upload, tail, SSH, stream).
+ * This eliminates idle RPC calls on page mount.
  */
-export function useIngestionStatus(workspaceId: string) {
-  const { jobs, activeJob, lastJob, startPolling, stopPolling } = useIngestionStore();
-
-  useEffect(() => {
-    if (workspaceId) {
-      startPolling(workspaceId);
-    }
-    return () => {
-      stopPolling();
-    };
-  }, [workspaceId, startPolling, stopPolling]);
-
+export function useIngestionStatus(_workspaceId: string) {
+  const jobs = useIngestionStore((state) => state.jobs);
+  const activeJob = useIngestionStore((state) => state.activeJob);
+  const lastJob = useIngestionStore((state) => state.lastJob);
   return { activeJob, lastJob, jobs };
 }

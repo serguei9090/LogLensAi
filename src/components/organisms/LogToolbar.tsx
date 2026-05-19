@@ -85,14 +85,15 @@ export function LogToolbar({
   const { timeRange, setTimeRange } = useInvestigationStore();
   const { isSidebarOpen, setSidebarOpen } = useAiStore();
   const { facetSidebarCollapsed, toggleFacetSidebar } = useUIStore();
-  const { status: clusteringStatus, startPolling, stopPolling, setMode } = useClusteringStore();
+  const { status: clusteringStatus, fetchStatus, setMode } = useClusteringStore();
   const [isSaveTemplateModalOpen, setIsSaveTemplateModalOpen] = useState(false);
   const [isLoadTemplateModalOpen, setIsLoadTemplateModalOpen] = useState(false);
 
+  // One-shot fetch when workspace changes so the clustering controls render
+  // with correct initial state. Ongoing updates are driven by ingestionStore.
   useEffect(() => {
-    startPolling(activeWorkspaceId);
-    return () => stopPolling();
-  }, [activeWorkspaceId, startPolling, stopPolling]);
+    fetchStatus(activeWorkspaceId);
+  }, [activeWorkspaceId, fetchStatus]);
 
   return (
     <div className="sticky top-0 z-10 flex flex-nowrap items-center gap-3 bg-bg-app/95 backdrop-blur-sm border-b border-border-subtle px-4 py-2.5 shadow-sm overflow-x-auto scrollbar-none">
