@@ -101,7 +101,8 @@ def _tag_log_batch(  # noqa: PLR0913
                         if params:
                             for param in params:
                                 mask_key = param.mask_name.strip("<>").lower()
-                                meta["facets"][mask_key] = param.value
+                                if mask_key != "*":
+                                    meta["facets"][mask_key] = param.value
                     except Exception:
                         pass
 

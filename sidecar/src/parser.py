@@ -73,7 +73,8 @@ class DrainParser:
                     for param in params:
                         # Clean up mask name e.g., <IP> -> ip, <NUM> -> num
                         mask_key = param.mask_name.strip("<>").lower()
-                        facets[mask_key] = param.value
+                        if mask_key != "*":
+                            facets[mask_key] = param.value
             except Exception:
                 pass
 

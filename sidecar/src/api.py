@@ -1537,7 +1537,9 @@ class App:
                         )
                         if params:
                             for p in params:
-                                meta["facets"][p.mask_name.strip("<>").lower()] = p.value
+                                mask_key = p.mask_name.strip("<>").lower()
+                                if mask_key != "*":
+                                    meta["facets"][mask_key] = p.value
                     except Exception:
                         pass
 

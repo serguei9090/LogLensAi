@@ -4,14 +4,13 @@ LogLensAi is a **Tauri v2 desktop application** for professional log analysis. I
 
 ## 🗺️ Rule-Map (Laws of Physics)
 
-- **Architecture**: `.agents/rules/Architecture.md` (Hexagonal + Ports/Adapters)
-- **Jules CLI**: `.agents/rules/JulesCLI.md` (Remote & Task Delegation)
-- **UI Protocol**: `.agents/rules/UIReviewProtocol.md` (Mandatory Propose-First UI changes)
-- **Tracking**: `.agents/rules/ProjectTracking.md` (Session Sync + Boot Sequence)
-- **Software Standards**: `.agents/rules/SoftwareStandards.md` (DRY, KISS, SOLID)
-- **Quality**: `.agents/rules/Quality.md` (TODO(ID) + Atomic Design)
-- **Arch Mandate**: `.agents/rules/ArchitectureDocs.md` (Mandatory documentation rule)
+- **Architecture**: `.agents/rules/System/Architecture.md` (Hexagonal + Ports/Adapters)
+- **Software Standards**: `.agents/rules/System/SoftwareStandards.md` (DRY, KISS, SOLID)
+- **Quality**: `.agents/rules/System/CodeQuality.md` (TODO(ID) + Atomic Design)
+- **UI Design**: `.agents/rules/UI/AtomicDesignStandard.md` (Visual Hierarchy)
+- **Docs First**: `.agents/rules/System/DocsFirst.md` (Mandatory documentation rule)
 - **Design Standard**: `DESIGN.md` (Unified design tokens & rationale)
+- **Intelligence**: `.agents/rules/System/IntelligenceStack.md` (AI Orchestration)
 
 ## 🎯 Product Scope (STRICT)
 
@@ -44,12 +43,12 @@ The **only active modules** are:
 | Frontend | react + react-dom | `^19.0.0` |
 | Frontend | vite | `^6.0.11` |
 | Frontend | typescript | `^5.7.3` |
-| Frontend | @tauri-apps/api | `^2.3.0` |
+| Frontend | @tauri-apps/api | `^2.10.1` |
 | Frontend | @tauri-apps/cli | `^2.3.0` |
 | Frontend | zustand | `^5.0.3` |
 | Frontend | @tanstack/react-virtual | `^3.11.2` |
-| Frontend | lucide-react | `^0.469.0` |
-| Frontend | tailwindcss | `^3.4.17` |
+| Frontend | lucide-react | `^1.7.0` |
+| Frontend | tailwindcss | `^4.0.0` |
 | Frontend | @biomejs/biome | `^1.9.4` |
 | Sidecar | duckdb | `>=1.2.0` |
 | Sidecar | drain3 | `>=0.9.11` |
@@ -57,9 +56,9 @@ The **only active modules** are:
 | Sidecar | aiohttp-cors | `>=0.7.0` |
 | Sidecar | paramiko | `>=3.5.0` |
 | Sidecar | pydantic | `>=2.10.0` |
-| Sidecar | pydantic-ai | `>=0.0.14` |
-| Sidecar | langgraph | `>=0.2.66` |
-| Sidecar | aiosqlite | `>=0.20.0` |
+| Sidecar | pydantic-ai | `>=1.31.0` |
+| Sidecar | langgraph | `>=1.1.9` |
+| Sidecar | aiosqlite | `>=0.22.1` |
 | Sidecar | ruff | `>=0.9.0` |
 
 ## 📁 Mandatory Folder Structure
@@ -87,6 +86,8 @@ sidecar/
     parser.py       ← Drain3 log parsing
     tailer.py       ← FileTailer background thread
     ssh_loader.py   ← SSH remote tailing
+    workers/        ← Async worker processes (ClusteringWorker)
+    services/       ← Business logic services (FastPathService, RagService)
     ai/
       __init__.py   ← AI Provider Factory
       base.py       ← AI Base Classes
@@ -113,22 +114,26 @@ All methods are called via `useSidecarBridge.ts`. Never change the transport.
 
 | Method | Params | Returns |
 |---|---|---|
-| `get_logs` | `{ workspace_id, offset, limit, filters: FilterEntry[], query?, sort_by?, sort_order? }` | `{ total, logs[], offset, limit }` |
-| `get_clusters` | `{ workspace_id }` | `ClusterEntry[]` |
+| `get_logs` | `{ workspace_id, offset, limit, filters, query, sort_by, sort_order }` | `{ total, logs[], offset, limit }` |
+| `get_clustering_status`| `{ workspace_id }` | `{ mode, paused, backlog, ... }` |
+| `set_clustering_mode` | `{ mode, workspace_id? }` | `{ status, mode, paused }` |
 | `start_tail` | `{ filepath, workspace_id }` | `{ status }` |
-| `stop_tail` | `{ filepath, workspace_id }` | `{ status }` |
-| `is_tailing` | `{ filepath, workspace_id }` | `boolean` |
-| `start_ssh_tail` | `{ host, port, username, password?, filepath, workspace_id }` | `{ status }` |
-| `stop_ssh_tail` | `{ connection_id }` | `{ status }` |
 | `ingest_logs` | `{ logs: IngestLogEntry[] }` | `{ status }` |
-| `update_log_comment` | `{ log_id, comment }` | `{ status }` |
-| `update_settings` | `{ settings: Record<string,string> }` | `{ status }` |
-| `get_settings` | `{}` | `Record<string,string>` |
 | `analyze_cluster` | `{ cluster_id, workspace_id }` | `{ summary, root_cause, recommended_actions[] }` |
+| `send_ai_message` | `{ session_id, message, workspace_id }` | `{ response, session_id }` |
+| `get_ai_sessions` | `{ workspace_id }` | `AiSession[]` |
+| `get_anomalies` | `{ workspace_id, limit? }` | `Anomaly[]` |
+| `get_settings` | `{}` | `Record<string,string>` |
+| `update_settings` | `{ settings: Record<string,string> }` | `{ status }` |
+| `factory_reset` | `{}` | `{ status, message }` |
+| `get_health` | `{}` | `{ status, uptime, version }` |
 
 ## Golden Standards
 
-- **Markdown-Based Task Tracking (Single Source of Truth)**: All tasks, TODO checklists, sprint tracking, and specs MUST live strictly within local markdown files (specifically `docs/track/TODO.md` and detailed specifications in `docs/track/specs/<ID>.md`). Do not use, initialize, or depend on any database-backed task managers (such as SQLite task DBs, external tracking engines, or `beads` systems).
+- **Team Perspective (NEW)**: We are the new autonomous development team. We value precision, automation, and strict adherence to the defined architecture. We verify before we implement.
+- **Markdown-Based Task Tracking (Single Source of Truth)**: All tasks, TODO checklists, sprint tracking, and specs MUST live strictly within local markdown files (specifically `docs/track/TODO.md` and detailed specifications in `docs/track/specs/<ID>.md`). 
+    - **Precedence**: This rule takes absolute precedence over any contradictory instructions in `.agents/rules/` (e.g., legacy `bd` or `beads` systems).
+    - **No DB Tasks**: Do not use, initialize, or depend on any database-backed task managers.
 - **Contract → Interface → Mock → Impl**: define boundaries before writing logic
 - **shadcn/ui Standards**: Always use the `shadcn` skill for UI tasks. Use `bunx --bun shadcn@latest` for all component management. Follow the critical rules in the skill (e.g. `cn()` for classes, `gap` over `space-x/y`, `data-icon` for button icons).
 - **Pydantic API Validation**: All JSON-RPC methods MUST receive inputs and return outputs validated by strict `Pydantic` models. 
@@ -148,12 +153,12 @@ When running `/smith_orchestra_auto`, Jules orchestrates work based on `docs/tra
 
 | Role | Responsibility | Primary Files |
 |---|---|---|
-| **@pm** | Roadmap & Logic Specs | `docs/track/TODO.md`, `docs/track/specs/*.md` |
-| **@critique** | Investigative Root Cause & Solution Review | `docs/track/LessonsLearned.md`, All codebase |
-| **@backend** | Sidecar, DB, & Logic | `sidecar/src/*.py` |
-| **@frontend** | UI, Layout, & State | `src/components/*`, `src/store/*`, `src/styles/` |
-| **@qa** | Auditing & Bug Fixes | All codebase |
-| **@devops** | Deployment & Packaging | `src-tauri/`, `Dockerfile`, `scripts/` |
+| **@pm** | Roadmap & Logic Specs. Owns `TODO.md` and `specs/*.md`. | `docs/track/` |
+| **@critique** | Investigative Root Cause & Solution Review. Audits all plans. | `docs/track/LessonsLearned.md` |
+| **@backend** | Sidecar, DB, & Logic. Ensures DuckDB cursor safety. | `sidecar/src/` |
+| **@frontend** | UI, Layout, & State. Strictly follows `DESIGN.md`. | `src/components/`, `src/store/` |
+| **@qa** | Auditing & Bug Fixes. Manages `vitest` and `pytest`. | All codebase |
+| **@devops** | Deployment, Packaging, & Automation Scripts. | `src-tauri/`, `scripts/` |
 
 ### Working Protocol
 

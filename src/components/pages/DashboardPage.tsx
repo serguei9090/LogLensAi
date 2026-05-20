@@ -184,6 +184,7 @@ export default function DashboardPage() {
   const ingestionJobs = useIngestionStore((state) => state.jobs);
   const [loading, setLoading] = useState(true);
   const [mode, setMode] = useState<DashboardMode>("static");
+  const [stats, setStats] = useState<DashboardStats | null>(null);
 
   // Handle Mode Change with Sidebar auto-open
   const handleModeChange = (newMode: DashboardMode) => {

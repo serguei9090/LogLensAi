@@ -735,6 +735,19 @@ class LogDatabase:
         wr = cursor.fetchone()
         _append_rules(wr[0] if wr else None)
 
+        # Also dynamically fetch all unique keys currently in the logs table
+        try:
+            cursor.execute(
+                "SELECT DISTINCT UNNEST(json_keys(facets)) FROM logs WHERE workspace_id = ? AND facets IS NOT NULL",
+                (workspace_id,)
+            )
+            for row in cursor.fetchall():
+                key = str(row[0])
+                if key and key not in keys and key != "*":
+                    keys.append(key)
+        except Exception as e:
+            logger.warning("[DB] Failed to extract dynamic facet keys: %s", e)
+
         return keys
 
     def _get_facet_aggregations(
@@ -749,13 +762,13 @@ class LogDatabase:
                 where_clauses = ["workspace_id = ?", "level IS NOT NULL"]
                 query_field = "level"
             else:
+                # Whitelist: ensure key only contains safe characters if it's used in JSON path
+                safe_key = "".join(c for c in key if c.isalnum() or c in "_-")
                 where_clauses = [
                     "workspace_id = ?",
-                    f"json_extract_string(facets, '$.\"{key}\"') IS NOT NULL",
+                    f"json_extract_string(facets, '$.\"{safe_key}\"') IS NOT NULL",
                 ]
-                # Whitelist: ensure key only contains safe characters if it's used in JSON path
-            safe_key = "".join(c for c in key if c.isalnum() or c in "_-")
-            query_field = f"json_extract_string(facets, '$.\"{safe_key}\"')"
+                query_field = f"json_extract_string(facets, '$.\"{safe_key}\"')"
 
             sql_params = [workspace_id]
 
