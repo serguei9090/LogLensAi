@@ -23,6 +23,7 @@ import {
   X,
 } from "lucide-react";
 import { memo, useEffect, useRef, useState } from "react";
+import { ConfirmationDialog } from "../molecules/ConfirmationDialog";
 import { HierarchyTree } from "../molecules/HierarchyTree";
 
 interface SidebarProps {
@@ -55,6 +56,7 @@ function SidebarImpl({
   const [newName, setNewName] = useState("");
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");
+  const [deletingWorkspaceId, setDeletingWorkspaceId] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const handleStartAdd = () => {
@@ -218,7 +220,7 @@ function SidebarImpl({
                             size="icon-xs"
                             onClick={(e) => {
                               e.stopPropagation();
-                              onWorkspaceDelete?.(ws.id);
+                              setDeletingWorkspaceId(ws.id);
                             }}
                             className="text-error/90 hover:text-error transition-colors"
                           >
@@ -365,6 +367,24 @@ function SidebarImpl({
             </div>
           </TooltipProvider>
         </div>
+        <ConfirmationDialog
+          isOpen={deletingWorkspaceId !== null}
+          onOpenChange={(open) => {
+            if (!open) {
+              setDeletingWorkspaceId(null);
+            }
+          }}
+          onConfirm={() => {
+            if (deletingWorkspaceId && onWorkspaceDelete) {
+              onWorkspaceDelete(deletingWorkspaceId);
+            }
+            setDeletingWorkspaceId(null);
+          }}
+          title="Delete Catalog"
+          description="Are you sure you want to delete this catalog? This will permanently delete all associated log sources, index files, and clustering history from disk. This action cannot be undone."
+          confirmText="Delete"
+          variant="destructive"
+        />
       </div>
     </motion.div>
   );

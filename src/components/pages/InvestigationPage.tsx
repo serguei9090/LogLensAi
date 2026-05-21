@@ -15,12 +15,10 @@ import { useAiStore } from "@/store/aiStore";
 import { useInvestigationStore } from "@/store/investigationStore";
 import { useSettingsStore } from "@/store/settingsStore";
 import { type LogSource, selectActiveWorkspace, useWorkspaceStore } from "@/store/workspaceStore";
-import type { LogEntry } from "@/types/log";
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { useLogIngestion } from "@/lib/hooks/useLogIngestion";
-import { parseManualLogs } from "@/lib/log-utils";
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
@@ -42,7 +40,6 @@ function InvestigationPageImpl() {
     setSort,
     showDistribution,
     setShowDistribution,
-    showAnomalies,
     timeRange,
     syncActiveSource,
     setAvailableFacets,
@@ -104,7 +101,7 @@ function InvestigationPageImpl() {
   }, [activeWorkspaceId, activeSourceId, setLogs, setAvailableFacets]);
 
   // Memoize the query params to reduce complexity in fetchLogs
-  const { isFetching, isConnected, anomalousClusters, fetchLogs, queryParams } = useLogFetching(
+  const { isFetching, isConnected, anomalousClusters, fetchLogs } = useLogFetching(
     activeWorkspaceId,
     activeSourceId,
   );

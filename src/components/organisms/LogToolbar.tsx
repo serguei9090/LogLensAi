@@ -27,7 +27,6 @@ import {
   Sparkles,
   Upload,
   Zap,
-  ZapOff,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { LoadTemplateModal } from "./LoadTemplateModal";

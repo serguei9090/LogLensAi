@@ -32,14 +32,14 @@ describe("workspaceStore", () => {
     vi.clearAllMocks();
   });
 
-  it("can add and remove workspaces", () => {
+  it("can add and remove workspaces", async () => {
     const store = useWorkspaceStore.getState();
     store.addWorkspace({ id: "ws1", name: "Workspace 1" });
 
     expect(useWorkspaceStore.getState().workspaces).toHaveLength(1);
     expect(useWorkspaceStore.getState().activeWorkspaceId).toBe("ws1");
 
-    useWorkspaceStore.getState().removeWorkspace("ws1");
+    await useWorkspaceStore.getState().removeWorkspace("ws1");
     expect(useWorkspaceStore.getState().workspaces).toHaveLength(0);
     expect(useWorkspaceStore.getState().activeWorkspaceId).toBe("");
   });

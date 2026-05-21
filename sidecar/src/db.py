@@ -825,6 +825,32 @@ class LogDatabase:
 
         self.commit()
 
+    def delete_workspace(self, workspace_id: str):
+        """Delete all database records related to the workspace."""
+        cursor = self.get_cursor()
+
+        # Delete AI messages nested under the workspace's sessions
+        cursor.execute(
+            "DELETE FROM ai_messages WHERE session_id IN (SELECT session_id FROM ai_sessions WHERE workspace_id = ?)",
+            (workspace_id,),
+        )
+
+        cursor.execute("DELETE FROM logs WHERE workspace_id = ?", (workspace_id,))
+        cursor.execute("DELETE FROM clusters WHERE workspace_id = ?", (workspace_id,))
+        cursor.execute("DELETE FROM log_sources WHERE workspace_id = ?", (workspace_id,))
+        cursor.execute("DELETE FROM folders WHERE workspace_id = ?", (workspace_id,))
+        cursor.execute("DELETE FROM ingestion_jobs WHERE workspace_id = ?", (workspace_id,))
+        cursor.execute("DELETE FROM anomalies WHERE workspace_id = ?", (workspace_id,))
+        cursor.execute("DELETE FROM ai_sessions WHERE workspace_id = ?", (workspace_id,))
+        cursor.execute("DELETE FROM ai_memory WHERE workspace_id = ?", (workspace_id,))
+        cursor.execute("DELETE FROM temporal_offsets WHERE workspace_id = ?", (workspace_id,))
+        cursor.execute("DELETE FROM fusion_configs WHERE workspace_id = ?", (workspace_id,))
+        cursor.execute("DELETE FROM workspace_settings WHERE workspace_id = ?", (workspace_id,))
+        cursor.execute("DELETE FROM settings_templates WHERE workspace_id = ?", (workspace_id,))
+        cursor.execute("DELETE FROM log_streams WHERE workspace_id = ?", (workspace_id,))
+
+        self.commit()
+
     # --- Hierarchy Management ---
 
     def create_folder(self, workspace_id: str, folder_id: str, name: str, parent_id: str = None):

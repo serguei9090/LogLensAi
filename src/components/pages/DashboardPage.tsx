@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/select";
 import { callSidecar } from "@/lib/hooks/useSidecarBridge";
 import { cn } from "@/lib/utils";
-import { type IngestionJob, useIngestionStore } from "@/store/ingestionStore";
+import { useIngestionStore } from "@/store/ingestionStore";
 import { selectActiveWorkspace, useWorkspaceStore } from "@/store/workspaceStore";
 import { AnimatePresence, motion } from "framer-motion";
 import {
@@ -199,14 +199,30 @@ export default function DashboardPage() {
   const [selectedSourceId, setSelectedSourceId] = useState<string>("all");
   const [timeRange, setTimeRange] = useState<TimeRange>({ start: "", end: "" });
 
-  // Sync selectedWorkspaceId with activeWorkspace on initial load
+  // Sync selectedWorkspaceId with activeWorkspace on initial load or deletion fallback
   useEffect(() => {
-    if (activeWorkspace && selectedWorkspaceId === "all") {
+    const exists = workspaces.some((w) => w.id === selectedWorkspaceId);
+    if (!exists && selectedWorkspaceId !== "all") {
+      if (activeWorkspace) {
+        setSelectedWorkspaceId(activeWorkspace.id);
+      } else if (workspaces.length > 0) {
+        setSelectedWorkspaceId(workspaces[0].id);
+      } else {
+        setSelectedWorkspaceId("all");
+      }
+    } else if (activeWorkspace && selectedWorkspaceId === "all") {
       setSelectedWorkspaceId(activeWorkspace.id);
     } else if (!activeWorkspace && workspaces.length > 0 && selectedWorkspaceId === "all") {
       setSelectedWorkspaceId(workspaces[0].id);
     }
   }, [activeWorkspace, workspaces, selectedWorkspaceId]);
+
+  // Reset selected source to "all" when workspace changes
+  useEffect(() => {
+    if (selectedWorkspaceId) {
+      setSelectedSourceId("all");
+    }
+  }, [selectedWorkspaceId]);
 
   const fetchStats = useCallback(async () => {
     setLoading(true);

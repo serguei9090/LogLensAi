@@ -173,6 +173,35 @@ class DiskLogStore:
                 handle.close()
             self._registry.clear()
 
+    def delete_source_files(self, source_id: str) -> None:
+        """Close handles and delete physical files for a source."""
+        with self._registry_lock:
+            if source_id in self._registry:
+                try:
+                    self._registry[source_id].close()
+                except Exception as e:
+                    logger.warning(
+                        "[DiskLogStore] Error closing handle for %s: %s",
+                        source_id,
+                        e,
+                    )
+                del self._registry[source_id]
+
+        log_path = self.file_path(source_id)
+        idx_path = self.index_path(source_id)
+
+        for path in [log_path, idx_path]:
+            if os.path.exists(path):
+                try:
+                    os.remove(path)
+                    logger.info("[DiskLogStore] Deleted physical file: %s", path)
+                except Exception as e:
+                    logger.error(
+                        "[DiskLogStore] Error deleting physical file %s: %s",
+                        path,
+                        e,
+                    )
+
     def get_handle(self, source_id: str) -> SourceFileHandle:
         """Public access to the source handle."""
         return self._get_handle(source_id)

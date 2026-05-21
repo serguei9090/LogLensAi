@@ -67,3 +67,45 @@ def test_db_extra_ingestion_jobs():
     jobs = db.get_ingestion_jobs("ws1")
     assert len(jobs) == 1
     assert jobs[0]["processed_lines"] == 50
+
+
+def test_db_extra_delete_workspace():
+    db = LogDatabase(":memory:")
+    cursor = db.get_cursor()
+
+    # Insert mock records
+    cursor.execute(
+        "INSERT INTO log_sources (id, workspace_id, name, type, path) VALUES ('src1', 'ws1', 'Source 1', 'local', 'path1')"
+    )
+    cursor.execute(
+        "INSERT INTO folders (id, workspace_id, name) VALUES ('fold1', 'ws1', 'Folder 1')"
+    )
+    cursor.execute(
+        "INSERT INTO logs (id, workspace_id, source_id, timestamp, raw_text, level) VALUES (1, 'ws1', 'src1', '2026-05-18 10:00:00', 'log line', 'INFO')"
+    )
+    cursor.execute(
+        "INSERT INTO workspace_settings (workspace_id, key, value) VALUES ('ws1', 'key1', 'val1')"
+    )
+    cursor.execute(
+        "INSERT INTO ai_sessions (session_id, workspace_id, name) VALUES ('session1', 'ws1', 'Session 1')"
+    )
+    db.commit()
+
+    # Verify they exist
+    cursor.execute("SELECT COUNT(*) FROM log_sources WHERE workspace_id = 'ws1'")
+    assert cursor.fetchone()[0] == 1
+
+    # Perform workspace delete
+    db.delete_workspace("ws1")
+
+    # Verify they are gone
+    cursor.execute("SELECT COUNT(*) FROM log_sources WHERE workspace_id = 'ws1'")
+    assert cursor.fetchone()[0] == 0
+    cursor.execute("SELECT COUNT(*) FROM folders WHERE workspace_id = 'ws1'")
+    assert cursor.fetchone()[0] == 0
+    cursor.execute("SELECT COUNT(*) FROM logs WHERE workspace_id = 'ws1'")
+    assert cursor.fetchone()[0] == 0
+    cursor.execute("SELECT COUNT(*) FROM workspace_settings WHERE workspace_id = 'ws1'")
+    assert cursor.fetchone()[0] == 0
+    cursor.execute("SELECT COUNT(*) FROM ai_sessions WHERE workspace_id = 'ws1'")
+    assert cursor.fetchone()[0] == 0

@@ -7,7 +7,6 @@ import { useHealthStore } from "@/store/healthStore";
 import {
   AlertCircle,
   AlertTriangle,
-  Bug,
   Cpu,
   Database,
   Info,

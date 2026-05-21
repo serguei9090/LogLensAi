@@ -1,6 +1,7 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import { type LogEntry, VirtualLogTable } from "../VirtualLogTable";
+import { type LogEntry } from "@/types/log";
+import { VirtualLogTable } from "../VirtualLogTable";
 
 // Mock virtualization
 vi.mock("@tanstack/react-virtual", () => ({
@@ -79,6 +80,7 @@ describe("VirtualLogTable", () => {
   const mockLogs: LogEntry[] = [
     {
       id: 1,
+      line_id: 1,
       timestamp: "2023-10-25 10:00:00",
       level: "INFO",
       message: "Test log 1",
@@ -87,6 +89,7 @@ describe("VirtualLogTable", () => {
     },
     {
       id: 2,
+      line_id: 2,
       timestamp: "2023-10-25 10:01:00",
       level: "ERROR",
       message: "Test log 2",

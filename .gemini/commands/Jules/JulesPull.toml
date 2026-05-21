@@ -1,8 +1,0 @@
-description = "Pulls remote work from Jules, merges it locally, and updates the inventory tracker."
-prompt = """
-1. Pull the specified task from the remote Jules repository/branch and merge it into the current local branch.
-2. Run standard local validations (e.g., linting, tests) if available.
-3. Update the status of this task in the Jules inventory located at `docs/track/JULES.md` to reflect the new state (e.g., 'Merged', 'Deprecated', or 'Completed'). Update the 'Last Sync' timestamp to today.
-
-Task Details/Branch: {{args}}
-"""

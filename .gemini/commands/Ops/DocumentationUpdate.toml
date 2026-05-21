@@ -1,8 +1,0 @@
-description = "Updates project documentation to reflect recent codebase changes."
-prompt = """
-Please update the project documentation to reflect recent changes.
-1. Scan the codebase and recent git commits to understand what has changed.
-2. Update `README.md`, `GEMINI.md`, or any relevant specification files in `docs/` to accurately describe the current state of the project.
-
-Focus areas: {{args}}
-"""

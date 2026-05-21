@@ -23,7 +23,7 @@ interface HealthStore {
   setPolling: (isPolling: boolean) => void;
 }
 
-export const useHealthStore = create<HealthStore>((set, get) => ({
+export const useHealthStore = create<HealthStore>((set) => ({
   health: null,
   isPolling: false,
   error: null,

@@ -1,0 +1,15 @@
+{
+  "version": "1.0.0",
+  "hooks": [
+    {
+      "event": "pre_tool_call",
+      "action": "execute_script",
+      "path": "./.agents/scripts/validate-args.ps1"
+    },
+    {
+      "event": "tool_error",
+      "action": "notify_endpoint",
+      "url": "http://localhost:0/error-intercept"
+    }
+  ]
+}

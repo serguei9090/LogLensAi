@@ -36,6 +36,7 @@ from models import (
     DeleteLogSourceRequest,
     DeleteLogsRequest,
     DeleteLogStreamRequest,
+    DeleteWorkspaceRequest,
     ExportLogsRequest,
     FolderCreateRequest,
     FolderDeleteRequest,
@@ -183,6 +184,7 @@ class App:
         "generate_facet_regex": GenerateExtractionRegexRequest,
         "export_logs": ExportLogsRequest,
         "delete_logs": DeleteLogsRequest,
+        "delete_workspace": DeleteWorkspaceRequest,
         "get_hierarchy": GetHierarchyRequest,
         "create_folder": FolderCreateRequest,
         "update_folder": FolderUpdateRequest,
@@ -333,6 +335,42 @@ class App:
         """Delete logs for a workspace or specific source."""
         logger.info("RPC Dispatch: delete_logs (workspace=%s, source=%s)", workspace_id, source_id)
         self.db.delete_logs(workspace_id, source_id)
+        return {"status": "success"}
+
+    def method_delete_workspace(self, workspace_id: str) -> dict:
+        """Delete all database records and storage files associated with a workspace."""
+        logger.info("RPC Dispatch: delete_workspace (workspace=%s)", workspace_id)
+
+        # 1. Stop tailers for this workspace
+        keys_to_stop = [k for k in self.tailers if k.startswith(f"{workspace_id}:")]
+        for key in keys_to_stop:
+            try:
+                self.tailers[key].stop()
+                self.tailers.pop(key, None)
+                logger.info("Stopped tailer for deleted workspace: %s", key)
+            except Exception as e:
+                logger.error("Error stopping tailer %s: %s", key, e)
+
+        # 2. Fetch log source IDs associated with the workspace to delete physical files
+        cursor = self.db.get_cursor()
+        cursor.execute("SELECT id FROM log_sources WHERE workspace_id = ?", (workspace_id,))
+        source_ids = [row[0] for row in cursor.fetchall()]
+
+        # 3. Delete database records
+        self.db.delete_workspace(workspace_id)
+
+        # 4. Delete physical storage files
+        if hasattr(self, "log_store"):
+            for source_id in source_ids:
+                try:
+                    self.log_store.delete_source_files(source_id)
+                except Exception as e:
+                    logger.error(
+                        "Error deleting physical files for source %s: %s",
+                        source_id,
+                        e,
+                    )
+
         return {"status": "success"}
 
     def method_factory_reset(self) -> dict:
@@ -1696,6 +1734,11 @@ class App:
 
     def method_delete_log_source(self, source_id: str) -> dict:
         self.db.delete_log_source(source_id)
+        if hasattr(self, "log_store"):
+            try:
+                self.log_store.delete_source_files(source_id)
+            except Exception as e:
+                logger.error("Error deleting physical files for source %s: %s", source_id, e)
         return {"status": "success"}
 
     def method_move_source(self, source_id: str, folder_id: str | None = None) -> dict:

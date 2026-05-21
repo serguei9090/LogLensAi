@@ -1,7 +1,0 @@
-description = "Pushes a task/branch to Jules and records it in the remote tracker inventory."
-prompt = """
-1. Push the specified task or current branch to the remote Jules repository for processing.
-2. Record this task into the Jules inventory located at `docs/track/JULES.md`. Add a new entry to the 'Active Remote Loops' table with a unique Task ID, a Status of 'Pending', and the current date for 'Initiated'.
-
-Task details: {{args}}
-"""

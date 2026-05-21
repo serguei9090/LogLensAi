@@ -55,7 +55,7 @@ interface WorkspaceStore {
   isHierarchyLoading: boolean;
   setActive: (id: string) => void;
   addWorkspace: (ws: Pick<Workspace, "id" | "name">) => void;
-  removeWorkspace: (id: string) => void;
+  removeWorkspace: (id: string) => Promise<void>;
   renameWorkspace: (id: string, name: string) => void;
   /** Add a new LogSource to a workspace and switch to it */
   createSource: (
@@ -118,7 +118,13 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
           };
         }),
 
-      removeWorkspace: (id) =>
+      removeWorkspace: async (id) => {
+        try {
+          const { callSidecar } = await import("../lib/hooks/useSidecarBridge");
+          await callSidecar("delete_workspace", { workspace_id: id });
+        } catch (error) {
+          console.error("[WorkspaceStore] Failed to delete workspace in backend sidecar:", error);
+        }
         set((state) => {
           const remaining = state.workspaces.filter((w) => w.id !== id);
           return {
@@ -126,7 +132,8 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
             activeWorkspaceId:
               state.activeWorkspaceId === id ? (remaining[0]?.id ?? "") : state.activeWorkspaceId,
           };
-        }),
+        });
+      },
 
       renameWorkspace: (id, name) =>
         set((state) => ({

@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { DraggableItem, DroppableArea } from "@/lib/dnd-wrappers";
 import { cn } from "@/lib/utils";
 import { type HierarchyNode, useWorkspaceStore } from "@/store/workspaceStore";
-import { Check, ChevronDown, ChevronRight, Folder, FolderPlus, Pencil, Trash2 } from "lucide-react";
+import { ChevronDown, ChevronRight, Folder, FolderPlus, Pencil, Trash2 } from "lucide-react";
 import { memo, useState } from "react";
 import { ConfirmationDialog } from "../molecules/ConfirmationDialog";
 import { SourceItem } from "./SourceItem";
