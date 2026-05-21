@@ -13,7 +13,7 @@
 
 Select the primary application shell / delivery mechanism:
 
-- [ ] **Tauri v2** *(Recommended: Desktop app, uses Rust shell + web frontend)*
+- [x] **Tauri v2** *(Recommended: Desktop app, uses Rust shell + web frontend)*
 - [ ] **Electron** *(Desktop app, Node.js shell — heavier but more ecosystem)*
 - [ ] **Next.js (Vercel)** *(Web app, SSR + API routes)*
 - [ ] **Vite + React (SPA)** *(Web app, client-side only)*
@@ -26,7 +26,7 @@ Select the primary application shell / delivery mechanism:
 
 ## 🎨 Frontend Framework
 
-- [ ] **React 19** *(default for Tauri/Vite/Next.js projects)*
+- [x] **React 19** *(default for Tauri/Vite/Next.js projects)*
 - [ ] **Next.js 15** *(SSR, file-based routing, Server Components)*
 - [ ] **Flutter / Dart** *(for Flutter shell projects)*
 - [ ] **Vue 3 + Vite** *(alternative web framework)*
@@ -37,8 +37,8 @@ Select the primary application shell / delivery mechanism:
 
 ## 💅 UI Component Library
 
-- [ ] **shadcn/ui** *(Recommended: copy-own components, Radix + Tailwind)*
-- [ ] **Radix UI (headless)** *(unstyled primitives, full control)*
+- [x] **shadcn/ui** *(Recommended: copy-own components, Radix + Tailwind)*
+- [x] **Radix UI (headless)** *(unstyled primitives, full control)*
 - [ ] **Mantine** *(batteries-included, good DX)*
 - [ ] **Ant Design** *(enterprise-grade, feature-rich)*
 - [ ] **Lobe UI** *(AI-optimized components from LobeHub)*
@@ -49,7 +49,7 @@ Select the primary application shell / delivery mechanism:
 
 ## 🎨 Styling System
 
-- [ ] **Tailwind CSS v4** *(Recommended for most React projects)*
+- [x] **Tailwind CSS v4** *(Recommended for most React projects)*
 - [ ] **Vanilla CSS + CSS Variables** *(recommended for maximum control)*
 - [ ] **CSS Modules** *(scoped styles, good for large teams)*
 - [ ] **Styled Components / Emotion** *(CSS-in-JS)*
@@ -61,7 +61,7 @@ Select the primary application shell / delivery mechanism:
 
 > See also: `docs/architecture/state_management.md` for detailed patterns.
 
-- [ ] **Zustand** *(Recommended: React — minimal, hook-based)*
+- [x] **Zustand** *(Recommended: React — minimal, hook-based)*
 - [ ] **Jotai** *(atomic state — good for fine-grained reactivity)*
 - [ ] **Redux Toolkit** *(large apps, strict data flow)*
 - [ ] **React Context + useReducer** *(simple apps, no extra deps)*
@@ -73,7 +73,7 @@ Select the primary application shell / delivery mechanism:
 
 ## ⚙️ Backend / Sidecar
 
-- [ ] **Python (uv) + JSON-RPC Sidecar** *(Recommended for Tauri + AI apps)*
+- [x] **Python (uv) + JSON-RPC Sidecar** *(Recommended for Tauri + AI apps)*
 - [ ] **Python (uv) + FastAPI** *(Recommended for standalone web APIs)*
 - [ ] **Bun + Hono** *(TypeScript-native, ultra-fast API)*
 - [ ] **Node.js + Express** *(standard JS backend)*
@@ -86,7 +86,7 @@ Select the primary application shell / delivery mechanism:
 
 > See also: `docs/architecture/database.md` for schema and migration patterns.
 
-- [ ] **DuckDB** *(Recommended for Sidecar apps — analytical, embedded, thread-safe)*
+- [x] **DuckDB** *(Recommended for Sidecar apps — analytical, embedded, thread-safe)*
 - [ ] **SQLite + Drizzle ORM** *(Recommended for Tauri — file-based, type-safe)*
 - [ ] **PostgreSQL + Prisma** *(Recommended for web apps with complex relations)*
 - [ ] **MongoDB** *(document store — good for flexible schemas)*
@@ -98,13 +98,13 @@ Select the primary application shell / delivery mechanism:
 
 ## 🤖 AI / LLM Integration
 
-- [ ] **Ollama (local)** *(Recommended: Gemma 4 / offline-first)*
-- [ ] **Google Gemini API** *(cloud, multimodal)*
-- [ ] **OpenAI API** *(GPT-4o / cloud)*
+- [x] **Ollama (local)** *(Recommended: Gemma 4 / offline-first)*
+- [x] **Google Gemini API** *(cloud, multimodal)*
+- [x] **OpenAI API** *(GPT-4o / cloud)*
 - [ ] **Anthropic Claude API** *(cloud, long context)*
-- [ ] **Google ADK 2.0** *(agentic workflows + tool use)*
-- [ ] **Pydantic AI** *(type-safe agent framework)*
-- [ ] **LangGraph** *(stateful multi-actor workflows)*
+- [x] **Google ADK 2.0** *(agentic workflows + tool use)*
+- [x] **Pydantic AI** *(type-safe agent framework)*
+- [x] **LangGraph** *(stateful multi-actor workflows)*
 - [ ] **No AI integration**
 
 ---
@@ -113,9 +113,8 @@ Select the primary application shell / delivery mechanism:
 
 | Layer | Tool | Version |
 |-------|------|---------|
-| **Python** | `uv` | *(fill)* |
-| **JavaScript / TypeScript** | `bun` | *(fill)* |
-| **Dart / Flutter** | `flutter` / `dart pub` | *(fill)* |
+| **Python** | `uv` | `>=0.5.0` |
+| **JavaScript / TypeScript** | `bun` | `>=1.0.0` |
 
 ---
 
@@ -125,7 +124,6 @@ Select the primary application shell / delivery mechanism:
 |------|---------|-------------|
 | `ruff` | Python lint + format | `pyproject.toml` |
 | `biome` | JS/TS lint + format | `biome.json` |
-| `very_good_analysis` | Flutter lint | `analysis_options.yaml` |
 | `lefthook` | Git hooks orchestration | `lefthook.yml` |
 
 ---

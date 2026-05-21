@@ -135,13 +135,14 @@ export const useInvestigationStore = create<InvestigationStore>((set, get) => ({
     })),
   clearSelection: () => set({ selectedLogIds: [] }),
   setAvailableFacets: (availableFacets) => set({ availableFacets }),
-  reset: () => set({
-    ...DEFAULT_SOURCE_STATE,
-    isTailing: false,
-    showDistribution: false,
-    showAnomalies: false,
-    workspaceGlobalContext: null,
-    currentSourceId: "aggregate",
-    sourceStates: {},
-  }),
+  reset: () =>
+    set({
+      ...DEFAULT_SOURCE_STATE,
+      isTailing: false,
+      showDistribution: false,
+      showAnomalies: false,
+      workspaceGlobalContext: null,
+      currentSourceId: "aggregate",
+      sourceStates: {},
+    }),
 }));

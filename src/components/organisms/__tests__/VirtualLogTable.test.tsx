@@ -1,6 +1,6 @@
+import type { LogEntry } from "@/types/log";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import { type LogEntry } from "@/types/log";
 import { VirtualLogTable } from "../VirtualLogTable";
 
 // Mock virtualization

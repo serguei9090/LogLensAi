@@ -179,8 +179,9 @@ export function LogToolbar({
 
           <div className="w-px h-3 bg-border-subtle mx-1" />
 
-          <button
-            type="button"
+          <Button
+            variant="ghost"
+            size="icon-sm"
             onClick={() =>
               setMode(clusteringStatus?.mode === "burst" ? "auto" : "burst", activeWorkspaceId)
             }
@@ -197,7 +198,7 @@ export function LogToolbar({
             }
           >
             <Zap className={cn("size-3.5", clusteringStatus?.mode === "burst" && "fill-current")} />
-          </button>
+          </Button>
         </div>
       </div>
 

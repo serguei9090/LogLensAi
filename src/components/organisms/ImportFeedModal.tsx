@@ -71,8 +71,8 @@ export function ImportFeedModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <button
-        type="button"
+      <Button
+        variant="ghost"
         className="absolute inset-0 bg-bg-base/90 backdrop-blur-xl cursor-default border-none outline-none appearance-none"
         onClick={() => onOpenChange(false)}
         aria-label="Close modal"
@@ -294,11 +294,11 @@ export function ImportFeedModal({
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
-                  <button
-                    type="button"
+                  <Button
+                    variant="ghost"
                     onClick={() => setLiveSyslog(!liveSyslog)}
                     className={cn(
-                      "p-5 rounded-2xl border transition-all text-left flex flex-col gap-2",
+                      "p-5 rounded-2xl border transition-all text-left flex flex-col gap-2 h-auto",
                       liveSyslog
                         ? "bg-primary/5 border-primary shadow-sm"
                         : "bg-bg-surface border-border opacity-60 hover:opacity-100",
@@ -328,13 +328,13 @@ export function ImportFeedModal({
                     <span className="text-[10px] text-text-muted/60">
                       Passive listening on port 514
                     </span>
-                  </button>
+                  </Button>
 
-                  <button
-                    type="button"
+                  <Button
+                    variant="ghost"
                     onClick={() => setLiveHttp(!liveHttp)}
                     className={cn(
-                      "p-5 rounded-2xl border transition-all text-left flex flex-col gap-2",
+                      "p-5 rounded-2xl border transition-all text-left flex flex-col gap-2 h-auto",
                       liveHttp
                         ? "bg-primary/5 border-primary shadow-sm"
                         : "bg-bg-surface border-border opacity-60 hover:opacity-100",
@@ -364,7 +364,7 @@ export function ImportFeedModal({
                     <span className="text-[10px] text-text-muted/60">
                       POST endpoint on port 5002
                     </span>
-                  </button>
+                  </Button>
                 </div>
 
                 <div className="flex items-start gap-3 border border-orange-500/20 bg-orange-500/5 rounded-2xl p-4">

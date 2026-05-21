@@ -51,10 +51,10 @@ function StrategyCard({
   readonly onClick: () => void;
 }) {
   return (
-    <button
-      type="button"
+    <Button
+      variant="ghost"
       onClick={onClick}
-      className="w-full flex items-center gap-3 p-3 rounded-lg border border-white/5 bg-white/[0.02] hover:bg-white/[0.04] transition-all text-left group"
+      className="w-full flex items-center gap-3 p-3 rounded-lg border border-white/5 bg-white/[0.02] hover:bg-white/[0.04] transition-all text-left group h-auto"
     >
       <div className="size-8 rounded-md bg-white/5 border border-white/10 text-white/50 flex items-center justify-center group-hover:text-white transition-all shrink-0">
         {icon}
@@ -65,7 +65,7 @@ function StrategyCard({
         </p>
         <p className="text-[11px] text-white/40 leading-relaxed truncate">{description}</p>
       </div>
-    </button>
+    </Button>
   );
 }
 

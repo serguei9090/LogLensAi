@@ -306,13 +306,14 @@ export function CustomParserModal({
                 </div>
               </div>
             </div>
-            <button
+            <Button
               type="button"
+              variant="ghost"
               onClick={onClose}
               className="p-2 hover:bg-white/10 rounded-full transition-colors text-text-muted hover:text-text-primary"
             >
               <X className="size-5" />
-            </button>
+            </Button>
           </div>
 
           <div className="flex-1 flex min-h-0 divide-x divide-border/40">
@@ -391,8 +392,9 @@ export function CustomParserModal({
                     <div className="absolute top-2 right-2 flex flex-col gap-2">
                       {activeSelection && (
                         <div className="flex flex-col gap-1 p-1 bg-primary/10 border border-primary/20 rounded-lg animate-in slide-in-from-right-2">
-                          <button
+                          <Button
                             type="button"
+                            variant="ghost"
                             onClick={() => {
                               setMapping((prev) => ({
                                 ...prev,
@@ -407,9 +409,10 @@ export function CustomParserModal({
                             title="Map as Timestamp"
                           >
                             <Clock className="size-3" />
-                          </button>
-                          <button
+                          </Button>
+                          <Button
                             type="button"
+                            variant="ghost"
                             onClick={() => {
                               setMapping((prev) => ({
                                 ...prev,
@@ -421,7 +424,7 @@ export function CustomParserModal({
                             title="Map as Severity"
                           >
                             <Info className="size-3" />
-                          </button>
+                          </Button>
                         </div>
                       )}
                       <Tooltip>
@@ -549,8 +552,9 @@ export function CustomParserModal({
           }}
           className="z-[999] flex items-center gap-1 p-1 bg-bg-surface border border-border-subtle rounded-lg shadow-2xl animate-in zoom-in-95 duration-200"
         >
-          <button
+          <Button
             type="button"
+            variant="ghost"
             onClick={() => {
               setMapping((prev) => ({
                 ...prev,
@@ -562,10 +566,11 @@ export function CustomParserModal({
             className="px-2 py-1.5 rounded-md hover:bg-primary/20 text-primary text-[10px] font-bold transition-colors flex items-center gap-1.5"
           >
             <Clock className="size-3" /> Map Timestamp
-          </button>
+          </Button>
           <div className="w-px h-4 bg-white/10 mx-1" />
-          <button
+          <Button
             type="button"
+            variant="ghost"
             onClick={() => {
               setMapping((prev) => ({
                 ...prev,
@@ -577,7 +582,7 @@ export function CustomParserModal({
             className="px-2 py-1.5 rounded-md hover:bg-cyan-500/20 text-cyan-400 text-[10px] font-bold transition-colors flex items-center gap-1.5"
           >
             <Info className="size-3" /> Map Level
-          </button>
+          </Button>
         </div>
       )}
     </TooltipProvider>

@@ -386,8 +386,8 @@ export function AIInvestigationSidebar({
       }}
     >
       {/* Resize Handle */}
-      <button
-        type="button"
+      <Button
+        variant="ghost"
         aria-label="Resize Sidebar"
         onMouseDown={startResizing}
         className="absolute left-[-2px] top-0 w-[4px] h-full cursor-col-resize hover:bg-emerald-500/50 transition-colors z-[100] border-none bg-transparent block p-0"
@@ -415,16 +415,16 @@ export function AIInvestigationSidebar({
                 }}
               />
             ) : (
-              <button
-                type="button"
-                className="flex items-center gap-2 group/title cursor-pointer outline-none focus-visible:ring-1 focus-visible:ring-emerald-500/50 rounded bg-transparent p-0 border-none text-left"
+              <Button
+                variant="ghost"
+                className="flex items-center gap-2 group/title cursor-pointer outline-none focus-visible:ring-1 focus-visible:ring-emerald-500/50 rounded bg-transparent p-0 border-none text-left h-auto"
                 onClick={() => setIsEditingTitle(true)}
               >
                 <h2 className="text-sm font-bold text-text-primary leading-tight truncate">
                   {displayTitle}
                 </h2>
                 <Pencil className="h-3 w-3 text-text-muted opacity-0 group-hover/title:opacity-100 transition-opacity hover:text-primary" />
-              </button>
+              </Button>
             )}
             <p className="text-[10px] text-text-muted uppercase tracking-widest opacity-60 font-medium">
               {currentSessionId ? "Active Session" : "New Investigation"}
@@ -489,11 +489,11 @@ export function AIInvestigationSidebar({
                   </div>
                   <div className="grid grid-cols-1 gap-2">
                     {sessions.slice(0, 4).map((s) => (
-                      <button
+                      <Button
                         key={s.session_id}
-                        type="button"
+                        variant="ghost"
                         onClick={() => setSession(s.session_id)}
-                        className="flex flex-col items-start p-4 text-left bg-bg-surface-bright/40 border border-border-subtle rounded-2xl hover:border-primary/30 hover:bg-primary/[0.02] transition-all group"
+                        className="flex flex-col items-start p-4 text-left bg-bg-surface-bright/40 border border-border-subtle rounded-2xl hover:border-primary/30 hover:bg-primary/[0.02] transition-all group h-auto w-full"
                       >
                         <span className="text-xs font-bold text-text-primary group-hover:text-primary transition-colors mb-1 truncate w-full">
                           {s.name}
@@ -504,7 +504,7 @@ export function AIInvestigationSidebar({
                           <span>•</span>
                           <span>Investigation</span>
                         </div>
-                      </button>
+                      </Button>
                     ))}
                   </div>
 
@@ -660,10 +660,10 @@ export function AIInvestigationSidebar({
               <div className="p-2 space-y-1">
                 {AI_COMMANDS.filter((c) => c.cmd.startsWith(inputValue.toLowerCase())).map(
                   (cmd) => (
-                    <button
+                    <Button
                       key={cmd.cmd}
-                      type="button"
-                      className="w-full flex flex-col items-start px-3 py-2 text-left rounded-lg bg-transparent hover:bg-primary/10 focus:bg-primary/10 outline-none transition-colors group"
+                      variant="ghost"
+                      className="w-full flex flex-col items-start px-3 py-2 text-left rounded-lg bg-transparent hover:bg-primary/10 focus:bg-primary/10 outline-none transition-colors group h-auto"
                       onClick={() => {
                         setInputValue(`${cmd.cmd} `);
                         setShowCommands(false);
@@ -676,7 +676,7 @@ export function AIInvestigationSidebar({
                       <span className="text-[10px] text-text-muted group-hover:text-text-secondary mt-0.5">
                         {cmd.desc}
                       </span>
-                    </button>
+                    </Button>
                   ),
                 )}
               </div>

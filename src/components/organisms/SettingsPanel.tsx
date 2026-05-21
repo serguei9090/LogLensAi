@@ -132,14 +132,14 @@ function ModelSelector({
       <div className="flex items-center justify-between">
         <SectionLabel htmlFor="ai_model_selector">Model</SectionLabel>
         {["ollama", "lmstudio", "ai-studio", "openai-compatible"].includes(provider) && (
-          <button
-            type="button"
+          <Button
+            variant="ghost"
             onClick={onRefresh}
             disabled={isFetching}
-            className="text-[9px] uppercase tracking-tighter font-bold text-primary hover:text-primary-light transition-colors disabled:opacity-30"
+            className="text-[9px] uppercase tracking-tighter font-bold text-primary hover:text-primary-light transition-colors disabled:opacity-30 h-auto p-0"
           >
             {isFetching ? "Pulling..." : "Refresh List"}
-          </button>
+          </Button>
         )}
       </div>
       {availableModels.length > 0 ? (
@@ -590,12 +590,12 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
 
         <nav className="flex flex-col gap-1.5 flex-1">
           {SECTIONS.map(({ id, icon: Icon, label, desc }) => (
-            <button
+            <Button
               key={id}
-              type="button"
+              variant="ghost"
               onClick={() => setActiveSection(id)}
               className={cn(
-                "flex items-center gap-3 px-4 py-3 rounded-2xl text-left transition-all relative group overflow-hidden",
+                "flex items-center gap-3 px-4 py-3 rounded-2xl text-left transition-all relative group overflow-hidden h-auto w-full justify-start",
                 activeSection === id
                   ? "bg-primary/10 text-primary border border-primary/20"
                   : "text-text-secondary hover:bg-white/5 hover:text-text-primary border border-transparent",
@@ -616,7 +616,7 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
               {activeSection === id && (
                 <div className="absolute left-0 top-1/4 bottom-1/4 w-1 bg-primary rounded-full" />
               )}
-            </button>
+            </Button>
           ))}
         </nav>
 
@@ -642,23 +642,23 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
             )}
           </div>
 
-          <button
-            type="button"
+          <Button
+            variant="ghost"
             onClick={() => setIsResetModalOpen(true)}
-            className="flex items-center gap-2 px-4 py-3 text-text-muted hover:text-amber-400 hover:bg-amber-500/5 rounded-2xl text-[11px] font-bold uppercase transition-all border border-transparent hover:border-amber-500/10 group"
+            className="flex items-center gap-2 px-4 py-3 text-text-muted hover:text-amber-400 hover:bg-amber-500/5 rounded-2xl text-[11px] font-bold uppercase transition-all border border-transparent hover:border-amber-500/10 group h-auto w-full justify-start"
           >
             <RotateCcw className="size-4 shrink-0 opacity-50 group-hover:opacity-100" />
             Reset Settings
-          </button>
+          </Button>
 
-          <button
-            type="button"
+          <Button
+            variant="ghost"
             onClick={() => setIsFactoryResetModalOpen(true)}
-            className="flex items-center gap-2 px-4 py-3 text-text-muted hover:text-red-400 hover:bg-red-500/5 rounded-2xl text-[11px] font-bold uppercase transition-all border border-transparent hover:border-red-500/10 group"
+            className="flex items-center gap-2 px-4 py-3 text-text-muted hover:text-red-400 hover:bg-red-500/5 rounded-2xl text-[11px] font-bold uppercase transition-all border border-transparent hover:border-red-500/10 group h-auto w-full justify-start"
           >
             <Trash2 className="size-4 shrink-0 opacity-50 group-hover:opacity-100" />
             Factory Reset
-          </button>
+          </Button>
         </div>
       </aside>
       <main className="flex-1 overflow-auto bg-bg-base/50 relative">
@@ -710,14 +710,14 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
                   <div className="space-y-2 animate-in fade-in slide-in-from-left-2 duration-300">
                     <div className="flex items-center justify-between">
                       <SectionLabel htmlFor="ai_gemini_url">A2A Server URL</SectionLabel>
-                      <button
-                        type="button"
+                      <Button
+                        variant="ghost"
                         onClick={handleTestConnection}
                         disabled={isTestingConnection}
-                        className="text-[9px] uppercase tracking-tighter font-bold text-primary hover:text-primary-light transition-colors disabled:opacity-30"
+                        className="text-[9px] uppercase tracking-tighter font-bold text-primary hover:text-primary-light transition-colors disabled:opacity-30 h-auto p-0"
                       >
                         {isTestingConnection ? "Testing..." : "Test Connection"}
-                      </button>
+                      </Button>
                     </div>
                     <SettingInput
                       id="ai_gemini_url"
@@ -735,14 +735,14 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
                   <div className="space-y-2 animate-in fade-in slide-in-from-left-2 duration-300">
                     <div className="flex items-center justify-between">
                       <SectionLabel htmlFor="ai_ollama_host">Ollama Server Host</SectionLabel>
-                      <button
-                        type="button"
+                      <Button
+                        variant="ghost"
                         onClick={handleTestConnection}
                         disabled={isTestingConnection}
-                        className="text-[9px] uppercase tracking-tighter font-bold text-primary hover:text-primary-light transition-colors disabled:opacity-30"
+                        className="text-[9px] uppercase tracking-tighter font-bold text-primary hover:text-primary-light transition-colors disabled:opacity-30 h-auto p-0"
                       >
                         {isTestingConnection ? "Testing..." : "Test Connection"}
-                      </button>
+                      </Button>
                     </div>
                     <SettingInput
                       id="ai_ollama_host"
@@ -762,14 +762,14 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
                   <div className="space-y-2 animate-in fade-in slide-in-from-left-2 duration-300">
                     <div className="flex items-center justify-between">
                       <SectionLabel htmlFor="ai_lmstudio_host">LM Studio Server Host</SectionLabel>
-                      <button
-                        type="button"
+                      <Button
+                        variant="ghost"
                         onClick={handleTestConnection}
                         disabled={isTestingConnection}
-                        className="text-[9px] uppercase tracking-tighter font-bold text-primary hover:text-primary-light transition-colors disabled:opacity-30"
+                        className="text-[9px] uppercase tracking-tighter font-bold text-primary hover:text-primary-light transition-colors disabled:opacity-30 h-auto p-0"
                       >
                         {isTestingConnection ? "Testing..." : "Test Connection"}
-                      </button>
+                      </Button>
                     </div>
                     <SettingInput
                       id="ai_lmstudio_host"
@@ -790,14 +790,14 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
                   <div className="space-y-2 animate-in fade-in slide-in-from-left-2 duration-300">
                     <div className="flex items-center justify-between">
                       <SectionLabel htmlFor="ai_api_key">Secret API Key</SectionLabel>
-                      <button
-                        type="button"
+                      <Button
+                        variant="ghost"
                         onClick={handleTestConnection}
                         disabled={isTestingConnection || !settings.ai_api_key}
-                        className="text-[9px] uppercase tracking-tighter font-bold text-primary hover:text-primary-light transition-colors disabled:opacity-30"
+                        className="text-[9px] uppercase tracking-tighter font-bold text-primary hover:text-primary-light transition-colors disabled:opacity-30 h-auto p-0"
                       >
                         {isTestingConnection ? "Testing..." : "Test Connection"}
-                      </button>
+                      </Button>
                     </div>
                     <div className="relative group/key">
                       <SettingInput
@@ -809,8 +809,9 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
                         placeholder="Encrypted: sk-••••••••••••••••"
                         className="pr-10"
                       />
-                      <button
-                        type="button"
+                      <Button
+                        variant="ghost"
+                        size="icon-sm"
                         onClick={() => setShowApiKey(!showApiKey)}
                         className="absolute right-3 top-1/2 -translate-y-1/2 text-text-muted hover:text-text-primary transition-colors p-1"
                       >
@@ -819,7 +820,7 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
                         ) : (
                           <Eye className="size-3.5" />
                         )}
-                      </button>
+                      </Button>
                     </div>
                     <p className="text-[10px] text-text-muted/50 px-1">
                       Keys are stored securely locally. Optional for some local engines (e.g., LM
@@ -911,10 +912,10 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
               </div>
 
               <div className="pt-4 border-t border-border/30">
-                <button
-                  type="button"
+                <Button
+                  variant="ghost"
                   onClick={() => setIsToolsExpanded(!isToolsExpanded)}
-                  className="w-full flex items-center justify-between py-2 text-left group"
+                  className="w-full flex items-center justify-between py-2 text-left group h-auto px-0"
                 >
                   <SectionLabel>Tools & Skills</SectionLabel>
                   <div className="text-text-muted group-hover:text-text-primary transition-colors pr-2">
@@ -924,7 +925,7 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
                       <ChevronRight className="size-4" />
                     )}
                   </div>
-                </button>
+                </Button>
 
                 {isToolsExpanded && (
                   <div className="mt-3 space-y-4 px-1">
@@ -960,14 +961,14 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
 
                     <div className="flex items-center justify-between pt-2">
                       <p className="text-sm font-bold text-text-primary pl-2">Custom Skills</p>
-                      <button
-                        type="button"
+                      <Button
+                        variant="ghost"
                         onClick={() => setIsSkillModalOpen(true)}
-                        className="flex items-center gap-1.5 px-3 py-1.5 bg-primary/10 text-primary hover:bg-primary/20 rounded-lg text-xs font-semibold transition-colors"
+                        className="flex items-center gap-1.5 px-3 py-1.5 bg-primary/10 text-primary hover:bg-primary/20 rounded-lg text-xs font-semibold transition-colors h-auto"
                       >
                         <Plus className="size-3" />
                         Add Skill
-                      </button>
+                      </Button>
                     </div>
                   </div>
                 )}
@@ -1112,14 +1113,14 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
                     <SectionLabel>Variable Masking</SectionLabel>
-                    <button
-                      type="button"
+                    <Button
+                      variant="ghost"
                       onClick={handleResetMasks}
-                      className="text-[10px] font-bold text-primary/60 hover:text-primary transition-colors flex items-center gap-1.5 uppercase pr-1 cursor-pointer"
+                      className="text-[10px] font-bold text-primary/60 hover:text-primary transition-colors flex items-center gap-1.5 uppercase pr-1 cursor-pointer h-auto p-0"
                     >
                       <RotateCcw className="size-3" />
                       Reset to Standard
-                    </button>
+                    </Button>
                   </div>
                   <div className="space-y-2">
                     <p className="text-[10px] text-text-muted px-1 -mt-2">
@@ -1194,8 +1195,9 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
                               />
                             </div>
                           </div>
-                          <button
-                            type="button"
+                          <Button
+                            variant="ghost"
+                            size="icon-sm"
                             onClick={() => {
                               const newMasks = settings.drain_masks.filter((_, i) => i !== idx);
                               update("drain_masks", newMasks);
@@ -1203,24 +1205,24 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
                             className="opacity-0 group-hover:opacity-100 p-1.5 text-text-muted hover:text-red-400 transition-all cursor-pointer"
                           >
                             <Trash2 className="size-3.5" />
-                          </button>
+                          </Button>
                         </div>
                       ),
                     )}
 
-                    <button
-                      type="button"
+                    <Button
+                      variant="ghost"
                       onClick={() => {
                         update("drain_masks", [
                           ...settings.drain_masks,
                           { label: "NEW_MASK", pattern: "", enabled: true },
                         ]);
                       }}
-                      className="w-full flex items-center justify-center gap-2 py-3 border border-dashed border-border rounded-xl text-[10px] font-bold text-text-muted hover:border-primary hover:text-primary hover:bg-primary/5 transition-all uppercase tracking-tighter cursor-pointer"
+                      className="w-full flex items-center justify-center gap-2 py-3 border border-dashed border-border rounded-xl text-[10px] font-bold text-text-muted hover:border-primary hover:text-primary hover:bg-primary/5 transition-all uppercase tracking-tighter cursor-pointer h-auto"
                     >
                       <Plus className="size-3" />
                       Add Custom Masking Instruction
-                    </button>
+                    </Button>
                   </div>
                 </div>
 
@@ -1233,14 +1235,14 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
                       scratch. This does not affect your masking rules.
                     </p>
                   </div>
-                  <button
-                    type="button"
+                  <Button
+                    variant="ghost"
                     onClick={() => setIsResetPatternsModalOpen(true)}
-                    className="flex items-center gap-2 px-4 py-2 bg-red-500/10 text-red-400 hover:bg-red-500/20 rounded-xl text-xs font-bold transition-all border border-red-500/20"
+                    className="flex items-center gap-2 px-4 py-2 bg-red-500/10 text-red-400 hover:bg-red-500/20 rounded-xl text-xs font-bold transition-all border border-red-500/20 h-auto"
                   >
                     <RefreshCcw className="size-3.5" />
                     Clear Pattern Cache
-                  </button>
+                  </Button>
                 </div>
               </div>
 
@@ -1472,13 +1474,14 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
                 <FolderOpen className="size-4 text-primary" />
                 Add Custom AI Skill
               </h3>
-              <button
-                type="button"
+              <Button
+                variant="ghost"
+                size="icon-sm"
                 onClick={() => setIsSkillModalOpen(false)}
                 className="p-1 hover:bg-white/10 rounded-md transition-colors text-text-muted hover:text-white"
               >
                 <X className="size-4" />
-              </button>
+              </Button>
             </div>
 
             <div className="p-5 space-y-5 overflow-y-auto custom-scrollbar">
@@ -1517,19 +1520,16 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
             </div>
 
             <div className="p-4 border-t border-white/5 bg-white/[0.01] flex justify-end gap-3 shrink-0">
-              <button
-                type="button"
+              <Button
+                variant="ghost"
                 onClick={() => setIsSkillModalOpen(false)}
-                className="px-4 py-2 text-xs font-semibold text-text-muted hover:text-white transition-colors"
+                className="px-4 py-2 text-xs font-semibold text-text-muted hover:text-white transition-colors h-auto"
               >
                 Cancel
-              </button>
-              <button
-                type="button"
-                className="px-5 py-2 text-xs font-bold text-white bg-primary hover:bg-primary-hover rounded-lg transition-colors shadow-lg active:scale-95"
-              >
+              </Button>
+              <Button className="px-5 py-2 text-xs font-bold text-white bg-primary hover:bg-primary-hover rounded-lg transition-colors shadow-lg active:scale-95 h-auto">
                 Install Skill
-              </button>
+              </Button>
             </div>
           </div>
         </div>
