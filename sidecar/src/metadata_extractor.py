@@ -16,15 +16,31 @@ def _get_timestamp_from_match(match: re.Match, tz_offset: float) -> str | None:
     if not extracted_ts:
         return None
 
-    try:
-        # Attempt to parse common formats: YYYY-MM-DD HH:MM:SS
-        dt = datetime.datetime.strptime(extracted_ts[:19], "%Y-%m-%d %H:%M:%S")
-        if tz_offset != 0:
-            dt = dt + datetime.timedelta(hours=tz_offset)
+    # Strip trailing timezone offsets like " +0000" or " -0500" before parsing
+    ts_clean = re.sub(r"\s[+-]\d{4}$", "", extracted_ts.strip())
+
+    # Try formats in priority order — most specific first
+    formats = [
+        "%Y-%m-%d %H:%M:%S",  # ISO 8601 (DB canonical)
+        "%Y-%m-%dT%H:%M:%S",  # ISO 8601 with T separator
+        "%d/%b/%Y:%H:%M:%S",  # Apache CLF: 17/May/2015:10:05:03
+        "%b %d %H:%M:%S",  # Syslog: Jun  1 12:34:56
+        "%d/%m/%Y %H:%M:%S",  # European format
+        "%m/%d/%Y %H:%M:%S",  # US format
+        "%Y/%m/%d %H:%M:%S",  # Alternative ISO
+    ]
+
+    for fmt in formats:
+        try:
+            dt = datetime.datetime.strptime(ts_clean[: len(fmt) + 2], fmt)
+            if tz_offset != 0:
+                dt = dt + datetime.timedelta(hours=tz_offset)
             return dt.strftime("%Y-%m-%d %H:%M:%S")
-        return dt.strftime("%Y-%m-%d %H:%M:%S")
-    except Exception:
-        return extracted_ts
+        except Exception:
+            continue
+
+    # Last resort: return as-is (non-normalizable format)
+    return extracted_ts
 
 
 def _extract_base_metadata(

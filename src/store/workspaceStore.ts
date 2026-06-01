@@ -1,3 +1,4 @@
+// Assume Role: Frontend Engineer (@frontend)
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
@@ -86,6 +87,16 @@ interface WorkspaceStore {
 }
 
 // ─── Helper ────────────────────────────────────────────────────────────────────
+
+function flattenSources(node: HierarchyNode): LogSource[] {
+  let list = [...(node.sources || [])];
+  if (node.children) {
+    for (const child of node.children) {
+      list = list.concat(flattenSources(child));
+    }
+  }
+  return list;
+}
 
 // ─── Store ────────────────────────────────────────────────────────────────────
 
@@ -271,9 +282,10 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
             },
           );
           if (res) {
+            const flatSources = flattenSources(res.root);
             set((state) => ({
               workspaces: state.workspaces.map((w) =>
-                w.id === workspaceId ? { ...w, hierarchy: res.root } : w,
+                w.id === workspaceId ? { ...w, hierarchy: res.root, sources: flatSources } : w,
               ),
             }));
           }

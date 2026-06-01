@@ -1,3 +1,4 @@
+# Assume Role: Backend Engineer (@backend)
 import asyncio
 import csv
 import inspect
@@ -96,6 +97,18 @@ A2UI_START = "[[A2UI]]"
 A2UI_END = "[[/A2UI]]"
 AI_STATE_DB = "ai_state.sqlite"
 SQL_AND_JOIN = " AND "
+
+
+def _json_default(obj: Any) -> str:
+    """Custom JSON serializer for types not supported by the stdlib encoder.
+
+    Per architecture rules, datetime objects must NEVER appear in JSON-RPC
+    responses. This acts as a safety net for any value that slips through.
+    """
+    if isinstance(obj, datetime):
+        return obj.isoformat()
+    return str(obj)
+
 
 # --- Professional Logging Setup ---
 SIDE_CAR_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -2272,8 +2285,16 @@ class App:
             req = JSONRPCRequest(**body)
             res = await self.dispatch(req)
             resp_data = res.model_dump()
-            logger.debug("RPC Response [%s]: %s", req.method, json.dumps(resp_data)[:100])
-            return web.json_response(resp_data)
+            logger.debug(
+                "RPC Response [%s]: %s",
+                req.method,
+                json.dumps(resp_data, default=_json_default)[:100],
+            )
+            # Use custom encoder to handle any datetime objects in the response
+            return web.Response(
+                text=json.dumps(resp_data, default=_json_default),
+                content_type="application/json",
+            )
         except ValidationError:
             return web.json_response(
                 {
@@ -2535,20 +2556,73 @@ class App:
             cursor.execute("SELECT COUNT(DISTINCT workspace_id) FROM logs")
         workspace_count = cursor.fetchone()[0]
 
-        # 6. Time Series (Log Volume & Severity over time)
+        # 6. Time Series (Log Volume & Severity over time with dynamic bucket sizing)
         bucket_format = "%Y-%m-%d %H:%M:00"
+        try:
+            cursor.execute(
+                "SELECT MIN(TRY_CAST(timestamp AS TIMESTAMP)), MAX(TRY_CAST(timestamp AS TIMESTAMP)) FROM logs l"
+                + where_sql,
+                params,
+            )
+            min_ts, max_ts = cursor.fetchone()
+            if min_ts and max_ts:
+                # Normalize type — DuckDB may return datetime objects or strings
+                try:
+                    if isinstance(min_ts, str):
+                        min_dt = datetime.fromisoformat(min_ts.replace("Z", "+00:00"))
+                        max_dt = datetime.fromisoformat(max_ts.replace("Z", "+00:00"))
+                    else:
+                        # datetime object returned directly by DuckDB
+                        min_dt = min_ts if hasattr(min_ts, "total_seconds") is False else None
+                        max_dt = max_ts if hasattr(max_ts, "total_seconds") is False else None
+                        # Ensure we have actual datetime instances
+                        if not isinstance(min_dt, datetime):
+                            min_dt = None
+                        if not isinstance(max_dt, datetime):
+                            max_dt = None
+                except Exception:
+                    min_dt = None
+                    max_dt = None
+
+                if min_dt and max_dt:
+                    diff = max_dt - min_dt
+                    seconds = diff.total_seconds()
+                    if seconds <= 180:  # <= 3 minutes: second level
+                        bucket_format = "%Y-%m-%d %H:%M:%S"
+                    elif seconds <= 7200:  # <= 2 hours: minute level
+                        bucket_format = "%Y-%m-%d %H:%M:00"
+                    elif seconds <= 172800:  # <= 48 hours: hour level
+                        bucket_format = "%Y-%m-%d %H:00:00"
+                    else:  # > 48 hours: day level
+                        bucket_format = "%Y-%m-%d 00:00:00"
+        except Exception as e:
+            logger.error("Failed to calculate dynamic time bucket size: %s", e)
+
+        # Build WHERE clause — safely extend existing filters with NULL timestamp guard
+        ts_null_guard = "TRY_CAST(l.timestamp AS TIMESTAMP) IS NOT NULL"
+        ts_where = (
+            (where_sql + " AND " + ts_null_guard) if where_sql else (" WHERE " + ts_null_guard)
+        )
         ts_query = (
-            f"SELECT strftime('{bucket_format}', l.timestamp::TIMESTAMP) as bucket, l.level, COUNT(*) as count "
-            "FROM logs l " + where_sql + " GROUP BY bucket, l.level ORDER BY bucket ASC"
+            f"SELECT strftime('{bucket_format}', TRY_CAST(l.timestamp AS TIMESTAMP)) as bucket, l.level, COUNT(*) as count "
+            f"FROM logs l {ts_where} GROUP BY bucket, l.level ORDER BY bucket ASC"
         )
         cursor.execute(ts_query, params)
         ts_raw = cursor.fetchall()
 
         ts_pivot = {}
         for bucket, level, count in ts_raw:
-            if bucket not in ts_pivot:
-                ts_pivot[bucket] = {"timestamp": bucket}
-            ts_pivot[bucket][level] = count
+            # Always cast bucket to str — DuckDB strftime may return datetime objects
+            bucket_key = (
+                bucket.isoformat()
+                if isinstance(bucket, datetime)
+                else str(bucket)
+                if bucket is not None
+                else ""
+            )
+            if bucket_key not in ts_pivot:
+                ts_pivot[bucket_key] = {"timestamp": bucket_key}
+            ts_pivot[bucket_key][str(level) if level else "UNKNOWN"] = count
         time_series = list(ts_pivot.values())
 
         # 7. Top Error Clusters
@@ -2921,7 +2995,7 @@ async def run_stdio_async(db_path=DEFAULT_DB, start_http=False, http_port=5000):
                 req_dict = json.loads(line)
                 req = JSONRPCRequest(**req_dict)
                 res = await app.dispatch(req)
-                print(json.dumps(res.model_dump()), flush=True)
+                print(json.dumps(res.model_dump(), default=_json_default), flush=True)
             except json.JSONDecodeError:
                 print(
                     json.dumps(

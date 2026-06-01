@@ -1,3 +1,7 @@
+// Assume Role: Frontend Engineer (@frontend)
+
+import { memo, useEffect, useMemo, useRef, useState } from "react";
+import { toast } from "sonner";
 import { AIInvestigationSidebar } from "@/components/organisms/AIInvestigationSidebar";
 import { CustomParserModal } from "@/components/organisms/CustomParserModal";
 import { ExplorerView } from "@/components/organisms/ExplorerView";
@@ -10,15 +14,12 @@ import { InvestigationLayout } from "@/components/templates/InvestigationLayout"
 import { useIngestionStatus } from "@/lib/hooks/useIngestionStatus";
 import { useKeyboardShortcuts } from "@/lib/hooks/useKeyboardShortcuts";
 import { useLogFetching } from "@/lib/hooks/useLogFetching";
+import { useLogIngestion } from "@/lib/hooks/useLogIngestion";
 import { callSidecar } from "@/lib/hooks/useSidecarBridge";
 import { useAiStore } from "@/store/aiStore";
 import { useInvestigationStore } from "@/store/investigationStore";
 import { useSettingsStore } from "@/store/settingsStore";
 import { type LogSource, selectActiveWorkspace, useWorkspaceStore } from "@/store/workspaceStore";
-import { memo, useEffect, useMemo, useRef, useState } from "react";
-import { toast } from "sonner";
-
-import { useLogIngestion } from "@/lib/hooks/useLogIngestion";
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
@@ -127,6 +128,12 @@ function InvestigationPageImpl() {
     }
     return isFetching;
   }, [transitioningSourceId, activeSourceId, activeJobForSource, isFetching]);
+
+  // Sync the currently active source's tailing status to the global isTailing store state
+  useEffect(() => {
+    const isActiveSourceTailing = activeSourceId ? tailingSourceIds.has(activeSourceId) : false;
+    setTailing(isActiveSourceTailing);
+  }, [activeSourceId, tailingSourceIds, setTailing]);
 
   // Clear transitioning state once a job for that source is detected
   useEffect(() => {
@@ -285,17 +292,57 @@ function InvestigationPageImpl() {
   };
 
   const handleToggleTail = async (tail: boolean) => {
+    if (!activeSourceId) {
+      toast.warning("No active log source selected.");
+      return;
+    }
+    const src = sources.find((s) => s.id === activeSourceId);
+    if (!src) {
+      toast.error("Active source not found.");
+      return;
+    }
+
     try {
-      if (!tail) {
+      if (tail) {
+        await callSidecar({
+          method: "start_tail",
+          params: {
+            filepath: src.path,
+            workspace_id: activeWorkspaceId,
+            source_id: src.id,
+          },
+        });
+        setTailingSourceIds((prev) => {
+          const next = new Set(prev);
+          next.add(src.id);
+          return next;
+        });
+        const { useIngestionStore } = await import("@/store/ingestionStore");
+        useIngestionStore.getState().addLiveSource();
+        useIngestionStore.getState().startPolling(activeWorkspaceId ?? "");
+
+        toast.success(`Live monitoring active for ${src.name}`);
+      } else {
         await callSidecar({
           method: "stop_tail",
-          params: { filepath: "ALL", workspace_id: activeWorkspaceId },
+          params: {
+            filepath: src.path,
+            workspace_id: activeWorkspaceId,
+            source_id: src.id,
+          },
         });
-        setTailingSourceIds(new Set());
+        setTailingSourceIds((prev) => {
+          const next = new Set(prev);
+          next.delete(src.id);
+          return next;
+        });
+        const { useIngestionStore } = await import("@/store/ingestionStore");
+        useIngestionStore.getState().removeLiveSource();
+
+        toast.info(`Live monitoring stopped for ${src.name}`);
       }
-      setTailing(tail);
-    } catch {
-      toast.error("Failed to update monitoring state.");
+    } catch (e: any) {
+      toast.error(e?.message || "Failed to update monitoring state.");
     }
   };
 
