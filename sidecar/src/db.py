@@ -1,3 +1,4 @@
+# Assume Role: Backend Engineer (@backend)
 import contextlib
 import json
 import logging
@@ -77,6 +78,53 @@ class LogDatabase:
         self._setup_schema(cursor)
         self._run_migrations(cursor)
         self._initialize_cluster_cache(cursor)
+        self._initialize_default_settings(cursor)
+
+    def _initialize_default_settings(self, cursor):
+        cursor.execute("SELECT COUNT(*) FROM settings")
+        if cursor.fetchone()[0] == 0:
+            logger.info("[DB] Seeding default settings...")
+            defaults = {
+                "ai_provider": "ollama",
+                "ai_model": "gemma4:e2b",
+                "ai_api_key": "",
+                "ai_system_prompt": "You are LogLens Assistant, a senior DevOps engineer and SRE specializing in root cause analysis.",
+                "ai_gemini_url": "http://localhost:22436",
+                "ai_ollama_host": "http://localhost:11434",
+                "ai_openai_host": "https://api.openai.com/v1",
+                "ai_lmstudio_host": "http://localhost:1234/v1",
+                "drain_similarity_threshold": "0.5",
+                "drain_max_children": "100",
+                "drain_max_clusters": "1000",
+                "ui_row_height": "36px",
+                "ui_font_size": "13px",
+                "mcp_server_enabled": "false",
+                "ai_tool_search": "true",
+                "ai_tool_memory": "true",
+                "drain_template_scope": "global",
+                "drain_masks": json.dumps(
+                    [
+                        {
+                            "pattern": r"((?<=[^A-Za-z0-9])|^)(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})(?=[^A-Za-z0-9]|$)",
+                            "label": "IP",
+                            "enabled": True,
+                        },
+                        {
+                            "pattern": "[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}",
+                            "label": "UUID",
+                            "enabled": True,
+                        },
+                    ]
+                ),
+                "ingestion_syslog_enabled": "true",
+                "ingestion_syslog_port": "514",
+                "ingestion_http_enabled": "true",
+                "ingestion_http_port": "5002",
+                "facet_extractions": "[]",
+                "ui_command_palette_shortcut": json.dumps({"key": "k", "ctrl": True}),
+            }
+            for k, v in defaults.items():
+                cursor.execute("INSERT INTO settings (key, value) VALUES (?, ?)", (k, v))
 
     def _setup_schema(self, cursor):
         """Initial table and sequence creation.
@@ -739,7 +787,7 @@ class LogDatabase:
         try:
             cursor.execute(
                 "SELECT DISTINCT UNNEST(json_keys(facets)) FROM logs WHERE workspace_id = ? AND facets IS NOT NULL",
-                (workspace_id,)
+                (workspace_id,),
             )
             for row in cursor.fetchall():
                 key = str(row[0])

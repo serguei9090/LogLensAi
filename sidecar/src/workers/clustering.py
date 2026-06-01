@@ -1,3 +1,4 @@
+# Assume Role: Backend Engineer (@backend)
 """
 ClusteringWorker — Train-then-Tag Parallel Pipeline
 =====================================================
@@ -329,6 +330,8 @@ class ClusteringWorker:
                 parser = self.app.get_drain_parser(ws_id)
                 res = parser.parse(meta["message"])  # ← updates tree
                 cluster_id, template = res["cluster_id"], res["template"]
+                if "facets" in res:
+                    meta["facets"].update(res["facets"])
 
                 key = (ws_id, cluster_id, template)
                 cluster_increments[key] = cluster_increments.get(key, 0) + 1

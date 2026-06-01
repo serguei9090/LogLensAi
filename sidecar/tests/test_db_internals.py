@@ -1,3 +1,4 @@
+# Assume Role: Backend Engineer (@backend)
 import pytest
 from db import LogDatabase
 
@@ -50,12 +51,12 @@ def test_process_log_results(db):
 
 def test_get_facet_keys(db):
     cursor = db.get_cursor()
-    # Add some extra rules
+    # Add some extra rules using REPLACE to avoid duplicate key violations with seeded defaults
     cursor.execute(
-        "INSERT INTO settings (key, value) VALUES ('facet_extractions', '[{\"name\": \"custom1\"}]')"
+        "INSERT OR REPLACE INTO settings (key, value) VALUES ('facet_extractions', '[{\"name\": \"custom1\"}]')"
     )
     cursor.execute(
-        "INSERT INTO workspace_settings (workspace_id, key, value) VALUES ('ws1', 'facet_extractions', '[{\"name\": \"custom2\"}]')"
+        "INSERT OR REPLACE INTO workspace_settings (workspace_id, key, value) VALUES ('ws1', 'facet_extractions', '[{\"name\": \"custom2\"}]')"
     )
     db.commit()
 
