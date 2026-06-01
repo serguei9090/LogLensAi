@@ -33,11 +33,17 @@ export function FacetList({ onApplyFilter, className }: FacetListProps) {
     }
 
     const field = key === "level" ? "level" : `facets.${key}`;
-    // Check if filter already exists
-    if (filters.some((f: FilterEntry) => f.field === field && f.value === value)) {
+    const existingIndex = filters.findIndex(
+      (f: FilterEntry) => f.field === field && f.value === value,
+    );
+
+    if (existingIndex !== -1) {
+      // Toggle off: remove the filter
+      setFilters(filters.filter((_, idx) => idx !== existingIndex));
       return;
     }
 
+    // Toggle on: add the filter
     setFilters([...filters, { id: crypto.randomUUID(), field, value, operator: "equals" }]);
   };
 

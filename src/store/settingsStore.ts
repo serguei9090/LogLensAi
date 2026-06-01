@@ -57,13 +57,26 @@ export const defaultSettings: AppSettings = {
   drain_template_scope: "global",
   drain_masks: [
     {
-      pattern: String.raw`((?<=[^A-Za-z0-9])|^)(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})(?=[^A-Za-z0-9]|$)`,
+      // \b word-boundary works in Python re; variable-width lookbehind alternatives do not.
+      pattern: String.raw`\b(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})\b`,
       label: "IP",
       enabled: true,
     },
     {
-      pattern: "[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}",
+      pattern: String.raw`[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}`,
       label: "UUID",
+      enabled: true,
+    },
+    {
+      // HTTP status codes 100-599
+      pattern: String.raw`\b([1-5][0-9]{2})\b`,
+      label: "HTTP_STATUS",
+      enabled: true,
+    },
+    {
+      // HTTP methods
+      pattern: String.raw`\b(GET|POST|PUT|DELETE|PATCH|HEAD|OPTIONS|TRACE)\b`,
+      label: "HTTP_METHOD",
       enabled: true,
     },
   ],

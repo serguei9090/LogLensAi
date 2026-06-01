@@ -582,8 +582,9 @@ class App:
             )
 
     def _parse_filters(self, filters: list[dict]) -> tuple[list[str], list[Any]]:
-        where_clauses = []
-        params = []
+        from collections import defaultdict
+
+        field_groups = defaultdict(list)
         allowed_fields = {"level", "source_id", "cluster_id", "raw_text", "has_comment"}
 
         for f in filters:
@@ -604,8 +605,21 @@ class App:
 
             clause, param = self._build_filter_clause(field_sql, op, value)
             if clause:
-                where_clauses.append(clause)
-                params.append(param)
+                field_groups[field_sql].append((clause, param))
+
+        where_clauses = []
+        params = []
+        for _, items in field_groups.items():
+            if not items:
+                continue
+            clauses = [item[0] for item in items]
+            field_params = [item[1] for item in items]
+
+            if len(clauses) > 1:
+                where_clauses.append("(" + " OR ".join(clauses) + ")")
+            else:
+                where_clauses.append(clauses[0])
+            params.extend(field_params)
 
         return where_clauses, params
 

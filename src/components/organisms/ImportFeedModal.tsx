@@ -78,7 +78,7 @@ export function ImportFeedModal({
         aria-label="Close modal"
       />
 
-      <div className="relative z-10 w-full max-w-[560px] bg-bg-surface/60 border border-border/80 rounded-[2rem] shadow-[0_30px_60px_-15px_rgba(0,0,0,0.8)] overflow-hidden animate-in zoom-in-95 fade-in duration-300">
+      <div className="relative z-10 w-full max-w-[560px] bg-bg-surface border border-border/80 rounded-[2rem] shadow-[0_30px_60px_-15px_rgba(0,0,0,0.8)] overflow-hidden animate-in zoom-in-95 fade-in duration-300">
         <div className="flex items-center justify-between px-8 py-6 border-b border-border/50 bg-white/[0.03]">
           <div>
             <div className="flex items-center gap-2 mb-0.5">

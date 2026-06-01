@@ -76,7 +76,7 @@ export function CustomParserModal({
       try {
         const result = await callSidecar<string[]>({
           method: "get_sample_lines",
-          params: { workspace_id: workspaceId, source_id: sourceId, limit: 2 },
+          params: { workspace_id: workspaceId, source_id: sourceId, limit: 15 },
         });
         setSamples(result);
 
@@ -465,7 +465,7 @@ export function CustomParserModal({
                     className="bg-black/40 rounded-xl border border-border-subtle/40 divide-y divide-white/5 overflow-hidden text-wrap"
                   >
                     {previewResults.length > 0 ? (
-                      previewResults.slice(0, 2).map((res, i) => (
+                      previewResults.slice(0, 5).map((res, i) => (
                         <div
                           key={`preview-${res.timestamp}-${i}`}
                           className="p-3 flex items-center justify-between text-[11px]"

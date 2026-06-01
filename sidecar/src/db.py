@@ -105,13 +105,27 @@ class LogDatabase:
                 "drain_masks": json.dumps(
                     [
                         {
-                            "pattern": r"((?<=[^A-Za-z0-9])|^)(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})(?=[^A-Za-z0-9]|$)",
+                            # \b is a zero-width word boundary — works in Python re unlike
+                            # variable-width lookbehind alternatives.
+                            "pattern": r"\b(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})\b",
                             "label": "IP",
                             "enabled": True,
                         },
                         {
-                            "pattern": "[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}",
+                            "pattern": r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}",
                             "label": "UUID",
+                            "enabled": True,
+                        },
+                        {
+                            # Matches HTTP status codes: 100-599
+                            "pattern": r"\b([1-5][0-9]{2})\b",
+                            "label": "HTTP_STATUS",
+                            "enabled": True,
+                        },
+                        {
+                            # Matches HTTP methods
+                            "pattern": r"\b(GET|POST|PUT|DELETE|PATCH|HEAD|OPTIONS|TRACE)\b",
+                            "label": "HTTP_METHOD",
                             "enabled": True,
                         },
                     ]
@@ -312,6 +326,67 @@ class LogDatabase:
         self._migrate_ingestion_jobs(cursor)
         self._migrate_fast_path_schema(cursor)
         self._migrate_indexes(cursor)
+        self._migrate_drain_masks(cursor)
+
+    def _migrate_drain_masks(self, cursor):
+        """Fix the broken IP lookbehind regex in stored drain_masks setting.
+
+        The original default used ``(?<=[^A-Za-z0-9]|^)`` which is an invalid
+        variable-width lookbehind in Python's ``re`` module. This caused the mask
+        to be silently skipped, meaning IPs were never extracted as facets.
+        This migration replaces the broken pattern with a ``\\b`` word boundary
+        equivalent and adds HTTP_STATUS / HTTP_METHOD masks if not present.
+        """
+        broken_ip_pattern = (
+            r"((?<=[^A-Za-z0-9])|^)(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})(?=[^A-Za-z0-9]|$)"
+        )
+        fixed_ip_pattern = r"\b(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})\b"
+
+        extra_masks = [
+            {
+                "pattern": r"\b([1-5][0-9]{2})\b",
+                "label": "HTTP_STATUS",
+                "enabled": True,
+            },
+            {
+                "pattern": r"\b(GET|POST|PUT|DELETE|PATCH|HEAD|OPTIONS|TRACE)\b",
+                "label": "HTTP_METHOD",
+                "enabled": True,
+            },
+        ]
+
+        cursor.execute("SELECT value FROM settings WHERE key = 'drain_masks'")
+        row = cursor.fetchone()
+        if not row:
+            return
+
+        try:
+            masks = json.loads(row[0])
+        except Exception:
+            return
+
+        changed = False
+        existing_labels = {m.get("label") for m in masks if isinstance(m, dict)}
+
+        # Fix the broken IP pattern in place
+        for m in masks:
+            if isinstance(m, dict) and m.get("pattern") == broken_ip_pattern:
+                m["pattern"] = fixed_ip_pattern
+                changed = True
+                logger.info("[DB Migration] Fixed broken IP lookbehind regex in drain_masks")
+
+        # Add missing masks
+        for extra in extra_masks:
+            if extra["label"] not in existing_labels:
+                masks.append(extra)
+                changed = True
+                logger.info("[DB Migration] Added '%s' mask to drain_masks", extra["label"])
+
+        if changed:
+            cursor.execute(
+                "UPDATE settings SET value = ? WHERE key = 'drain_masks'",
+                (json.dumps(masks),),
+            )
 
     def _migrate_fast_path_schema(self, cursor):
         """Migration: upgrade existing logs table to the Skinny / Fast-Path schema.
@@ -758,6 +833,8 @@ class LogDatabase:
             "method",
             "level",
             "email",
+            "http_method",
+            "http_status",
         ]
 
         def _append_rules(json_str: str | None):
