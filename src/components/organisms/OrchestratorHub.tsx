@@ -1,3 +1,9 @@
+// Assume Role: Frontend Engineer (@frontend)
+
+import { Check, Clock, Cpu, Layers, Settings2, Sparkles, X, Zap } from "lucide-react";
+import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { callSidecar } from "@/lib/hooks/useSidecarBridge";
@@ -5,10 +11,6 @@ import { cn } from "@/lib/utils";
 import { useClusteringStore } from "@/store/clusteringStore";
 import { useInvestigationStore } from "@/store/investigationStore";
 import type { LogSource } from "@/store/workspaceStore";
-import { Check, Clock, Cpu, Layers, Settings2, Sparkles, X, Zap } from "lucide-react";
-import { useEffect, useState } from "react";
-import { createPortal } from "react-dom";
-import { toast } from "sonner";
 import { CustomParserModal } from "./CustomParserModal";
 import { TimeShiftModal } from "./TimeShiftModal";
 
@@ -94,7 +96,7 @@ export function OrchestratorHub({
   const setShowAnomalies = useInvestigationStore((s) => s.setShowAnomalies);
   const workspaceGlobalContext = useInvestigationStore((s) => s.workspaceGlobalContext);
   const setWorkspaceGlobalContext = useInvestigationStore((s) => s.setWorkspaceGlobalContext);
-  const { status: clusteringStatus, fetchStatus, setMode, setPaused } = useClusteringStore();
+  const { status: clusteringStatus, fetchStatus, setPaused } = useClusteringStore();
 
   const [view, setView] = useState<
     "picker" | "fusion-form" | "ai-context-form" | "time-alignment-form"
@@ -378,28 +380,6 @@ export function OrchestratorHub({
                     <Switch
                       checked={!clusteringStatus?.paused}
                       onCheckedChange={(checked) => setPaused(!checked, workspaceId)}
-                    />
-                  </div>
-
-                  <div className="flex items-center justify-between p-3 rounded-lg border border-white/5 bg-white/[0.02] hover:bg-white/[0.04] transition-all group">
-                    <div className="flex items-center gap-3">
-                      <div className="size-8 rounded-md bg-white/5 border border-white/10 flex items-center justify-center group-hover:bg-white/10 transition-all text-white/40 group-hover:text-white">
-                        <Zap className="size-4" />
-                      </div>
-                      <div className="space-y-0.5">
-                        <span className="block text-[13px] font-medium text-white/90 group-hover:text-white transition-colors">
-                          Burst Mode
-                        </span>
-                        <span className="block text-[11px] text-white/40 truncate">
-                          High-speed indexing
-                        </span>
-                      </div>
-                    </div>
-                    <Switch
-                      checked={clusteringStatus?.mode === "burst"}
-                      onCheckedChange={(checked) =>
-                        setMode(checked ? "burst" : "auto", workspaceId)
-                      }
                     />
                   </div>
                 </div>

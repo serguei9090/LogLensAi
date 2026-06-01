@@ -1,3 +1,7 @@
+// Assume Role: Frontend Engineer (@frontend)
+
+import { Columns, Cpu, Download, LayoutTemplate, List, Plus, Sparkles, Upload } from "lucide-react";
+import { useState } from "react";
 import { StatusDot } from "@/components/atoms/StatusDot";
 import { TailSwitch } from "@/components/atoms/TailSwitch";
 import { FilterBuilder, type FilterEntry } from "@/components/molecules/FilterBuilder";
@@ -13,22 +17,9 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 import { useAiStore } from "@/store/aiStore";
-import { useClusteringStore } from "@/store/clusteringStore";
 import { useInvestigationStore } from "@/store/investigationStore";
 import { useUIStore } from "@/store/uiStore";
 import type { LogSource } from "@/store/workspaceStore";
-import {
-  Columns,
-  Cpu,
-  Download,
-  LayoutTemplate,
-  List,
-  Plus,
-  Sparkles,
-  Upload,
-  Zap,
-} from "lucide-react";
-import { useEffect, useState } from "react";
 import { LoadTemplateModal } from "./LoadTemplateModal";
 import { SaveTemplateModal } from "./SaveTemplateModal";
 
@@ -84,15 +75,8 @@ export function LogToolbar({
   const { timeRange, setTimeRange } = useInvestigationStore();
   const { isSidebarOpen, setSidebarOpen } = useAiStore();
   const { facetSidebarCollapsed, toggleFacetSidebar } = useUIStore();
-  const { status: clusteringStatus, fetchStatus, setMode } = useClusteringStore();
   const [isSaveTemplateModalOpen, setIsSaveTemplateModalOpen] = useState(false);
   const [isLoadTemplateModalOpen, setIsLoadTemplateModalOpen] = useState(false);
-
-  // One-shot fetch when workspace changes so the clustering controls render
-  // with correct initial state. Ongoing updates are driven by ingestionStore.
-  useEffect(() => {
-    fetchStatus(activeWorkspaceId);
-  }, [activeWorkspaceId, fetchStatus]);
 
   return (
     <div className="sticky top-0 z-10 flex flex-nowrap items-center gap-3 bg-bg-app/95 backdrop-blur-sm border-b border-border-subtle px-4 py-2.5 shadow-sm overflow-x-auto scrollbar-none">
@@ -161,44 +145,6 @@ export function LogToolbar({
         {/* Tail control moved to left */}
         <div className="flex items-center gap-3 shrink-0">
           <TailSwitch checked={isTailing} onCheckedChange={onTailToggle} />
-        </div>
-
-        <div className="h-5 w-px bg-zinc-800 shrink-0" />
-
-        {/* Clustering Status & Controls */}
-        <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-bg-surface-bright/50 border border-border-subtle shrink-0">
-          <div
-            className="flex items-center gap-2 group cursor-help"
-            title="Clustering Engine Status"
-          >
-            <StatusDot active={!!clusteringStatus?.running && !clusteringStatus?.paused} />
-            <span className="text-[11px] font-mono text-text-muted">
-              {clusteringStatus?.backlog?.toLocaleString() ?? 0}
-            </span>
-          </div>
-
-          <div className="w-px h-3 bg-border-subtle mx-1" />
-
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            onClick={() =>
-              setMode(clusteringStatus?.mode === "burst" ? "auto" : "burst", activeWorkspaceId)
-            }
-            className={cn(
-              "p-1 rounded-md transition-all group shrink-0",
-              clusteringStatus?.mode === "burst"
-                ? "bg-amber-500/20 text-amber-400 shadow-[0_0_12px_rgba(245,158,11,0.2)] border border-amber-500/30"
-                : "text-text-muted hover:text-text-primary hover:bg-bg-hover",
-            )}
-            title={
-              clusteringStatus?.mode === "burst"
-                ? "Burst Mode Active (High CPU)"
-                : "Activate Burst Mode"
-            }
-          >
-            <Zap className={cn("size-3.5", clusteringStatus?.mode === "burst" && "fill-current")} />
-          </Button>
         </div>
       </div>
 
