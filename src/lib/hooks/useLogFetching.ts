@@ -1,7 +1,7 @@
+import { useCallback, useMemo, useState } from "react";
 import { useInvestigationStore } from "@/store/investigationStore";
 import { type LogSource, selectActiveWorkspace, useWorkspaceStore } from "@/store/workspaceStore";
 import type { LogEntry } from "@/types/log";
-import { useCallback, useMemo, useState } from "react";
 import { callSidecar } from "./useSidecarBridge";
 
 /**

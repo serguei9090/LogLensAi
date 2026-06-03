@@ -1,5 +1,5 @@
-import { cn } from "@/lib/utils";
 import { Fragment, type ReactNode } from "react";
+import { cn } from "@/lib/utils";
 
 interface MarkdownContentProps {
   /** The raw text content to render with lightweight markdown support. */

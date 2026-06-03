@@ -12,6 +12,7 @@ export interface LogEntry {
   id: number;
   line_id: number;
   timestamp: string;
+  ingest_timestamp?: string;
   level: LogLevel;
   message: string;
   cluster_id: string;

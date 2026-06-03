@@ -1,8 +1,8 @@
+import { FileText, Pencil, Trash2 } from "lucide-react";
+import { memo, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import type { LogSource } from "@/store/workspaceStore";
-import { FileText, Pencil, Trash2 } from "lucide-react";
-import { memo, useEffect, useState } from "react";
 
 interface SourceItemProps {
   source: LogSource;

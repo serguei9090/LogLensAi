@@ -1,14 +1,3 @@
-import type { NavTab } from "@/App";
-import { Button } from "@/components/ui/button";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { cn } from "@/lib/utils";
-import { useUIStore } from "@/store/uiStore";
-
-import type { Workspace } from "@/store/workspaceStore";
-import { useWorkspaceStore } from "@/store/workspaceStore";
-
-import { SidebarNavItem } from "@/components/atoms/SidebarNavItem";
 import { motion } from "framer-motion";
 import {
   Check,
@@ -24,6 +13,15 @@ import {
   X,
 } from "lucide-react";
 import { memo, useEffect, useRef, useState } from "react";
+import type { NavTab } from "@/App";
+import { SidebarNavItem } from "@/components/atoms/SidebarNavItem";
+import { Button } from "@/components/ui/button";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { cn } from "@/lib/utils";
+import { useUIStore } from "@/store/uiStore";
+import type { Workspace } from "@/store/workspaceStore";
+import { useWorkspaceStore } from "@/store/workspaceStore";
 import { ConfirmationDialog } from "../molecules/ConfirmationDialog";
 import { HierarchyTree } from "../molecules/HierarchyTree";
 

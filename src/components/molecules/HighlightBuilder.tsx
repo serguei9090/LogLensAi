@@ -1,9 +1,9 @@
-import { Input } from "@/components/ui/input";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { cn } from "@/lib/utils";
 import { Check, Highlighter, Plus, X } from "lucide-react";
 import { useState } from "react";
 import { HexColorPicker } from "react-colorful";
+import { Input } from "@/components/ui/input";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { cn } from "@/lib/utils";
 
 export interface HighlightEntry {
   id: string;

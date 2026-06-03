@@ -1,9 +1,3 @@
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { cn } from "@/lib/utils";
-import { useDebugStore } from "@/store/debugStore";
-import { useHealthStore } from "@/store/healthStore";
 import {
   AlertCircle,
   AlertTriangle,
@@ -15,6 +9,12 @@ import {
   Trash2,
   X,
 } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { cn } from "@/lib/utils";
+import { useDebugStore } from "@/store/debugStore";
+import { useHealthStore } from "@/store/healthStore";
 
 export function SystemDiagnosticConsole() {
   const { logs, isOpen, setOpen, clearLogs } = useDebugStore();

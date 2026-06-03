@@ -12,9 +12,11 @@ vi.mock("../../lib/hooks/useSidecarBridge", () => ({
       return { source_id: `mock-source-id-${idCounter}` };
     }
     if (method === "get_hierarchy") {
+      const store = useWorkspaceStore.getState();
+      const ws = store.workspaces.find((w) => w.id === params.workspace_id);
       return {
         workspace_id: params.workspace_id,
-        root: { id: "root", name: "Root", children: [], sources: [] },
+        root: { id: "root", name: "Root", children: [], sources: ws ? ws.sources : [] },
       };
     }
     return { status: "success" };

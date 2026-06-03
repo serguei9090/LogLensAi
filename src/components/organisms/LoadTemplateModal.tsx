@@ -1,3 +1,6 @@
+import { LayoutTemplate, Loader2, Trash2 } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -7,9 +10,6 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { callSidecar } from "@/lib/hooks/useSidecarBridge";
-import { LayoutTemplate, Loader2, Trash2 } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
-import { toast } from "sonner";
 import type { FilterEntry } from "../molecules/FilterBuilder";
 import type { HighlightEntry } from "../molecules/HighlightBuilder";
 

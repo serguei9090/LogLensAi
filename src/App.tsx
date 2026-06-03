@@ -1,3 +1,4 @@
+import { useCallback, useEffect, useRef, useState } from "react";
 import { CommandPalette } from "@/components/organisms/CommandPalette";
 import { SystemDiagnosticConsole } from "@/components/organisms/SystemDiagnosticConsole";
 import DashboardPage from "@/components/pages/DashboardPage";
@@ -12,7 +13,6 @@ import { useDebugStore } from "@/store/debugStore";
 import { useSettingsStore } from "@/store/settingsStore";
 import { useUIStore } from "@/store/uiStore";
 import { useWorkspaceStore } from "@/store/workspaceStore";
-import { useCallback, useEffect, useRef, useState } from "react";
 
 export type NavTab = "investigation" | "settings" | "dashboard";
 

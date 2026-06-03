@@ -1,6 +1,6 @@
-import { type IngestionJob, useIngestionStore } from "@/store/ingestionStore";
 import { AnimatePresence, motion } from "framer-motion";
 import { RefreshCcw, Sparkles } from "lucide-react";
+import { type IngestionJob, useIngestionStore } from "@/store/ingestionStore";
 
 /**
  * Displays a floating processing indicator while Drain3 pattern mining is active.

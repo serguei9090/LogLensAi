@@ -1,7 +1,7 @@
+import { Loader2 } from "lucide-react";
 import { Progress, ProgressIndicator, ProgressTrack } from "@/components/ui/progress";
 import type { IngestionJob } from "@/lib/hooks/useIngestionStatus";
 import { cn } from "@/lib/utils";
-import { Loader2 } from "lucide-react";
 
 interface IngestionOverlayProps {
   readonly job?: IngestionJob | null;

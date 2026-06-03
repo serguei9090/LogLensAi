@@ -1,9 +1,9 @@
+import { useCallback, useState } from "react";
+import { toast } from "sonner";
 import { useIngestionStore } from "@/store/ingestionStore";
 import { useInvestigationStore } from "@/store/investigationStore";
 import { useSettingsStore } from "@/store/settingsStore";
 import { useWorkspaceStore } from "@/store/workspaceStore";
-import { useCallback, useState } from "react";
-import { toast } from "sonner";
 import { parseManualLogs } from "../log-utils";
 import { callSidecar } from "./useSidecarBridge";
 

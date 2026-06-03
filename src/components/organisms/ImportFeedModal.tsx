@@ -1,3 +1,5 @@
+import { Activity, Code, FolderOpen, Info, Server, Terminal, Upload, Wifi, X } from "lucide-react";
+import { useState } from "react";
 import { TailSwitch } from "@/components/atoms/TailSwitch";
 import { NativeFilePicker } from "@/components/molecules/NativeFilePicker";
 import { SourceSelector } from "@/components/molecules/SourceSelector";
@@ -5,8 +7,6 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useSettingsStore } from "@/store/settingsStore";
 import { useWorkspaceStore } from "@/store/workspaceStore";
-import { Activity, Code, FolderOpen, Info, Server, Terminal, Upload, Wifi, X } from "lucide-react";
-import { useState } from "react";
 
 interface ImportFeedModalProps {
   readonly open: boolean;

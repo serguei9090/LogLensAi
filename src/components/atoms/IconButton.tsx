@@ -1,7 +1,7 @@
+import type { ReactNode } from "react";
 import { buttonVariants } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
-import type { ReactNode } from "react";
 
 interface IconButtonProps {
   icon: ReactNode;

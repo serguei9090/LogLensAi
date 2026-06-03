@@ -762,6 +762,7 @@ class App:
         allowed_sort = [
             "id",
             "timestamp",
+            "ingest_timestamp",
             "level",
             "source_id",
             "cluster_id",
@@ -1562,6 +1563,7 @@ class App:
 
             og_log = original_logs[i] if original_logs else {}
             ts = og_log.get("timestamp") or meta["timestamp"] or now_ts
+            ingest_ts = og_log.get("ingest_timestamp") or meta["ingest_timestamp"] or now_ts
             lvl = og_log.get("level") or meta["level"] or "INFO"
 
             og_facets = og_log.get("facets") or {}
@@ -1574,6 +1576,7 @@ class App:
                     train_ids[i],
                     raw_text,
                     ts,
+                    ingest_ts,
                     lvl,
                     cluster_id,
                     json.dumps(meta["facets"]),
@@ -1613,6 +1616,7 @@ class App:
 
                 og_log = original_logs[train_sample_size + i] if original_logs else {}
                 ts = og_log.get("timestamp") or meta["timestamp"] or now_ts
+                ingest_ts = og_log.get("ingest_timestamp") or meta["ingest_timestamp"] or now_ts
                 lvl = og_log.get("level") or meta["level"] or "INFO"
 
                 og_facets = og_log.get("facets") or {}
@@ -1625,6 +1629,7 @@ class App:
                         tag_ids[i],
                         raw_text,
                         ts,
+                        ingest_ts,
                         lvl,
                         cluster_id,
                         json.dumps(meta["facets"]),
@@ -1649,6 +1654,7 @@ class App:
                 "line_id",
                 "raw_text",
                 "timestamp",
+                "ingest_timestamp",
                 "level",
                 "cluster_id",
                 "facets",
@@ -1657,7 +1663,7 @@ class App:
         )
 
         cursor.execute(
-            "INSERT INTO logs (workspace_id, source_id, line_id, raw_text, timestamp, level, cluster_id, facets, processed) SELECT * FROM arrow_logs"
+            "INSERT INTO logs (workspace_id, source_id, line_id, raw_text, timestamp, ingest_timestamp, level, cluster_id, facets, processed) SELECT * FROM arrow_logs"
         )
 
         # PyArrow clusters table
@@ -2659,7 +2665,7 @@ class App:
         source_heatmap = []
         try:
             sh_query = (
-                f"SELECT strftime('{bucket_format}', l.timestamp::TIMESTAMP) as bucket, l.source_id, s.name as source_name, COUNT(*) as count "
+                f"SELECT strftime('{bucket_format}', TRY_CAST(l.timestamp AS TIMESTAMP)) as bucket, l.source_id, s.name as source_name, COUNT(*) as count "
                 "FROM logs l LEFT JOIN log_sources s ON l.source_id = s.id "
                 + where_sql
                 + " GROUP BY bucket, l.source_id, s.name ORDER BY bucket ASC"

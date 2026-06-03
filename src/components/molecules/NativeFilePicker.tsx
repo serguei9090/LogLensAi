@@ -1,8 +1,8 @@
+import { FolderOpen } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
-import { FolderOpen } from "lucide-react";
-import { toast } from "sonner";
 
 /**
  * Detects whether the app is running inside a Tauri desktop shell.

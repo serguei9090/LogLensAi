@@ -1,9 +1,9 @@
+import type React from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { callSidecar } from "@/lib/hooks/useSidecarBridge";
 import { useWorkspaceStore } from "@/store/workspaceStore";
-import type React from "react";
-import { useEffect, useState } from "react";
 
 interface A2UIComponent {
   type: string;

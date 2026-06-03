@@ -70,6 +70,7 @@ class FileTailer:
             line, custom_rules=custom_rules, parser_config=p_config, tz_offset=p_tz
         )
         timestamp = metadata["timestamp"]
+        ingest_timestamp = metadata["ingest_timestamp"]
         level = metadata["level"]
         facets = metadata.get("facets", {})
 
@@ -78,8 +79,8 @@ class FileTailer:
         cursor = self.db.get_cursor()
         cursor.execute(
             """
-            INSERT INTO logs (workspace_id, source_id, line_id, raw_text, timestamp, level, cluster_id, facets, processed)
-            VALUES (?, ?, ?, ?, ?, ?, NULL, ?, FALSE)
+            INSERT INTO logs (workspace_id, source_id, line_id, raw_text, timestamp, ingest_timestamp, level, cluster_id, facets, processed)
+            VALUES (?, ?, ?, ?, ?, ?, ?, NULL, ?, FALSE)
             """,
             (
                 self.workspace_id,
@@ -87,6 +88,7 @@ class FileTailer:
                 line_id,
                 line,  # raw_text
                 timestamp,
+                ingest_timestamp,
                 level,
                 facets_json,
             ),

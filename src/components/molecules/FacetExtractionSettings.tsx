@@ -1,7 +1,7 @@
-import { HelpTooltip } from "@/components/atoms/HelpTooltip";
-import { cn } from "@/lib/utils";
 import { Plus, ToggleLeft, ToggleRight, Trash2 } from "lucide-react";
 import { useState } from "react";
+import { HelpTooltip } from "@/components/atoms/HelpTooltip";
+import { cn } from "@/lib/utils";
 
 export interface FacetExtractionRule {
   name: string;

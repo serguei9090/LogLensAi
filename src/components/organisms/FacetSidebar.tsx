@@ -1,10 +1,10 @@
+import { motion } from "framer-motion";
+import { FilterX, PanelLeftClose } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 import { useInvestigationStore } from "@/store/investigationStore";
 import { useUIStore } from "@/store/uiStore";
-import { motion } from "framer-motion";
-import { FilterX, PanelLeftClose } from "lucide-react";
 import { FacetList } from "../molecules/FacetList";
 
 export function FacetSidebar() {

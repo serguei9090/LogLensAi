@@ -1,6 +1,15 @@
-// Assume Role: Frontend Engineer (@frontend)
-
-import { Columns, Cpu, Download, LayoutTemplate, List, Plus, Sparkles, Upload } from "lucide-react";
+import {
+  Columns,
+  Cpu,
+  Download,
+  Eye,
+  EyeOff,
+  LayoutTemplate,
+  List,
+  Plus,
+  Sparkles,
+  Upload,
+} from "lucide-react";
 import { useState } from "react";
 import { StatusDot } from "@/components/atoms/StatusDot";
 import { TailSwitch } from "@/components/atoms/TailSwitch";
@@ -74,7 +83,8 @@ export function LogToolbar({
 }: LogToolbarProps) {
   const { timeRange, setTimeRange } = useInvestigationStore();
   const { isSidebarOpen, setSidebarOpen } = useAiStore();
-  const { facetSidebarCollapsed, toggleFacetSidebar } = useUIStore();
+  const { facetSidebarCollapsed, toggleFacetSidebar, visibleColumns, toggleColumnVisibility } =
+    useUIStore();
   const [isSaveTemplateModalOpen, setIsSaveTemplateModalOpen] = useState(false);
   const [isLoadTemplateModalOpen, setIsLoadTemplateModalOpen] = useState(false);
 
@@ -172,6 +182,40 @@ export function LogToolbar({
           <DropdownMenu>
             <DropdownMenuTrigger
               className="p-1.5 rounded-md hover:bg-bg-hover text-text-muted hover:text-text-primary transition-colors ml-1"
+              title="Toggle Columns"
+            >
+              <Columns className="size-4" />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent
+              align="end"
+              className="w-48 bg-bg-surface border-border-subtle p-2"
+            >
+              <div className="text-[9px] font-bold text-text-muted uppercase tracking-wider px-2 py-1 border-b border-border/30 mb-1">
+                Visible Columns
+              </div>
+              {Object.keys(visibleColumns).map((colName) => (
+                <DropdownMenuItem
+                  key={colName}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    toggleColumnVisibility(colName);
+                  }}
+                  className="flex items-center justify-between gap-2 text-xs py-1.5 px-2 hover:bg-white/5 rounded cursor-pointer select-none"
+                >
+                  <span className="capitalize">{colName.replace("_", " ")}</span>
+                  {visibleColumns[colName] ? (
+                    <Eye className="size-3.5 text-primary" />
+                  ) : (
+                    <EyeOff className="size-3.5 text-text-muted/40" />
+                  )}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+
+          <DropdownMenu>
+            <DropdownMenuTrigger
+              className="p-1.5 rounded-md hover:bg-bg-hover text-text-muted hover:text-text-primary transition-colors ml-1"
               title="Template Actions"
             >
               <LayoutTemplate className="size-4" />
@@ -215,7 +259,7 @@ export function LogToolbar({
             className={cn(
               "size-8 shrink-0",
               isSidebarOpen
-                ? "bg-primary/10 border-primary/20 text-primary ring-1 ring-primary/30 shadow-[0_0_12px_rgba(var(--color-primary-rgb),0.1)]"
+                ? "bg-primary/10 border-primary/20 text-primary ring-1 ring-primary/30 shadow-[0_0_12px_rgba(var(--color-primary-rgb),0.15)]"
                 : "bg-bg-surface-bright/50 border-border-subtle text-text-muted hover:text-text-primary",
             )}
             title={isSidebarOpen ? "Close AI Assistant" : "Open AI Assistant"}

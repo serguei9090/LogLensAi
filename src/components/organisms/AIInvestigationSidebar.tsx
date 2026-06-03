@@ -1,14 +1,3 @@
-import { MarkdownContent } from "@/components/atoms/MarkdownContent";
-import { ThinkingBlock } from "@/components/atoms/ThinkingBlock";
-import { AIHistorySearchModal } from "@/components/organisms/AIHistorySearchModal";
-import { Button } from "@/components/ui/button";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Textarea } from "@/components/ui/textarea";
-import { cn } from "@/lib/utils";
-import { useAiStore } from "@/store/aiStore";
-import { useInvestigationStore } from "@/store/investigationStore";
-import { useSettingsStore } from "@/store/settingsStore";
-import { selectActiveWorkspace, useWorkspaceStore } from "@/store/workspaceStore";
 import {
   Bot,
   Clock,
@@ -24,6 +13,17 @@ import {
   X,
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { MarkdownContent } from "@/components/atoms/MarkdownContent";
+import { ThinkingBlock } from "@/components/atoms/ThinkingBlock";
+import { AIHistorySearchModal } from "@/components/organisms/AIHistorySearchModal";
+import { Button } from "@/components/ui/button";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Textarea } from "@/components/ui/textarea";
+import { cn } from "@/lib/utils";
+import { useAiStore } from "@/store/aiStore";
+import { useInvestigationStore } from "@/store/investigationStore";
+import { useSettingsStore } from "@/store/settingsStore";
+import { selectActiveWorkspace, useWorkspaceStore } from "@/store/workspaceStore";
 import { A2UIRenderer } from "../atoms/A2UIRenderer";
 import { TypingIndicator } from "../atoms/TypingIndicator";
 
@@ -167,7 +167,9 @@ export function parseThinking(content: string): {
 
 export function AIInvestigationSidebar({
   onEngineSettingsOpen,
-}: { readonly onEngineSettingsOpen?: () => void }) {
+}: {
+  readonly onEngineSettingsOpen?: () => void;
+}) {
   const {
     isSidebarOpen,
     setSidebarOpen,

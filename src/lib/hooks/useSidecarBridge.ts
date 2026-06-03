@@ -32,8 +32,8 @@ export const SIDECAR_BASE_URL = import.meta.env.VITE_SIDECAR_URL || "http://loca
 
 export const SIDECAR_URL = `${SIDECAR_BASE_URL}/rpc`;
 
-import { useDebugStore } from "@/store/debugStore";
 import { toast } from "sonner";
+import { useDebugStore } from "@/store/debugStore";
 
 /**
  * Dispatches a JSON-RPC request to the Python sidecar.

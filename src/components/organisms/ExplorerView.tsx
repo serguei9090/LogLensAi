@@ -1,7 +1,7 @@
+import { FileText, Folder, MoreVertical, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DraggableItem, DroppableArea } from "@/lib/dnd-wrappers";
 import type { HierarchyNode } from "@/store/workspaceStore";
-import { FileText, Folder, MoreVertical, Plus } from "lucide-react";
 
 interface ExplorerViewProps {
   readonly folderId: string | null;

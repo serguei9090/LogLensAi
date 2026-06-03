@@ -1,20 +1,3 @@
-import {
-  type DashboardMode,
-  DashboardModeToggle,
-} from "@/components/molecules/DashboardModeToggle";
-import { type TimeRange, TimeRangePicker } from "@/components/molecules/TimeRangePicker";
-import { Button } from "@/components/ui/button";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { callSidecar } from "@/lib/hooks/useSidecarBridge";
-import { cn } from "@/lib/utils";
-import { useIngestionStore } from "@/store/ingestionStore";
-import { selectActiveWorkspace, useWorkspaceStore } from "@/store/workspaceStore";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   Activity,
@@ -27,16 +10,31 @@ import {
   TrendingUp,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
-
+import { A2UIRenderer } from "@/components/atoms/A2UIRenderer";
 // Atomic/Molecule Imports
 import { StatCard } from "@/components/atoms/StatCard";
 import { ClusterRow } from "@/components/molecules/ClusterRow";
-import { DashboardCharts } from "@/components/organisms/DashboardCharts";
-
-import { A2UIRenderer } from "@/components/atoms/A2UIRenderer";
+import {
+  type DashboardMode,
+  DashboardModeToggle,
+} from "@/components/molecules/DashboardModeToggle";
+import { type TimeRange, TimeRangePicker } from "@/components/molecules/TimeRangePicker";
 import { AIInvestigationSidebar } from "@/components/organisms/AIInvestigationSidebar";
+import { DashboardCharts } from "@/components/organisms/DashboardCharts";
+import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { callSidecar } from "@/lib/hooks/useSidecarBridge";
+import { cn } from "@/lib/utils";
 // AI Mode Imports
 import { useAiStore } from "@/store/aiStore";
+import { useIngestionStore } from "@/store/ingestionStore";
+import { selectActiveWorkspace, useWorkspaceStore } from "@/store/workspaceStore";
 
 interface DashboardStats {
   total_logs: number;

@@ -1,3 +1,27 @@
+import {
+  Activity,
+  Bot,
+  Check,
+  ChevronDown,
+  ChevronRight,
+  Clock,
+  Cpu,
+  Eye,
+  EyeOff,
+  FolderOpen,
+  Layers,
+  Loader2,
+  Network,
+  Palette,
+  Plus,
+  RefreshCcw,
+  RotateCcw,
+  Terminal,
+  Trash2,
+  X,
+} from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
+import { toast } from "sonner";
 import { HelpTooltip } from "@/components/atoms/HelpTooltip";
 import { FacetExtractionSettings } from "@/components/molecules/FacetExtractionSettings";
 import { Button } from "@/components/ui/button";
@@ -16,34 +40,11 @@ import { useIngestionStore } from "@/store/ingestionStore";
 import { useInvestigationStore } from "@/store/investigationStore";
 import {
   type AppSettings,
-  type KeyboardShortcut,
   defaultSettings,
+  type KeyboardShortcut,
   useSettingsStore,
 } from "@/store/settingsStore";
 import { useWorkspaceStore } from "@/store/workspaceStore";
-import {
-  Activity,
-  Bot,
-  Check,
-  ChevronDown,
-  ChevronRight,
-  Cpu,
-  Eye,
-  EyeOff,
-  FolderOpen,
-  Layers,
-  Loader2,
-  Network,
-  Palette,
-  Plus,
-  RefreshCcw,
-  RotateCcw,
-  Terminal,
-  Trash2,
-  X,
-} from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
-import { toast } from "sonner";
 
 type SectionId = "ai" | "drain" | "ingestion" | "general";
 
@@ -1243,6 +1244,77 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
                     <RefreshCcw className="size-3.5" />
                     Clear Pattern Cache
                   </Button>
+                </div>
+              </div>
+
+              {/* Sub-Section: Log Timestamp Extraction */}
+              <div className="space-y-6 pt-6 border-t border-border/30">
+                <div className="flex items-center gap-3">
+                  <div className="bg-primary/20 p-2 rounded-xl">
+                    <Clock className="h-5 w-5 text-primary" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-bold text-text-primary">
+                      Log Timestamp Extraction & Detection
+                    </h3>
+                    <p className="text-xs text-text-muted">
+                      Control how dates are automatically detected or parsed from log lines.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between bg-bg-surface/50 border border-border rounded-xl p-4 hover:bg-bg-surface transition-colors">
+                    <div>
+                      <p className="text-sm font-bold text-text-primary">Auto-Detect Timestamps</p>
+                      <p className="text-[10px] text-text-muted mt-0.5">
+                        Scan log messages automatically for standard date formats (ISO, Apache,
+                        Syslog, etc.).
+                      </p>
+                    </div>
+                    <Switch
+                      checked={settings.timestamp_auto_detect}
+                      onCheckedChange={(checked) => update("timestamp_auto_detect", checked)}
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-6 pt-2">
+                    <div className="space-y-2">
+                      <SectionLabel htmlFor="timestamp_custom_regex">
+                        Custom Timestamp Regex
+                      </SectionLabel>
+                      <SettingInput
+                        id="timestamp_custom_regex"
+                        type="text"
+                        value={settings.timestamp_custom_regex || ""}
+                        onChange={(e) => update("timestamp_custom_regex", e.target.value, false)}
+                        onBlur={() => onSave(settings)}
+                        placeholder="e.g. ^\[(?P<timestamp>[^\]]+)\]"
+                      />
+                      <p className="text-[10px] text-text-muted/50 px-1">
+                        Use a custom regex pattern to extract the timestamp string (requires a{" "}
+                        <code>?P&lt;timestamp&gt;</code> capture group).
+                      </p>
+                    </div>
+
+                    <div className="space-y-2">
+                      <SectionLabel htmlFor="timestamp_custom_format">
+                        Custom Timestamp Format
+                      </SectionLabel>
+                      <SettingInput
+                        id="timestamp_custom_format"
+                        type="text"
+                        value={settings.timestamp_custom_format || ""}
+                        onChange={(e) => update("timestamp_custom_format", e.target.value, false)}
+                        onBlur={() => onSave(settings)}
+                        placeholder="e.g. %d/%b/%Y:%H:%M:%S"
+                      />
+                      <p className="text-[10px] text-text-muted/50 px-1">
+                        Optionally provide a custom <code>strptime</code> format string to parse the
+                        extracted timestamp.
+                      </p>
+                    </div>
+                  </div>
                 </div>
               </div>
 

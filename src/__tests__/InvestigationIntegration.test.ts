@@ -1,6 +1,6 @@
+import { describe, expect, it, vi } from "vitest";
 import { callSidecar } from "@/lib/hooks/useSidecarBridge";
 import { useInvestigationStore } from "@/store/investigationStore";
-import { describe, expect, it, vi } from "vitest";
 
 // Mock fetch for web-mode sidecar calls
 globalThis.fetch = vi.fn();

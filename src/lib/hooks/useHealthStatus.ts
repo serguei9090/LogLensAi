@@ -1,5 +1,5 @@
-import { useHealthStore } from "@/store/healthStore";
 import { useEffect, useRef } from "react";
+import { useHealthStore } from "@/store/healthStore";
 
 // Health is a heartbeat — only needs to detect a crashed sidecar process.
 // 30s is sufficient; reduces health RPC calls by ~83% vs the prior 5s interval.

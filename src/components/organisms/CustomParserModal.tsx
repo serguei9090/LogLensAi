@@ -1,10 +1,10 @@
+import { Clock, Info, Search, Terminal, Trash2, Wand2, X } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { callSidecar } from "@/lib/hooks/useSidecarBridge";
 import { cn } from "@/lib/utils";
-import { Clock, Info, Search, Terminal, Trash2, Wand2, X } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
-import { toast } from "sonner";
 
 interface ParserMapping {
   start: number;

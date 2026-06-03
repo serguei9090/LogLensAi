@@ -1,5 +1,5 @@
-import { callSidecar } from "@/lib/hooks/useSidecarBridge";
 import { create } from "zustand";
+import { callSidecar } from "@/lib/hooks/useSidecarBridge";
 
 export interface KeyboardShortcut {
   key: string;
@@ -34,6 +34,9 @@ export interface AppSettings {
   ingestion_http_port: number;
   facet_extractions: Array<{ name: string; regex: string; group: number; enabled: boolean }>;
   ui_command_palette_shortcut: KeyboardShortcut;
+  timestamp_auto_detect: boolean;
+  timestamp_custom_regex: string;
+  timestamp_custom_format: string;
 }
 
 export const defaultSettings: AppSettings = {
@@ -63,7 +66,7 @@ export const defaultSettings: AppSettings = {
       enabled: true,
     },
     {
-      pattern: String.raw`[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}`,
+      pattern: "[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}",
       label: "UUID",
       enabled: true,
     },
@@ -86,6 +89,9 @@ export const defaultSettings: AppSettings = {
   ingestion_http_port: 5002,
   facet_extractions: [],
   ui_command_palette_shortcut: { key: "k", ctrl: true },
+  timestamp_auto_detect: true,
+  timestamp_custom_regex: "",
+  timestamp_custom_format: "",
 };
 
 interface SettingsStore {
@@ -162,6 +168,9 @@ export const useSettingsStore = create<SettingsStore>((set) => ({
                 ? (parsed as KeyboardShortcut)
                 : defaultSettings.ui_command_palette_shortcut;
             })(),
+            timestamp_auto_detect: remote.timestamp_auto_detect?.toLowerCase() !== "false",
+            timestamp_custom_regex: remote.timestamp_custom_regex || "",
+            timestamp_custom_format: remote.timestamp_custom_format || "",
           },
         });
       }

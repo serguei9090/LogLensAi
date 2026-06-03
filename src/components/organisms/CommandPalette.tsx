@@ -1,9 +1,3 @@
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { useAiStore } from "@/store/aiStore";
-import { useUIStore } from "@/store/uiStore";
-import { useWorkspaceStore } from "@/store/workspaceStore";
 import {
   Database,
   LayoutDashboard,
@@ -16,6 +10,12 @@ import {
   XCircle,
 } from "lucide-react";
 import { useMemo, useState } from "react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { useAiStore } from "@/store/aiStore";
+import { useUIStore } from "@/store/uiStore";
+import { useWorkspaceStore } from "@/store/workspaceStore";
 
 interface CommandPaletteProps {
   readonly open: boolean;

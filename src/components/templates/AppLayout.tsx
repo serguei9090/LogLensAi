@@ -1,8 +1,3 @@
-import type { NavTab } from "@/App";
-import { type DiagnosticData, DiagnosticSidebar } from "@/components/organisms/DiagnosticSidebar";
-import { Sidebar } from "@/components/organisms/Sidebar";
-import type { Workspace } from "@/store/workspaceStore";
-import { useWorkspaceStore } from "@/store/workspaceStore";
 import {
   DndContext,
   type DragEndEvent,
@@ -13,6 +8,11 @@ import {
 } from "@dnd-kit/core";
 import { restrictToWindowEdges } from "@dnd-kit/modifiers";
 import type { ReactNode } from "react";
+import type { NavTab } from "@/App";
+import { type DiagnosticData, DiagnosticSidebar } from "@/components/organisms/DiagnosticSidebar";
+import { Sidebar } from "@/components/organisms/Sidebar";
+import type { Workspace } from "@/store/workspaceStore";
+import { useWorkspaceStore } from "@/store/workspaceStore";
 
 interface AppLayoutProps {
   readonly workspaces: readonly Workspace[];

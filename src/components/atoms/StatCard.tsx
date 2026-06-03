@@ -1,6 +1,6 @@
-import { cn } from "@/lib/utils";
 import { motion } from "framer-motion";
 import type React from "react";
+import { cn } from "@/lib/utils";
 
 interface StatCardProps {
   icon: React.ReactNode;

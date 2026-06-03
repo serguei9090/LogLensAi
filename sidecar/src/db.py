@@ -161,6 +161,7 @@ class LogDatabase:
                 line_id      INTEGER,
                 raw_text     TEXT,
                 timestamp    TEXT,
+                ingest_timestamp TEXT,
                 level        TEXT,
                 cluster_id   TEXT,
                 has_comment  BOOLEAN DEFAULT FALSE,
@@ -581,6 +582,12 @@ class LogDatabase:
             cursor.execute("SELECT source_id FROM logs LIMIT 1")
         except Exception:
             cursor.execute("ALTER TABLE logs ADD COLUMN source_id TEXT")
+
+        try:
+            cursor.execute("SELECT ingest_timestamp FROM logs LIMIT 1")
+        except Exception:
+            logger.info("[DB] Migrating: Adding 'ingest_timestamp' column to logs table")
+            cursor.execute("ALTER TABLE logs ADD COLUMN ingest_timestamp TEXT")
 
         # Ensure all per-table sequences exist on legacy databases that were
         # created before the dedicated-sequence migration.

@@ -1,8 +1,8 @@
-import { cn } from "@/lib/utils";
-import { useInvestigationStore } from "@/store/investigationStore";
 import { AnimatePresence, motion } from "framer-motion";
 import { ChevronDown, ChevronRight, Database } from "lucide-react";
 import { useState } from "react";
+import { cn } from "@/lib/utils";
+import { useInvestigationStore } from "@/store/investigationStore";
 import type { FilterEntry } from "./FilterBuilder";
 
 interface FacetListProps {

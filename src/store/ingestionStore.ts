@@ -1,5 +1,5 @@
-import { callSidecar } from "@/lib/hooks/useSidecarBridge";
 import { create } from "zustand";
+import { callSidecar } from "@/lib/hooks/useSidecarBridge";
 
 export interface IngestionJob {
   id: number;
