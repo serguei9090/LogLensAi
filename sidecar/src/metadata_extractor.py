@@ -56,6 +56,16 @@ def _parse_timestamp(extracted_ts: str, fmt: str, tz_offset: float) -> str | Non
     if fmt == "%Y-%m-%d %H:%M:%S" and "T" in ts_clean:
         ts_clean = ts_clean.replace("T", " ")
 
+    # Check for milliseconds or fraction of a second if %f is not in format
+    fraction_sec = 0.0
+    if "%f" not in fmt:
+        ms_match = re.search(r"[:\d]([.,]\d{1,6})\b", ts_clean)
+        if ms_match:
+            fraction_str = ms_match.group(1).replace(",", ".")
+            with contextlib.suppress(ValueError):
+                fraction_sec = float(fraction_str)
+            ts_clean = ts_clean.replace(ms_match.group(1), "")
+
     has_year = "%Y" in fmt or "%y" in fmt
     try:
         if not has_year:
@@ -66,9 +76,13 @@ def _parse_timestamp(extracted_ts: str, fmt: str, tz_offset: float) -> str | Non
             slice_len = FORMAT_LENGTHS.get(fmt, len(fmt) + 2)
             dt = datetime.datetime.strptime(ts_clean[:slice_len], fmt)
 
+        if fraction_sec > 0:
+            dt = dt + datetime.timedelta(seconds=fraction_sec)
+
         if tz_offset != 0:
             dt = dt + datetime.timedelta(hours=tz_offset)
-        return dt.strftime("%Y-%m-%d %H:%M:%S")
+
+        return dt.strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
     except Exception:
         return None
 

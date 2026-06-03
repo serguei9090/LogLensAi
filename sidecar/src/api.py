@@ -648,6 +648,18 @@ class App:
         }
         return mapping.get(op, (None, None))
 
+    def _normalize_query_timestamp(self, ts: str | None) -> str | None:
+        if not ts:
+            return None
+        norm = ts.replace("T", " ").replace("Z", "")
+        if "." in norm:
+            parts = norm.split(".")
+            ms_val = parts[1].ljust(3, "0")[:3]
+            if ms_val == "000":
+                return parts[0]
+            return parts[0] + "." + ms_val
+        return norm
+
     def _build_logs_where_clause(
         self,
         workspace_id: str,
@@ -682,11 +694,13 @@ class App:
             params.extend(llql_params)
 
         if start_time:
+            norm_start = self._normalize_query_timestamp(start_time)
             where_clauses.append("l.timestamp >= ?")
-            params.append(start_time)
+            params.append(norm_start)
         if end_time:
+            norm_end = self._normalize_query_timestamp(end_time)
             where_clauses.append("l.timestamp <= ?")
-            params.append(end_time)
+            params.append(norm_end)
 
         return SQL_AND_JOIN.join(where_clauses), params
 
@@ -848,12 +862,12 @@ class App:
                 sql_params.extend(llql_params)
 
         if params.start_time:
-            norm_start = params.start_time.replace("T", " ").split(".")[0].replace("Z", "")
+            norm_start = self._normalize_query_timestamp(params.start_time)
             where_clauses.append("timestamp >= ?")
             sql_params.append(norm_start)
 
         if params.end_time:
-            norm_end = params.end_time.replace("T", " ").split(".")[0].replace("Z", "")
+            norm_end = self._normalize_query_timestamp(params.end_time)
             where_clauses.append("timestamp <= ?")
             sql_params.append(norm_end)
 
@@ -880,9 +894,14 @@ class App:
                     ts_str = log["timestamp"]
                     if "T" in ts_str:
                         ts_str = ts_str.replace("T", " ")
+                    ms_part = ""
+                    if "." in ts_str:
+                        parts = ts_str.split(".")
+                        ts_str = parts[0]
+                        ms_part = "." + parts[1]
                     dt = datetime.strptime(ts_str[:19], "%Y-%m-%d %H:%M:%S")
                     dt = dt + timedelta(seconds=shift_sec)
-                    log["timestamp"] = dt.strftime("%Y-%m-%d %H:%M:%S")
+                    log["timestamp"] = dt.strftime("%Y-%m-%d %H:%M:%S") + ms_part
                 except Exception:
                     pass
 

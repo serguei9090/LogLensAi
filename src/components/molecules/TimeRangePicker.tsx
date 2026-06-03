@@ -344,8 +344,8 @@ function CalendarHeader({
   };
   const label = LABEL_BY_VIEW[view];
   const isClickable = isDays || isMonths;
-  const showPrev = isDays ? Boolean(onPrev) : isClickable;
-  const showNext = isDays ? Boolean(onNext) : isClickable;
+  const showPrev = Boolean(onPrev);
+  const showNext = Boolean(onNext);
 
   return (
     <div className="flex items-center justify-between w-full mb-2 pb-2 border-b border-white/5 px-1">
@@ -726,11 +726,11 @@ export function TimeRangePicker({ value, onChange, className }: TimeRangePickerP
                         view={view}
                         onPrev={() => {
                           const setter = activeSide === "left" ? setMonthLeft : setMonthRight;
-                          setter((m) => dateFnsSetYear(m, getYear(m) - 5));
+                          setter((m) => dateFnsSetYear(m, getYear(m) - 12));
                         }}
                         onNext={() => {
                           const setter = activeSide === "left" ? setMonthLeft : setMonthRight;
-                          setter((m) => dateFnsSetYear(m, getYear(m) + 5));
+                          setter((m) => dateFnsSetYear(m, getYear(m) + 12));
                         }}
                         onToggleView={() => handleToggleView(activeSide)}
                       />

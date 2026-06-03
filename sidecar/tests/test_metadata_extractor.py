@@ -30,7 +30,7 @@ def test_extract_base_metadata_with_config():
     config = {"regex": r"^(?P<timestamp>.*?) \[(?P<level>.*?)\] (?P<message>.*)$"}
     line = "2026-04-23 12:00:00 [DEBUG] Detailed info"
     ts, lvl, msg = _extract_base_metadata(line, parser_config=config)
-    assert ts == "2026-04-23 12:00:00"
+    assert ts == "2026-04-23 12:00:00.000"
     assert lvl == "DEBUG"
     assert msg == "Detailed info"
 
@@ -39,7 +39,7 @@ def test_extract_base_metadata_with_timezone():
     config = {"regex": r"^(?P<timestamp>[\d\- :]{19}) (?P<message>.*)$"}
     line = "2026-04-23 12:00:00 Something happened"
     ts, _, _ = _extract_base_metadata(line, parser_config=config, tz_offset=2)
-    assert ts == "2026-04-23 14:00:00"
+    assert ts == "2026-04-23 14:00:00.000"
 
 
 def test_extract_log_metadata_full():
