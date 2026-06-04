@@ -7,7 +7,11 @@ import re
 logger = logging.getLogger(__name__)
 
 # --- Pre-compiled Patterns for Performance ---
-RE_LEVEL = re.compile(r"\b(FATAL|ERROR|WARN|DEBUG|TRACE|INFO)\b", re.I)
+RE_LEVEL = re.compile(r"\b(FATAL|ERROR|WARN(?:ING)?|DEBUG|TRACE|INFO)\b", re.I)
+
+# Apache/Nginx CLF: matches the HTTP status code field (e.g. '" 200 ', '" 404 ')
+# Format: "METHOD /path HTTP/x.x" STATUS bytes
+RE_HTTP_STATUS = re.compile(r'"[^"]*"\s+(\d{3})\s')
 
 # Pre-calculate expected length of each format string using a dummy date
 _DUMMY_DATE = datetime.datetime(2000, 10, 10, 12, 12, 12)
@@ -137,10 +141,26 @@ def _extract_base_metadata(
     level = "INFO"
     message = raw_line
 
-    # Generic heuristic for level
+    # Derive level from HTTP status codes (Apache/Nginx CLF access logs)
+    http_match = RE_HTTP_STATUS.search(raw_line)
+    if http_match:
+        status = int(http_match.group(1))
+        if status >= 500:
+            level = "ERROR"
+        elif status >= 400:
+            level = "WARN"
+        elif status >= 300:
+            level = "DEBUG"
+        else:
+            level = "INFO"  # 2xx — keep default
+
+    # Generic heuristic for level (overrides HTTP status if explicit keyword found)
     match = RE_LEVEL.search(raw_line)
     if match:
         level = match.group(1).upper()
+        # Normalize WARNING → WARN
+        if level == "WARNING":
+            level = "WARN"
 
     parser_config = parser_config or {}
 
@@ -212,9 +232,7 @@ def extract_log_metadata(
     Applies source-specific regex patterns and timezone normalization to a raw log line.
     """
     # 1. Base Metadata
-    timestamp, level, message = _extract_base_metadata(
-        raw_line, parser_config, tz_offset
-    )
+    timestamp, level, message = _extract_base_metadata(raw_line, parser_config, tz_offset)
     ingest_timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
     facets = {}
