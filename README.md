@@ -1,6 +1,11 @@
 # LogLensAi: High-Performance Log Analysis Cockpit
 
 LogLensAi is a state-of-the-art diagnostic tool designed for high-velocity log ingestion and clustering. Built on the **Obsidian Lens** design system, it provides developers with a sleek, premium interface for deep-diving into millions of logs with zero latency.
+## This is a personal learning project created for educational purposes and to explore different code concepts with ai concepts. 
+
+* **Status:** Personal sandbox / Portfolio piece.
+* **License:** This project is open-source and available for public educational use under the MIT License.
+* **Purpose:** Academic research and technical skill development.
 
 ## 🏗️ Technical Architecture
 - **Frontend**: Tauri v2, React 19, Vite, Zustand, TanStack Table (Virtualization).
