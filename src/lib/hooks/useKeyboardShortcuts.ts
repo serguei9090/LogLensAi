@@ -15,11 +15,29 @@ interface Shortcut {
 export function useKeyboardShortcuts(shortcuts: Shortcut[]) {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      const activeEl = document.activeElement;
+      const isInputField =
+        activeEl &&
+        (activeEl.tagName === "INPUT" ||
+          activeEl.tagName === "TEXTAREA" ||
+          activeEl.getAttribute("contenteditable") === "true");
+
       const platform = (navigator as any).platform || "";
       const isMac = platform.toUpperCase().includes("MAC");
 
       for (const shortcut of shortcuts) {
         if (!shortcut.key) {
+          continue;
+        }
+
+        // Ignore single-character keyboard shortcuts when typing in inputs/textareas
+        if (
+          isInputField &&
+          !shortcut.ctrl &&
+          !shortcut.meta &&
+          !shortcut.alt &&
+          shortcut.key.length === 1
+        ) {
           continue;
         }
 

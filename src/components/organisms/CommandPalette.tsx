@@ -126,7 +126,7 @@ export function CommandPalette({ open, onOpenChange, onNavSelect }: CommandPalet
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl bg-zinc-950/90 border-zinc-800/60 backdrop-blur-xl p-0 overflow-hidden outline-none">
+      <DialogContent className="sm:max-w-2xl w-full bg-zinc-950/90 border-zinc-800/60 backdrop-blur-xl p-0 overflow-hidden outline-none">
         <DialogHeader className="p-4 border-b border-zinc-800/40">
           <DialogTitle className="sr-only">Command Palette</DialogTitle>
           <div className="relative">

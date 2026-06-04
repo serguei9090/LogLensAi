@@ -1880,19 +1880,25 @@ class App:
     def method_get_sample_logs(
         self, workspace_id: str, limit: int = 10, source_id: str | None = None
     ) -> dict:
-        """Return random raw log lines for column preview in the Add Column modal."""
+        """Return random raw log lines from the beginning for column preview in the Add Column modal."""
         cursor = self.db.get_cursor()
         if source_id:
             cursor.execute(
-                """SELECT raw_text FROM logs
-                   WHERE workspace_id = ? AND source_id = ? AND raw_text IS NOT NULL
+                """SELECT raw_text FROM (
+                       SELECT raw_text, id FROM logs
+                       WHERE workspace_id = ? AND source_id = ? AND raw_text IS NOT NULL
+                       ORDER BY id ASC LIMIT 200
+                   )
                    ORDER BY RANDOM() LIMIT ?""",
                 (workspace_id, source_id, max(1, min(limit, 50))),
             )
         else:
             cursor.execute(
-                """SELECT raw_text FROM logs
-                   WHERE workspace_id = ? AND raw_text IS NOT NULL
+                """SELECT raw_text FROM (
+                       SELECT raw_text, id FROM logs
+                       WHERE workspace_id = ? AND raw_text IS NOT NULL
+                       ORDER BY id ASC LIMIT 200
+                   )
                    ORDER BY RANDOM() LIMIT ?""",
                 (workspace_id, max(1, min(limit, 50))),
             )

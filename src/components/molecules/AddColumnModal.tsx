@@ -120,7 +120,7 @@ export function AddColumnModal({ open, onOpenChange, onSave }: AddColumnModalPro
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl bg-bg-surface border-border text-text-primary">
+      <DialogContent className="sm:max-w-2xl w-full bg-bg-surface border-border text-text-primary">
         <DialogHeader>
           <DialogTitle className="text-lg font-bold flex items-center gap-2">
             <Plus className="size-4 text-primary" />
@@ -132,7 +132,7 @@ export function AddColumnModal({ open, onOpenChange, onSave }: AddColumnModalPro
           </DialogDescription>
         </DialogHeader>
 
-        <div className="grid grid-cols-2 gap-4 py-2">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 py-2">
           {/* Column Name */}
           <div className="space-y-1.5">
             <Label
@@ -187,7 +187,7 @@ export function AddColumnModal({ open, onOpenChange, onSave }: AddColumnModalPro
           </div>
 
           {/* Regex */}
-          <div className="col-span-2 space-y-1.5">
+          <div className="col-span-1 sm:col-span-2 space-y-1.5">
             <Label
               htmlFor="col-regex"
               className="text-xs font-semibold uppercase tracking-wider text-text-secondary"
@@ -248,17 +248,19 @@ export function AddColumnModal({ open, onOpenChange, onSave }: AddColumnModalPro
               <div className="divide-y divide-border/50">
                 {preview.map((row, i) => (
                   <div key={i} className="px-3 py-2 group hover:bg-white/[0.02]">
-                    {/* Raw line — truncated */}
-                    <p className="font-mono text-[11px] text-text-muted truncate leading-tight">
+                    {/* Raw line — wrapped */}
+                    <p className="font-mono text-[11px] text-text-muted break-all whitespace-pre-wrap leading-tight">
                       {row.raw}
                     </p>
                     {/* Extracted value */}
                     {row.match !== null ? (
-                      <p className="font-mono text-[11px] text-primary mt-0.5 truncate">
+                      <p className="font-mono text-[11px] text-primary mt-0.5 break-all whitespace-pre-wrap">
                         → <span className="bg-primary/10 px-1 rounded">{row.match}</span>
                       </p>
                     ) : regex && !regexError ? (
-                      <p className="font-mono text-[11px] text-text-muted/40 mt-0.5">→ no match</p>
+                      <p className="font-mono text-[11px] text-text-muted/40 mt-0.5 break-all whitespace-pre-wrap">
+                        → no match
+                      </p>
                     ) : null}
                   </div>
                 ))}

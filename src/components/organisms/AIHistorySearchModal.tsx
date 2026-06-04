@@ -30,7 +30,7 @@ export function AIHistorySearchModal({ open, onOpenChange }: AIHistorySearchModa
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl bg-bg-surface-bright/95 border-border/60 backdrop-blur-xl p-0 overflow-hidden outline-none shadow-2xl">
+      <DialogContent className="sm:max-w-2xl w-full bg-bg-surface-bright/95 border-border/60 backdrop-blur-xl p-0 overflow-hidden outline-none shadow-2xl">
         <DialogHeader className="p-4 border-b border-zinc-800/40">
           <DialogTitle className="text-text-muted text-[10px] font-bold uppercase tracking-widest flex items-center gap-2">
             <Search className="size-3" />
