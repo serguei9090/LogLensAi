@@ -274,7 +274,7 @@ export function DashboardCharts({
 
         <div className="flex-1 w-full min-h-0 select-none">
           {chartData.length > 0 ? (
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
               <BarChart
                 data={chartData}
                 maxBarSize={28}

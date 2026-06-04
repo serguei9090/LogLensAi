@@ -70,7 +70,6 @@ export function LogDistributionWidget({
               fusion_id: fusionId,
               query: query,
               filters: filters,
-              interval: "1h",
               start_time: timeRange.start || undefined,
               end_time: timeRange.end || undefined,
             },
@@ -115,11 +114,9 @@ export function LogDistributionWidget({
   const formattedData = useMemo(
     () =>
       data.map((d) => {
-        const timeStr = d.bucket; // "YYYY-MM-DD HH:MM"
-        const date = new Date(`${timeStr}:00Z`);
-        const displayTime = Number.isNaN(date.getTime())
-          ? timeStr.split(" ")[1] || timeStr
-          : date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+        const timeStr = d.bucket; // "YYYY-MM-DD HH:MM:SS" or similar
+        const parts = timeStr.split(" ");
+        const displayTime = parts.length === 2 ? parts[1] : timeStr;
 
         const hasAnomaly = anomalies.some((a) => a.timestamp.startsWith(timeStr));
 
@@ -225,7 +222,7 @@ export function LogDistributionWidget({
           Recharts warning that fires when the container hasn't laid out yet.
         */}
         {formattedData.length > 0 && (
-          <ResponsiveContainer width="100%" height="100%" minHeight={0}>
+          <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
             <BarChart data={formattedData} margin={{ top: 0, right: 10, left: -20, bottom: 0 }}>
               <XAxis
                 dataKey="displayTime"

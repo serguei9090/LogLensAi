@@ -101,6 +101,7 @@ export function InvestigationLayout({
           fusionId={activeSource?.type === "fusion" ? activeSource.path : undefined}
           isTailing={activeSourceId ? tailingSourceIds?.has(activeSourceId) : false}
           filters={activeFilters}
+          query={searchQuery}
           onClose={onDistributionClose}
         />
       )}
