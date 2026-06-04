@@ -99,7 +99,7 @@ function InvestigationPageImpl() {
 
     setLogs([], 0);
     setAvailableFacets({});
-    // Also reset any local investigation state if needed
+    useInvestigationStore.getState().setTimeRange({ start: "", end: "", label: "All Time" });
   }, [activeWorkspaceId, activeSourceId, setLogs, setAvailableFacets]);
 
   // Memoize the query params to reduce complexity in fetchLogs

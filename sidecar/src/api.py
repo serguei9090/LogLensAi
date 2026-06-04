@@ -921,6 +921,13 @@ class App:
             sql_params.extend(params.source_ids)
 
         where_sql = " AND ".join(where_clauses)
+
+        # Safeguard: Check if logs exist first to prevent DuckDB assertions on empty datasets
+        cursor.execute(f"SELECT EXISTS(SELECT 1 FROM logs WHERE {where_sql})", sql_params)
+        exists = cursor.fetchone()[0]
+        if not exists:
+            return {"min_time": "", "max_time": ""}
+
         query = f"SELECT MIN(timestamp), MAX(timestamp) FROM logs WHERE {where_sql}"
 
         cursor.execute(query, sql_params)
@@ -1001,6 +1008,12 @@ class App:
 
         where_sql, sql_params = self._build_distribution_where_clause(params)
         if where_sql is None:
+            return {"buckets": []}
+
+        # Safeguard: Check if logs exist first to prevent DuckDB assertions on empty datasets
+        cursor.execute(f"SELECT EXISTS(SELECT 1 FROM logs WHERE {where_sql})", sql_params)
+        exists = cursor.fetchone()[0]
+        if not exists:
             return {"buckets": []}
 
         # Determine duration of the timeframe to calculate optimal buckets

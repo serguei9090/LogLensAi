@@ -21,7 +21,7 @@ def test_apply_custom_extractions():
 
 def test_extract_base_metadata_no_config():
     line = "ERROR: Something went wrong"
-    ts, lvl, msg = _extract_base_metadata(line)
+    ts, lvl, msg, _ = _extract_base_metadata(line)
     assert lvl == "ERROR"
     assert msg == line
 
@@ -29,7 +29,7 @@ def test_extract_base_metadata_no_config():
 def test_extract_base_metadata_with_config():
     config = {"regex": r"^(?P<timestamp>.*?) \[(?P<level>.*?)\] (?P<message>.*)$"}
     line = "2026-04-23 12:00:00 [DEBUG] Detailed info"
-    ts, lvl, msg = _extract_base_metadata(line, parser_config=config)
+    ts, lvl, msg, _ = _extract_base_metadata(line, parser_config=config)
     assert ts == "2026-04-23 12:00:00.000"
     assert lvl == "DEBUG"
     assert msg == "Detailed info"
@@ -38,7 +38,7 @@ def test_extract_base_metadata_with_config():
 def test_extract_base_metadata_with_timezone():
     config = {"regex": r"^(?P<timestamp>[\d\- :]{19}) (?P<message>.*)$"}
     line = "2026-04-23 12:00:00 Something happened"
-    ts, _, _ = _extract_base_metadata(line, parser_config=config, tz_offset=2)
+    ts, _, _, _ = _extract_base_metadata(line, parser_config=config, tz_offset=2)
     assert ts == "2026-04-23 14:00:00.000"
 
 
@@ -51,7 +51,7 @@ def test_extract_log_metadata_full():
 
 def test_extract_base_metadata_exception():
     config = {"regex": "["}
-    _, lvl, msg = _extract_base_metadata("Some line", parser_config=config)
+    _, lvl, msg, _ = _extract_base_metadata("Some line", parser_config=config)
     assert lvl == "INFO"
     assert msg == "Some line"
 
