@@ -1,9 +1,12 @@
+// Assume Role: Frontend Engineer (@frontend)
 import { X } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Bar, BarChart, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import type { FilterEntry } from "@/components/molecules/FilterBuilder";
 import { callSidecar } from "@/lib/hooks/useSidecarBridge";
 import { useInvestigationStore } from "@/store/investigationStore";
+
+// ─── Types ────────────────────────────────────────────────────────────────────
 
 interface Bucket {
   bucket: string;
@@ -29,6 +32,8 @@ interface LogDistributionWidgetProps {
   readonly isTailing?: boolean;
   readonly onClose?: () => void;
 }
+
+// ─── Component ────────────────────────────────────────────────────────────────
 
 export function LogDistributionWidget({
   workspaceId,
@@ -106,28 +111,35 @@ export function LogDistributionWidget({
     };
   }, [workspaceId, sourceIds, fusionId, filters, query, isTailing, timeRange]);
 
-  // Format the time bucket for display
-  const formattedData = data.map((d) => {
-    const timeStr = d.bucket; // "YYYY-MM-DD HH:MM"
-    const date = new Date(`${timeStr}:00Z`); // approximate or treat as local
-    const displayTime = Number.isNaN(date.getTime())
-      ? timeStr.split(" ")[1] || timeStr
-      : date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  // Format the time bucket for display — memoized to avoid recalculation every render
+  const formattedData = useMemo(
+    () =>
+      data.map((d) => {
+        const timeStr = d.bucket; // "YYYY-MM-DD HH:MM"
+        const date = new Date(`${timeStr}:00Z`);
+        const displayTime = Number.isNaN(date.getTime())
+          ? timeStr.split(" ")[1] || timeStr
+          : date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 
-    // Match anomalies to this bucket
-    const hasAnomaly = anomalies.some((a) => a.timestamp.startsWith(timeStr));
+        const hasAnomaly = anomalies.some((a) => a.timestamp.startsWith(timeStr));
 
-    return {
-      ...d,
-      displayTime,
-      hasAnomaly,
-      INFO: d.INFO || 0,
-      ERROR: d.ERROR || 0,
-      WARN: d.WARN || 0,
-    };
-  });
+        return {
+          ...d,
+          displayTime,
+          hasAnomaly,
+          INFO: d.INFO || 0,
+          ERROR: d.ERROR || 0,
+          WARN: d.WARN || 0,
+        };
+      }),
+    [data, anomalies],
+  );
 
-  const renderStatusOverlay = () => {
+  // Memoized status overlay — prevents the "setState during render" error that
+  // occurs when an inline function interacts with parent store updates mid-render.
+  // The specific error was: "Cannot update SystemDiagnosticConsole while rendering
+  // a different component (ForwardRef [ResponsiveContainer])".
+  const statusOverlay = useMemo(() => {
     if (loading && data.length === 0) {
       return (
         <div className="absolute inset-0 flex items-center justify-center bg-bg-base/80 z-20">
@@ -160,11 +172,11 @@ export function LogDistributionWidget({
     }
 
     return null;
-  };
+  }, [loading, error, data.length, isTailing]);
 
   return (
     <div className="min-h-[220px] h-[220px] w-full bg-bg-base border-b border-border/40 shrink-0 flex flex-col relative group">
-      {/* Header with Date Selectors */}
+      {/* Header */}
       <div className="flex items-center justify-between px-4 h-10 border-b border-border/20 bg-bg-base/50">
         <div className="flex items-center gap-2">
           <span className="text-[10px] font-bold uppercase tracking-widest text-text-muted">
@@ -198,48 +210,61 @@ export function LogDistributionWidget({
         </div>
       </div>
 
-      <div className="flex-1 p-4 relative overflow-hidden">
-        {renderStatusOverlay()}
+      {/*
+        Chart container — flex-1 + min-h-0 ensures flexbox resolves to a real
+        pixel height before Recharts measures it.  Without min-h-0, a flex child
+        inside a fixed-height parent can report -1 to ResponsiveContainer on the
+        first paint, triggering the "width(-1) and height(-1)" warning.
+      */}
+      <div className="flex-1 min-h-0 p-4 relative overflow-hidden">
+        {statusOverlay}
 
-        <ResponsiveContainer width="100%" height="100%">
-          <BarChart data={formattedData} margin={{ top: 0, right: 10, left: -20, bottom: 0 }}>
-            <XAxis
-              dataKey="displayTime"
-              tick={{ fill: "var(--color-text-muted)", fontSize: 10 }}
-              tickLine={false}
-              axisLine={false}
-              dy={5}
-            />
-            <YAxis
-              tick={{ fill: "var(--color-text-muted)", fontSize: 10 }}
-              tickLine={false}
-              axisLine={false}
-              dx={-5}
-            />
-            <Tooltip
-              cursor={{ fill: "var(--color-bg-hover)" }}
-              contentStyle={{
-                backgroundColor: "var(--color-bg-tooltip)",
-                borderColor: "var(--color-border-subtle)",
-                borderRadius: "8px",
-                fontSize: "12px",
-              }}
-              itemStyle={{ fontSize: "12px" }}
-            />
-            <Bar dataKey="INFO" stackId="a" fill="var(--color-info)" radius={[0, 0, 4, 4]} />
-            <Bar dataKey="WARN" stackId="a" fill="var(--color-warning)" />
-            <Bar dataKey="ERROR" stackId="a" fill="var(--color-error)" radius={[4, 4, 0, 0]}>
-              {formattedData.map((entry, index) => (
-                <Cell
-                  key={`cell-${index}`}
-                  fill={entry.hasAnomaly ? "var(--color-error)" : "var(--color-error)"}
-                  stroke={entry.hasAnomaly ? "var(--color-text-primary)" : "none"}
-                  strokeWidth={entry.hasAnomaly ? 2 : 0}
-                />
-              ))}
-            </Bar>
-          </BarChart>
-        </ResponsiveContainer>
+        {/*
+          Only mount the chart when there is data.
+          Skipping it while empty/loading prevents the width(-1)/height(-1)
+          Recharts warning that fires when the container hasn't laid out yet.
+        */}
+        {formattedData.length > 0 && (
+          <ResponsiveContainer width="100%" height="100%" minHeight={0}>
+            <BarChart data={formattedData} margin={{ top: 0, right: 10, left: -20, bottom: 0 }}>
+              <XAxis
+                dataKey="displayTime"
+                tick={{ fill: "var(--color-text-muted)", fontSize: 10 }}
+                tickLine={false}
+                axisLine={false}
+                dy={5}
+              />
+              <YAxis
+                tick={{ fill: "var(--color-text-muted)", fontSize: 10 }}
+                tickLine={false}
+                axisLine={false}
+                dx={-5}
+              />
+              <Tooltip
+                cursor={{ fill: "var(--color-bg-hover)" }}
+                contentStyle={{
+                  backgroundColor: "var(--color-bg-tooltip)",
+                  borderColor: "var(--color-border-subtle)",
+                  borderRadius: "8px",
+                  fontSize: "12px",
+                }}
+                itemStyle={{ fontSize: "12px" }}
+              />
+              <Bar dataKey="INFO" stackId="a" fill="var(--color-info)" radius={[0, 0, 4, 4]} />
+              <Bar dataKey="WARN" stackId="a" fill="var(--color-warning)" />
+              <Bar dataKey="ERROR" stackId="a" fill="var(--color-error)" radius={[4, 4, 0, 0]}>
+                {formattedData.map((entry, index) => (
+                  <Cell
+                    key={`cell-${index}`}
+                    fill="var(--color-error)"
+                    stroke={entry.hasAnomaly ? "var(--color-text-primary)" : "none"}
+                    strokeWidth={entry.hasAnomaly ? 2 : 0}
+                  />
+                ))}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        )}
       </div>
     </div>
   );

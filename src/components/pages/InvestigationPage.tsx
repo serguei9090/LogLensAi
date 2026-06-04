@@ -3,6 +3,7 @@
 import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { AIInvestigationSidebar } from "@/components/organisms/AIInvestigationSidebar";
+import { ColumnManagerSidebar } from "@/components/organisms/ColumnManagerSidebar";
 import { CustomParserModal } from "@/components/organisms/CustomParserModal";
 import { ExplorerView } from "@/components/organisms/ExplorerView";
 import { FacetSidebar } from "@/components/organisms/FacetSidebar";
@@ -524,7 +525,12 @@ function InvestigationPageImpl() {
         showDistribution={showDistribution}
         onDistributionClose={() => setShowDistribution(!showDistribution)}
         workspaceId={activeWorkspaceId}
-        leftPanel={<FacetSidebar />}
+        leftPanel={
+          <>
+            <FacetSidebar />
+            <ColumnManagerSidebar />
+          </>
+        }
         rightPanel={
           <AIInvestigationSidebar onEngineSettingsOpen={() => setIsEngineSettingsOpen(true)} />
         }

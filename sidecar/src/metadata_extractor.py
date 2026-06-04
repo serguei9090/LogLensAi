@@ -9,9 +9,11 @@ logger = logging.getLogger(__name__)
 # --- Pre-compiled Patterns for Performance ---
 RE_LEVEL = re.compile(r"\b(FATAL|ERROR|WARN(?:ING)?|DEBUG|TRACE|INFO)\b", re.I)
 
-# Apache/Nginx CLF: matches the HTTP status code field (e.g. '" 200 ', '" 404 ')
-# Format: "METHOD /path HTTP/x.x" STATUS bytes
-RE_HTTP_STATUS = re.compile(r'"[^"]*"\s+(\d{3})\s')
+# Apache/Nginx Combined Log Format — captures method AND status in one pass.
+# Format: IP - - [date] "METHOD /path HTTP/x" STATUS bytes ...
+RE_HTTP_CLF = re.compile(
+    r'"(GET|POST|PUT|DELETE|PATCH|HEAD|OPTIONS|CONNECT|TRACE)\s[^"]*"\s+(\d{3})\s'
+)
 
 # Pre-calculate expected length of each format string using a dummy date
 _DUMMY_DATE = datetime.datetime(2000, 10, 10, 12, 12, 12)
@@ -135,16 +137,19 @@ def _auto_detect_timestamp(raw_line: str, tz_offset: float) -> str | None:
 
 def _extract_base_metadata(
     raw_line: str, parser_config: dict = None, tz_offset: float = 0
-) -> tuple[str, str, str]:
-    """Extracts timestamp, level, and message using configuration."""
+) -> tuple[str, str, str, dict]:
+    """Extracts timestamp, level, message, and auto-detected facets."""
     timestamp = None
     level = "INFO"
     message = raw_line
+    clf_facets: dict = {}
 
-    # Derive level from HTTP status codes (Apache/Nginx CLF access logs)
-    http_match = RE_HTTP_STATUS.search(raw_line)
+    # Derive level from HTTP status codes AND extract method/status facets (CLF logs)
+    http_match = RE_HTTP_CLF.search(raw_line)
     if http_match:
-        status = int(http_match.group(1))
+        clf_facets["http_method"] = http_match.group(1)
+        clf_facets["http_status"] = http_match.group(2)
+        status = int(http_match.group(2))
         if status >= 500:
             level = "ERROR"
         elif status >= 400:
@@ -191,7 +196,7 @@ def _extract_base_metadata(
     if not timestamp:
         timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-    return timestamp, level, message
+    return timestamp, level, message, clf_facets
 
 
 def _apply_custom_extractions(raw_line: str, custom_rules: list, facets: dict):
@@ -230,14 +235,19 @@ def extract_log_metadata(
 ) -> dict:
     """
     Applies source-specific regex patterns and timezone normalization to a raw log line.
+    Returns timestamp, ingest_timestamp, level, message, and facets dict.
+    Auto-extracted facets (http_method, http_status for CLF logs) are always included.
     """
-    # 1. Base Metadata
-    timestamp, level, message = _extract_base_metadata(raw_line, parser_config, tz_offset)
+    # 1. Base Metadata + auto-detected CLF facets (http_method, http_status)
+    timestamp, level, message, clf_facets = _extract_base_metadata(
+        raw_line, parser_config, tz_offset
+    )
     ingest_timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-    facets = {}
+    # Start with auto-extracted facets; custom rules can override them
+    facets: dict = dict(clf_facets)
 
-    # 2. Custom Rules
+    # 2. User-defined custom extraction rules
     _apply_custom_extractions(raw_line, custom_rules, facets)
 
     return {

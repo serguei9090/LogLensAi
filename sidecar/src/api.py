@@ -1877,6 +1877,28 @@ class App:
         params = GetMetadataFacetsRequest(**kwargs)
         return self.db.get_metadata_facets(params.workspace_id, params.source_ids)
 
+    def method_get_sample_logs(
+        self, workspace_id: str, limit: int = 10, source_id: str | None = None
+    ) -> dict:
+        """Return random raw log lines for column preview in the Add Column modal."""
+        cursor = self.db.get_cursor()
+        if source_id:
+            cursor.execute(
+                """SELECT raw_text FROM logs
+                   WHERE workspace_id = ? AND source_id = ? AND raw_text IS NOT NULL
+                   ORDER BY RANDOM() LIMIT ?""",
+                (workspace_id, source_id, max(1, min(limit, 50))),
+            )
+        else:
+            cursor.execute(
+                """SELECT raw_text FROM logs
+                   WHERE workspace_id = ? AND raw_text IS NOT NULL
+                   ORDER BY RANDOM() LIMIT ?""",
+                (workspace_id, max(1, min(limit, 50))),
+            )
+        rows = cursor.fetchall()
+        return {"samples": [r[0] for r in rows if r[0]]}
+
     def method_update_log_comment(self, log_id: int, comment: str) -> dict:
         """Update annotation for a specific log entry. If empty, the note is removed."""
         cursor = self.db.get_cursor()

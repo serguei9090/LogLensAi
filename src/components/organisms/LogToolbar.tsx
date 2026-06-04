@@ -84,8 +84,14 @@ export function LogToolbar({
   const { timeRange, timeRangeBounds, setTimeRange, resetTimeRangeToAllTime } =
     useInvestigationStore();
   const { isSidebarOpen, setSidebarOpen } = useAiStore();
-  const { facetSidebarCollapsed, toggleFacetSidebar, visibleColumns, toggleColumnVisibility } =
-    useUIStore();
+  const {
+    facetSidebarCollapsed,
+    toggleFacetSidebar,
+    columnManagerCollapsed,
+    toggleColumnManager,
+    visibleColumns,
+    toggleColumnVisibility,
+  } = useUIStore();
 
   const isFiltered = useMemo(() => {
     return (
@@ -156,6 +162,21 @@ export function LogToolbar({
           title={facetSidebarCollapsed ? "Show Facets" : "Hide Facets"}
         >
           <Columns className="size-4" />
+        </Button>
+
+        <Button
+          variant="outline"
+          size="icon"
+          onClick={toggleColumnManager}
+          className={cn(
+            "size-8 shrink-0",
+            columnManagerCollapsed
+              ? "bg-bg-surface-bright/50 border-border-subtle text-text-muted hover:text-text-primary"
+              : "bg-primary/10 border-primary/20 text-primary hover:text-primary-hover shadow-[0_0_12px_rgba(var(--color-primary-rgb),0.15)]",
+          )}
+          title={columnManagerCollapsed ? "Show Column Manager" : "Hide Column Manager"}
+        >
+          <LayoutTemplate className="size-4" />
         </Button>
 
         <div className="h-5 w-px bg-zinc-800 shrink-0" />

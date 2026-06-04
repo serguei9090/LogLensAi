@@ -22,4 +22,5 @@ export interface LogEntry {
   has_comment?: boolean;
   comment?: string;
   raw_text?: string;
+  facets?: Record<string, string>;
 }

@@ -84,7 +84,10 @@ export function VirtualLogTable({
   } = useInvestigationStore();
   const { logSessionMap, fetchMapping } = useAiStore();
   const activeWorkspace = useWorkspaceStore(selectActiveWorkspace);
-  const { visibleColumns } = useUIStore();
+  const { visibleColumns, customColumns } = useUIStore();
+
+  // Build the visible custom columns list (preserves order from the store)
+  const visibleCustomColumns = customColumns.filter((c) => visibleColumns[c.id]);
 
   const gridTemplateColumns = [
     "12px",
@@ -92,6 +95,8 @@ export function VirtualLogTable({
     visibleColumns.timestamp ? "180px" : "",
     visibleColumns.ingest_timestamp ? "180px" : "",
     visibleColumns.level ? "90px" : "",
+    // Inject visible custom columns BEFORE the message (1fr)
+    ...visibleCustomColumns.map((c) => c.width),
     "1fr",
     visibleColumns.cluster_id ? "110px" : "",
     visibleColumns.actions ? "100px" : "",
@@ -569,6 +574,22 @@ export function VirtualLogTable({
                             </Button>
                           </th>
                         )}
+                        {/* ── Custom / Extracted Columns ── */}
+                        {visibleCustomColumns.map((col) => (
+                          <th
+                            key={col.id}
+                            className="p-0 text-left flex items-center"
+                            title={
+                              col.source === "auto"
+                                ? `Auto-extracted: ${col.id}`
+                                : `Custom regex column`
+                            }
+                          >
+                            <div className="w-full h-10 px-3 flex items-center gap-1.5 font-bold uppercase tracking-widest text-[10px] text-text-muted">
+                              {col.label}
+                            </div>
+                          </th>
+                        ))}
                         <th className="p-0 text-left min-w-0 flex items-center">
                           <div className="px-3 py-1 text-left w-full">Message</div>
                         </th>
@@ -897,7 +918,9 @@ function LogTableRow({
 }: LogTableRowProps) {
   const { setSidebarOpen, setSession } = useAiStore();
   const { clearSelection, setSelectedLogIds } = useInvestigationStore();
-  const { visibleColumns } = useUIStore();
+  const { visibleColumns, customColumns } = useUIStore();
+
+  const visibleCustomColumns = customColumns.filter((c) => visibleColumns[c.id]);
 
   const gridTemplateColumns = [
     "12px",
@@ -905,6 +928,7 @@ function LogTableRow({
     visibleColumns.timestamp ? "180px" : "",
     visibleColumns.ingest_timestamp ? "180px" : "",
     visibleColumns.level ? "90px" : "",
+    ...visibleCustomColumns.map((c) => c.width),
     "1fr",
     visibleColumns.cluster_id ? "110px" : "",
     visibleColumns.actions ? "100px" : "",
@@ -970,6 +994,52 @@ function LogTableRow({
           <LogLevelBadge level={log.level} className="scale-75 origin-left" />
         </td>
       )}
+      {/* ── Custom / Extracted Columns ── */}
+      {visibleCustomColumns.map((col) => {
+        let cellValue: string | null = null;
+        if (col.source === "auto") {
+          cellValue = log.facets?.[col.id] ?? null;
+        } else if (col.regex) {
+          try {
+            const m = new RegExp(col.regex).exec(log.raw_text ?? log.message);
+            cellValue = m?.[1] ?? m?.[0] ?? null;
+          } catch {
+            cellValue = null;
+          }
+        }
+
+        // Color-code HTTP status values
+        const isStatus = col.id === "http_status" && cellValue;
+        const statusCode = isStatus ? parseInt(cellValue ?? "0", 10) : 0;
+        const statusColor =
+          statusCode >= 500
+            ? "text-red-400"
+            : statusCode >= 400
+              ? "text-yellow-400"
+              : statusCode >= 300
+                ? "text-blue-400"
+                : "text-primary";
+
+        return (
+          <td
+            key={col.id}
+            className="px-3 py-2 align-top whitespace-nowrap overflow-hidden text-ellipsis text-[11px]"
+          >
+            {cellValue !== null ? (
+              <span
+                className={cn(
+                  "font-mono font-semibold",
+                  isStatus ? statusColor : "text-text-secondary/80",
+                )}
+              >
+                {cellValue}
+              </span>
+            ) : (
+              <span className="text-text-muted/30">—</span>
+            )}
+          </td>
+        );
+      })}
       <td className="px-3 py-2 text-text-primary/90 align-top whitespace-normal break-words leading-relaxed min-w-0">
         <div className="max-w-full overflow-hidden">{content}</div>
       </td>

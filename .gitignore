@@ -55,7 +55,7 @@ fastembed_cache
 
 #data
 data/
-
+apache_logs.log
 debug_*
 final_debug*
 /scripts/logs/**
