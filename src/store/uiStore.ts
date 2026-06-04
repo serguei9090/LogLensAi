@@ -41,6 +41,10 @@ interface UIStore {
   customColumns: CustomColumnDef[];
   addCustomColumn: (col: CustomColumnDef) => void;
   removeCustomColumn: (id: string) => void;
+  columnOrder: string[];
+  setColumnOrder: (order: string[]) => void;
+  columnWidths: Record<string, string>;
+  setColumnWidth: (id: string, width: string) => void;
 }
 
 // ─── Store ────────────────────────────────────────────────────────────────────
@@ -107,18 +111,59 @@ export const useUIStore = create<UIStore>()(
         })),
       customColumns: DEFAULT_CUSTOM_COLUMNS,
       addCustomColumn: (col) =>
-        set((state) => ({
-          customColumns: [...state.customColumns, col],
-          visibleColumns: { ...state.visibleColumns, [col.id]: true },
-        })),
+        set((state) => {
+          const idx = state.columnOrder.indexOf("message");
+          const nextOrder = [...state.columnOrder];
+          if (idx !== -1) {
+            nextOrder.splice(idx, 0, col.id);
+          } else {
+            nextOrder.push(col.id);
+          }
+          return {
+            customColumns: [...state.customColumns, col],
+            columnOrder: nextOrder,
+            columnWidths: { ...state.columnWidths, [col.id]: col.width },
+            visibleColumns: { ...state.visibleColumns, [col.id]: true },
+          };
+        }),
       removeCustomColumn: (id) =>
         set((state) => {
           const { [id]: _removed, ...rest } = state.visibleColumns;
+          const { [id]: _widthRemoved, ...restWidths } = state.columnWidths;
           return {
             customColumns: state.customColumns.filter((c) => c.id !== id),
+            columnOrder: state.columnOrder.filter((cId) => cId !== id),
+            columnWidths: restWidths,
             visibleColumns: rest,
           };
         }),
+      columnOrder: [
+        "id",
+        "timestamp",
+        "ingest_timestamp",
+        "level",
+        "http_method",
+        "http_status",
+        "message",
+        "cluster_id",
+        "actions",
+      ],
+      setColumnOrder: (order) => set({ columnOrder: order }),
+      columnWidths: {
+        id: "80px",
+        timestamp: "180px",
+        ingest_timestamp: "180px",
+        level: "90px",
+        http_method: "80px",
+        http_status: "72px",
+        message: "1fr",
+        cluster_id: "110px",
+        actions: "100px",
+      },
+      setColumnWidth: (id, width) =>
+        set((state) => ({
+          columnWidths: { ...state.columnWidths, [id]: width },
+        })),
     }),
     {
       name: "loglensai-ui-state",

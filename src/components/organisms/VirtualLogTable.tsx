@@ -13,7 +13,7 @@ import {
   StickyNote,
   X,
 } from "lucide-react";
-import { Fragment, useCallback, useEffect, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { toast } from "sonner";
 import { IconButton } from "@/components/atoms/IconButton";
@@ -84,25 +84,71 @@ export function VirtualLogTable({
   } = useInvestigationStore();
   const { logSessionMap, fetchMapping } = useAiStore();
   const activeWorkspace = useWorkspaceStore(selectActiveWorkspace);
-  const { visibleColumns, customColumns } = useUIStore();
+  const { visibleColumns, customColumns, columnOrder, columnWidths, setColumnWidth } = useUIStore();
 
-  // Build the visible custom columns list (preserves order from the store)
-  const visibleCustomColumns = customColumns.filter((c) => visibleColumns[c.id]);
+  // Active visible columns ordered by store order
+  const activeVisibleColumns = useMemo(() => {
+    return columnOrder.filter((colId) => visibleColumns[colId] ?? false);
+  }, [columnOrder, visibleColumns]);
 
-  const gridTemplateColumns = [
-    "12px",
-    visibleColumns.id ? "80px" : "",
-    visibleColumns.timestamp ? "180px" : "",
-    visibleColumns.ingest_timestamp ? "180px" : "",
-    visibleColumns.level ? "90px" : "",
-    // Inject visible custom columns BEFORE the message (1fr)
-    ...visibleCustomColumns.map((c) => c.width),
-    "1fr",
-    visibleColumns.cluster_id ? "110px" : "",
-    visibleColumns.actions ? "100px" : "",
-  ]
-    .filter(Boolean)
-    .join(" ");
+  const gridTemplateColumns = useMemo(() => {
+    const widths = activeVisibleColumns.map((colId) => {
+      if (colId === "message") {
+        return "minmax(200px, 1fr)";
+      }
+      return columnWidths[colId] || "120px";
+    });
+    return ["12px", ...widths].filter(Boolean).join(" ");
+  }, [activeVisibleColumns, columnWidths]);
+
+  const getColumnLabel = useCallback(
+    (colId: string) => {
+      switch (colId) {
+        case "id":
+          return "ID";
+        case "timestamp":
+          return "Timestamp";
+        case "ingest_timestamp":
+          return "Ingested";
+        case "level":
+          return "Level";
+        case "message":
+          return "Message";
+        case "cluster_id":
+          return "Cluster";
+        case "actions":
+          return "Actions";
+      }
+      const custom = customColumns.find((c) => c.id === colId);
+      return custom ? custom.label : colId;
+    },
+    [customColumns],
+  );
+
+  const handleResizeStart = useCallback(
+    (e: React.MouseEvent, colId: string) => {
+      e.preventDefault();
+      e.stopPropagation();
+
+      const startX = e.clientX;
+      const startWidth = parseInt(columnWidths[colId] || "120px", 10) || 120;
+
+      const handleMouseMove = (moveEvent: MouseEvent) => {
+        const deltaX = moveEvent.clientX - startX;
+        const newWidth = Math.max(50, startWidth + deltaX);
+        setColumnWidth(colId, `${newWidth}px`);
+      };
+
+      const handleMouseUp = () => {
+        document.removeEventListener("mousemove", handleMouseMove);
+        document.removeEventListener("mouseup", handleMouseUp);
+      };
+
+      document.addEventListener("mousemove", handleMouseMove);
+      document.addEventListener("mouseup", handleMouseUp);
+    },
+    [columnWidths, setColumnWidth],
+  );
 
   useEffect(() => {
     if (activeWorkspace?.id) {
@@ -530,87 +576,47 @@ export function VirtualLogTable({
                             />
                           </Button>
                         </th>
-                        {visibleColumns.id && (
-                          <th className="p-0 text-center flex items-center justify-center">
-                            <Button
-                              variant="ghost"
-                              className="w-full h-10 px-3 flex items-center justify-center gap-1.5 hover:text-text-primary transition-colors focus-visible:bg-primary/5 outline-none rounded-none border-none font-bold uppercase tracking-widest text-[10px]"
-                              onClick={() => onSort("id")}
+                        {activeVisibleColumns.map((colId) => {
+                          const isSortable = [
+                            "id",
+                            "timestamp",
+                            "ingest_timestamp",
+                            "level",
+                            "cluster_id",
+                          ].includes(colId);
+                          const label = getColumnLabel(colId);
+
+                          return (
+                            <th
+                              key={colId}
+                              className="p-0 text-left flex items-center relative group/header min-w-0"
                             >
-                              ID {renderSortIcon("id")}
-                            </Button>
-                          </th>
-                        )}
-                        {visibleColumns.timestamp && (
-                          <th className="p-0 text-left flex items-center">
-                            <Button
-                              variant="ghost"
-                              className="w-full h-10 px-3 flex items-center gap-1.5 hover:text-text-primary transition-colors focus-visible:bg-primary/5 outline-none rounded-none border-none font-bold uppercase tracking-widest text-[10px]"
-                              onClick={() => onSort("timestamp")}
-                            >
-                              Timestamp {renderSortIcon("timestamp")}
-                            </Button>
-                          </th>
-                        )}
-                        {visibleColumns.ingest_timestamp && (
-                          <th className="p-0 text-left flex items-center">
-                            <Button
-                              variant="ghost"
-                              className="w-full h-10 px-3 flex items-center gap-1.5 hover:text-text-primary transition-colors focus-visible:bg-primary/5 outline-none rounded-none border-none font-bold uppercase tracking-widest text-[10px]"
-                              onClick={() => onSort("ingest_timestamp")}
-                            >
-                              Ingested {renderSortIcon("ingest_timestamp")}
-                            </Button>
-                          </th>
-                        )}
-                        {visibleColumns.level && (
-                          <th className="p-0 text-left flex items-center">
-                            <Button
-                              variant="ghost"
-                              className="w-full h-10 px-3 flex items-center gap-1.5 hover:text-text-primary transition-colors focus-visible:bg-primary/5 outline-none rounded-none border-none font-bold uppercase tracking-widest text-[10px]"
-                              onClick={() => onSort("level")}
-                            >
-                              Level {renderSortIcon("level")}
-                            </Button>
-                          </th>
-                        )}
-                        {/* ── Custom / Extracted Columns ── */}
-                        {visibleCustomColumns.map((col) => (
-                          <th
-                            key={col.id}
-                            className="p-0 text-left flex items-center"
-                            title={
-                              col.source === "auto"
-                                ? `Auto-extracted: ${col.id}`
-                                : `Custom regex column`
-                            }
-                          >
-                            <div className="w-full h-10 px-3 flex items-center gap-1.5 font-bold uppercase tracking-widest text-[10px] text-text-muted">
-                              {col.label}
-                            </div>
-                          </th>
-                        ))}
-                        <th className="p-0 text-left min-w-0 flex items-center">
-                          <div className="px-3 py-1 text-left w-full">Message</div>
-                        </th>
-                        {visibleColumns.cluster_id && (
-                          <th className="p-0 text-center flex items-center justify-center">
-                            <Button
-                              variant="ghost"
-                              className="w-full h-10 px-3 flex items-center justify-center gap-1.5 hover:text-text-primary transition-colors focus-visible:bg-primary/5 outline-none rounded-none border-none font-bold uppercase tracking-widest text-[10px]"
-                              onClick={() => onSort("cluster_id")}
-                            >
-                              Cluster {renderSortIcon("cluster_id")}
-                            </Button>
-                          </th>
-                        )}
-                        {visibleColumns.actions && (
-                          <th className="p-0 text-center flex items-center justify-center">
-                            <div className="w-full h-10 px-3 flex items-center justify-center gap-1.5">
-                              Actions
-                            </div>
-                          </th>
-                        )}
+                              {isSortable ? (
+                                <Button
+                                  variant="ghost"
+                                  className="w-full h-10 px-3 flex items-center justify-start gap-1.5 hover:text-text-primary transition-colors focus-visible:bg-primary/5 outline-none rounded-none border-none font-bold uppercase tracking-widest text-[10px] min-w-0"
+                                  onClick={() => onSort(colId)}
+                                >
+                                  <span className="truncate">{label}</span>
+                                  {renderSortIcon(colId)}
+                                </Button>
+                              ) : (
+                                <div className="w-full h-10 px-3 flex items-center justify-start gap-1.5 font-bold uppercase tracking-widest text-[10px] text-text-muted min-w-0">
+                                  <span className="truncate">{label}</span>
+                                </div>
+                              )}
+
+                              {/* Drag handle for resizing (excluding actions and message) */}
+                              {colId !== "actions" && colId !== "message" && (
+                                // biome-ignore lint/a11y/noStaticElementInteractions: drag handle is utility overlay
+                                <div
+                                  className="absolute right-0 top-0 h-full w-1.5 cursor-col-resize hover:bg-primary/50 active:bg-primary transition-colors z-20 group-hover/header:bg-white/10"
+                                  onMouseDown={(e) => handleResizeStart(e, colId)}
+                                />
+                              )}
+                            </th>
+                          );
+                        })}
                       </tr>
                     </thead>
                     <tbody className="font-mono text-[12px] relative z-0 block">
@@ -918,23 +924,21 @@ function LogTableRow({
 }: LogTableRowProps) {
   const { setSidebarOpen, setSession } = useAiStore();
   const { clearSelection, setSelectedLogIds } = useInvestigationStore();
-  const { visibleColumns, customColumns } = useUIStore();
+  const { visibleColumns, customColumns, columnOrder, columnWidths } = useUIStore();
 
-  const visibleCustomColumns = customColumns.filter((c) => visibleColumns[c.id]);
+  const activeVisibleColumns = useMemo(() => {
+    return columnOrder.filter((colId) => visibleColumns[colId] ?? false);
+  }, [columnOrder, visibleColumns]);
 
-  const gridTemplateColumns = [
-    "12px",
-    visibleColumns.id ? "80px" : "",
-    visibleColumns.timestamp ? "180px" : "",
-    visibleColumns.ingest_timestamp ? "180px" : "",
-    visibleColumns.level ? "90px" : "",
-    ...visibleCustomColumns.map((c) => c.width),
-    "1fr",
-    visibleColumns.cluster_id ? "110px" : "",
-    visibleColumns.actions ? "100px" : "",
-  ]
-    .filter(Boolean)
-    .join(" ");
+  const gridTemplateColumns = useMemo(() => {
+    const widths = activeVisibleColumns.map((colId) => {
+      if (colId === "message") {
+        return "minmax(200px, 1fr)";
+      }
+      return columnWidths[colId] || "120px";
+    });
+    return ["12px", ...widths].filter(Boolean).join(" ");
+  }, [activeVisibleColumns, columnWidths]);
 
   return (
     <tr
@@ -974,164 +978,207 @@ function LogTableRow({
           )}
         </div>
       </td>
-      {visibleColumns.id && (
-        <td className="px-3 py-2 text-center text-text-muted/50 select-none group-hover:text-text-secondary align-top font-bold">
-          {log.line_id + 1}
-        </td>
-      )}
-      {visibleColumns.timestamp && (
-        <td className="px-3 py-2 text-text-secondary/70 align-top opacity-80 whitespace-nowrap overflow-hidden text-ellipsis">
-          {log.timestamp}
-        </td>
-      )}
-      {visibleColumns.ingest_timestamp && (
-        <td className="px-3 py-2 text-text-secondary/70 align-top opacity-80 whitespace-nowrap overflow-hidden text-ellipsis">
-          {log.ingest_timestamp || log.timestamp}
-        </td>
-      )}
-      {visibleColumns.level && (
-        <td className="px-3 py-2 align-top flex items-start">
-          <LogLevelBadge level={log.level} className="scale-75 origin-left" />
-        </td>
-      )}
-      {/* ── Custom / Extracted Columns ── */}
-      {visibleCustomColumns.map((col) => {
-        let cellValue: string | null = null;
-        if (col.source === "auto") {
-          cellValue = log.facets?.[col.id] ?? null;
-        } else if (col.regex) {
-          try {
-            const m = new RegExp(col.regex).exec(log.raw_text ?? log.message);
-            cellValue = m?.[1] ?? m?.[0] ?? null;
-          } catch {
-            cellValue = null;
-          }
-        }
-
-        // Color-code HTTP status values
-        const isStatus = col.id === "http_status" && cellValue;
-        const statusCode = isStatus ? parseInt(cellValue ?? "0", 10) : 0;
-        const statusColor =
-          statusCode >= 500
-            ? "text-red-400"
-            : statusCode >= 400
-              ? "text-yellow-400"
-              : statusCode >= 300
-                ? "text-blue-400"
-                : "text-primary";
-
-        return (
-          <td
-            key={col.id}
-            className="px-3 py-2 align-top whitespace-nowrap overflow-hidden text-ellipsis text-[11px]"
-          >
-            {cellValue !== null ? (
-              <span
-                className={cn(
-                  "font-mono font-semibold",
-                  isStatus ? statusColor : "text-text-secondary/80",
-                )}
-              >
-                {cellValue}
-              </span>
-            ) : (
-              <span className="text-text-muted/30">—</span>
-            )}
-          </td>
-        );
-      })}
-      <td className="px-3 py-2 text-text-primary/90 align-top whitespace-normal break-words leading-relaxed min-w-0">
-        <div className="max-w-full overflow-hidden">{content}</div>
-      </td>
-      {visibleColumns.cluster_id && (
-        <td className="px-3 py-2 text-center align-top flex flex-col items-center justify-start">
-          {log.cluster_id ? (
-            <div
-              className={cn(
-                "flex flex-col items-center justify-center gap-0.5 group/cluster",
-                log.cluster_id !== "unknown" && "animate-in fade-in zoom-in-95 duration-500",
-              )}
+      {activeVisibleColumns.map((colId) => {
+        if (colId === "id") {
+          return (
+            <td
+              key="id"
+              className="px-3 py-2 text-center text-text-muted/50 select-none group-hover:text-text-secondary align-top font-bold"
             >
-              <Button
-                variant="ghost"
-                className={cn(
-                  "inline-flex items-center justify-center border h-5 px-1.5 rounded-md text-[9px] font-bold transition-colors outline-none focus-visible:ring-1 focus-visible:ring-primary p-0 min-w-0",
-                  getClusterStyles(log.cluster_id, anomalousClusters),
-                )}
-                title={log.cluster_template || "Click to analyze with AI"}
-                onClick={(e) => {
-                  if (log.cluster_id && onAnalyzeCluster) {
-                    e.stopPropagation();
-                    onAnalyzeCluster(log.cluster_id);
-                  }
-                }}
-              >
-                #{log.cluster_id}
-              </Button>
-              {log.cluster_percent !== undefined && (
-                <span className="text-[8px] text-text-muted/60 font-medium whitespace-nowrap">
-                  {Number(log.cluster_percent).toFixed(1)}%
-                </span>
-              )}
-            </div>
-          ) : (
-            <span className="opacity-10">—</span>
-          )}
-        </td>
-      )}
-      {visibleColumns.actions && (
-        <td className="px-3 py-2 text-center relative align-top flex items-start justify-center">
-          <div className="flex items-center justify-center gap-1">
-            <IconButton
-              icon={
-                <StickyNote
-                  className={cn("h-3.5 w-3.5", log.has_comment && "text-primary fill-primary/20")}
-                />
-              }
-              label={log.has_comment ? "View Note" : "Add Note"}
-              onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
-                e.stopPropagation();
-                onToggleView(log.id);
-              }}
-              className={cn(
-                "transition-all h-7 w-7 rounded-lg text-text-muted hover:text-primary hover:bg-primary/10",
-                !log.has_comment && "opacity-0 group-hover:opacity-100",
-                log.has_comment && "opacity-100 text-primary bg-primary/20",
-              )}
-            />
-            <IconButton
-              icon={
-                <Sparkles
+              {log.line_id + 1}
+            </td>
+          );
+        }
+        if (colId === "timestamp") {
+          return (
+            <td
+              key="timestamp"
+              className="px-3 py-2 text-text-secondary/70 align-top opacity-80 break-all whitespace-pre-wrap leading-tight"
+            >
+              {log.timestamp}
+            </td>
+          );
+        }
+        if (colId === "ingest_timestamp") {
+          return (
+            <td
+              key="ingest_timestamp"
+              className="px-3 py-2 text-text-secondary/70 align-top opacity-80 break-all whitespace-pre-wrap leading-tight"
+            >
+              {log.ingest_timestamp || log.timestamp}
+            </td>
+          );
+        }
+        if (colId === "level") {
+          return (
+            <td key="level" className="px-3 py-2 align-top flex items-start">
+              <LogLevelBadge level={log.level} className="scale-75 origin-left" />
+            </td>
+          );
+        }
+        if (colId === "message") {
+          return (
+            <td
+              key="message"
+              className="px-3 py-2 text-text-primary/90 align-top whitespace-normal break-words leading-relaxed min-w-0"
+            >
+              <div className="max-w-full overflow-hidden">{content}</div>
+            </td>
+          );
+        }
+        if (colId === "cluster_id") {
+          return (
+            <td
+              key="cluster_id"
+              className="px-3 py-2 text-center align-top flex flex-col items-center justify-start"
+            >
+              {log.cluster_id ? (
+                <div
                   className={cn(
-                    "h-3.5 w-3.5 transition-all",
-                    logSessionMap[log.id] && "text-violet-400 fill-violet-400/20",
+                    "flex flex-col items-center justify-center gap-0.5 group/cluster",
+                    log.cluster_id !== "unknown" && "animate-in fade-in zoom-in-95 duration-500",
+                  )}
+                >
+                  <Button
+                    variant="ghost"
+                    className={cn(
+                      "inline-flex items-center justify-center border h-5 px-1.5 rounded-md text-[9px] font-bold transition-colors outline-none focus-visible:ring-1 focus-visible:ring-primary p-0 min-w-0",
+                      getClusterStyles(log.cluster_id, anomalousClusters),
+                    )}
+                    title={log.cluster_template || "Click to analyze with AI"}
+                    onClick={(e) => {
+                      if (log.cluster_id && onAnalyzeCluster) {
+                        e.stopPropagation();
+                        onAnalyzeCluster(log.cluster_id);
+                      }
+                    }}
+                  >
+                    #{log.cluster_id}
+                  </Button>
+                  {log.cluster_percent !== undefined && (
+                    <span className="text-[8px] text-text-muted/60 font-medium whitespace-nowrap">
+                      {Number(log.cluster_percent).toFixed(1)}%
+                    </span>
+                  )}
+                </div>
+              ) : (
+                <span className="opacity-10">—</span>
+              )}
+            </td>
+          );
+        }
+        if (colId === "actions") {
+          return (
+            <td
+              key="actions"
+              className="px-3 py-2 text-center relative align-top flex items-start justify-center"
+            >
+              <div className="flex items-center justify-center gap-1">
+                <IconButton
+                  icon={
+                    <StickyNote
+                      className={cn(
+                        "h-3.5 w-3.5",
+                        log.has_comment && "text-primary fill-primary/20",
+                      )}
+                    />
+                  }
+                  label={log.has_comment ? "View Note" : "Add Note"}
+                  onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
+                    e.stopPropagation();
+                    onToggleView(log.id);
+                  }}
+                  className={cn(
+                    "transition-all h-7 w-7 rounded-lg text-text-muted hover:text-primary hover:bg-primary/10",
+                    !log.has_comment && "opacity-0 group-hover:opacity-100",
+                    log.has_comment && "opacity-100 text-primary bg-primary/20",
                   )}
                 />
-              }
-              label={logSessionMap[log.id] ? "View AI Investigation" : "Start AI Analysis"}
-              onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
-                e.stopPropagation();
-                const existingSessionId = logSessionMap[log.id];
+                <IconButton
+                  icon={
+                    <Sparkles
+                      className={cn(
+                        "h-3.5 w-3.5 transition-all",
+                        logSessionMap[log.id] && "text-violet-400 fill-violet-400/20",
+                      )}
+                    />
+                  }
+                  label={logSessionMap[log.id] ? "View AI Investigation" : "Start AI Analysis"}
+                  onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
+                    e.stopPropagation();
+                    const existingSessionId = logSessionMap[log.id];
 
-                if (existingSessionId) {
-                  setSession(existingSessionId);
-                } else {
-                  setSession(null);
-                  clearSelection();
-                  setSelectedLogIds([log.id]);
-                }
-                setSidebarOpen(true);
-              }}
-              className={cn(
-                "transition-all h-7 w-7 rounded-lg",
-                logSessionMap[log.id]
-                  ? "opacity-100 bg-violet-500/10 border border-violet-500/20 text-violet-400"
-                  : "text-text-muted hover:text-violet-400 hover:bg-violet-500/10 opacity-0 group-hover:opacity-100",
+                    if (existingSessionId) {
+                      setSession(existingSessionId);
+                    } else {
+                      setSession(null);
+                      clearSelection();
+                      setSelectedLogIds([log.id]);
+                    }
+                    setSidebarOpen(true);
+                  }}
+                  className={cn(
+                    "transition-all h-7 w-7 rounded-lg",
+                    logSessionMap[log.id]
+                      ? "opacity-100 bg-violet-500/10 border border-violet-500/20 text-violet-400"
+                      : "text-text-muted hover:text-violet-400 hover:bg-violet-500/10 opacity-0 group-hover:opacity-100",
+                  )}
+                />
+              </div>
+            </td>
+          );
+        }
+
+        // Custom facet or regex columns
+        const custom = customColumns.find((c) => c.id === colId);
+        if (custom) {
+          let cellValue: string | null = null;
+          if (custom.source === "auto") {
+            cellValue = log.facets?.[custom.id] ?? null;
+          } else if (custom.regex) {
+            try {
+              const m = new RegExp(custom.regex).exec(log.raw_text ?? log.message);
+              cellValue = m?.[1] ?? m?.[0] ?? null;
+            } catch {
+              cellValue = null;
+            }
+          }
+
+          // Color-code HTTP status values
+          const isStatus = custom.id === "http_status" && cellValue;
+          const statusCode = isStatus ? parseInt(cellValue ?? "0", 10) : 0;
+          const statusColor =
+            statusCode >= 500
+              ? "text-red-400"
+              : statusCode >= 400
+                ? "text-yellow-400"
+                : statusCode >= 300
+                  ? "text-blue-400"
+                  : "text-primary";
+
+          return (
+            <td
+              key={custom.id}
+              className="px-3 py-2 align-top whitespace-nowrap overflow-hidden text-ellipsis text-[11px]"
+            >
+              {cellValue !== null ? (
+                <span
+                  className={cn(
+                    "font-mono font-semibold",
+                    isStatus ? statusColor : "text-text-secondary/80",
+                  )}
+                >
+                  {cellValue}
+                </span>
+              ) : (
+                <span className="text-text-muted/30">—</span>
               )}
-            />
-          </div>
-        </td>
-      )}
+            </td>
+          );
+        }
+
+        return null;
+      })}
     </tr>
   );
 }

@@ -1,6 +1,21 @@
 // Assume Role: Frontend Engineer (@frontend)
+import {
+  closestCenter,
+  DndContext,
+  type DragEndEvent,
+  PointerSensor,
+  useSensor,
+  useSensors,
+} from "@dnd-kit/core";
+import {
+  arrayMove,
+  SortableContext,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import { motion } from "framer-motion";
-import { Columns2, PanelLeftClose, Plus, Sparkle, Trash2, User } from "lucide-react";
+import { Columns2, GripVertical, PanelLeftClose, Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { AddColumnModal } from "@/components/molecules/AddColumnModal";
 import { Button } from "@/components/ui/button";
@@ -10,73 +25,111 @@ import { useUIStore } from "@/store/uiStore";
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
-interface ColumnRowProps {
+interface SortableColumnRowProps {
   readonly id: string;
   readonly label: string;
   readonly visible: boolean;
-  readonly badge?: "auto" | "user";
+  readonly badge?: "built-in" | "auto" | "user";
   readonly onToggle: () => void;
   readonly onDelete?: () => void;
 }
 
-function ColumnRow({ id, label, visible, badge, onToggle, onDelete }: ColumnRowProps) {
+function SortableColumnRow({
+  id,
+  label,
+  visible,
+  badge,
+  onToggle,
+  onDelete,
+}: SortableColumnRowProps) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id,
+  });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    zIndex: isDragging ? 50 : "auto",
+  };
+
   return (
-    <label
-      htmlFor={`col-toggle-${id}`}
-      className="flex items-center gap-2.5 px-3 py-1.5 rounded-md cursor-pointer hover:bg-white/[0.04] transition-colors group select-none"
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={cn(
+        "flex items-center gap-1 px-2 py-1.5 rounded-md hover:bg-white/[0.04] transition-colors group select-none border border-transparent bg-bg-app/50",
+        isDragging && "border-primary/20 bg-white/[0.06] shadow-lg cursor-grabbing",
+      )}
     >
-      {/* Native checkbox — hidden visually, custom styled */}
-      <span className="relative flex items-center justify-center shrink-0">
-        <input
-          type="checkbox"
-          id={`col-toggle-${id}`}
-          checked={visible}
-          onChange={(e) => {
-            e.stopPropagation();
-            onToggle();
-          }}
-          className="sr-only"
-        />
-        <span
-          aria-hidden="true"
-          className={cn(
-            "w-3.5 h-3.5 rounded border flex items-center justify-center transition-all duration-150",
-            visible
-              ? "bg-primary border-primary"
-              : "border-white/20 bg-transparent hover:border-white/40",
-          )}
-        >
-          {visible && (
-            <svg
-              viewBox="0 0 10 8"
-              className="w-2 h-2 fill-none stroke-white stroke-[2]"
-              aria-hidden="true"
-            >
-              <path d="M1 4l2.5 2.5L9 1" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-          )}
-        </span>
+      {/* Drag handle */}
+      <span
+        {...attributes}
+        {...listeners}
+        className="cursor-grab active:cursor-grabbing text-text-muted/40 hover:text-text-muted transition-colors p-1"
+        title="Drag to reorder column"
+      >
+        <GripVertical className="size-3.5 shrink-0" />
       </span>
 
-      <span
-        className={cn(
-          "flex-1 text-xs font-medium truncate transition-colors",
-          visible ? "text-text-primary" : "text-text-muted",
-        )}
+      {/* Checkbox & label */}
+      <label
+        htmlFor={`col-toggle-${id}`}
+        className="flex items-center gap-2.5 flex-1 min-w-0 cursor-pointer"
       >
-        {label}
-      </span>
+        <span className="relative flex items-center justify-center shrink-0">
+          <input
+            type="checkbox"
+            id={`col-toggle-${id}`}
+            checked={visible}
+            onChange={(e) => {
+              e.stopPropagation();
+              onToggle();
+            }}
+            className="sr-only"
+          />
+          <span
+            aria-hidden="true"
+            className={cn(
+              "w-3.5 h-3.5 rounded border flex items-center justify-center transition-all duration-150",
+              visible
+                ? "bg-primary border-primary"
+                : "border-white/20 bg-transparent hover:border-white/40",
+            )}
+          >
+            {visible && (
+              <svg
+                viewBox="0 0 10 8"
+                className="w-2 h-2 fill-none stroke-white stroke-[2]"
+                aria-hidden="true"
+              >
+                <path d="M1 4l2.5 2.5L9 1" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            )}
+          </span>
+        </span>
+
+        <span
+          className={cn(
+            "flex-1 text-xs font-medium truncate transition-colors",
+            visible ? "text-text-primary" : "text-text-muted",
+          )}
+        >
+          {label}
+        </span>
+      </label>
 
       {badge && (
         <span
           className={cn(
-            "text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded shrink-0",
-            badge === "auto"
-              ? "bg-blue-500/10 text-blue-400 border border-blue-500/20"
-              : "bg-purple-500/10 text-purple-400 border border-purple-500/20",
+            "text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded shrink-0 scale-[0.85] origin-right",
+            badge === "built-in"
+              ? "bg-white/5 text-text-muted border border-white/10"
+              : badge === "auto"
+                ? "bg-blue-500/10 text-blue-400 border border-blue-500/20"
+                : "bg-purple-500/10 text-purple-400 border border-purple-500/20",
           )}
         >
-          {badge === "auto" ? "auto" : "regex"}
+          {badge === "built-in" ? "built-in" : badge === "auto" ? "auto" : "regex"}
         </span>
       )}
 
@@ -89,37 +142,15 @@ function ColumnRow({ id, label, visible, badge, onToggle, onDelete }: ColumnRowP
             e.stopPropagation();
             onDelete();
           }}
-          className="h-5 w-5 opacity-0 group-hover:opacity-100 text-text-muted hover:text-red-400 hover:bg-red-500/10 transition-all shrink-0"
+          className="h-5 w-5 opacity-0 group-hover:opacity-100 text-text-muted hover:text-red-400 hover:bg-red-500/10 transition-all shrink-0 ml-1"
           title={`Remove ${label} column`}
         >
           <Trash2 className="size-2.5" />
         </Button>
       )}
-    </label>
-  );
-}
-
-function SectionHeader({ icon: Icon, title }: { icon: React.ElementType; title: string }) {
-  return (
-    <div className="flex items-center gap-1.5 px-3 pt-4 pb-1">
-      <Icon className="size-3 text-text-muted/60 shrink-0" />
-      <span className="text-[9px] font-bold uppercase tracking-widest text-text-muted/60">
-        {title}
-      </span>
     </div>
   );
 }
-
-// ─── Built-in column definitions ─────────────────────────────────────────────
-
-const BUILTIN_COLUMNS = [
-  { id: "id", label: "ID" },
-  { id: "timestamp", label: "Timestamp" },
-  { id: "ingest_timestamp", label: "Ingest Time" },
-  { id: "level", label: "Level" },
-  { id: "cluster_id", label: "Cluster" },
-  { id: "actions", label: "Actions" },
-] as const;
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 
@@ -132,19 +163,83 @@ export function ColumnManagerSidebar() {
     customColumns,
     addCustomColumn,
     removeCustomColumn,
+    columnOrder,
+    setColumnOrder,
   } = useUIStore();
 
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
 
-  const autoColumns = customColumns.filter((c) => c.source === "auto");
-  const userColumns = customColumns.filter((c) => c.source === "user");
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 4, // Allow clicking check-boxes without initiating drag
+      },
+    }),
+  );
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) {
+      return;
+    }
+    const oldIndex = columnOrder.indexOf(active.id as string);
+    const newIndex = columnOrder.indexOf(over.id as string);
+    if (oldIndex !== -1 && newIndex !== -1) {
+      setColumnOrder(arrayMove(columnOrder, oldIndex, newIndex));
+    }
+  };
+
+  const getColumnDetails = (colId: string) => {
+    switch (colId) {
+      case "id":
+        return { label: "ID", badge: "built-in" as const };
+      case "timestamp":
+        return { label: "Timestamp", badge: "built-in" as const };
+      case "ingest_timestamp":
+        return { label: "Ingest Time", badge: "built-in" as const };
+      case "level":
+        return { label: "Level", badge: "built-in" as const };
+      case "message":
+        return { label: "Message", badge: "built-in" as const };
+      case "cluster_id":
+        return { label: "Cluster", badge: "built-in" as const };
+      case "actions":
+        return { label: "Actions", badge: "built-in" as const };
+    }
+    const custom = customColumns.find((c) => c.id === colId);
+    if (custom) {
+      return {
+        label: custom.label,
+        badge: custom.source as "auto" | "user",
+        onDelete: custom.source === "user" ? () => removeCustomColumn(custom.id) : undefined,
+      };
+    }
+    return null;
+  };
+
+  // Only render columns present in current workspace hierarchy
+  const orderedList = columnOrder
+    .map((colId) => {
+      const details = getColumnDetails(colId);
+      if (!details) {
+        return null;
+      }
+      return {
+        id: colId,
+        label: details.label,
+        visible: visibleColumns[colId] ?? false,
+        badge: details.badge,
+        onDelete: details.onDelete,
+      };
+    })
+    .filter((item): item is NonNullable<typeof item> => item !== null);
 
   return (
     <>
       <motion.div
         initial={false}
         animate={{
-          width: columnManagerCollapsed ? 0 : 220,
+          width: columnManagerCollapsed ? 0 : 256,
           opacity: columnManagerCollapsed ? 0 : 1,
         }}
         transition={{ type: "spring", stiffness: 400, damping: 40 }}
@@ -173,53 +268,35 @@ export function ColumnManagerSidebar() {
         </div>
 
         <ScrollArea className="flex-1 min-h-0">
-          <div className="pb-4">
-            {/* ── Built-in Columns ── */}
-            <SectionHeader icon={Columns2} title="Built-in" />
-            {BUILTIN_COLUMNS.map((col) => (
-              <ColumnRow
-                key={col.id}
-                id={col.id}
-                label={col.label}
-                visible={visibleColumns[col.id] ?? false}
-                onToggle={() => toggleColumnVisibility(col.id)}
-              />
-            ))}
+          <div className="p-3">
+            <span className="text-[9px] font-bold uppercase tracking-widest text-text-muted/60 block mb-3 px-1">
+              Active Layout Order (Drag to sort)
+            </span>
 
-            {/* ── Auto-extracted Columns ── */}
-            {autoColumns.length > 0 && (
-              <>
-                <SectionHeader icon={Sparkle} title="Extracted" />
-                {autoColumns.map((col) => (
-                  <ColumnRow
-                    key={col.id}
-                    id={col.id}
-                    label={col.label}
-                    visible={visibleColumns[col.id] ?? false}
-                    badge="auto"
-                    onToggle={() => toggleColumnVisibility(col.id)}
-                  />
-                ))}
-              </>
-            )}
-
-            {/* ── User-defined Columns ── */}
-            {userColumns.length > 0 && (
-              <>
-                <SectionHeader icon={User} title="Custom" />
-                {userColumns.map((col) => (
-                  <ColumnRow
-                    key={col.id}
-                    id={col.id}
-                    label={col.label}
-                    visible={visibleColumns[col.id] ?? false}
-                    badge="user"
-                    onToggle={() => toggleColumnVisibility(col.id)}
-                    onDelete={() => removeCustomColumn(col.id)}
-                  />
-                ))}
-              </>
-            )}
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              onDragEnd={handleDragEnd}
+            >
+              <SortableContext
+                items={orderedList.map((item) => item.id)}
+                strategy={verticalListSortingStrategy}
+              >
+                <div className="space-y-1">
+                  {orderedList.map((item) => (
+                    <SortableColumnRow
+                      key={item.id}
+                      id={item.id}
+                      label={item.label}
+                      visible={item.visible}
+                      badge={item.badge}
+                      onToggle={() => toggleColumnVisibility(item.id)}
+                      onDelete={item.onDelete}
+                    />
+                  ))}
+                </div>
+              </SortableContext>
+            </DndContext>
           </div>
         </ScrollArea>
 
