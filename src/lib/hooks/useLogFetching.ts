@@ -71,6 +71,30 @@ export function useLogFetching(workspaceId: string | null, activeSourceId: strin
     setIsFetching(true);
 
     try {
+      // 0. Fetch Time Boundaries & Auto-Initialize Time Range
+      try {
+        const bounds = await callSidecar<{ min_time: string; max_time: string }>({
+          method: "get_time_boundaries",
+          params: {
+            workspace_id: workspaceId,
+            source_ids: queryParams.isFusion ? undefined : [queryParams.activeSrc.id],
+          },
+          silent: true,
+        });
+        if (bounds && bounds.min_time && bounds.max_time && currentSourceRef === activeSourceId) {
+          const minIso = bounds.min_time.replace(" ", "T");
+          const maxIso = bounds.max_time.replace(" ", "T");
+          const store = useInvestigationStore.getState();
+          store.setTimeRangeBounds({ start: minIso, end: maxIso });
+          if (!store.timeRange.start && !store.timeRange.end) {
+            store.setTimeRange({ start: minIso, end: maxIso, label: "All Time" });
+            return;
+          }
+        }
+      } catch (err) {
+        console.warn("[useLogFetching] Failed to get time boundaries:", err);
+      }
+
       // 1. Fetch Anomalies
       if (showAnomalies) {
         const res = await callSidecar<{ anomalies: { cluster_id: string }[] }>({

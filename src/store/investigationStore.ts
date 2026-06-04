@@ -13,6 +13,7 @@ export interface SourceState {
   sortBy: string;
   sortOrder: "asc" | "desc";
   timeRange: { start: string; end: string; label?: string };
+  timeRangeBounds: { start: string; end: string };
   selectedLogIds: number[];
   availableFacets: Record<string, { value: string; count: number }[]>;
 }
@@ -44,6 +45,8 @@ export interface InvestigationStore extends SourceState {
   setShowAnomalies: (v: boolean) => void;
   setWorkspaceGlobalContext: (v: string | null) => void;
   setTimeRange: (range: { start: string; end: string; label?: string }) => void;
+  setTimeRangeBounds: (bounds: { start: string; end: string }) => void;
+  resetTimeRangeToAllTime: () => void;
   setSelectedLogIds: (ids: number[]) => void;
   toggleLogSelection: (id: number) => void;
   clearSelection: () => void;
@@ -61,6 +64,7 @@ const DEFAULT_SOURCE_STATE: SourceState = {
   sortBy: "timestamp",
   sortOrder: "desc",
   timeRange: { start: "", end: "" },
+  timeRangeBounds: { start: "", end: "" },
   selectedLogIds: [],
   availableFacets: {},
 };
@@ -92,6 +96,7 @@ export const useInvestigationStore = create<InvestigationStore>((set, get) => ({
       sortBy: get().sortBy,
       sortOrder: get().sortOrder,
       timeRange: get().timeRange,
+      timeRangeBounds: get().timeRangeBounds,
       selectedLogIds: get().selectedLogIds,
       availableFacets: get().availableFacets,
     };
@@ -126,6 +131,15 @@ export const useInvestigationStore = create<InvestigationStore>((set, get) => ({
   setShowAnomalies: (showAnomalies) => set({ showAnomalies }),
   setWorkspaceGlobalContext: (workspaceGlobalContext) => set({ workspaceGlobalContext }),
   setTimeRange: (timeRange) => set({ timeRange }),
+  setTimeRangeBounds: (timeRangeBounds) => set({ timeRangeBounds }),
+  resetTimeRangeToAllTime: () =>
+    set((state) => ({
+      timeRange: {
+        start: state.timeRangeBounds.start,
+        end: state.timeRangeBounds.end,
+        label: "All Time",
+      },
+    })),
   setSelectedLogIds: (selectedLogIds) => set({ selectedLogIds }),
   toggleLogSelection: (id) =>
     set((state) => ({

@@ -148,5 +148,27 @@ def test_get_metadata_facets(api):
     )
     res = api.method_get_metadata_facets(workspace_id="ws1")
     assert isinstance(res, dict)
+
+
+def test_get_time_boundaries(api):
+    api.method_ingest_logs(
+        [
+            IngestLogEntry(
+                workspace_id="ws1",
+                source_id="src1",
+                raw_text="2023-01-01 10:00:00 INFO Test",
+                timestamp="2023-01-01 10:00:00",
+            ),
+            IngestLogEntry(
+                workspace_id="ws1",
+                source_id="src1",
+                raw_text="2023-01-01 10:15:00 INFO Test",
+                timestamp="2023-01-01 10:15:00",
+            ),
+        ]
+    )
+    res = api.method_get_time_boundaries(workspace_id="ws1")
+    assert res["min_time"] == "2023-01-01 10:00:00"
+    assert res["max_time"] == "2023-01-01 10:15:00"
     # The facets might be empty if metadata extraction didn't run or wasn't mocked
     # But calling the method itself covers the code path

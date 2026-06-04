@@ -10,7 +10,7 @@ import {
   Sparkles,
   Upload,
 } from "lucide-react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { StatusDot } from "@/components/atoms/StatusDot";
 import { TailSwitch } from "@/components/atoms/TailSwitch";
 import { FilterBuilder, type FilterEntry } from "@/components/molecules/FilterBuilder";
@@ -81,10 +81,18 @@ export function LogToolbar({
   onEngineSettingsOpen,
   searchRef,
 }: LogToolbarProps) {
-  const { timeRange, setTimeRange } = useInvestigationStore();
+  const { timeRange, timeRangeBounds, setTimeRange, resetTimeRangeToAllTime } =
+    useInvestigationStore();
   const { isSidebarOpen, setSidebarOpen } = useAiStore();
   const { facetSidebarCollapsed, toggleFacetSidebar, visibleColumns, toggleColumnVisibility } =
     useUIStore();
+
+  const isFiltered = useMemo(() => {
+    return (
+      (timeRange.start && timeRange.start !== timeRangeBounds.start) ||
+      (timeRange.end && timeRange.end !== timeRangeBounds.end)
+    );
+  }, [timeRange, timeRangeBounds]);
   const [isSaveTemplateModalOpen, setIsSaveTemplateModalOpen] = useState(false);
   const [isLoadTemplateModalOpen, setIsLoadTemplateModalOpen] = useState(false);
 
@@ -171,6 +179,16 @@ export function LogToolbar({
 
       {/* Right Group */}
       <div className="flex items-center gap-3 shrink-0">
+        {isFiltered && (
+          <Button
+            type="button"
+            variant="outline"
+            onClick={resetTimeRangeToAllTime}
+            className="text-[11px] h-7 px-2 border-primary/20 bg-primary/5 text-primary hover:bg-primary hover:text-text-inverse transition-all rounded cursor-pointer font-semibold"
+          >
+            Reset Time
+          </Button>
+        )}
         <TimeRangePicker value={timeRange} onChange={setTimeRange} />
 
         <div className="h-5 w-px bg-zinc-800 shrink-0" />

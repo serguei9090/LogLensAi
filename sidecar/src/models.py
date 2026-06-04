@@ -255,6 +255,11 @@ class SetClusteringPausedRequest(BaseModel):
     workspace_id: str | None = None
 
 
+class GetTimeBoundariesRequest(BaseModel):
+    workspace_id: str
+    source_ids: list[str] | None = None
+
+
 class GetLogDistributionRequest(BaseModel):
     workspace_id: str
     fusion_id: str | None = None

@@ -60,6 +60,7 @@ from models import (
     GetSampleLinesRequest,
     GetSettingsRequest,
     GetTemporalOffsetsRequest,
+    GetTimeBoundariesRequest,
     GetWorkspaceSourcesRequest,
     IngestLocalFileRequest,
     IngestLogsRequest,
@@ -178,6 +179,7 @@ class App:
         "get_metadata_facets": GetMetadataFacetsRequest,
         "analyze_cluster": AnalyzeClusterRequest,
         "get_settings": GetSettingsRequest,
+        "get_time_boundaries": GetTimeBoundariesRequest,
         "update_settings": UpdateSettingsRequest,
         "get_dashboard_stats": GetDashboardStatsRequest,
         "purge_inactive_workspaces": PurgeInactiveWorkspacesRequest,
@@ -905,6 +907,30 @@ class App:
                 except Exception:
                     pass
 
+    def method_get_time_boundaries(self, **kwargs) -> dict:
+        """Find the min and max log timestamps for a workspace/source list."""
+        params = GetTimeBoundariesRequest(**kwargs)
+        cursor = self.db.get_cursor()
+
+        where_clauses = ["workspace_id = ?"]
+        sql_params = [params.workspace_id]
+
+        if params.source_ids:
+            placeholders = ",".join(["?"] * len(params.source_ids))
+            where_clauses.append(f"source_id IN ({placeholders})")
+            sql_params.extend(params.source_ids)
+
+        where_sql = " AND ".join(where_clauses)
+        query = f"SELECT MIN(timestamp), MAX(timestamp) FROM logs WHERE {where_sql}"
+
+        cursor.execute(query, sql_params)
+        row = cursor.fetchone()
+
+        min_time = row[0] if row and row[0] else ""
+        max_time = row[1] if row and row[1] else ""
+
+        return {"min_time": min_time, "max_time": max_time}
+
     def method_get_logs(self, **kwargs) -> dict:
         """Fetch logs normally for a workspace/source."""
         params = GetLogsRequest(**kwargs)
@@ -977,14 +1003,71 @@ class App:
         if where_sql is None:
             return {"buckets": []}
 
-        # Aggregate by time bucket
-        # Default to minute-level bucketing, but support hour-level for larger ranges
-        # bucket_length is strictly mapped to prevent injection.
-        bucket_length = 13 if getattr(params, "interval", None) == "1h" else 16
+        # Determine duration of the timeframe to calculate optimal buckets
+        start_ts = params.start_time
+        end_ts = params.end_time
+
+        if not start_ts or not end_ts:
+            # Query min/max timestamps from DB for this workspace/sources
+            cursor.execute(
+                f"SELECT MIN(timestamp), MAX(timestamp) FROM logs WHERE {where_sql}", sql_params
+            )
+            db_row = cursor.fetchone()
+            if db_row and db_row[0] and db_row[1]:
+                if not start_ts:
+                    start_ts = db_row[0]
+                if not end_ts:
+                    end_ts = db_row[1]
+
+        duration_sec = 3600.0  # default fallback to 1 hour range
+        if start_ts and end_ts:
+            try:
+                s_str = start_ts.replace("T", " ").replace("Z", "")
+                e_str = end_ts.replace("T", " ").replace("Z", "")
+                dt_s = datetime.strptime(s_str[:19], "%Y-%m-%d %H:%M:%S")
+                dt_e = datetime.strptime(e_str[:19], "%Y-%m-%d %H:%M:%S")
+                duration_sec = max(1.0, (dt_e - dt_s).total_seconds())
+            except Exception:
+                pass
+
+        # Select bucket interval based on the duration to have ~15-60 columns
+        if duration_sec <= 10:
+            interval_str = "1 second"
+            format_str = "%Y-%m-%d %H:%M:%S"
+        elif duration_sec <= 60:
+            interval_str = "5 seconds"
+            format_str = "%Y-%m-%d %H:%M:%S"
+        elif duration_sec <= 600:  # 10 mins
+            interval_str = "15 seconds"
+            format_str = "%Y-%m-%d %H:%M:%S"
+        elif duration_sec <= 3600:  # 1 hour
+            interval_str = "1 minute"
+            format_str = "%Y-%m-%d %H:%M"
+        elif duration_sec <= 14400:  # 4 hours
+            interval_str = "5 minutes"
+            format_str = "%Y-%m-%d %H:%M"
+        elif duration_sec <= 86400:  # 24 hours
+            interval_str = "15 minutes"
+            format_str = "%Y-%m-%d %H:%M"
+        elif duration_sec <= 259200:  # 3 days
+            interval_str = "1 hour"
+            format_str = "%Y-%m-%d %H:00"
+        elif duration_sec <= 604800:  # 7 days
+            interval_str = "4 hours"
+            format_str = "%Y-%m-%d %H:00"
+        elif duration_sec <= 2592000:  # 30 days
+            interval_str = "12 hours"
+            format_str = "%Y-%m-%d %H:00"
+        elif duration_sec <= 15552000:  # 180 days
+            interval_str = "1 day"
+            format_str = "%Y-%m-%d"
+        else:
+            interval_str = "30 days"
+            format_str = "%Y-%m"
 
         query = f"""
             SELECT
-                substring(timestamp, 1, {bucket_length}) as time_bucket,
+                strftime(time_bucket(INTERVAL '{interval_str}', CAST(timestamp AS TIMESTAMP)), '{format_str}') as time_bucket,
                 level,
                 COUNT(*) as count
             FROM logs
@@ -995,21 +1078,92 @@ class App:
         cursor.execute(query, sql_params)
         rows = cursor.fetchall()
 
-        # Reshape to a list of dicts: {"bucket": "2023...", "INFO": 5, "ERROR": 2}
-        buckets_map = {}
+        # Reshape DB results: {"bucket": "2023...", "INFO": 5, "ERROR": 2}
+        db_buckets: dict[str, dict] = {}
         for row in rows:
-            time_bucket = row[0]
-            if bucket_length == 13:
-                time_bucket += ":00"  # Normalize to HH:00 for frontend parsing
+            time_bucket_key = row[0]
+            if len(time_bucket_key) == 13:
+                time_bucket_key += ":00"  # Normalize "YYYY-MM-DD HH" → "YYYY-MM-DD HH:00"
             level = row[1]
             count = row[2]
+            if time_bucket_key not in db_buckets:
+                db_buckets[time_bucket_key] = {"bucket": time_bucket_key}
+            db_buckets[time_bucket_key][level] = count
 
-            if time_bucket not in buckets_map:
-                buckets_map[time_bucket] = {"bucket": time_bucket}
+        # ── Kibana "extended_bounds" / "min_doc_count:0" equivalent ──────────
+        # Generate ALL bucket slots between start_ts and end_ts so Recharts
+        # gets a continuous grid of bars. Empty slots render at height 0 instead
+        # of causing gaps (Recharts spreads only the data-points it receives).
+        empty_levels = {"DEBUG": 0, "INFO": 0, "WARN": 0, "ERROR": 0}
 
-            buckets_map[time_bucket][level] = count
+        def _parse_ts(ts_str: str) -> datetime | None:
+            """Parse a timestamp string into a datetime, tolerating various formats."""
+            if not ts_str:
+                return None
+            s = ts_str.replace("T", " ").replace("Z", "").strip()
+            # (fmt, slice_length) pairs — ordered most→least specific
+            _formats = [
+                ("%Y-%m-%d %H:%M:%S", 19),
+                ("%Y-%m-%d %H:%M", 16),
+                ("%Y-%m-%d %H", 13),
+                ("%Y-%m-%d", 10),
+                ("%Y-%m", 7),
+            ]
+            for fmt, length in _formats:
+                try:
+                    return datetime.strptime(s[:length], fmt)
+                except ValueError:
+                    continue
+            return None
 
-        return {"buckets": list(buckets_map.values())}
+        # Map interval_str → timedelta
+        _interval_map = {
+            "1 second": timedelta(seconds=1),
+            "5 seconds": timedelta(seconds=5),
+            "15 seconds": timedelta(seconds=15),
+            "1 minute": timedelta(minutes=1),
+            "5 minutes": timedelta(minutes=5),
+            "15 minutes": timedelta(minutes=15),
+            "1 hour": timedelta(hours=1),
+            "4 hours": timedelta(hours=4),
+            "12 hours": timedelta(hours=12),
+            "1 day": timedelta(days=1),
+            "30 days": timedelta(days=30),
+        }
+        delta = _interval_map.get(interval_str, timedelta(hours=1))
+
+        dt_start = _parse_ts(start_ts) if start_ts else None
+        dt_end = _parse_ts(end_ts) if end_ts else None
+
+        all_slots: list[str] = []
+        if dt_start and dt_end and delta:
+            current = dt_start
+            # Safety cap: max 500 slots to prevent runaway allocations
+            while current <= dt_end and len(all_slots) < 500:
+                slot_label = current.strftime(format_str)
+                # Normalize "YYYY-MM-DD HH" (13-char) labels consistently
+                if len(slot_label) == 13:
+                    slot_label += ":00"
+                all_slots.append(slot_label)
+                current += delta
+
+        # Merge: start from fully-filled zero grid, overlay real DB data
+        full_buckets: dict[str, dict] = {}
+        for slot in all_slots:
+            full_buckets[slot] = {"bucket": slot, **empty_levels}
+        for key, data in db_buckets.items():
+            if key in full_buckets:
+                full_buckets[key].update(data)
+            else:
+                # DB key outside generated range (shouldn't normally happen)
+                full_buckets[key] = {**empty_levels, **data}
+
+        # If slot generation failed fall back to whatever the DB returned
+        final_buckets = list(full_buckets.values()) if all_slots else list(db_buckets.values())
+        # Ensure sorted by bucket label (ISO-format strings sort lexicographically)
+        final_buckets.sort(key=lambda b: b.get("bucket", ""))
+
+        return {"buckets": final_buckets, "bucket_interval": interval_str}
 
     def method_get_anomalies(self, workspace_id: str, time_range: str | None = None) -> dict:
         """Fetch recently detected cluster anomalies from the database."""
@@ -2581,74 +2735,144 @@ class App:
             cursor.execute("SELECT COUNT(DISTINCT workspace_id) FROM logs")
         workspace_count = cursor.fetchone()[0]
 
-        # 6. Time Series (Log Volume & Severity over time with dynamic bucket sizing)
-        bucket_format = "%Y-%m-%d %H:%M:00"
+        # 6. Time Series — dynamic bucket sizing + Kibana extended_bounds (fill all slots with 0)
+        ts_min_time: str | None = None
+        ts_max_time: str | None = None
+        bucket_interval_str = "1 hour"
+        bucket_format = "%Y-%m-%d %H:00:00"
+
         try:
             cursor.execute(
-                "SELECT MIN(TRY_CAST(timestamp AS TIMESTAMP)), MAX(TRY_CAST(timestamp AS TIMESTAMP)) FROM logs l"
-                + where_sql,
+                "SELECT MIN(l.timestamp), MAX(l.timestamp) FROM logs l" + where_sql,
                 params,
             )
-            min_ts, max_ts = cursor.fetchone()
-            if min_ts and max_ts:
-                # Normalize type — DuckDB may return datetime objects or strings
+            min_ts_row, max_ts_row = cursor.fetchone()
+            if min_ts_row and max_ts_row:
+                ts_min_time = str(min_ts_row)
+                ts_max_time = str(max_ts_row)
                 try:
-                    if isinstance(min_ts, str):
-                        min_dt = datetime.fromisoformat(min_ts.replace("Z", "+00:00"))
-                        max_dt = datetime.fromisoformat(max_ts.replace("Z", "+00:00"))
-                    else:
-                        # datetime object returned directly by DuckDB
-                        min_dt = min_ts if hasattr(min_ts, "total_seconds") is False else None
-                        max_dt = max_ts if hasattr(max_ts, "total_seconds") is False else None
-                        # Ensure we have actual datetime instances
-                        if not isinstance(min_dt, datetime):
-                            min_dt = None
-                        if not isinstance(max_dt, datetime):
-                            max_dt = None
+                    _s = ts_min_time.replace("T", " ").replace("Z", "")[:19]
+                    _e = ts_max_time.replace("T", " ").replace("Z", "")[:19]
+                    min_dt_ts = datetime.strptime(_s, "%Y-%m-%d %H:%M:%S")
+                    max_dt_ts = datetime.strptime(_e, "%Y-%m-%d %H:%M:%S")
+                    seconds_span = max((max_dt_ts - min_dt_ts).total_seconds(), 1.0)
                 except Exception:
-                    min_dt = None
-                    max_dt = None
+                    min_dt_ts = None
+                    max_dt_ts = None
+                    seconds_span = 3600.0
 
-                if min_dt and max_dt:
-                    diff = max_dt - min_dt
-                    seconds = diff.total_seconds()
-                    if seconds <= 180:  # <= 3 minutes: second level
-                        bucket_format = "%Y-%m-%d %H:%M:%S"
-                    elif seconds <= 7200:  # <= 2 hours: minute level
-                        bucket_format = "%Y-%m-%d %H:%M:00"
-                    elif seconds <= 172800:  # <= 48 hours: hour level
-                        bucket_format = "%Y-%m-%d %H:00:00"
-                    else:  # > 48 hours: day level
-                        bucket_format = "%Y-%m-%d 00:00:00"
+                # Mirror the interval ladder from method_get_log_distribution
+                if seconds_span <= 10:
+                    bucket_interval_str = "1 second"
+                    bucket_format = "%Y-%m-%d %H:%M:%S"
+                elif seconds_span <= 60:
+                    bucket_interval_str = "5 seconds"
+                    bucket_format = "%Y-%m-%d %H:%M:%S"
+                elif seconds_span <= 600:
+                    bucket_interval_str = "15 seconds"
+                    bucket_format = "%Y-%m-%d %H:%M:%S"
+                elif seconds_span <= 3600:
+                    bucket_interval_str = "1 minute"
+                    bucket_format = "%Y-%m-%d %H:%M"
+                elif seconds_span <= 14400:
+                    bucket_interval_str = "5 minutes"
+                    bucket_format = "%Y-%m-%d %H:%M"
+                elif seconds_span <= 86400:
+                    bucket_interval_str = "15 minutes"
+                    bucket_format = "%Y-%m-%d %H:%M"
+                elif seconds_span <= 259200:
+                    bucket_interval_str = "1 hour"
+                    bucket_format = "%Y-%m-%d %H:00"
+                elif seconds_span <= 604800:
+                    bucket_interval_str = "4 hours"
+                    bucket_format = "%Y-%m-%d %H:00"
+                elif seconds_span <= 2592000:
+                    bucket_interval_str = "12 hours"
+                    bucket_format = "%Y-%m-%d %H:00"
+                elif seconds_span <= 15552000:
+                    bucket_interval_str = "1 day"
+                    bucket_format = "%Y-%m-%d"
+                else:
+                    bucket_interval_str = "30 days"
+                    bucket_format = "%Y-%m"
         except Exception as e:
             logger.error("Failed to calculate dynamic time bucket size: %s", e)
+            min_dt_ts = None
+            max_dt_ts = None
 
         # Build WHERE clause — safely extend existing filters with NULL timestamp guard
-        ts_null_guard = "TRY_CAST(l.timestamp AS TIMESTAMP) IS NOT NULL"
+        ts_null_guard = "l.timestamp IS NOT NULL"
         ts_where = (
             (where_sql + " AND " + ts_null_guard) if where_sql else (" WHERE " + ts_null_guard)
         )
         ts_query = (
-            f"SELECT strftime('{bucket_format}', TRY_CAST(l.timestamp AS TIMESTAMP)) as bucket, l.level, COUNT(*) as count "
+            f"SELECT strftime(time_bucket(INTERVAL '{bucket_interval_str}', CAST(l.timestamp AS TIMESTAMP)), '{bucket_format}') as bucket, l.level, COUNT(*) as count "
             f"FROM logs l {ts_where} GROUP BY bucket, l.level ORDER BY bucket ASC"
         )
         cursor.execute(ts_query, params)
         ts_raw = cursor.fetchall()
 
-        ts_pivot = {}
-        for bucket, level, count in ts_raw:
-            # Always cast bucket to str — DuckDB strftime may return datetime objects
-            bucket_key = (
-                bucket.isoformat()
-                if isinstance(bucket, datetime)
-                else str(bucket)
-                if bucket is not None
-                else ""
-            )
+        # Build pivot from DB results
+        ts_pivot: dict[str, dict] = {}
+        for bucket_val, level, count in ts_raw:
+            bucket_key = str(bucket_val) if bucket_val is not None else ""
+            if len(bucket_key) == 13:
+                bucket_key += ":00"
             if bucket_key not in ts_pivot:
                 ts_pivot[bucket_key] = {"timestamp": bucket_key}
             ts_pivot[bucket_key][str(level) if level else "UNKNOWN"] = count
-        time_series = list(ts_pivot.values())
+
+        # ── Extended-bounds fill (same as method_get_log_distribution) ─────────
+        _interval_map_dash = {
+            "1 second": timedelta(seconds=1),
+            "5 seconds": timedelta(seconds=5),
+            "15 seconds": timedelta(seconds=15),
+            "1 minute": timedelta(minutes=1),
+            "5 minutes": timedelta(minutes=5),
+            "15 minutes": timedelta(minutes=15),
+            "1 hour": timedelta(hours=1),
+            "4 hours": timedelta(hours=4),
+            "12 hours": timedelta(hours=12),
+            "1 day": timedelta(days=1),
+            "30 days": timedelta(days=30),
+        }
+        empty_ts_levels = {"DEBUG": 0, "INFO": 0, "WARN": 0, "ERROR": 0}
+        delta_dash = _interval_map_dash.get(bucket_interval_str, timedelta(hours=1))
+        filled_slots: list[str] = []
+
+        _ts_min = ts_min_time
+        _ts_max = ts_max_time
+        if start_time:
+            _ts_min = start_time
+        if end_time:
+            _ts_max = end_time
+
+        if _ts_min and _ts_max:
+            try:
+                _s2 = _ts_min.replace("T", " ").replace("Z", "")[:19]
+                _e2 = _ts_max.replace("T", " ").replace("Z", "")[:19]
+                cur_dt = datetime.strptime(_s2, "%Y-%m-%d %H:%M:%S")
+                end_dt = datetime.strptime(_e2, "%Y-%m-%d %H:%M:%S")
+                while cur_dt <= end_dt and len(filled_slots) < 500:
+                    slot = cur_dt.strftime(bucket_format)
+                    if len(slot) == 13:
+                        slot += ":00"
+                    filled_slots.append(slot)
+                    cur_dt += delta_dash
+            except Exception:
+                pass
+
+        full_ts: dict[str, dict] = {}
+        for slot in filled_slots:
+            full_ts[slot] = {"timestamp": slot, **empty_ts_levels}
+        for key, data in ts_pivot.items():
+            if key in full_ts:
+                full_ts[key].update(data)
+            else:
+                full_ts[key] = {**{"timestamp": key}, **empty_ts_levels, **data}
+
+        time_series = list(full_ts.values()) if filled_slots else list(ts_pivot.values())
+        time_series.sort(key=lambda b: b.get("timestamp", ""))
 
         # 7. Top Error Clusters
         error_where = (
@@ -2737,6 +2961,11 @@ class App:
             "new_patterns_count": new_patterns_count,
             "workspace_count": workspace_count,
             "active_tailers": len([k for k, t in self.tailers.items() if t.running]),
+            "bucket_interval": bucket_interval_str,
+            "time_bounds": {
+                "min": ts_min_time or "",
+                "max": ts_max_time or "",
+            },
         }
 
     def method_purge_inactive_workspaces(self, active_workspace_ids: list[str]) -> dict:

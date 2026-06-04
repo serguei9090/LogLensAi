@@ -53,6 +53,8 @@ interface DashboardStats {
   new_patterns_count: number;
   workspace_count: number;
   active_tailers: number;
+  bucket_interval?: string;
+  time_bounds?: { min: string; max: string };
 }
 
 /**
@@ -103,6 +105,8 @@ function DashboardFilters({
   sources,
   timeRange,
   onTimeRangeChange,
+  timeBounds,
+  onResetTime,
 }: Readonly<{
   selectedWorkspaceId: string;
   onWorkspaceChange: (v: string) => void;
@@ -112,9 +116,16 @@ function DashboardFilters({
   sources: any[];
   timeRange: TimeRange;
   onTimeRangeChange: (tr: TimeRange) => void;
+  timeBounds: { min: string; max: string } | null;
+  onResetTime: () => void;
 }>) {
   const selectedWorkspace = workspaces.find((w) => w.id === selectedWorkspaceId);
   const selectedSource = sources.find((s) => s.id === selectedSourceId);
+
+  const isFiltered =
+    timeBounds &&
+    ((timeRange.start && timeRange.start !== timeBounds.min) ||
+      (timeRange.end && timeRange.end !== timeBounds.max));
 
   return (
     <div className="flex flex-wrap items-center gap-3 bg-bg-surface/30 p-2 rounded-xl border border-border/50 backdrop-blur-sm">
@@ -163,6 +174,15 @@ function DashboardFilters({
         <span className="text-[10px] font-bold uppercase tracking-widest text-text-muted">
           Time:
         </span>
+        {isFiltered && (
+          <button
+            type="button"
+            onClick={onResetTime}
+            className="text-[10px] h-7 px-2 border border-primary/20 bg-primary/5 text-primary hover:bg-primary hover:text-text-inverse transition-all rounded font-semibold cursor-pointer"
+          >
+            All Time
+          </button>
+        )}
         <TimeRangePicker
           value={timeRange}
           onChange={onTimeRangeChange}
@@ -183,6 +203,8 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [mode, setMode] = useState<DashboardMode>("static");
   const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [timeBounds, setTimeBounds] = useState<{ min: string; max: string } | null>(null);
+  const [isFirstLoad, setIsFirstLoad] = useState(true);
 
   // Handle Mode Change with Sidebar auto-open
   const handleModeChange = (newMode: DashboardMode) => {
@@ -237,12 +259,21 @@ export default function DashboardPage() {
         silent: true,
       });
       setStats(res);
+      // Auto-initialize time range from data bounds on first load
+      if (res?.time_bounds?.min && res.time_bounds.max) {
+        const bounds = { min: res.time_bounds.min, max: res.time_bounds.max };
+        setTimeBounds(bounds);
+        if (isFirstLoad) {
+          setTimeRange({ start: bounds.min, end: bounds.max, label: "All Time" });
+          setIsFirstLoad(false);
+        }
+      }
     } catch (e) {
       console.error("Failed to fetch dashboard stats", e);
     } finally {
       setLoading(false);
     }
-  }, [selectedWorkspaceId, selectedSourceId, timeRange, workspaces]);
+  }, [selectedWorkspaceId, selectedSourceId, timeRange, workspaces, isFirstLoad]);
 
   useEffect(() => {
     fetchStats();
@@ -390,6 +421,7 @@ export default function DashboardPage() {
             onWorkspaceChange={(v) => {
               setSelectedWorkspaceId(v || "all");
               setSelectedSourceId("all");
+              setIsFirstLoad(true); // Re-auto-init when workspace changes
             }}
             workspaces={workspaces}
             selectedSourceId={selectedSourceId}
@@ -397,6 +429,14 @@ export default function DashboardPage() {
             sources={sources}
             timeRange={timeRange}
             onTimeRangeChange={setTimeRange}
+            timeBounds={timeBounds}
+            onResetTime={() => {
+              if (timeBounds) {
+                setTimeRange({ start: timeBounds.min, end: timeBounds.max, label: "All Time" });
+              } else {
+                setTimeRange({ start: "", end: "" });
+              }
+            }}
           />
         </header>
 
@@ -480,7 +520,20 @@ export default function DashboardPage() {
               </div>
 
               {/* Main Charts Row */}
-              <DashboardCharts stats={stats} />
+              <DashboardCharts
+                stats={stats}
+                bucketInterval={stats?.bucket_interval}
+                timeBounds={timeBounds ?? undefined}
+                timeRange={timeRange}
+                onZoom={(start, end) => setTimeRange({ start, end, label: "Zoomed Range" })}
+                onReset={() => {
+                  if (timeBounds) {
+                    setTimeRange({ start: timeBounds.min, end: timeBounds.max, label: "All Time" });
+                  } else {
+                    setTimeRange({ start: "", end: "" });
+                  }
+                }}
+              />
 
               {/* Patterns Row */}
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
