@@ -10,7 +10,7 @@ interface FacetListProps {
   className?: string;
 }
 
-export function FacetList({ onApplyFilter, className }: FacetListProps) {
+export function FacetList({ onApplyFilter, className }: Readonly<FacetListProps>) {
   const { availableFacets, filters, setFilters } = useInvestigationStore();
   const [expandedKeys, setExpandedKeys] = useState<Set<string>>(
     new Set(["ip", "uuid", "level", "email", "user_id"]),

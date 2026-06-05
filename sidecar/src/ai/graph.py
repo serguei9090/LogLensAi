@@ -7,6 +7,8 @@ from langgraph.graph import END, StateGraph
 
 from .base import AIChatMessage
 from .tools import (
+    CreateColumnParams,
+    CreateFacetParams,
     GetClustersParams,
     GetFacetsParams,
     GetHierarchyParams,
@@ -156,6 +158,12 @@ class GraphManager:
                     elif name == "get_hierarchy":
                         params = GetHierarchyParams(**args)
                         result = await self.tools.get_hierarchy(ctx, params)
+                    elif name == "create_column":
+                        params = CreateColumnParams(**args)
+                        result = await self.tools.create_column(ctx, params)
+                    elif name == "create_facet":
+                        params = CreateFacetParams(**args)
+                        result = await self.tools.create_facet(ctx, params)
 
                     state["messages"].append(
                         {

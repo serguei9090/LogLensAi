@@ -23,6 +23,7 @@ import { cn } from "@/lib/utils";
 import { useAiStore } from "@/store/aiStore";
 import { useInvestigationStore } from "@/store/investigationStore";
 import { useSettingsStore } from "@/store/settingsStore";
+import { useUIStore } from "@/store/uiStore";
 import { selectActiveWorkspace, useWorkspaceStore } from "@/store/workspaceStore";
 import { A2UIRenderer } from "../atoms/A2UIRenderer";
 import { TypingIndicator } from "../atoms/TypingIndicator";
@@ -211,6 +212,11 @@ export function AIInvestigationSidebar({
       operator?: FilterEntry["operator"];
       query?: string;
       command?: string;
+      id?: string;
+      label?: string;
+      width?: string;
+      source?: "auto" | "user";
+      regex?: string;
     };
 
     switch (a.type) {
@@ -239,6 +245,22 @@ export function AIInvestigationSidebar({
         }
         break;
       }
+      case "add_column": {
+        if (a.label) {
+          const colId = a.id || `col-${Date.now()}`;
+          const existing = useUIStore.getState().customColumns.find((c) => c.id === colId);
+          if (!existing) {
+            useUIStore.getState().addCustomColumn({
+              id: colId,
+              label: a.label,
+              width: a.width || "120px",
+              source: a.source || "user",
+              regex: a.regex,
+            });
+          }
+        }
+        break;
+      }
       default:
         console.warn("Unhandled A2UI action:", a);
     }
@@ -254,6 +276,12 @@ export function AIInvestigationSidebar({
       desc: "Perform deep-dive analysis on a log pattern",
     },
     { cmd: "/anomalies", label: "Find Anomalies", desc: "Scan workspace for statistical outliers" },
+    { cmd: "/create_column", label: "Create Column", desc: "Ask AI to create a custom column" },
+    {
+      cmd: "/create_facet",
+      label: "Create Facet",
+      desc: "Ask AI to extract a custom facet (mask)",
+    },
   ];
 
   const generateDefaultName = useCallback(() => {

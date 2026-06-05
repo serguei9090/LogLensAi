@@ -558,6 +558,34 @@ export function TimeRangePicker({ value, onChange, className }: TimeRangePickerP
 
   const hasEndDate = Boolean(range?.to);
 
+  const MonthCaptionLeft = useMemo(() => {
+    return function MonthCaptionLeftComp({ calendarMonth }: MonthCaptionProps) {
+      return (
+        <CalendarHeader
+          calendarMonth={calendarMonth}
+          view={view}
+          onPrev={() => setMonthLeft((m) => dateFnsSubMonths(m, 1))}
+          onNext={() => setMonthLeft((m) => dateFnsAddMonths(m, 1))}
+          onToggleView={() => handleToggleView("left")}
+        />
+      );
+    };
+  }, [view, handleToggleView]);
+
+  const MonthCaptionRight = useMemo(() => {
+    return function MonthCaptionRightComp({ calendarMonth }: MonthCaptionProps) {
+      return (
+        <CalendarHeader
+          calendarMonth={calendarMonth}
+          view={view}
+          onPrev={() => setMonthRight((m) => dateFnsSubMonths(m, 1))}
+          onNext={() => setMonthRight((m) => dateFnsAddMonths(m, 1))}
+          onToggleView={() => handleToggleView("right")}
+        />
+      );
+    };
+  }, [view, handleToggleView]);
+
   const commonPickerProps = {
     mode: "range" as const,
     selected: range,
@@ -657,15 +685,7 @@ export function TimeRangePicker({ value, onChange, className }: TimeRangePickerP
                         month={monthLeft}
                         onMonthChange={setMonthLeft}
                         components={{
-                          MonthCaption: ({ calendarMonth }: MonthCaptionProps) => (
-                            <CalendarHeader
-                              calendarMonth={calendarMonth}
-                              view={view}
-                              onPrev={() => setMonthLeft((m) => dateFnsSubMonths(m, 1))}
-                              onNext={() => setMonthLeft((m) => dateFnsAddMonths(m, 1))}
-                              onToggleView={() => handleToggleView("left")}
-                            />
-                          ),
+                          MonthCaption: MonthCaptionLeft,
                         }}
                       />
                       <DayPicker
@@ -673,15 +693,7 @@ export function TimeRangePicker({ value, onChange, className }: TimeRangePickerP
                         month={monthRight}
                         onMonthChange={setMonthRight}
                         components={{
-                          MonthCaption: ({ calendarMonth }: MonthCaptionProps) => (
-                            <CalendarHeader
-                              calendarMonth={calendarMonth}
-                              view={view}
-                              onPrev={() => setMonthRight((m) => dateFnsSubMonths(m, 1))}
-                              onNext={() => setMonthRight((m) => dateFnsAddMonths(m, 1))}
-                              onToggleView={() => handleToggleView("right")}
-                            />
-                          ),
+                          MonthCaption: MonthCaptionRight,
                         }}
                       />
                     </div>

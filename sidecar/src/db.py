@@ -14,6 +14,7 @@ logger = logging.getLogger(__name__)
 
 
 MEMORY_DB = ":memory:"
+DELETE_CLUSTERS_BY_WORKSPACE = "DELETE FROM clusters WHERE workspace_id = ?"
 
 
 class LogDatabase:
@@ -41,6 +42,18 @@ class LogDatabase:
         conn = self._get_conn()
         self._create_tables(conn)
 
+    def _recover_wal(self, e: Exception):
+        if self.db_path != MEMORY_DB:
+            wal_path = f"{self.db_path}.wal"
+            if os.path.exists(wal_path):
+                logger.warning("[DB] WAL replay failed: %s", e)
+                try:
+                    os.remove(wal_path)
+                    return duckdb.connect(self.db_path)
+                except Exception:
+                    pass
+        raise e
+
     def _get_conn(self):
         # Memory DBs MUST share the same connection object to see the same data.
         # File-based DBs should use thread-local connections to avoid transaction interference.
@@ -54,17 +67,7 @@ class LogDatabase:
                 # Use the same db_path for all connections
                 self._local.conn = duckdb.connect(self.db_path)
             except Exception as e:
-                if self.db_path != MEMORY_DB:
-                    wal_path = f"{self.db_path}.wal"
-                    if os.path.exists(wal_path):
-                        logger.warning("[DB] WAL replay failed: %s", e)
-                        try:
-                            os.remove(wal_path)
-                            self._local.conn = duckdb.connect(self.db_path)
-                            return self._local.conn
-                        except Exception:
-                            pass
-                raise e
+                self._local.conn = self._recover_wal(e)
         return self._local.conn
 
     def get_cursor(self):
@@ -826,6 +829,19 @@ class LogDatabase:
 
         return {"total": total, "logs": logs, "offset": offset, "limit": limit}
 
+    def _get_dynamic_facet_keys(self, cursor: Any, workspace_id: str, keys: list[str]):
+        try:
+            cursor.execute(
+                "SELECT DISTINCT UNNEST(json_keys(facets)) FROM logs WHERE workspace_id = ? AND facets IS NOT NULL",
+                (workspace_id,),
+            )
+            for row in cursor.fetchall():
+                key = str(row[0])
+                if key and key not in keys and key != "*":
+                    keys.append(key)
+        except Exception as e:
+            logger.warning("[DB] Failed to extract dynamic facet keys: %s", e)
+
     def _get_facet_keys(self, workspace_id: str) -> list[str]:
         """Resolve priority and custom facet keys from settings."""
         cursor = self.get_cursor()
@@ -867,18 +883,7 @@ class LogDatabase:
         wr = cursor.fetchone()
         _append_rules(wr[0] if wr else None)
 
-        # Also dynamically fetch all unique keys currently in the logs table
-        try:
-            cursor.execute(
-                "SELECT DISTINCT UNNEST(json_keys(facets)) FROM logs WHERE workspace_id = ? AND facets IS NOT NULL",
-                (workspace_id,),
-            )
-            for row in cursor.fetchall():
-                key = str(row[0])
-                if key and key not in keys and key != "*":
-                    keys.append(key)
-        except Exception as e:
-            logger.warning("[DB] Failed to extract dynamic facet keys: %s", e)
+        self._get_dynamic_facet_keys(cursor, workspace_id, keys)
 
         return keys
 
@@ -942,7 +947,7 @@ class LogDatabase:
                 (workspace_id, source_id),
             )
             # Re-initialize cluster cache for the workspace to reflect deletions
-            cursor.execute("DELETE FROM clusters WHERE workspace_id = ?", (workspace_id,))
+            cursor.execute(DELETE_CLUSTERS_BY_WORKSPACE, (workspace_id,))
             cursor.execute(
                 """
                 INSERT INTO clusters (workspace_id, cluster_id, template, count)
@@ -953,7 +958,7 @@ class LogDatabase:
             )
         else:
             cursor.execute("DELETE FROM logs WHERE workspace_id = ?", (workspace_id,))
-            cursor.execute("DELETE FROM clusters WHERE workspace_id = ?", (workspace_id,))
+            cursor.execute(DELETE_CLUSTERS_BY_WORKSPACE, (workspace_id,))
 
         self.commit()
 
@@ -968,7 +973,7 @@ class LogDatabase:
         )
 
         cursor.execute("DELETE FROM logs WHERE workspace_id = ?", (workspace_id,))
-        cursor.execute("DELETE FROM clusters WHERE workspace_id = ?", (workspace_id,))
+        cursor.execute(DELETE_CLUSTERS_BY_WORKSPACE, (workspace_id,))
         cursor.execute("DELETE FROM log_sources WHERE workspace_id = ?", (workspace_id,))
         cursor.execute("DELETE FROM folders WHERE workspace_id = ?", (workspace_id,))
         cursor.execute("DELETE FROM ingestion_jobs WHERE workspace_id = ?", (workspace_id,))

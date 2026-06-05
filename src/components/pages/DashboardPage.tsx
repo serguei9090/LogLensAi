@@ -193,6 +193,103 @@ function DashboardFilters({
   );
 }
 
+function ProcessingHUD({ jobs }: Readonly<{ jobs: any[] }>) {
+  const activeJobs = jobs.filter((j) => j.status === "processing" || j.status === "pending");
+  if (activeJobs.length === 0) {
+    return null;
+  }
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center gap-2 mb-2">
+        <RefreshCcw className="size-3 text-primary animate-spin" />
+        <span className="text-[10px] font-bold uppercase tracking-widest text-text-muted">
+          Background Processing
+        </span>
+      </div>
+      {activeJobs.map((job) => (
+        <motion.div
+          key={job.id}
+          initial={{ opacity: 0, height: 0 }}
+          animate={{ opacity: 1, height: "auto" }}
+          className="bg-bg-surface/40 border border-border/50 rounded-xl p-4 backdrop-blur-sm"
+        >
+          <div className="flex justify-between items-center mb-2">
+            <div className="flex items-center gap-3">
+              <span className="text-[10px] font-mono text-primary bg-primary/10 px-1.5 py-0.5 rounded uppercase font-bold">
+                Job #{job.id}
+              </span>
+              <span className="text-[11px] font-medium text-text-primary uppercase tracking-tight">
+                Clustering Patterns...
+              </span>
+            </div>
+            <span className="text-[10px] font-mono text-text-muted">
+              {job.processed_lines.toLocaleString()} / {job.total_lines.toLocaleString()} lines
+            </span>
+          </div>
+          <div className="h-1.5 bg-bg-base/50 rounded-full overflow-hidden border border-white/5">
+            <motion.div
+              className="h-full bg-primary shadow-[0_0_10px_var(--primary-glow)]"
+              initial={{ width: 0 }}
+              animate={{
+                width: `${(job.processed_lines / job.total_lines) * 100}%`,
+              }}
+              transition={{ type: "spring", stiffness: 50 }}
+            />
+          </div>
+        </motion.div>
+      ))}
+    </div>
+  );
+}
+
+function SourceHeatmap({ stats }: Readonly<{ stats: DashboardStats | null }>) {
+  if (!stats || stats.source_heatmap.length === 0) {
+    return (
+      <div className="py-20 text-center text-[10px] font-mono text-text-muted uppercase tracking-widest">
+        Insufficient Source Data
+      </div>
+    );
+  }
+
+  const uniqueSources = Array.from(new Set(stats.source_heatmap.map((d) => d.source_name)));
+
+  return (
+    <div className="relative z-10">
+      <div className="flex flex-col gap-4">
+        {uniqueSources.map((sourceName) => {
+          const sourceData = stats.source_heatmap.filter((d) => d.source_name === sourceName);
+          const maxCount = Math.max(...sourceData.map((d) => d.count));
+
+          return (
+            <div key={sourceName} className="flex items-center gap-4">
+              <span className="text-[10px] font-mono text-text-muted w-32 truncate">
+                {sourceName}
+              </span>
+              <div className="flex-1 flex gap-1 h-4">
+                {sourceData.slice(-50).map((d) => {
+                  const intensity = maxCount > 0 ? d.count / maxCount : 0;
+                  return (
+                    <div
+                      key={`${d.source_name}-${d.timestamp}`}
+                      className="h-full flex-1 rounded-sm border border-white/5 transition-all hover:scale-110"
+                      style={{
+                        backgroundColor: `color-mix(in srgb, var(--primary) ${intensity * 100}%, transparent)`,
+                        minWidth: "4px",
+                      }}
+                      title={`${d.timestamp}: ${d.count} logs`}
+                    />
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 export default function DashboardPage() {
   // Global State
   const workspaces = useWorkspaceStore((state) => state.workspaces);
@@ -287,111 +384,6 @@ export default function DashboardPage() {
 
   const sources = useMemo(() => currentWorkspace?.sources || [], [currentWorkspace]);
 
-  /**
-   * Renders the background processing progress indicators.
-   */
-  const renderProcessingHUD = () => {
-    const activeJobs = ingestionJobs.filter(
-      (j) => j.status === "processing" || j.status === "pending",
-    );
-    if (activeJobs.length === 0) {
-      return null;
-    }
-
-    return (
-      <div className="space-y-3">
-        <div className="flex items-center gap-2 mb-2">
-          <RefreshCcw className="size-3 text-primary animate-spin" />
-          <span className="text-[10px] font-bold uppercase tracking-widest text-text-muted">
-            Background Processing
-          </span>
-        </div>
-        {activeJobs.map((job) => (
-          <motion.div
-            key={job.id}
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: "auto" }}
-            className="bg-bg-surface/40 border border-border/50 rounded-xl p-4 backdrop-blur-sm"
-          >
-            <div className="flex justify-between items-center mb-2">
-              <div className="flex items-center gap-3">
-                <span className="text-[10px] font-mono text-primary bg-primary/10 px-1.5 py-0.5 rounded uppercase font-bold">
-                  Job #{job.id}
-                </span>
-                <span className="text-[11px] font-medium text-text-primary uppercase tracking-tight">
-                  Clustering Patterns...
-                </span>
-              </div>
-              <span className="text-[10px] font-mono text-text-muted">
-                {job.processed_lines.toLocaleString()} / {job.total_lines.toLocaleString()} lines
-              </span>
-            </div>
-            <div className="h-1.5 bg-bg-base/50 rounded-full overflow-hidden border border-white/5">
-              <motion.div
-                className="h-full bg-primary shadow-[0_0_10px_var(--primary-glow)]"
-                initial={{ width: 0 }}
-                animate={{
-                  width: `${(job.processed_lines / job.total_lines) * 100}%`,
-                }}
-                transition={{ type: "spring", stiffness: 50 }}
-              />
-            </div>
-          </motion.div>
-        ))}
-      </div>
-    );
-  };
-
-  /**
-   * Renders the source activity heatmap grid.
-   */
-  const renderSourceHeatmap = () => {
-    if (!stats || stats.source_heatmap.length === 0) {
-      return (
-        <div className="py-20 text-center text-[10px] font-mono text-text-muted uppercase tracking-widest">
-          Insufficient Source Data
-        </div>
-      );
-    }
-
-    const uniqueSources = Array.from(new Set(stats.source_heatmap.map((d) => d.source_name)));
-
-    return (
-      <div className="relative z-10">
-        <div className="flex flex-col gap-4">
-          {uniqueSources.map((sourceName) => {
-            const sourceData = stats.source_heatmap.filter((d) => d.source_name === sourceName);
-            const maxCount = Math.max(...sourceData.map((d) => d.count));
-
-            return (
-              <div key={sourceName} className="flex items-center gap-4">
-                <span className="text-[10px] font-mono text-text-muted w-32 truncate">
-                  {sourceName}
-                </span>
-                <div className="flex-1 flex gap-1 h-4">
-                  {sourceData.slice(-50).map((d) => {
-                    const intensity = maxCount > 0 ? d.count / maxCount : 0;
-                    return (
-                      <div
-                        key={`${d.source_name}-${d.timestamp}`}
-                        className="h-full flex-1 rounded-sm border border-white/5 transition-all hover:scale-110"
-                        style={{
-                          backgroundColor: `color-mix(in srgb, var(--primary) ${intensity * 100}%, transparent)`,
-                          minWidth: "4px",
-                        }}
-                        title={`${d.timestamp}: ${d.count} logs`}
-                      />
-                    );
-                  })}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-    );
-  };
-
   if (loading && !stats) {
     const loadingText = mode === "static" ? "Loading Analytics..." : "Scanning for AI Insights...";
     return (
@@ -450,7 +442,7 @@ export default function DashboardPage() {
               className="space-y-10"
             >
               {/* Processing HUD */}
-              {renderProcessingHUD()}
+              <ProcessingHUD jobs={ingestionJobs} />
 
               {/* AI Insight Snippet */}
               {stats?.latest_ai_insight && (
@@ -603,7 +595,7 @@ export default function DashboardPage() {
                   </h2>
                 </div>
 
-                {renderSourceHeatmap()}
+                <SourceHeatmap stats={stats} />
                 <Activity className="absolute -bottom-4 -right-4 size-32 text-text-muted/5 opacity-5 pointer-events-none" />
               </section>
             </motion.div>
@@ -640,9 +632,10 @@ export default function DashboardPage() {
                   </div>
                 ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 auto-rows-max overflow-y-auto custom-scrollbar pr-2 pb-20">
-                    {dashboardWidgets.map((widget, i) => (
-                      <A2UIRenderer key={i} payload={widget} />
-                    ))}
+                    {dashboardWidgets.map((widget, i) => {
+                      const widgetKey = (widget as any).raw || `widget-${i}`;
+                      return <A2UIRenderer key={widgetKey} payload={widget} />;
+                    })}
                   </div>
                 )}
               </div>

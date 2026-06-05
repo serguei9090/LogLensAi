@@ -184,7 +184,7 @@ function safeParse(raw: string | null): unknown {
   }
   try {
     return JSON.parse(raw);
-  } catch (_e) {
+  } catch {
     // Fallback: handle Python repr strings (single quotes, True/False/None)
     try {
       const jsonified = raw
