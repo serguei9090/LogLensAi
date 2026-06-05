@@ -33,7 +33,7 @@ export function StatCard({ icon, label, value, subValue, trend }: Readonly<StatC
     <motion.div
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
-      className="bg-bg-surface/40 border border-white/5 rounded-xl p-4 relative overflow-hidden group hover:border-primary/20 transition-all hover:bg-bg-surface/60"
+      className="bg-bg-surface/40 border border-white/5 rounded-xl p-4 relative overflow-hidden group hover:border-primary/20 transition-[border-color,background-color] duration-200 hover:bg-bg-surface/60"
     >
       <div className="flex items-start justify-between gap-3">
         <div className="flex-1">
@@ -52,13 +52,13 @@ export function StatCard({ icon, label, value, subValue, trend }: Readonly<StatC
             {subValue}
           </p>
         </div>
-        <div className="p-2 rounded-lg bg-bg-base/50 border border-white/5 group-hover:border-primary/10 transition-colors">
+        <div className="p-2 rounded-lg bg-bg-base/50 border border-white/5 group-hover:border-primary/10 transition-colors duration-200">
           {icon}
         </div>
       </div>
 
-      {/* Subtle accent line */}
-      <div className="absolute bottom-0 left-0 h-0.5 w-0 bg-primary group-hover:w-full transition-all duration-500 opacity-30" />
+      {/* Subtle accent line - optimized to use GPU-accelerated transform scaling */}
+      <div className="absolute bottom-0 left-0 h-0.5 w-full bg-primary origin-left scale-x-0 group-hover:scale-x-100 transition-transform duration-300 ease-out opacity-30" />
     </motion.div>
   );
 }

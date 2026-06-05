@@ -272,7 +272,7 @@ function SourceHeatmap({ stats }: Readonly<{ stats: DashboardStats | null }>) {
                   return (
                     <div
                       key={`${d.source_name}-${d.timestamp}`}
-                      className="h-full flex-1 rounded-sm border border-white/5 transition-all hover:scale-110"
+                      className="h-full flex-1 rounded-sm border border-white/5 transition-[transform,background-color] duration-200 hover:scale-115"
                       style={{
                         backgroundColor: `color-mix(in srgb, var(--primary) ${intensity * 100}%, transparent)`,
                         minWidth: "4px",

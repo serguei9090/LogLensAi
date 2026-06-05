@@ -392,7 +392,7 @@ export function LogDistributionWidget({
             <button
               type="button"
               onClick={resetTimeRangeToAllTime}
-              className="ml-2 flex items-center gap-1 px-2 py-0.5 text-[10px] font-semibold text-primary hover:text-text-inverse bg-primary/10 hover:bg-primary border border-primary/20 rounded transition-all cursor-pointer"
+              className="ml-2 flex items-center gap-1 px-2 py-0.5 text-[10px] font-semibold text-primary hover:text-text-inverse bg-primary/10 hover:bg-primary border border-primary/20 rounded transition-colors duration-200 cursor-pointer"
             >
               <ZoomIn className="size-2.5" />
               Reset Zoom
@@ -460,12 +460,18 @@ export function LogDistributionWidget({
                 stackId="a"
                 fill="var(--color-info)"
                 radius={[0, 0, 4, 4]}
+                isAnimationActive={true}
+                animationDuration={400}
+                animationEasing="ease-out"
                 onClick={handleBarClick}
               />
               <Bar
                 dataKey="WARN"
                 stackId="a"
                 fill="var(--color-warning)"
+                isAnimationActive={true}
+                animationDuration={400}
+                animationEasing="ease-out"
                 onClick={handleBarClick}
               />
               <Bar
@@ -473,6 +479,9 @@ export function LogDistributionWidget({
                 stackId="a"
                 fill="var(--color-error)"
                 radius={[4, 4, 0, 0]}
+                isAnimationActive={true}
+                animationDuration={400}
+                animationEasing="ease-out"
                 onClick={handleBarClick}
               >
                 {formattedData.map((entry, index) => (

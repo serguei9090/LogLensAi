@@ -21,7 +21,7 @@ export function ClusterRow({ index, template, count, total, type }: Readonly<Clu
       : "shadow-[0_0_8px_rgba(167,139,250,0.3)]";
 
   return (
-    <div className="group flex items-start gap-4 p-3 rounded-lg hover:bg-bg-hover transition-all border border-transparent hover:border-border/50 bg-bg-surface/30">
+    <div className="group flex items-start gap-4 p-3 rounded-lg hover:bg-bg-hover transition-[background-color,border-color] duration-200 border border-transparent hover:border-border/50 bg-bg-surface/30">
       <span className="text-[10px] font-mono text-text-muted py-1 w-6">#{index + 1}</span>
       <div className="flex-1 overflow-hidden">
         <p

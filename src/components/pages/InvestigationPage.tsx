@@ -45,6 +45,7 @@ function InvestigationPageImpl() {
     timeRange,
     syncActiveSource,
     setAvailableFacets,
+    total,
   } = useInvestigationStore();
 
   const {
@@ -103,7 +104,7 @@ function InvestigationPageImpl() {
   }, [activeWorkspaceId, activeSourceId, setLogs, setAvailableFacets]);
 
   // Memoize the query params to reduce complexity in fetchLogs
-  const { isFetching, isConnected, anomalousClusters, fetchLogs } = useLogFetching(
+  const { isFetching, isConnected, anomalousClusters, fetchLogs, fetchMoreLogs } = useLogFetching(
     activeWorkspaceId,
     activeSourceId,
   );
@@ -127,8 +128,9 @@ function InvestigationPageImpl() {
     if (activeJobForSource) {
       return true;
     }
-    return isFetching;
-  }, [transitioningSourceId, activeSourceId, activeJobForSource, isFetching]);
+    // Only block the whole view if we don't have any logs loaded yet
+    return isFetching && logs.length === 0;
+  }, [transitioningSourceId, activeSourceId, activeJobForSource, isFetching, logs.length]);
 
   // Sync the currently active source's tailing status to the global isTailing store state
   useEffect(() => {
@@ -545,6 +547,9 @@ function InvestigationPageImpl() {
             anomalousClusters={anomalousClusters}
             activeJob={activeJobForSource}
             isTransitioning={isSourceLoading}
+            fetchMoreLogs={fetchMoreLogs}
+            total={total}
+            isFetching={isFetching}
             onAddComment={(id, comment) => {
               const has_comment = comment.trim().length > 0;
               const originalLog = logs.find((l) => l.id === id);

@@ -13,7 +13,7 @@ import {
   StickyNote,
   X,
 } from "lucide-react";
-import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { toast } from "sonner";
 import { IconButton } from "@/components/atoms/IconButton";
@@ -44,6 +44,9 @@ interface VirtualLogTableProps {
   readonly onImport?: () => void;
   readonly activeJob?: IngestionJob | null;
   readonly isTransitioning?: boolean;
+  readonly fetchMoreLogs?: () => void;
+  readonly total?: number;
+  readonly isFetching?: boolean;
 }
 
 export function VirtualLogTable({
@@ -59,6 +62,9 @@ export function VirtualLogTable({
   onImport,
   activeJob,
   isTransitioning,
+  fetchMoreLogs,
+  total,
+  isFetching,
 }: VirtualLogTableProps) {
   const parentRef = useRef<HTMLDivElement>(null);
   const [expandedRow, setExpandedRow] = useState<number | null>(null);
@@ -72,6 +78,17 @@ export function VirtualLogTable({
     sourceId: string;
   } | null>(null);
   const [lastSelectedId, setLastSelectedId] = useState<number | null>(null);
+  const [showTransitioningLoader, setShowTransitioningLoader] = useState(false);
+
+  useEffect(() => {
+    if (isTransitioning) {
+      const timer = setTimeout(() => {
+        setShowTransitioningLoader(true);
+      }, 200);
+      return () => clearTimeout(timer);
+    }
+    setShowTransitioningLoader(false);
+  }, [isTransitioning]);
 
   const {
     filters,
@@ -317,14 +334,40 @@ export function VirtualLogTable({
     globalThis.getSelection()?.removeAllRanges();
   };
 
+  const hasMore = logs.length < (total ?? 0);
+  const rowCount = hasMore ? logs.length + 1 : logs.length;
+
   const rowVirtualizer = useVirtualizer({
-    count: logs.length,
+    count: rowCount,
     getScrollElement: () => parentRef.current,
     estimateSize: () => 40,
     overscan: 10,
-    getItemKey: useCallback((index: number) => logs[index]?.id ?? index, [logs]),
+    getItemKey: useCallback(
+      (index: number) => {
+        if (index === logs.length) {
+          return "loader-row";
+        }
+        return logs[index]?.id ?? index;
+      },
+      [logs],
+    ),
     measureElement: (element) => element?.getBoundingClientRect().height,
   });
+
+  const virtualItems = rowVirtualizer.getVirtualItems();
+
+  // Scroll threshold detection for infinite pagination
+  useEffect(() => {
+    if (virtualItems.length === 0 || !fetchMoreLogs || isFetching) {
+      return;
+    }
+    const lastItem = virtualItems[virtualItems.length - 1];
+    const totalCount = total ?? 0;
+    // Trigger fetch if we scroll within 10 rows of the current batch end
+    if (lastItem.index >= logs.length - 10 && logs.length < totalCount) {
+      fetchMoreLogs();
+    }
+  }, [virtualItems, logs.length, total, isFetching, fetchMoreLogs]);
 
   const prevLogsLength = useRef(logs.length);
 
@@ -407,8 +450,9 @@ export function VirtualLogTable({
       >
         {/* ─── State Management Overlays ────────────────────────────────────── */}
         {(() => {
-          const showOverlay = (activeJob || isTransitioning) && (logs.length === 0 || !isTailing);
-          const isEmpty = logs.length === 0 && !activeJob && !isTransitioning;
+          const showOverlay =
+            (activeJob || showTransitioningLoader) && (logs.length === 0 || !isTailing);
+          const isEmpty = logs.length === 0 && !activeJob && !showTransitioningLoader;
 
           if (showOverlay) {
             return (
@@ -621,6 +665,31 @@ export function VirtualLogTable({
                     </thead>
                     <tbody className="font-mono text-[12px] relative z-0 block">
                       {rowVirtualizer.getVirtualItems().map((virtualRow) => {
+                        const isLoaderRow = virtualRow.index === logs.length;
+                        if (isLoaderRow) {
+                          return (
+                            <tr
+                              key="loader-row"
+                              ref={rowVirtualizer.measureElement}
+                              data-index={virtualRow.index}
+                              style={{
+                                position: "absolute",
+                                top: 0,
+                                left: 0,
+                                width: "100%",
+                                transform: `translateY(${virtualRow.start}px)`,
+                                gridTemplateColumns: "1fr",
+                              }}
+                              className="flex items-center justify-center border-b border-border/20 text-text-muted text-xs font-mono select-none"
+                            >
+                              <td className="w-full text-center py-3 flex items-center justify-center gap-2">
+                                <span className="inline-block w-3 h-3 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                                Loading more records ({logs.length} / {total?.toLocaleString()})...
+                              </td>
+                            </tr>
+                          );
+                        }
+
                         const log = logs[virtualRow.index];
                         const isExpanded = expandedRow === log.id;
                         const isSelected = selectedLogIds.includes(log.id);
@@ -639,6 +708,9 @@ export function VirtualLogTable({
                             onAnalyzeCluster={onAnalyzeCluster}
                             anomalousClusters={anomalousClusters}
                             logSessionMap={logSessionMap}
+                            activeVisibleColumns={activeVisibleColumns}
+                            gridTemplateColumns={gridTemplateColumns}
+                            customColumns={customColumns}
                           />
                         );
                       })}
@@ -907,9 +979,12 @@ interface LogTableRowProps {
   readonly onAnalyzeCluster?: (clusterId: string) => void;
   readonly anomalousClusters?: Set<string>;
   readonly logSessionMap: Record<number, string>;
+  readonly activeVisibleColumns: string[];
+  readonly gridTemplateColumns: string;
+  readonly customColumns: Array<{ id: string; label: string; source?: string; regex?: string }>;
 }
 
-function LogTableRow({
+const LogTableRow = memo(function LogTableRow({
   log,
   content,
   virtualRow,
@@ -921,24 +996,12 @@ function LogTableRow({
   onAnalyzeCluster,
   anomalousClusters,
   logSessionMap,
+  activeVisibleColumns,
+  gridTemplateColumns,
+  customColumns,
 }: LogTableRowProps) {
   const { setSidebarOpen, setSession } = useAiStore();
   const { clearSelection, setSelectedLogIds } = useInvestigationStore();
-  const { visibleColumns, customColumns, columnOrder, columnWidths } = useUIStore();
-
-  const activeVisibleColumns = useMemo(() => {
-    return columnOrder.filter((colId) => visibleColumns[colId] ?? false);
-  }, [columnOrder, visibleColumns]);
-
-  const gridTemplateColumns = useMemo(() => {
-    const widths = activeVisibleColumns.map((colId) => {
-      if (colId === "message") {
-        return "minmax(200px, 1fr)";
-      }
-      return columnWidths[colId] || "120px";
-    });
-    return ["12px", ...widths].filter(Boolean).join(" ");
-  }, [activeVisibleColumns, columnWidths]);
 
   return (
     <tr
@@ -949,7 +1012,7 @@ function LogTableRow({
       aria-expanded={isExpanded}
       aria-controls={isExpanded ? `row-details-${log.id}` : undefined}
       className={cn(
-        "group cursor-pointer transition-all border-b border-border/40 outline-none focus-visible:bg-bg-hover focus-visible:ring-1 focus-visible:ring-primary/30 relative",
+        "group cursor-pointer transition-colors border-b border-border/40 outline-none focus-visible:bg-bg-hover focus-visible:ring-1 focus-visible:ring-primary/30 relative",
         "grid items-stretch",
         getRowLevelStyles(log.level),
         isSelected && "bg-emerald-500/[0.04]",
@@ -1033,12 +1096,7 @@ function LogTableRow({
               className="px-3 py-2 text-center align-top flex flex-col items-center justify-start"
             >
               {log.cluster_id ? (
-                <div
-                  className={cn(
-                    "flex flex-col items-center justify-center gap-0.5 group/cluster",
-                    log.cluster_id !== "unknown" && "animate-in fade-in zoom-in-95 duration-500",
-                  )}
-                >
+                <div className="flex flex-col items-center justify-center gap-0.5 group/cluster">
                   <Button
                     variant="ghost"
                     className={cn(
@@ -1181,4 +1239,4 @@ function LogTableRow({
       })}
     </tr>
   );
-}
+});
