@@ -201,7 +201,11 @@ export function DashboardCharts({
       if (isDragging) {
         return; // Don't fire click if user was dragging
       }
-      const bucket = data?.activeLabel || data?.activePayload?.[0]?.payload?.timestamp;
+      const bucket =
+        data?.timestamp ||
+        data?.payload?.timestamp ||
+        data?.activeLabel ||
+        data?.activePayload?.[0]?.payload?.timestamp;
       if (!bucket) {
         return;
       }
@@ -350,7 +354,6 @@ export function DashboardCharts({
                 onMouseDown={handleMouseDown}
                 onMouseMove={handleMouseMove}
                 onMouseUp={handleMouseUp}
-                onClick={handleBarClick}
                 style={{ cursor: isDragging ? "col-resize" : "pointer" }}
                 margin={{ bottom: 20 }}
               >
@@ -392,6 +395,7 @@ export function DashboardCharts({
                   fill={LEVEL_COLORS.DEBUG}
                   radius={[0, 0, 0, 0]}
                   isAnimationActive={false}
+                  onClick={handleBarClick}
                 />
                 <Bar
                   dataKey="INFO"
@@ -399,6 +403,7 @@ export function DashboardCharts({
                   fill={LEVEL_COLORS.INFO}
                   radius={[0, 0, 0, 0]}
                   isAnimationActive={false}
+                  onClick={handleBarClick}
                 />
                 <Bar
                   dataKey="WARN"
@@ -406,6 +411,7 @@ export function DashboardCharts({
                   fill={LEVEL_COLORS.WARN}
                   radius={[0, 0, 0, 0]}
                   isAnimationActive={false}
+                  onClick={handleBarClick}
                 />
                 <Bar
                   dataKey="ERROR"
@@ -413,6 +419,7 @@ export function DashboardCharts({
                   fill={LEVEL_COLORS.ERROR}
                   radius={[4, 4, 0, 0]}
                   isAnimationActive={false}
+                  onClick={handleBarClick}
                 />
 
                 {/* Drag-selection highlight */}

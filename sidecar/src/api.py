@@ -1011,7 +1011,7 @@ class App:
             return {"buckets": []}
 
         # Safeguard: Check if logs exist first to prevent DuckDB assertions on empty datasets
-        cursor.execute(f"SELECT EXISTS(SELECT 1 FROM logs WHERE {where_sql})", sql_params)
+        cursor.execute(f"SELECT EXISTS(SELECT 1 FROM logs l WHERE {where_sql})", sql_params)
         exists = cursor.fetchone()[0]
         if not exists:
             return {"buckets": []}
@@ -1023,7 +1023,7 @@ class App:
         if not start_ts or not end_ts:
             # Query min/max timestamps from DB for this workspace/sources
             cursor.execute(
-                f"SELECT MIN(timestamp), MAX(timestamp) FROM logs WHERE {where_sql}", sql_params
+                f"SELECT MIN(timestamp), MAX(timestamp) FROM logs l WHERE {where_sql}", sql_params
             )
             db_row = cursor.fetchone()
             if db_row and db_row[0] and db_row[1]:
@@ -1083,7 +1083,7 @@ class App:
                 strftime(time_bucket(INTERVAL '{interval_str}', CAST(timestamp AS TIMESTAMP)), '{format_str}') as time_bucket,
                 level,
                 COUNT(*) as count
-            FROM logs
+            FROM logs l
             WHERE {where_sql}
             GROUP BY time_bucket, level
             ORDER BY time_bucket ASC

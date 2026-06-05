@@ -28,7 +28,7 @@ export default function App() {
   const { toggleSidebar, toggleFacetSidebar } = useUIStore();
   const { setSidebarOpen: setAiSidebarOpen } = useAiStore();
   const { settings, fetchSettings } = useSettingsStore();
-  const [activeNav, setActiveNav] = useState<NavTab>("investigation");
+  const [activeNav, setActiveNav] = useState<NavTab>("dashboard");
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
 
   // Global Health Monitoring

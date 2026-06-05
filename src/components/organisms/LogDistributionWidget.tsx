@@ -210,7 +210,11 @@ export function LogDistributionWidget({
 
   const handleBarClick = useCallback(
     (clickData: any) => {
-      const bucket = clickData?.activeLabel || clickData?.activePayload?.[0]?.payload?.bucket;
+      const bucket =
+        clickData?.bucket ||
+        clickData?.payload?.bucket ||
+        clickData?.activeLabel ||
+        clickData?.activePayload?.[0]?.payload?.bucket;
       if (!bucket) {
         return;
       }
@@ -377,7 +381,7 @@ export function LogDistributionWidget({
   }, []);
 
   return (
-    <div className="min-h-[220px] h-[220px] w-full bg-bg-base border-b border-border/40 shrink-0 flex flex-col relative group">
+    <div className="min-h-[220px] h-[220px] w-full bg-bg-base border-b border-border/40 shrink-0 flex flex-col relative group select-none">
       {/* Header */}
       <div className="flex items-center justify-between px-4 h-10 border-b border-border/20 bg-bg-base/50">
         <div className="flex items-center gap-2">
@@ -441,7 +445,6 @@ export function LogDistributionWidget({
             <BarChart
               data={formattedData}
               margin={{ top: 0, right: 10, left: -20, bottom: 20 }}
-              onClick={handleBarClick}
               style={{ cursor: "pointer" }}
             >
               <XAxis dataKey="bucket" tick={renderXAxisTick} tickLine={false} axisLine={false} />
@@ -452,9 +455,26 @@ export function LogDistributionWidget({
                 dx={-5}
               />
               <Tooltip content={CustomTooltip} cursor={{ fill: "var(--color-bg-hover)" }} />
-              <Bar dataKey="INFO" stackId="a" fill="var(--color-info)" radius={[0, 0, 4, 4]} />
-              <Bar dataKey="WARN" stackId="a" fill="var(--color-warning)" />
-              <Bar dataKey="ERROR" stackId="a" fill="var(--color-error)" radius={[4, 4, 0, 0]}>
+              <Bar
+                dataKey="INFO"
+                stackId="a"
+                fill="var(--color-info)"
+                radius={[0, 0, 4, 4]}
+                onClick={handleBarClick}
+              />
+              <Bar
+                dataKey="WARN"
+                stackId="a"
+                fill="var(--color-warning)"
+                onClick={handleBarClick}
+              />
+              <Bar
+                dataKey="ERROR"
+                stackId="a"
+                fill="var(--color-error)"
+                radius={[4, 4, 0, 0]}
+                onClick={handleBarClick}
+              >
                 {formattedData.map((entry, index) => (
                   <Cell
                     key={`cell-${index}`}
