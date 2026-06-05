@@ -68,6 +68,23 @@ function stripA2UITags(text: string): string {
   return text.replaceAll(A2UI_REGEX, "").trim();
 }
 
+function findFirstTagIndex(
+  content: string,
+  tags: readonly string[],
+  startSearchFrom = 0,
+): { index: number; length: number } {
+  let firstIdx = -1;
+  let tagLen = 0;
+  for (const tag of tags) {
+    const idx = content.indexOf(tag, startSearchFrom);
+    if (idx !== -1 && (firstIdx === -1 || idx < firstIdx)) {
+      firstIdx = idx;
+      tagLen = tag.length;
+    }
+  }
+  return { index: firstIdx, length: tagLen };
+}
+
 export function parseThinking(content: string): {
   thinking: string | null;
   response: string;
@@ -94,36 +111,24 @@ export function parseThinking(content: string): {
   ];
 
   // 1. Find the FIRST start tag
-  let firstStartIdx = -1;
-  let startTagLength = 0;
-  for (const tag of startTags) {
-    const idx = content.indexOf(tag);
-    if (idx !== -1 && (firstStartIdx === -1 || idx < firstStartIdx)) {
-      firstStartIdx = idx;
-      startTagLength = tag.length;
-    }
-  }
+  const { index: firstStartIdx, length: startTagLength } = findFirstTagIndex(content, startTags);
 
   // 2. Find the FIRST end tag that appears AFTER the start tag
-  let firstEndIdx = -1;
-  let endTagLength = 0;
-  for (const tag of endTags) {
-    const searchStart = firstStartIdx !== -1 ? firstStartIdx + startTagLength : 0;
-    const idx = content.indexOf(tag, searchStart);
-    if (idx !== -1 && (firstEndIdx === -1 || idx < firstEndIdx)) {
-      firstEndIdx = idx;
-      endTagLength = tag.length;
-    }
-  }
+  const searchStart = firstStartIdx === -1 ? 0 : firstStartIdx + startTagLength;
+  const { index: firstEndIdx, length: endTagLength } = findFirstTagIndex(
+    content,
+    endTags,
+    searchStart,
+  );
 
   // 3. Phase: Terminal (Found transition)
   if (firstEndIdx !== -1) {
-    const prefix = firstStartIdx !== -1 ? content.substring(0, firstStartIdx) : "";
+    const prefix = firstStartIdx === -1 ? "" : content.substring(0, firstStartIdx);
     let thinking = "";
-    if (firstStartIdx !== -1) {
-      thinking = content.substring(firstStartIdx + startTagLength, firstEndIdx);
-    } else {
+    if (firstStartIdx === -1) {
       thinking = content.substring(0, firstEndIdx);
+    } else {
+      thinking = content.substring(firstStartIdx + startTagLength, firstEndIdx);
     }
 
     let response = prefix + content.substring(firstEndIdx + endTagLength);
@@ -164,6 +169,158 @@ export function parseThinking(content: string): {
     response: stripA2UITags(stripChannelTags(content)),
     isStreamingThink: false,
   };
+}
+
+interface AIMessageRowProps {
+  readonly message: {
+    id: string | number;
+    role: string;
+    content: string;
+    timestamp: string | number | Date;
+    context_logs?: (string | number)[] | null;
+    a2ui_payload?: any;
+  };
+  readonly prevMessage: { role: string } | null;
+  readonly isLoading: boolean;
+  readonly isLastMessage: boolean;
+  readonly onA2UIAction: (action: unknown) => void;
+}
+
+interface MessageContentBubbleProps {
+  readonly isUser: boolean;
+  readonly showTypingIndicator: boolean;
+  readonly thinking: string | null;
+  readonly isPulseActive: boolean;
+  readonly content: string;
+  readonly response: string;
+  readonly a2uiPayload?: any;
+  readonly onA2UIAction: (action: unknown) => void;
+}
+
+function MessageContentBubble({
+  isUser,
+  showTypingIndicator,
+  thinking,
+  isPulseActive,
+  content,
+  response,
+  a2uiPayload,
+  onA2UIAction,
+}: Readonly<MessageContentBubbleProps>) {
+  return (
+    <div
+      className={cn(
+        "px-4 py-3 rounded-2xl text-[13px] leading-relaxed shadow-sm overflow-hidden w-full break-words transition-all duration-300",
+        isUser
+          ? "bg-bg-surface text-text-primary border border-border-subtle rounded-tr-none"
+          : "bg-bg-app text-text-secondary border border-border-subtle rounded-tl-none",
+      )}
+    >
+      {showTypingIndicator ? (
+        <div className="flex items-center gap-3">
+          <TypingIndicator />
+          <span className="text-[11px] font-medium text-zinc-500 animate-pulse lowercase">
+            thinking…
+          </span>
+        </div>
+      ) : (
+        <>
+          {!isUser && (thinking !== null || isPulseActive) && (
+            <ThinkingBlock content={thinking ?? ""} isStreaming={isPulseActive} />
+          )}
+          <div className={cn("prose prose-invert prose-sm max-w-none", isUser && "text-right")}>
+            {isUser ? (
+              <p className="whitespace-pre-wrap">{content}</p>
+            ) : (
+              <>
+                <MarkdownContent content={response} className="text-text-primary" />
+                {a2uiPayload && <A2UIRenderer payload={a2uiPayload} onAction={onA2UIAction} />}
+              </>
+            )}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+function AIMessageRow({
+  message,
+  prevMessage,
+  isLoading,
+  isLastMessage,
+  onA2UIAction,
+}: Readonly<AIMessageRowProps>) {
+  const isUser = message.role === "user";
+  const isSameRoleAsPrev = prevMessage?.role === message.role;
+
+  const { thinking, response, isStreamingThink } = isUser
+    ? { thinking: null, response: message.content, isStreamingThink: false }
+    : parseThinking(message.content);
+
+  const isAssistantAndEmpty = !isUser && !thinking && !response;
+
+  // If assistant is empty and we're loading, show the typing indicator
+  const showTypingIndicator = isAssistantAndEmpty && isLoading && isLastMessage;
+
+  // Only hold the 'streaming' pulse state if the global store is actually still loading
+  const isPulseActive = isStreamingThink && isLoading && isLastMessage;
+
+  return (
+    <div
+      className={cn(
+        "flex gap-3 group",
+        isUser ? "flex-row-reverse" : "flex-row",
+        isSameRoleAsPrev ? "mt-1" : "mt-6",
+      )}
+    >
+      <div
+        className={cn(
+          "w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 border transition-transform group-hover:scale-105",
+          isUser ? "bg-bg-surface-bright border-border-subtle" : "bg-primary/10 border-primary/20",
+          isSameRoleAsPrev && "opacity-0 pointer-events-none", // Hide redundant avatars
+        )}
+      >
+        {isUser ? (
+          <User className="size-4 text-text-muted" />
+        ) : (
+          <Bot className="size-4 text-violet-400" />
+        )}
+      </div>
+      <div
+        className={cn(
+          "flex flex-col min-w-0 space-y-2 overflow-hidden",
+          isUser ? "items-end max-w-[85%]" : "items-start max-w-[90%]",
+        )}
+      >
+        {message.context_logs && message.context_logs.length > 0 && (
+          <div className="flex flex-wrap gap-1 mb-1">
+            <span className="bg-primary/10 px-2 py-0.5 rounded text-[9px] text-primary border border-primary/20 font-medium">
+              {message.context_logs.length} logs attached
+            </span>
+          </div>
+        )}
+        <MessageContentBubble
+          isUser={isUser}
+          showTypingIndicator={showTypingIndicator}
+          thinking={thinking}
+          isPulseActive={isPulseActive}
+          content={message.content}
+          response={response}
+          a2uiPayload={message.a2ui_payload}
+          onA2UIAction={onA2UIAction}
+        />
+        {!isSameRoleAsPrev && (
+          <span className="text-[9px] text-text-muted font-medium px-1 tracking-tight">
+            {new Date(message.timestamp).toLocaleTimeString([], {
+              hour: "2-digit",
+              minute: "2-digit",
+            })}
+          </span>
+        )}
+      </div>
+    </div>
+  );
 }
 
 export function AIInvestigationSidebar({
@@ -552,116 +709,16 @@ export function AIInvestigationSidebar({
               )}
             </div>
           ) : (
-            messages.map((m, index) => {
-              const isUser = m.role === "user";
-              const prevMessage = index > 0 ? messages[index - 1] : null;
-              const isSameRoleAsPrev = prevMessage?.role === m.role;
-
-              const { thinking, response, isStreamingThink } = isUser
-                ? { thinking: null, response: m.content, isStreamingThink: false }
-                : parseThinking(m.content);
-
-              const isAssistantAndEmpty = !isUser && !thinking && !response;
-
-              // If assistant is empty and we're loading, show the typing indicator
-              const showTypingIndicator =
-                isAssistantAndEmpty && isLoading && index === messages.length - 1;
-
-              // Only hold the 'streaming' pulse state if the global store is actually still loading
-              const isPulseActive = isStreamingThink && isLoading && index === messages.length - 1;
-
-              return (
-                <div
-                  key={m.id}
-                  className={cn(
-                    "flex gap-3 group",
-                    isUser ? "flex-row-reverse" : "flex-row",
-                    isSameRoleAsPrev ? "mt-1" : "mt-6",
-                  )}
-                >
-                  <div
-                    className={cn(
-                      "w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 border transition-transform group-hover:scale-105",
-                      isUser
-                        ? "bg-bg-surface-bright border-border-subtle"
-                        : "bg-primary/10 border-primary/20",
-                      isSameRoleAsPrev && "opacity-0 pointer-events-none", // Hide redundant avatars
-                    )}
-                  >
-                    {isUser ? (
-                      <User className="size-4 text-text-muted" />
-                    ) : (
-                      <Bot className="size-4 text-violet-400" />
-                    )}
-                  </div>
-                  <div
-                    className={cn(
-                      "flex flex-col min-w-0 space-y-2 overflow-hidden",
-                      isUser ? "items-end max-w-[85%]" : "items-start max-w-[90%]",
-                    )}
-                  >
-                    {m.context_logs && m.context_logs.length > 0 && (
-                      <div className="flex flex-wrap gap-1 mb-1">
-                        <span className="bg-primary/10 px-2 py-0.5 rounded text-[9px] text-primary border border-primary/20 font-medium">
-                          {m.context_logs.length} logs attached
-                        </span>
-                      </div>
-                    )}
-                    <div
-                      className={cn(
-                        "px-4 py-3 rounded-2xl text-[13px] leading-relaxed shadow-sm overflow-hidden w-full break-words transition-all duration-300",
-                        isUser
-                          ? "bg-bg-surface text-text-primary border border-border-subtle rounded-tr-none"
-                          : "bg-bg-app text-text-secondary border border-border-subtle rounded-tl-none",
-                      )}
-                    >
-                      {showTypingIndicator ? (
-                        <div className="flex items-center gap-3">
-                          <TypingIndicator />
-                          <span className="text-[11px] font-medium text-zinc-500 animate-pulse lowercase">
-                            thinking…
-                          </span>
-                        </div>
-                      ) : (
-                        <>
-                          {!isUser && (thinking !== null || isPulseActive) && (
-                            <ThinkingBlock content={thinking ?? ""} isStreaming={isPulseActive} />
-                          )}
-                          <div
-                            className={cn(
-                              "prose prose-invert prose-sm max-w-none",
-                              isUser && "text-right",
-                            )}
-                          >
-                            {isUser ? (
-                              <p className="whitespace-pre-wrap">{m.content}</p>
-                            ) : (
-                              <>
-                                <MarkdownContent content={response} className="text-text-primary" />
-                                {m.a2ui_payload && (
-                                  <A2UIRenderer
-                                    payload={m.a2ui_payload}
-                                    onAction={handleA2UIAction}
-                                  />
-                                )}
-                              </>
-                            )}
-                          </div>
-                        </>
-                      )}
-                    </div>
-                    {!isSameRoleAsPrev && (
-                      <span className="text-[9px] text-text-muted font-medium px-1 tracking-tight">
-                        {new Date(m.timestamp).toLocaleTimeString([], {
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        })}
-                      </span>
-                    )}
-                  </div>
-                </div>
-              );
-            })
+            messages.map((m, index) => (
+              <AIMessageRow
+                key={m.id}
+                message={m}
+                prevMessage={index > 0 ? messages[index - 1] : null}
+                isLoading={isLoading}
+                isLastMessage={index === messages.length - 1}
+                onA2UIAction={handleA2UIAction}
+              />
+            ))
           )}
           <div ref={scrollRef} />
         </div>

@@ -118,6 +118,57 @@ export function AddColumnModal({ open, onOpenChange, onSave }: AddColumnModalPro
   const matchCount = preview.filter((r) => r.match !== null).length;
   const hasMatches = matchCount > 0;
 
+  const renderPreviewContent = () => {
+    if (isFetchingSamples) {
+      return (
+        <div className="flex items-center justify-center gap-2 py-8 text-text-muted text-sm">
+          <Loader2 className="size-4 animate-spin" />
+          Loading samples…
+        </div>
+      );
+    }
+    if (samples.length === 0) {
+      return (
+        <p className="text-center py-8 text-text-muted text-sm">
+          No logs available in this workspace.
+        </p>
+      );
+    }
+    return (
+      <div className="divide-y divide-border/50">
+        {preview.map((row, i) => {
+          const key = `${row.raw.slice(0, 40)}-${i}`;
+
+          let matchIndicator = null;
+          if (row.match !== null) {
+            matchIndicator = (
+              <p className="font-mono text-[11px] text-primary mt-0.5 break-all whitespace-pre-wrap">
+                → <span className="bg-primary/10 px-1 rounded">{row.match}</span>
+              </p>
+            );
+          } else if (regex && !regexError) {
+            matchIndicator = (
+              <p className="font-mono text-[11px] text-text-muted/40 mt-0.5 break-all whitespace-pre-wrap">
+                → no match
+              </p>
+            );
+          }
+
+          return (
+            <div key={key} className="px-3 py-2 group hover:bg-white/[0.02]">
+              {/* Raw line — wrapped */}
+              <p className="font-mono text-[11px] text-text-muted break-all whitespace-pre-wrap leading-tight">
+                {row.raw}
+              </p>
+              {/* Extracted value */}
+              {matchIndicator}
+            </div>
+          );
+        })}
+      </div>
+    );
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-2xl w-full bg-bg-surface border-border text-text-primary">
@@ -196,7 +247,7 @@ export function AddColumnModal({ open, onOpenChange, onSave }: AddColumnModalPro
             </Label>
             <Textarea
               id="col-regex"
-              placeholder={`e.g. "([^"]+)"$   or   \\s(\\d{3})\\s`}
+              placeholder={String.raw`e.g. "([^"]+)"$   or   \s(\d{3})\s`}
               value={regex}
               onChange={(e) => setRegex(e.target.value)}
               rows={2}
@@ -235,37 +286,7 @@ export function AddColumnModal({ open, onOpenChange, onSave }: AddColumnModalPro
           </div>
 
           <div className="rounded-lg border border-border bg-bg-base overflow-hidden max-h-60 overflow-y-auto custom-scrollbar">
-            {isFetchingSamples ? (
-              <div className="flex items-center justify-center gap-2 py-8 text-text-muted text-sm">
-                <Loader2 className="size-4 animate-spin" />
-                Loading samples…
-              </div>
-            ) : samples.length === 0 ? (
-              <p className="text-center py-8 text-text-muted text-sm">
-                No logs available in this workspace.
-              </p>
-            ) : (
-              <div className="divide-y divide-border/50">
-                {preview.map((row, i) => (
-                  <div key={i} className="px-3 py-2 group hover:bg-white/[0.02]">
-                    {/* Raw line — wrapped */}
-                    <p className="font-mono text-[11px] text-text-muted break-all whitespace-pre-wrap leading-tight">
-                      {row.raw}
-                    </p>
-                    {/* Extracted value */}
-                    {row.match !== null ? (
-                      <p className="font-mono text-[11px] text-primary mt-0.5 break-all whitespace-pre-wrap">
-                        → <span className="bg-primary/10 px-1 rounded">{row.match}</span>
-                      </p>
-                    ) : regex && !regexError ? (
-                      <p className="font-mono text-[11px] text-text-muted/40 mt-0.5 break-all whitespace-pre-wrap">
-                        → no match
-                      </p>
-                    ) : null}
-                  </div>
-                ))}
-              </div>
-            )}
+            {renderPreviewContent()}
           </div>
         </div>
 

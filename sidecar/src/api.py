@@ -99,6 +99,85 @@ A2UI_END = "[[/A2UI]]"
 AI_STATE_DB = "ai_state.sqlite"
 SQL_AND_JOIN = " AND "
 
+INTERVAL_1_SEC = "1 second"
+INTERVAL_5_SEC = "5 seconds"
+INTERVAL_15_SEC = "15 seconds"
+INTERVAL_1_MIN = "1 minute"
+INTERVAL_5_MIN = "5 minutes"
+INTERVAL_15_MIN = "15 minutes"
+INTERVAL_1_HOUR = "1 hour"
+INTERVAL_4_HOURS = "4 hours"
+INTERVAL_12_HOURS = "12 hours"
+INTERVAL_1_DAY = "1 day"
+INTERVAL_30_DAYS = "30 days"
+
+INTERVALS = {
+    INTERVAL_1_SEC: (timedelta(seconds=1), "%Y-%m-%d %H:%M:%S"),
+    INTERVAL_5_SEC: (timedelta(seconds=5), "%Y-%m-%d %H:%M:%S"),
+    INTERVAL_15_SEC: (timedelta(seconds=15), "%Y-%m-%d %H:%M:%S"),
+    INTERVAL_1_MIN: (timedelta(minutes=1), "%Y-%m-%d %H:%M"),
+    INTERVAL_5_MIN: (timedelta(minutes=5), "%Y-%m-%d %H:%M"),
+    INTERVAL_15_MIN: (timedelta(minutes=15), "%Y-%m-%d %H:%M"),
+    INTERVAL_1_HOUR: (timedelta(hours=1), "%Y-%m-%d %H:00"),
+    INTERVAL_4_HOURS: (timedelta(hours=4), "%Y-%m-%d %H:00"),
+    INTERVAL_12_HOURS: (timedelta(hours=12), "%Y-%m-%d %H:00"),
+    INTERVAL_1_DAY: (timedelta(days=1), "%Y-%m-%d"),
+    INTERVAL_30_DAYS: (timedelta(days=30), "%Y-%m"),
+}
+
+
+def _determine_bucket_interval(duration_sec: float) -> str:
+    if duration_sec <= 10:
+        return INTERVAL_1_SEC
+    if duration_sec <= 60:
+        return INTERVAL_5_SEC
+    if duration_sec <= 600:
+        return INTERVAL_15_SEC
+    if duration_sec <= 3600:
+        return INTERVAL_1_MIN
+    if duration_sec <= 14400:
+        return INTERVAL_5_MIN
+    if duration_sec <= 86400:
+        return INTERVAL_15_MIN
+    if duration_sec <= 259200:
+        return INTERVAL_1_HOUR
+    if duration_sec <= 604800:
+        return INTERVAL_4_HOURS
+    if duration_sec <= 2592000:
+        return INTERVAL_12_HOURS
+    if duration_sec <= 15552000:
+        return INTERVAL_1_DAY
+    return INTERVAL_30_DAYS
+
+
+def _parse_ts(ts_str: str | None) -> datetime | None:
+    if not ts_str:
+        return None
+    s = ts_str.replace("T", " ").replace("Z", "").strip()
+    _formats = [
+        ("%Y-%m-%d %H:%M:%S", 19),
+        ("%Y-%m-%d %H:%M", 16),
+        ("%Y-%m-%d %H", 13),
+        ("%Y-%m-%d", 10),
+        ("%Y-%m", 7),
+    ]
+    for fmt, length in _formats:
+        try:
+            return datetime.strptime(s[:length], fmt)
+        except ValueError:
+            continue
+    return None
+
+
+def _floor_to_bucket(dt: datetime, ivl: timedelta) -> datetime:
+    epoch = datetime(1970, 1, 1)
+    total_secs = (dt - epoch).total_seconds()
+    ivl_secs = ivl.total_seconds()
+    if ivl_secs <= 0:
+        return dt
+    floored_secs = (total_secs // ivl_secs) * ivl_secs
+    return epoch + timedelta(seconds=floored_secs)
+
 
 def _json_default(obj: Any) -> str:
     """Custom JSON serializer for types not supported by the stdlib encoder.
@@ -235,8 +314,6 @@ class App:
         logger.info("Database initialized at: %s", os.path.abspath(db_path))
 
         # --- RAG Memory Service ---
-        pass
-
         self.rag_service = RagService(os.path.join(PROJECT_ROOT, "data"))
 
         # --- Disk-First / Fast-Path store ---
@@ -246,8 +323,6 @@ class App:
         logger.info("DiskLogStore initialized at: %s", storage_dir)
         self.fast_path = FastPathService(storage_dir, log_store=self.log_store)
         logger.info("FastPathService initialized at: %s", storage_dir)
-
-        pass
 
         self.shared_manager = SharedSourceManager(self.log_store)
         logger.info("SharedSourceManager initialized")
@@ -327,12 +402,12 @@ class App:
 
     def method_get_clustering_status(self, workspace_id: str | None = None) -> dict:
         """Fetch current clustering worker status and backlog."""
-        logger.debug("RPC Dispatch: get_clustering_status")
+        logger.debug("RPC Dispatch: get_clustering_status (workspace=%s)", workspace_id)
         return self.clustering_worker.get_status()
 
     def method_set_clustering_mode(self, mode: str, workspace_id: str | None = None) -> dict:
         """Set clustering worker mode (auto, manual, burst)."""
-        logger.info("RPC Dispatch: set_clustering_mode (mode=%s)", mode)
+        logger.info("RPC Dispatch: set_clustering_mode (mode=%s, workspace=%s)", mode, workspace_id)
         self.clustering_worker.set_mode(mode)
         return {
             "status": "success",
@@ -342,7 +417,9 @@ class App:
 
     def method_set_clustering_paused(self, paused: bool, workspace_id: str | None = None) -> dict:
         """Explicitly pause or resume the clustering worker."""
-        logger.info("RPC Dispatch: set_clustering_paused (paused=%s)", paused)
+        logger.info(
+            "RPC Dispatch: set_clustering_paused (paused=%s, workspace=%s)", paused, workspace_id
+        )
         self.clustering_worker.set_paused(paused)
         return {"status": "success", "paused": self.clustering_worker.paused}
 
@@ -405,8 +482,6 @@ class App:
         LogDatabase.reset()
 
         # 3. Delete files
-        pass
-
         data_dir = os.path.join(PROJECT_ROOT, "data")
         db_path = os.path.join(data_dir, "loglens.duckdb")
         ai_path = os.path.join(data_dir, AI_STATE_DB)
@@ -468,8 +543,6 @@ class App:
 
         def run_mcp():
             try:
-                pass
-
                 config = uvicorn.Config(
                     mcp_server.application, host="127.0.0.1", port=5002, log_level="error"
                 )
@@ -533,10 +606,14 @@ class App:
         # 6. Log Store & Shared Core
         if hasattr(self, "log_store"):
             self.log_store.close_all()
-        if hasattr(self, "shared_source_mgr"):
-            self.shared_source_mgr.cleanup()
 
         logger.info("Sidecar: Background workers stopped.")
+
+    async def _execute_handler(self, handler, kwargs: dict) -> Any:
+        res = handler(**kwargs)
+        if inspect.iscoroutine(res):
+            return await res
+        return res
 
     async def dispatch(self, req: JSONRPCRequest) -> JSONRPCResponse:
         logger.info("RPC Dispatch: %s", req.method)
@@ -567,12 +644,7 @@ class App:
                         result = await asyncio.to_thread(_run_offloaded)
                     else:
                         params_model = model(**req.params)
-                        kwargs = params_model.model_dump()
-                        res = handler(**kwargs)
-                        if inspect.iscoroutine(res):
-                            result = await res
-                        else:
-                            result = res
+                        result = await self._execute_handler(handler, params_model.model_dump())
                 except ValidationError as ve:
                     logger.error(
                         "JSON-RPC Validation Error for method '%s': %s", req.method, ve.errors()
@@ -583,11 +655,7 @@ class App:
                     )
             else:
                 # Direct call for unmapped methods
-                res = handler(**req.params)
-                if inspect.iscoroutine(res):
-                    result = await res
-                else:
-                    result = res
+                result = await self._execute_handler(handler, req.params)
 
             return JSONRPCResponse(id=req.id, result=result)
         except Exception as e:
@@ -596,6 +664,29 @@ class App:
                 id=req.id, error={"code": -32603, "message": "Internal error", "data": str(e)}
             )
 
+    def _process_single_filter(
+        self, f: dict, allowed_fields: set[str], field_groups: dict
+    ):
+        """Processes a single filter dict and appends the resulting SQL clause to field_groups."""
+        field = f.get("field")
+        value = f.get("value")
+        op = f.get("operator", "equals")
+
+        if not field or value is None:
+            return
+
+        if field.startswith("facets."):
+            facet_key = field.split(".", 1)[1]
+            field_sql = f"json_extract_string(l.facets, '$.{facet_key}')"
+        elif field in allowed_fields:
+            field_sql = f"l.{field}"
+        else:
+            return
+
+        clause, param = self._build_filter_clause(field_sql, op, value)
+        if clause:
+            field_groups[field_sql].append((clause, param))
+
     def _parse_filters(self, filters: list[dict]) -> tuple[list[str], list[Any]]:
         from collections import defaultdict
 
@@ -603,28 +694,11 @@ class App:
         allowed_fields = {"level", "source_id", "cluster_id", "raw_text", "has_comment"}
 
         for f in filters:
-            field = f.get("field")
-            value = f.get("value")
-            op = f.get("operator", "equals")
-
-            if not field or value is None:
-                continue
-
-            if field.startswith("facets."):
-                facet_key = field.split(".", 1)[1]
-                field_sql = f"json_extract_string(facets, '$.{facet_key}')"
-            elif field in allowed_fields:
-                field_sql = field
-            else:
-                continue
-
-            clause, param = self._build_filter_clause(field_sql, op, value)
-            if clause:
-                field_groups[field_sql].append((clause, param))
+            self._process_single_filter(f, allowed_fields, field_groups)
 
         where_clauses = []
         params = []
-        for _, items in field_groups.items():
+        for items in field_groups.values():
             if not items:
                 continue
             clauses = [item[0] for item in items]
@@ -689,8 +763,6 @@ class App:
             params.extend(f_params)
 
         if query:
-            pass
-
             llql_sql, llql_params = parse_llql(query)
             where_clauses.append(f"({llql_sql})")
             params.extend(llql_params)
@@ -856,8 +928,6 @@ class App:
             sql_params.extend(f_params)
 
         if params.query:
-            pass
-
             llql_sql, llql_params = parse_llql(params.query)
             if llql_sql:
                 where_clauses.append(f"({llql_sql})")
@@ -920,7 +990,7 @@ class App:
             where_clauses.append(f"source_id IN ({placeholders})")
             sql_params.extend(params.source_ids)
 
-        where_sql = " AND ".join(where_clauses)
+        where_sql = SQL_AND_JOIN.join(where_clauses)
 
         # Safeguard: Check if logs exist first to prevent DuckDB assertions on empty datasets
         cursor.execute(f"SELECT EXISTS(SELECT 1 FROM logs WHERE {where_sql})", sql_params)
@@ -948,9 +1018,6 @@ class App:
         Export matching logs to a file (CSV or JSON).
         """
         params = ExportLogsRequest(**kwargs)
-
-        pass  # import csv
-        pass  # import json
 
         filepath = params.filepath
         file_format = params.format
@@ -995,11 +1062,55 @@ class App:
                     json.dump(logs, f, indent=2)
                 return len(logs)
 
-        pass
-
         count = await asyncio.to_thread(write_to_file)
 
         return {"status": "ok", "count": count}
+
+    def _determine_distribution_bounds(
+        self, cursor, params: GetLogDistributionRequest, where_sql: str, sql_params: list
+    ) -> tuple[str | None, str | None, float]:
+        start_ts = params.start_time
+        end_ts = params.end_time
+
+        if not start_ts or not end_ts:
+            cursor.execute(
+                f"SELECT MIN(timestamp), MAX(timestamp) FROM logs l WHERE {where_sql}", sql_params
+            )
+            db_row = cursor.fetchone()
+            if db_row and db_row[0] and db_row[1]:
+                if not start_ts:
+                    start_ts = db_row[0]
+                if not end_ts:
+                    end_ts = db_row[1]
+
+        duration_sec = 3600.0
+        if start_ts and end_ts:
+            try:
+                s_str = start_ts.replace("T", " ").replace("Z", "")
+                e_str = end_ts.replace("T", " ").replace("Z", "")
+                dt_s = datetime.strptime(s_str[:19], "%Y-%m-%d %H:%M:%S")
+                dt_e = datetime.strptime(e_str[:19], "%Y-%m-%d %H:%M:%S")
+                duration_sec = max(1.0, (dt_e - dt_s).total_seconds())
+            except Exception:
+                pass
+        return start_ts, end_ts, duration_sec
+
+    def _build_distribution_slots(
+        self, start_ts: str | None, end_ts: str | None, delta: timedelta, format_str: str
+    ) -> list[str]:
+        dt_start = _parse_ts(start_ts)
+        dt_end = _parse_ts(end_ts)
+
+        all_slots: list[str] = []
+        if dt_start and dt_end and delta:
+            current = _floor_to_bucket(dt_start, delta)
+            while current <= dt_end and len(all_slots) < 500:
+                slot_label = current.strftime(format_str)
+                if len(slot_label) == 13:
+                    slot_label += ":00"
+                all_slots.append(slot_label)
+                current += delta
+        return all_slots
 
     def method_get_log_distribution(self, **kwargs) -> dict:
         """Fetch timeline distribution of logs aggregated by time bucket and level."""
@@ -1017,66 +1128,13 @@ class App:
             return {"buckets": []}
 
         # Determine duration of the timeframe to calculate optimal buckets
-        start_ts = params.start_time
-        end_ts = params.end_time
-
-        if not start_ts or not end_ts:
-            # Query min/max timestamps from DB for this workspace/sources
-            cursor.execute(
-                f"SELECT MIN(timestamp), MAX(timestamp) FROM logs l WHERE {where_sql}", sql_params
-            )
-            db_row = cursor.fetchone()
-            if db_row and db_row[0] and db_row[1]:
-                if not start_ts:
-                    start_ts = db_row[0]
-                if not end_ts:
-                    end_ts = db_row[1]
-
-        duration_sec = 3600.0  # default fallback to 1 hour range
-        if start_ts and end_ts:
-            try:
-                s_str = start_ts.replace("T", " ").replace("Z", "")
-                e_str = end_ts.replace("T", " ").replace("Z", "")
-                dt_s = datetime.strptime(s_str[:19], "%Y-%m-%d %H:%M:%S")
-                dt_e = datetime.strptime(e_str[:19], "%Y-%m-%d %H:%M:%S")
-                duration_sec = max(1.0, (dt_e - dt_s).total_seconds())
-            except Exception:
-                pass
+        start_ts, end_ts, duration_sec = self._determine_distribution_bounds(
+            cursor, params, where_sql, sql_params
+        )
 
         # Select bucket interval based on the duration to have ~15-60 columns
-        if duration_sec <= 10:
-            interval_str = "1 second"
-            format_str = "%Y-%m-%d %H:%M:%S"
-        elif duration_sec <= 60:
-            interval_str = "5 seconds"
-            format_str = "%Y-%m-%d %H:%M:%S"
-        elif duration_sec <= 600:  # 10 mins
-            interval_str = "15 seconds"
-            format_str = "%Y-%m-%d %H:%M:%S"
-        elif duration_sec <= 3600:  # 1 hour
-            interval_str = "1 minute"
-            format_str = "%Y-%m-%d %H:%M"
-        elif duration_sec <= 14400:  # 4 hours
-            interval_str = "5 minutes"
-            format_str = "%Y-%m-%d %H:%M"
-        elif duration_sec <= 86400:  # 24 hours
-            interval_str = "15 minutes"
-            format_str = "%Y-%m-%d %H:%M"
-        elif duration_sec <= 259200:  # 3 days
-            interval_str = "1 hour"
-            format_str = "%Y-%m-%d %H:00"
-        elif duration_sec <= 604800:  # 7 days
-            interval_str = "4 hours"
-            format_str = "%Y-%m-%d %H:00"
-        elif duration_sec <= 2592000:  # 30 days
-            interval_str = "12 hours"
-            format_str = "%Y-%m-%d %H:00"
-        elif duration_sec <= 15552000:  # 180 days
-            interval_str = "1 day"
-            format_str = "%Y-%m-%d"
-        else:
-            interval_str = "30 days"
-            format_str = "%Y-%m"
+        interval_str = _determine_bucket_interval(duration_sec)
+        delta, format_str = INTERVALS[interval_str]
 
         query = f"""
             SELECT
@@ -1104,78 +1162,8 @@ class App:
             db_buckets[time_bucket_key][level] = count
 
         # ── Kibana "extended_bounds" / "min_doc_count:0" equivalent ──────────
-        # Generate ALL bucket slots between start_ts and end_ts so Recharts
-        # gets a continuous grid of bars. Empty slots render at height 0 instead
-        # of causing gaps (Recharts spreads only the data-points it receives).
         empty_levels = {"DEBUG": 0, "INFO": 0, "WARN": 0, "ERROR": 0}
-
-        def _parse_ts(ts_str: str) -> datetime | None:
-            """Parse a timestamp string into a datetime, tolerating various formats."""
-            if not ts_str:
-                return None
-            s = ts_str.replace("T", " ").replace("Z", "").strip()
-            # (fmt, slice_length) pairs — ordered most→least specific
-            _formats = [
-                ("%Y-%m-%d %H:%M:%S", 19),
-                ("%Y-%m-%d %H:%M", 16),
-                ("%Y-%m-%d %H", 13),
-                ("%Y-%m-%d", 10),
-                ("%Y-%m", 7),
-            ]
-            for fmt, length in _formats:
-                try:
-                    return datetime.strptime(s[:length], fmt)
-                except ValueError:
-                    continue
-            return None
-
-        # Map interval_str → timedelta
-        _interval_map = {
-            "1 second": timedelta(seconds=1),
-            "5 seconds": timedelta(seconds=5),
-            "15 seconds": timedelta(seconds=15),
-            "1 minute": timedelta(minutes=1),
-            "5 minutes": timedelta(minutes=5),
-            "15 minutes": timedelta(minutes=15),
-            "1 hour": timedelta(hours=1),
-            "4 hours": timedelta(hours=4),
-            "12 hours": timedelta(hours=12),
-            "1 day": timedelta(days=1),
-            "30 days": timedelta(days=30),
-        }
-        delta = _interval_map.get(interval_str, timedelta(hours=1))
-
-        dt_start = _parse_ts(start_ts) if start_ts else None
-        dt_end = _parse_ts(end_ts) if end_ts else None
-
-        def _floor_to_bucket(dt: datetime, ivl: timedelta) -> datetime:
-            """Floor a datetime to the nearest interval boundary, matching DuckDB time_bucket().
-
-            DuckDB's time_bucket() uses epoch-aligned boundaries.  We replicate
-            that here so that every generated slot label matches the key the DB
-            will produce for the same interval.
-            """
-            epoch = datetime(1970, 1, 1)
-            total_secs = (dt - epoch).total_seconds()
-            ivl_secs = ivl.total_seconds()
-            if ivl_secs <= 0:
-                return dt
-            floored_secs = (total_secs // ivl_secs) * ivl_secs
-            return epoch + timedelta(seconds=floored_secs)
-
-        all_slots: list[str] = []
-        if dt_start and dt_end and delta:
-            # Align start to the same bucket boundary DuckDB uses so generated
-            # slot keys exactly match the keys coming back from the DB query.
-            current = _floor_to_bucket(dt_start, delta)
-            # Safety cap: max 500 slots to prevent runaway allocations
-            while current <= dt_end and len(all_slots) < 500:
-                slot_label = current.strftime(format_str)
-                # Normalize "YYYY-MM-DD HH" (13-char) labels consistently
-                if len(slot_label) == 13:
-                    slot_label += ":00"
-                all_slots.append(slot_label)
-                current += delta
+        all_slots = self._build_distribution_slots(start_ts, end_ts, delta, format_str)
 
         # Merge: start from fully-filled zero grid, overlay real DB data
         full_buckets: dict[str, dict] = {}
@@ -1233,7 +1221,6 @@ class App:
         result = self._get_logs_internal(**model_dump, source_ids=enabled_ids)
 
         # 3. Apply Multi-Source Timezone Normalization (PARS-004)
-        pass  # from datetime import timedelta
 
         normalized_logs = []
         for log in result["logs"]:
@@ -1404,7 +1391,7 @@ class App:
         count = 0
         keys_to_remove = []
         for k, t in self.tailers.items():
-            if k.startswith(f"{workspace_id}:") or k.startswith(f"ssh:{workspace_id}:"):
+            if k.startswith((f"{workspace_id}:", f"ssh:{workspace_id}:")):
                 t.stop()
                 keys_to_remove.append(k)
                 count += 1
@@ -1436,9 +1423,7 @@ class App:
         count_stopped = 0
         keys_to_remove = []
         for k, t in self.tailers.items():
-            is_match = (
-                k.startswith(f"{workspace_id}:") or k.startswith(f"ssh:{workspace_id}:")
-            ) and filepath in k
+            is_match = k.startswith((f"{workspace_id}:", f"ssh:{workspace_id}:")) and filepath in k
             if is_match:
                 t.stop()
                 keys_to_remove.append(k)
@@ -1458,96 +1443,99 @@ class App:
         with open(abs_path, encoding="utf-8", errors="replace") as f:
             return f.read()
 
-    def method_ingest_logs(self, logs: list[any]) -> dict:
+    def _get_global_rules(self, cursor) -> list:
+        cursor.execute("SELECT value FROM settings WHERE key = 'facet_extractions'")
+        gr = cursor.fetchone()
+        if gr and gr[0]:
+            try:
+                parsed = json.loads(gr[0])
+                return parsed if isinstance(parsed, list) else []
+            except Exception:
+                pass
+        return []
+
+    def _ingest_source_logs_batch(
+        self,
+        cursor,
+        ws_id: str,
+        src_id: str,
+        src_logs: list[dict],
+        rules_cache: dict,
+        global_rules: list,
+        now_ts: str,
+    ):
+        rules = self._get_facet_rules_for_workspace(cursor, ws_id, rules_cache, global_rules)
+
+        cursor.execute(
+            "SELECT parser_config, tz_offset FROM fusion_configs WHERE workspace_id = ? AND source_id = ?",
+            (ws_id, src_id),
+        )
+        row = cursor.fetchone()
+        p_config = json.loads(row[0]) if row and row[0] else {}
+        p_tz = row[1] if row and row[1] else 0
+
+        parser = self.get_drain_parser(ws_id)
+
+        # 1. Disk-First: write raw lines
+        raw_lines = [log.get("raw_text") or log.get("message") or "" for log in src_logs]
+        line_ids = self.log_store.append_batch(src_id, raw_lines)
+
+        # 2. Process Chunk in RAM
+        batch_data, cluster_increments = self._process_chunk_ram_first(
+            ws_id,
+            src_id,
+            line_ids,
+            raw_lines,
+            parser,
+            rules,
+            p_config,
+            p_tz,
+            now_ts,
+            original_logs=src_logs,
+        )
+        # 3. Bulk Insert via PyArrow
+        if batch_data:
+            self._insert_arrow_batch(cursor, batch_data, cluster_increments)
+
+        self.db.commit()
+
+        # 4. Broadcast to active overlays
+        try:
+            shared_src = self.shared_manager.get_source(src_id)
+            shared_src.push_batch(raw_lines, line_ids)
+        except Exception as e:
+            logger.error("[Ingestion] Broadcast failed for %s: %s", src_id, e)
+
+    def method_ingest_logs(self, logs: list[Any]) -> dict:
         """High-speed synchronous batch ingestion — RAM-First / PyArrow.
 
         Designed for streaming data (HTTP/Syslog). Runs synchronously as it is
         expected to be called from a background flush worker.
         Does NOT create ingestion jobs.
         """
-        pass  # import json
-        pass  # import time
-
         log_dicts = [log.model_dump() if hasattr(log, "model_dump") else log for log in logs]
 
         if not log_dicts:
             return {"status": "ok", "count": 0}
 
         # --- Group by (workspace_id, source_id) ---
-        pass  # from collections import defaultdict
-
         grouped: dict[tuple[str, str], list[dict]] = defaultdict(list)
         for log in log_dicts:
             ws = log.get("workspace_id") or "default"
             src = log.get("source_id") or "manual"
             grouped[(ws, src)].append(log)
 
-        now = time.time()
         now_ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-        db_instance = self.db
-        cursor = db_instance.get_cursor()
-
-        # Pre-fetch rules
-        cursor.execute("SELECT value FROM settings WHERE key = 'facet_extractions'")
-        gr = cursor.fetchone()
-        global_rules = []
-        if gr and gr[0]:
-            try:
-                parsed = json.loads(gr[0])
-                global_rules = parsed if isinstance(parsed, list) else []
-            except Exception:
-                pass
-
+        cursor = self.db.get_cursor()
+        global_rules = self._get_global_rules(cursor)
         rules_cache = {}
 
         for (ws_id, src_id), src_logs in grouped.items():
             try:
-                rules = self._get_facet_rules_for_workspace(
-                    cursor, ws_id, rules_cache, global_rules
+                self._ingest_source_logs_batch(
+                    cursor, ws_id, src_id, src_logs, rules_cache, global_rules, now_ts
                 )
-
-                cursor.execute(
-                    "SELECT parser_config, tz_offset FROM fusion_configs WHERE workspace_id = ? AND source_id = ?",
-                    (ws_id, src_id),
-                )
-                row = cursor.fetchone()
-                p_config = json.loads(row[0]) if row and row[0] else {}
-                p_tz = row[1] if row and row[1] else 0
-
-                parser = self.get_drain_parser(ws_id)
-
-                # 1. Disk-First: write raw lines
-                raw_lines = [log.get("raw_text") or log.get("message") or "" for log in src_logs]
-                line_ids = self.log_store.append_batch(src_id, raw_lines)
-
-                # 2. Process Chunk in RAM
-                batch_data, cluster_increments = self._process_chunk_ram_first(
-                    ws_id,
-                    src_id,
-                    line_ids,
-                    raw_lines,
-                    parser,
-                    rules,
-                    p_config,
-                    p_tz,
-                    now,
-                    now_ts,
-                    original_logs=src_logs,
-                )
-                # 3. Bulk Insert via PyArrow
-                if batch_data:
-                    self._insert_arrow_batch(cursor, batch_data, cluster_increments)
-
-                db_instance.commit()
-
-                # 4. Broadcast to active overlays
-                try:
-                    shared_src = self.shared_manager.get_source(src_id)
-                    shared_src.push_batch(raw_lines, line_ids)
-                except Exception as e:
-                    logger.error("[Ingestion] Broadcast failed for %s: %s", src_id, e)
-
             except Exception as exc:
                 logger.exception("[Ingestion] Stream batch failed: %s", exc)
 
@@ -1583,6 +1571,50 @@ class App:
 
         return {"status": "ok", "job_id": job_id, "total_lines": total_lines}
 
+    def _ingest_chunk(
+        self,
+        cursor,
+        workspace_id: str,
+        source_id: str,
+        chunk_lines: list[str],
+        parser,
+        rules,
+        p_config,
+        p_tz,
+        now_ts,
+    ) -> int:
+        line_ids = self.log_store.append_batch(source_id, chunk_lines)
+        batch_data, cluster_increments = self._process_chunk_ram_first(
+            workspace_id,
+            source_id,
+            line_ids,
+            chunk_lines,
+            parser,
+            rules,
+            p_config,
+            p_tz,
+            now_ts,
+        )
+        if batch_data:
+            self._insert_arrow_batch(cursor, batch_data, cluster_increments)
+        return len(chunk_lines)
+
+    def _read_file_chunks(self, filepath: str, initial_chunk_size: int, max_chunk_size: int):
+        """Generator that reads filepath and yields chunks of stripped non-empty lines."""
+        current_chunk_size = initial_chunk_size
+        with open(filepath, encoding="utf-8", errors="replace") as f:
+            chunk_lines: list[str] = []
+            for raw_line in f:
+                clean = raw_line.strip()
+                if clean:
+                    chunk_lines.append(clean)
+                    if len(chunk_lines) >= current_chunk_size:
+                        yield chunk_lines
+                        chunk_lines = []
+                        current_chunk_size = min(max_chunk_size, current_chunk_size * 2)
+            if chunk_lines:
+                yield chunk_lines
+
     def _bg_ingest_local_file(self, workspace_id: str, source_id: str, filepath: str, job_id: int):
         """Background worker for local file ingestion.
 
@@ -1590,19 +1622,14 @@ class App:
         1. Read chunk
         2. Write FastPath
         3. Train & Tag Drain3 in RAM (Single Thread)
-        4. Bulk Insert fully processed rows via PyArrow
+        4. Bulk Insert processed rows via PyArrow
         """
-        pass  # import json
-        pass  # import time
-
         initial_chunk_size = 5000
         max_chunk_size = 10000
         commit_interval = 10000
 
-        current_chunk_size = initial_chunk_size
         processed_count = 0
         uncommitted_count = 0
-        now = time.time()
         now_ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
         try:
@@ -1610,16 +1637,7 @@ class App:
             cursor = db_instance.get_cursor()
 
             # Pre-fetch rules and configs
-            cursor.execute("SELECT value FROM settings WHERE key = 'facet_extractions'")
-            gr = cursor.fetchone()
-            global_rules = []
-            if gr and gr[0]:
-                try:
-                    parsed = json.loads(gr[0])
-                    global_rules = parsed if isinstance(parsed, list) else []
-                except Exception:
-                    pass
-
+            global_rules = self._get_global_rules(cursor)
             rules_cache = {}
             rules = self._get_facet_rules_for_workspace(
                 cursor, workspace_id, rules_cache, global_rules
@@ -1635,69 +1653,28 @@ class App:
 
             parser = self.get_drain_parser(workspace_id)
 
-            with open(filepath, encoding="utf-8", errors="replace") as f:
-                chunk_lines: list[str] = []
+            for chunk_lines in self._read_file_chunks(filepath, initial_chunk_size, max_chunk_size):
+                n = self._ingest_chunk(
+                    cursor,
+                    workspace_id,
+                    source_id,
+                    chunk_lines,
+                    parser,
+                    rules,
+                    p_config,
+                    p_tz,
+                    now_ts,
+                )
+                processed_count += n
+                uncommitted_count += n
 
-                for raw_line in f:
-                    clean = raw_line.strip()
-                    if not clean:
-                        continue
-                    chunk_lines.append(clean)
-
-                    if len(chunk_lines) >= current_chunk_size:
-                        # 1. Write FastPath
-                        line_ids = self.log_store.append_batch(source_id, chunk_lines)
-
-                        # 2. Process Chunk in RAM
-                        batch_data, cluster_increments = self._process_chunk_ram_first(
-                            workspace_id,
-                            source_id,
-                            line_ids,
-                            chunk_lines,
-                            parser,
-                            rules,
-                            p_config,
-                            p_tz,
-                            now,
-                            now_ts,
-                        )
-
-                        # 3. Bulk Insert via PyArrow
-                        if batch_data:
-                            self._insert_arrow_batch(cursor, batch_data, cluster_increments)
-
-                        processed_count += len(chunk_lines)
-                        uncommitted_count += len(chunk_lines)
-
-                        if uncommitted_count >= commit_interval:
-                            cursor.execute(
-                                "UPDATE ingestion_jobs SET processed_lines = ?, status = 'processing', updated_at = CURRENT_TIMESTAMP WHERE id = ?",
-                                (processed_count, job_id),
-                            )
-                            db_instance.commit()
-                            uncommitted_count = 0
-
-                        chunk_lines = []
-                        current_chunk_size = min(max_chunk_size, current_chunk_size * 2)
-
-                # Final chunk
-                if chunk_lines:
-                    line_ids = self.log_store.append_batch(source_id, chunk_lines)
-                    batch_data, cluster_increments = self._process_chunk_ram_first(
-                        workspace_id,
-                        source_id,
-                        line_ids,
-                        chunk_lines,
-                        parser,
-                        rules,
-                        p_config,
-                        p_tz,
-                        now,
-                        now_ts,
+                if uncommitted_count >= commit_interval:
+                    cursor.execute(
+                        "UPDATE ingestion_jobs SET processed_lines = ?, status = 'processing', updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+                        (processed_count, job_id),
                     )
-                    if batch_data:
-                        self._insert_arrow_batch(cursor, batch_data, cluster_increments)
-                    processed_count += len(chunk_lines)
+                    db_instance.commit()
+                    uncommitted_count = 0
 
             # Mark job completed
             cursor.execute(
@@ -1724,33 +1701,21 @@ class App:
             except Exception:
                 pass
 
-    def _process_chunk_ram_first(
+    def _train_chunk_sample(
         self,
         workspace_id: str,
         source_id: str,
-        line_ids: list[int],
-        chunk_lines: list[str],
+        train_lines: list[str],
+        train_ids: list[int],
         parser,
         rules,
         p_config,
         p_tz,
-        now,
         now_ts,
-        original_logs=None,
+        original_logs,
+        cluster_increments,
+        batch_data,
     ):
-        pass  # import json
-
-        train_sample_size = 200
-        cluster_increments = {}
-        batch_data = []
-
-        train_lines = chunk_lines[:train_sample_size]
-        train_ids = line_ids[:train_sample_size]
-
-        tag_lines = chunk_lines[train_sample_size:]
-        tag_ids = line_ids[train_sample_size:]
-
-        # Phase 1: Train on sample
         for i, raw_text in enumerate(train_lines):
             meta = extract_log_metadata(
                 raw_text, custom_rules=rules, parser_config=p_config, tz_offset=p_tz
@@ -1783,68 +1748,170 @@ class App:
                     lvl,
                     cluster_id,
                     json.dumps(meta["facets"]),
-                    True,  # processed = True
+                    True,
                 )
             )
 
+    def _extract_match_parameters(self, parser, template: str, message: str, facets: dict):
+        try:
+            params = parser.miner.extract_parameters(
+                template, message, exact_matching=False
+            )
+            if not params:
+                return
+            for p in params:
+                mask_key = p.mask_name.strip("<>").lower()
+                if mask_key != "*":
+                    facets[mask_key] = p.value
+        except Exception:
+            pass
+
+    def _tag_single_remaining_line(
+        self,
+        workspace_id: str,
+        source_id: str,
+        line_id: int,
+        raw_text: str,
+        parser,
+        rules,
+        p_config,
+        p_tz,
+        now_ts,
+        og_log: dict,
+        cluster_increments: dict,
+    ) -> tuple:
+        meta = extract_log_metadata(
+            raw_text, custom_rules=rules, parser_config=p_config, tz_offset=p_tz
+        )
+        match = parser.match(meta["message"])
+
+        cluster_id = None
+        template = None
+
+        if match:
+            cluster_id = str(match["cluster_id"])
+            template = match["template"]
+
+            self._extract_match_parameters(parser, template, meta["message"], meta["facets"])
+
+            key = (workspace_id, cluster_id, template)
+            cluster_increments[key] = cluster_increments.get(key, 0) + 1
+
+        ts = og_log.get("timestamp") or meta["timestamp"] or now_ts
+        ingest_ts = og_log.get("ingest_timestamp") or meta["ingest_timestamp"] or now_ts
+        lvl = og_log.get("level") or meta["level"] or "INFO"
+
+        og_facets = og_log.get("facets") or {}
+        meta["facets"].update(og_facets)
+
+        return (
+            workspace_id,
+            source_id,
+            line_id,
+            raw_text,
+            ts,
+            ingest_ts,
+            lvl,
+            cluster_id,
+            json.dumps(meta["facets"]),
+            True,
+        )
+
+
+    def _tag_chunk_remaining(
+        self,
+        workspace_id: str,
+        source_id: str,
+        tag_lines: list[str],
+        tag_ids: list[int],
+        parser,
+        rules,
+        p_config,
+        p_tz,
+        now_ts,
+        original_logs,
+        cluster_increments,
+        batch_data,
+        train_sample_size: int,
+    ):
+        for i, raw_text in enumerate(tag_lines):
+            og_log = original_logs[train_sample_size + i] if original_logs else {}
+            item = self._tag_single_remaining_line(
+                workspace_id,
+                source_id,
+                tag_ids[i],
+                raw_text,
+                parser,
+                rules,
+                p_config,
+                p_tz,
+                now_ts,
+                og_log,
+                cluster_increments,
+            )
+            batch_data.append(item)
+
+
+    def _process_chunk_ram_first(
+        self,
+        workspace_id: str,
+        source_id: str,
+        line_ids: list[int],
+        chunk_lines: list[str],
+        parser,
+        rules,
+        p_config,
+        p_tz,
+        now_ts,
+        original_logs=None,
+    ):
+        train_sample_size = 200
+        cluster_increments = {}
+        batch_data = []
+
+        train_lines = chunk_lines[:train_sample_size]
+        train_ids = line_ids[:train_sample_size]
+
+        tag_lines = chunk_lines[train_sample_size:]
+        tag_ids = line_ids[train_sample_size:]
+
+        # Phase 1: Train on sample
+        self._train_chunk_sample(
+            workspace_id,
+            source_id,
+            train_lines,
+            train_ids,
+            parser,
+            rules,
+            p_config,
+            p_tz,
+            now_ts,
+            original_logs,
+            cluster_increments,
+            batch_data,
+        )
+
         # Phase 2: Tag remaining sequentially
         if tag_lines:
-            for i, raw_text in enumerate(tag_lines):
-                meta = extract_log_metadata(
-                    raw_text, custom_rules=rules, parser_config=p_config, tz_offset=p_tz
-                )
-                match = parser.match(meta["message"])
-
-                cluster_id = None
-                template = None
-
-                if match:
-                    cluster_id = str(match["cluster_id"])
-                    template = match["template"]
-
-                    try:
-                        params = parser.miner.extract_parameters(
-                            template, meta["message"], exact_matching=False
-                        )
-                        if params:
-                            for p in params:
-                                mask_key = p.mask_name.strip("<>").lower()
-                                if mask_key != "*":
-                                    meta["facets"][mask_key] = p.value
-                    except Exception:
-                        pass
-
-                    key = (workspace_id, cluster_id, template)
-                    cluster_increments[key] = cluster_increments.get(key, 0) + 1
-
-                og_log = original_logs[train_sample_size + i] if original_logs else {}
-                ts = og_log.get("timestamp") or meta["timestamp"] or now_ts
-                ingest_ts = og_log.get("ingest_timestamp") or meta["ingest_timestamp"] or now_ts
-                lvl = og_log.get("level") or meta["level"] or "INFO"
-
-                og_facets = og_log.get("facets") or {}
-                meta["facets"].update(og_facets)
-
-                batch_data.append(
-                    (
-                        workspace_id,
-                        source_id,
-                        tag_ids[i],
-                        raw_text,
-                        ts,
-                        ingest_ts,
-                        lvl,
-                        cluster_id,
-                        json.dumps(meta["facets"]),
-                        True,  # processed = True
-                    )
-                )
+            self._tag_chunk_remaining(
+                workspace_id,
+                source_id,
+                tag_lines,
+                tag_ids,
+                parser,
+                rules,
+                p_config,
+                p_tz,
+                now_ts,
+                original_logs,
+                cluster_increments,
+                batch_data,
+                train_sample_size,
+            )
 
         return batch_data, cluster_increments
 
     def _insert_arrow_batch(self, cursor, batch_data, cluster_increments):
-        pass
-
         cursor.execute("BEGIN TRANSACTION")
 
         # PyArrow logs table
@@ -1864,6 +1931,7 @@ class App:
                 "processed",
             ],
         )
+        _ = arrow_logs
 
         cursor.execute(
             "INSERT INTO logs (workspace_id, source_id, line_id, raw_text, timestamp, ingest_timestamp, level, cluster_id, facets, processed) SELECT * FROM arrow_logs"
@@ -1877,6 +1945,7 @@ class App:
                 [pa.array(c) for c in c_cols],
                 names=["workspace_id", "cluster_id", "template", "count"],
             )
+            _ = arrow_clusters
             cursor.execute("CREATE TEMP TABLE temp_clusters AS SELECT * FROM arrow_clusters")
             cursor.execute("""
                 INSERT INTO clusters (workspace_id, cluster_id, template, count)
@@ -1968,14 +2037,16 @@ class App:
     def method_get_hierarchy(self, workspace_id: str) -> dict:
         return self.db.get_hierarchy(workspace_id)
 
-    def method_create_folder(self, workspace_id: str, name: str, parent_id: str = None) -> dict:
-        pass  # import uuid
-
+    def method_create_folder(
+        self, workspace_id: str, name: str, parent_id: str | None = None
+    ) -> dict:
         folder_id = str(uuid.uuid4())
         self.db.create_folder(workspace_id, folder_id, name, parent_id)
         return {"status": "success", "folder_id": folder_id}
 
-    def method_update_folder(self, folder_id: str, name: str = None, parent_id: str = None) -> dict:
+    def method_update_folder(
+        self, folder_id: str, name: str | None = None, parent_id: str | None = None
+    ) -> dict:
         self.db.update_folder(folder_id, name, parent_id)
         return {"status": "success"}
 
@@ -1984,10 +2055,13 @@ class App:
         return {"status": "success"}
 
     def method_create_log_source(
-        self, workspace_id: str, name: str, type: str, path: str, folder_id: str = None
+        self,
+        workspace_id: str,
+        name: str,
+        type: str,
+        path: str,
+        folder_id: str | None = None,
     ) -> dict:
-        pass  # import uuid
-
         source_id = str(uuid.uuid4())
         self.db.upsert_log_source(workspace_id, source_id, name, type, path, folder_id)
         return {"status": "success", "source_id": source_id}
@@ -2015,7 +2089,7 @@ class App:
         return key in self.tailers and self.tailers[key].running
 
     def method_get_clusters(self, workspace_id: str) -> list:
-        clusters = self.parser.get_clusters()
+        clusters = self.get_drain_parser(workspace_id).get_clusters()
         return [
             {"id": c.cluster_id, "template": c.get_template(), "size": c.size} for c in clusters
         ]
@@ -2057,7 +2131,6 @@ class App:
         self, params: SendAiMessageRequest
     ) -> tuple[str, str | None, list[AIChatMessage]]:
         cursor = self.db.get_cursor()
-        pass  # import uuid
 
         session_id = params.session_id
         if not session_id:
@@ -2410,7 +2483,7 @@ class App:
         self.db.commit()
         return {"status": "success"}
 
-    def get_drain_parser(self, workspace_id: str = None) -> DrainParser:
+    def get_drain_parser(self, workspace_id: str | None = None) -> DrainParser:
         """Get or create a Drain3 parser based on current scope settings."""
         settings = self.method_get_settings(workspace_id)
         scope = settings.get("drain_template_scope", "global")
@@ -2451,7 +2524,7 @@ class App:
             )
         return self._parsers[key]
 
-    def method_reset_templates(self, workspace_id: str = None) -> dict:
+    def method_reset_templates(self, workspace_id: str | None = None) -> dict:
         """Deletes the persistence state for the given workspace or global scope."""
         settings = self.method_get_settings()
         scope = settings.get("drain_template_scope", "global")
@@ -2542,8 +2615,6 @@ class App:
                 status=400,
             )
         except Exception as e:
-            pass  # import traceback
-
             traceback.print_exc()
             return web.json_response(
                 {
@@ -2616,8 +2687,6 @@ class App:
             await response.write(b"data: [DONE]\n\n")
             return response
         except Exception as e:
-            pass  # import traceback
-
             logger.error("AI Stream Error: %s", str(e))
             traceback.print_exc()
             await response.write(f"data: {json.dumps({'error': str(e)})}\n\n".encode())
@@ -2636,10 +2705,6 @@ class App:
         )
 
         try:
-            pass  # import re
-
-            pass
-
             messages = [AIChatMessage(role="user", content=prompt)]
             # We use the current AI provider
             response = await self.ai.chat(messages)
@@ -2664,8 +2729,6 @@ class App:
             return {"regex": regex}
         except Exception as e:
             logger.error("Failed to generate regex with AI: %s", e)
-            pass  # import re
-
             return {"regex": f"({re.escape(selected_text)})"}
 
     def method_get_health(self) -> dict:
@@ -2739,6 +2802,194 @@ class App:
         where_sql = " WHERE " + SQL_AND_JOIN.join(where_clauses) if where_clauses else ""
         return where_sql, params, norm_start
 
+    def _get_dashboard_bucket_params(
+        self, cursor, where_sql: str, params: list
+    ) -> tuple[str, str, str | None, str | None]:
+        bucket_interval_str = "1 hour"
+        bucket_format = "%Y-%m-%d %H:00:00"
+        ts_min_time = None
+        ts_max_time = None
+        try:
+            cursor.execute(
+                "SELECT MIN(l.timestamp), MAX(l.timestamp) FROM logs l" + where_sql,
+                params,
+            )
+            min_ts_row, max_ts_row = cursor.fetchone()
+            if min_ts_row and max_ts_row:
+                ts_min_time = str(min_ts_row)
+                ts_max_time = str(max_ts_row)
+                try:
+                    _s = ts_min_time.replace("T", " ").replace("Z", "")[:19]
+                    _e = ts_max_time.replace("T", " ").replace("Z", "")[:19]
+                    min_dt_ts = datetime.strptime(_s, "%Y-%m-%d %H:%M:%S")
+                    max_dt_ts = datetime.strptime(_e, "%Y-%m-%d %H:%M:%S")
+                    seconds_span = max((max_dt_ts - min_dt_ts).total_seconds(), 1.0)
+                    bucket_interval_str = _determine_bucket_interval(seconds_span)
+                    _, bucket_format = INTERVALS[bucket_interval_str]
+                except Exception:
+                    pass
+        except Exception as e:
+            logger.error("Failed to calculate dynamic time bucket size: %s", e)
+        return bucket_interval_str, bucket_format, ts_min_time, ts_max_time
+
+    def _build_dashboard_filled_slots(
+        self,
+        start_time: str | None,
+        end_time: str | None,
+        ts_min_time: str | None,
+        ts_max_time: str | None,
+        bucket_interval_str: str,
+        bucket_format: str,
+    ) -> list[str]:
+        delta_dash, _ = INTERVALS.get(bucket_interval_str, (timedelta(hours=1), "%Y-%m-%d %H:00"))
+        filled_slots: list[str] = []
+
+        _ts_min = start_time or ts_min_time
+        _ts_max = end_time or ts_max_time
+
+        if _ts_min and _ts_max:
+            try:
+                _s2 = _ts_min.replace("T", " ").replace("Z", "")[:19]
+                _e2 = _ts_max.replace("T", " ").replace("Z", "")[:19]
+                cur_dt = datetime.strptime(_s2, "%Y-%m-%d %H:%M:%S")
+                end_dt = datetime.strptime(_e2, "%Y-%m-%d %H:%M:%S")
+                # Align to epoch-anchored bucket boundary (matches DuckDB time_bucket)
+                _epoch_dash = datetime(1970, 1, 1)
+                _ivl_secs_dash = delta_dash.total_seconds()
+                if _ivl_secs_dash > 0:
+                    _elapsed = (cur_dt - _epoch_dash).total_seconds()
+                    cur_dt = _epoch_dash + timedelta(
+                        seconds=(_elapsed // _ivl_secs_dash) * _ivl_secs_dash
+                    )
+                while cur_dt <= end_dt and len(filled_slots) < 500:
+                    slot = cur_dt.strftime(bucket_format)
+                    if len(slot) == 13:
+                        slot += ":00"
+                    filled_slots.append(slot)
+                    cur_dt += delta_dash
+            except Exception:
+                pass
+        return filled_slots
+
+    def _build_dashboard_time_series(
+        self,
+        ts_raw: list[tuple],
+        start_time: str | None,
+        end_time: str | None,
+        ts_min_time: str | None,
+        ts_max_time: str | None,
+        bucket_interval_str: str,
+        bucket_format: str,
+    ) -> list[dict]:
+        # Build pivot from DB results
+        ts_pivot: dict[str, dict] = {}
+        for bucket_val, level, count in ts_raw:
+            bucket_key = str(bucket_val) if bucket_val is not None else ""
+            if len(bucket_key) == 13:
+                bucket_key += ":00"
+            if bucket_key not in ts_pivot:
+                ts_pivot[bucket_key] = {"timestamp": bucket_key}
+            ts_pivot[bucket_key][str(level) if level else "UNKNOWN"] = count
+
+        empty_ts_levels = {"DEBUG": 0, "INFO": 0, "WARN": 0, "ERROR": 0}
+        filled_slots = self._build_dashboard_filled_slots(
+            start_time, end_time, ts_min_time, ts_max_time, bucket_interval_str, bucket_format
+        )
+
+        full_ts: dict[str, dict] = {}
+        for slot in filled_slots:
+            full_ts[slot] = {"timestamp": slot, **empty_ts_levels}
+        for key, data in ts_pivot.items():
+            if key in full_ts:
+                full_ts[key].update(data)
+            else:
+                full_ts[key] = {**{"timestamp": key}, **empty_ts_levels, **data}
+
+        time_series = list(full_ts.values()) if filled_slots else list(ts_pivot.values())
+        time_series.sort(key=lambda b: b.get("timestamp", ""))
+        return time_series
+
+    def _fetch_top_error_clusters(self, cursor, where_sql: str, params: list) -> list[dict]:
+        error_where = (
+            f"{where_sql} AND l.level IN ('ERROR', 'FATAL', 'CRITICAL') AND l.cluster_id IS NOT NULL"
+            if where_sql
+            else " WHERE l.level IN ('ERROR', 'FATAL', 'CRITICAL') AND l.cluster_id IS NOT NULL"
+        )
+        error_cluster_query = (
+            "SELECT COALESCE(c.template, 'Pattern ' || l.cluster_id) as template, COUNT(*) as count, l.cluster_id "
+            "FROM logs l LEFT JOIN clusters c ON l.workspace_id = c.workspace_id AND l.cluster_id = c.cluster_id "
+            + error_where
+            + " GROUP BY template, l.cluster_id ORDER BY count DESC LIMIT 5"
+        )
+        cursor.execute(error_cluster_query, params)
+        return [
+            {"template": row[0], "count": row[1], "cluster_id": str(row[2])}
+            for row in cursor.fetchall()
+        ]
+
+    def _fetch_pattern_drift(self, cursor, start_time: str | None, norm_start: str | None) -> int:
+        new_patterns_count = 0
+        try:
+            cursor.execute(
+                "SELECT count(*) FROM information_schema.columns WHERE table_name = 'clusters' AND column_name = 'created_at'"
+            )
+            if cursor.fetchone()[0] > 0:
+                drift_where = " WHERE created_at >= ?" if start_time else ""
+                drift_params = [norm_start] if start_time else []
+                q8 = f"SELECT COUNT(*) FROM clusters{drift_where}"
+                cursor.execute(q8, drift_params)
+                new_patterns_count = cursor.fetchone()[0]
+        except Exception:
+            pass
+        return new_patterns_count
+
+    def _fetch_source_heatmap(
+        self, cursor, where_sql: str, params: list, bucket_format: str
+    ) -> list[dict]:
+        source_heatmap = []
+        try:
+            sh_query = (
+                f"SELECT strftime('{bucket_format}', TRY_CAST(l.timestamp AS TIMESTAMP)) as bucket, l.source_id, s.name as source_name, COUNT(*) as count "
+                "FROM logs l LEFT JOIN log_sources s ON l.source_id = s.id "
+                + where_sql
+                + " GROUP BY bucket, l.source_id, s.name ORDER BY bucket ASC"
+            )
+            cursor.execute(sh_query, params)
+            source_heatmap = [
+                {"timestamp": r[0], "source_id": r[1], "source_name": r[2], "count": r[3]}
+                for r in cursor.fetchall()
+            ]
+        except Exception:
+            pass
+        return source_heatmap
+
+    def _fetch_latest_insight(self, cursor, workspace_id: str | None) -> str | None:
+        latest_insight = None
+        try:
+            insight_query = """
+                SELECT m.content
+                FROM ai_messages m
+                JOIN ai_sessions s ON m.session_id = s.session_id
+                WHERE m.role = 'assistant'
+            """
+            insight_params = []
+            if workspace_id:
+                insight_query += " AND s.workspace_id = ?"
+                insight_params.append(workspace_id)
+
+            insight_query += " ORDER BY m.timestamp DESC LIMIT 1"
+            cursor.execute(insight_query, insight_params)
+            row = cursor.fetchone()
+            if row:
+                content = row[0].strip()
+                clean_content = re.sub(r"<think>.*?</think>", "", content, flags=re.DOTALL).strip()
+                latest_insight = (
+                    (clean_content[:150] + "...") if len(clean_content) > 150 else clean_content
+                )
+        except Exception:
+            pass
+        return latest_insight
+
     def method_get_dashboard_stats(
         self,
         workspace_id: str | None = None,
@@ -2776,13 +3027,16 @@ class App:
             else " WHERE l.cluster_id IS NOT NULL"
         )
         cluster_query = (
-            "SELECT COALESCE(c.template, 'Pattern ' || l.cluster_id) as template, COUNT(*) as count "
+            "SELECT COALESCE(c.template, 'Pattern ' || l.cluster_id) as template, COUNT(*) as count, l.cluster_id "
             "FROM logs l LEFT JOIN clusters c ON l.workspace_id = c.workspace_id AND l.cluster_id = c.cluster_id "
             + cluster_where
             + " GROUP BY template, l.cluster_id ORDER BY count DESC LIMIT 10"
         )
         cursor.execute(cluster_query, params)
-        top_clusters = [{"template": row[0], "count": row[1]} for row in cursor.fetchall()]
+        top_clusters = [
+            {"template": row[0], "count": row[1], "cluster_id": str(row[2])}
+            for row in cursor.fetchall()
+        ]
 
         # 5. Global Metrics
         if active_workspace_ids:
@@ -2794,69 +3048,9 @@ class App:
         workspace_count = cursor.fetchone()[0]
 
         # 6. Time Series — dynamic bucket sizing + Kibana extended_bounds (fill all slots with 0)
-        ts_min_time: str | None = None
-        ts_max_time: str | None = None
-        bucket_interval_str = "1 hour"
-        bucket_format = "%Y-%m-%d %H:00:00"
-
-        try:
-            cursor.execute(
-                "SELECT MIN(l.timestamp), MAX(l.timestamp) FROM logs l" + where_sql,
-                params,
-            )
-            min_ts_row, max_ts_row = cursor.fetchone()
-            if min_ts_row and max_ts_row:
-                ts_min_time = str(min_ts_row)
-                ts_max_time = str(max_ts_row)
-                try:
-                    _s = ts_min_time.replace("T", " ").replace("Z", "")[:19]
-                    _e = ts_max_time.replace("T", " ").replace("Z", "")[:19]
-                    min_dt_ts = datetime.strptime(_s, "%Y-%m-%d %H:%M:%S")
-                    max_dt_ts = datetime.strptime(_e, "%Y-%m-%d %H:%M:%S")
-                    seconds_span = max((max_dt_ts - min_dt_ts).total_seconds(), 1.0)
-                except Exception:
-                    min_dt_ts = None
-                    max_dt_ts = None
-                    seconds_span = 3600.0
-
-                # Mirror the interval ladder from method_get_log_distribution
-                if seconds_span <= 10:
-                    bucket_interval_str = "1 second"
-                    bucket_format = "%Y-%m-%d %H:%M:%S"
-                elif seconds_span <= 60:
-                    bucket_interval_str = "5 seconds"
-                    bucket_format = "%Y-%m-%d %H:%M:%S"
-                elif seconds_span <= 600:
-                    bucket_interval_str = "15 seconds"
-                    bucket_format = "%Y-%m-%d %H:%M:%S"
-                elif seconds_span <= 3600:
-                    bucket_interval_str = "1 minute"
-                    bucket_format = "%Y-%m-%d %H:%M"
-                elif seconds_span <= 14400:
-                    bucket_interval_str = "5 minutes"
-                    bucket_format = "%Y-%m-%d %H:%M"
-                elif seconds_span <= 86400:
-                    bucket_interval_str = "15 minutes"
-                    bucket_format = "%Y-%m-%d %H:%M"
-                elif seconds_span <= 259200:
-                    bucket_interval_str = "1 hour"
-                    bucket_format = "%Y-%m-%d %H:00"
-                elif seconds_span <= 604800:
-                    bucket_interval_str = "4 hours"
-                    bucket_format = "%Y-%m-%d %H:00"
-                elif seconds_span <= 2592000:
-                    bucket_interval_str = "12 hours"
-                    bucket_format = "%Y-%m-%d %H:00"
-                elif seconds_span <= 15552000:
-                    bucket_interval_str = "1 day"
-                    bucket_format = "%Y-%m-%d"
-                else:
-                    bucket_interval_str = "30 days"
-                    bucket_format = "%Y-%m"
-        except Exception as e:
-            logger.error("Failed to calculate dynamic time bucket size: %s", e)
-            min_dt_ts = None
-            max_dt_ts = None
+        bucket_interval_str, bucket_format, ts_min_time, ts_max_time = (
+            self._get_dashboard_bucket_params(cursor, where_sql, params)
+        )
 
         # Build WHERE clause — safely extend existing filters with NULL timestamp guard
         ts_null_guard = "l.timestamp IS NOT NULL"
@@ -2870,150 +3064,21 @@ class App:
         cursor.execute(ts_query, params)
         ts_raw = cursor.fetchall()
 
-        # Build pivot from DB results
-        ts_pivot: dict[str, dict] = {}
-        for bucket_val, level, count in ts_raw:
-            bucket_key = str(bucket_val) if bucket_val is not None else ""
-            if len(bucket_key) == 13:
-                bucket_key += ":00"
-            if bucket_key not in ts_pivot:
-                ts_pivot[bucket_key] = {"timestamp": bucket_key}
-            ts_pivot[bucket_key][str(level) if level else "UNKNOWN"] = count
-
-        # ── Extended-bounds fill (same as method_get_log_distribution) ─────────
-        _interval_map_dash = {
-            "1 second": timedelta(seconds=1),
-            "5 seconds": timedelta(seconds=5),
-            "15 seconds": timedelta(seconds=15),
-            "1 minute": timedelta(minutes=1),
-            "5 minutes": timedelta(minutes=5),
-            "15 minutes": timedelta(minutes=15),
-            "1 hour": timedelta(hours=1),
-            "4 hours": timedelta(hours=4),
-            "12 hours": timedelta(hours=12),
-            "1 day": timedelta(days=1),
-            "30 days": timedelta(days=30),
-        }
-        empty_ts_levels = {"DEBUG": 0, "INFO": 0, "WARN": 0, "ERROR": 0}
-        delta_dash = _interval_map_dash.get(bucket_interval_str, timedelta(hours=1))
-        filled_slots: list[str] = []
-
-        _ts_min = ts_min_time
-        _ts_max = ts_max_time
-        if start_time:
-            _ts_min = start_time
-        if end_time:
-            _ts_max = end_time
-
-        if _ts_min and _ts_max:
-            try:
-                _s2 = _ts_min.replace("T", " ").replace("Z", "")[:19]
-                _e2 = _ts_max.replace("T", " ").replace("Z", "")[:19]
-                cur_dt = datetime.strptime(_s2, "%Y-%m-%d %H:%M:%S")
-                end_dt = datetime.strptime(_e2, "%Y-%m-%d %H:%M:%S")
-                # Align to epoch-anchored bucket boundary (matches DuckDB time_bucket)
-                _epoch_dash = datetime(1970, 1, 1)
-                _ivl_secs_dash = delta_dash.total_seconds()
-                if _ivl_secs_dash > 0:
-                    _elapsed = (cur_dt - _epoch_dash).total_seconds()
-                    cur_dt = _epoch_dash + timedelta(
-                        seconds=(_elapsed // _ivl_secs_dash) * _ivl_secs_dash
-                    )
-                while cur_dt <= end_dt and len(filled_slots) < 500:
-                    slot = cur_dt.strftime(bucket_format)
-                    if len(slot) == 13:
-                        slot += ":00"
-                    filled_slots.append(slot)
-                    cur_dt += delta_dash
-            except Exception:
-                pass
-
-        full_ts: dict[str, dict] = {}
-        for slot in filled_slots:
-            full_ts[slot] = {"timestamp": slot, **empty_ts_levels}
-        for key, data in ts_pivot.items():
-            if key in full_ts:
-                full_ts[key].update(data)
-            else:
-                full_ts[key] = {**{"timestamp": key}, **empty_ts_levels, **data}
-
-        time_series = list(full_ts.values()) if filled_slots else list(ts_pivot.values())
-        time_series.sort(key=lambda b: b.get("timestamp", ""))
+        time_series = self._build_dashboard_time_series(
+            ts_raw, start_time, end_time, ts_min_time, ts_max_time, bucket_interval_str, bucket_format
+        )
 
         # 7. Top Error Clusters
-        error_where = (
-            f"{where_sql} AND l.level IN ('ERROR', 'FATAL', 'CRITICAL') AND l.cluster_id IS NOT NULL"
-            if where_sql
-            else " WHERE l.level IN ('ERROR', 'FATAL', 'CRITICAL') AND l.cluster_id IS NOT NULL"
-        )
-        error_cluster_query = (
-            "SELECT COALESCE(c.template, 'Pattern ' || l.cluster_id) as template, COUNT(*) as count "
-            "FROM logs l LEFT JOIN clusters c ON l.workspace_id = c.workspace_id AND l.cluster_id = c.cluster_id "
-            + error_where
-            + " GROUP BY template, l.cluster_id ORDER BY count DESC LIMIT 5"
-        )
-        cursor.execute(error_cluster_query, params)
-        top_error_clusters = [{"template": row[0], "count": row[1]} for row in cursor.fetchall()]
+        top_error_clusters = self._fetch_top_error_clusters(cursor, where_sql, params)
 
         # 8. Pattern Drift
-        new_patterns_count = 0
-        try:
-            cursor.execute(
-                "SELECT count(*) FROM information_schema.columns WHERE table_name = 'clusters' AND column_name = 'created_at'"
-            )
-            if cursor.fetchone()[0] > 0:
-                drift_where = " WHERE created_at >= ?" if start_time else ""
-                drift_params = [norm_start] if start_time else []
-                q8 = f"SELECT COUNT(*) FROM clusters{drift_where}"
-                cursor.execute(q8, drift_params)
-                new_patterns_count = cursor.fetchone()[0]
-        except Exception:
-            pass
+        new_patterns_count = self._fetch_pattern_drift(cursor, start_time, norm_start)
 
         # 9. Source Heatmap
-        source_heatmap = []
-        try:
-            sh_query = (
-                f"SELECT strftime('{bucket_format}', TRY_CAST(l.timestamp AS TIMESTAMP)) as bucket, l.source_id, s.name as source_name, COUNT(*) as count "
-                "FROM logs l LEFT JOIN log_sources s ON l.source_id = s.id "
-                + where_sql
-                + " GROUP BY bucket, l.source_id, s.name ORDER BY bucket ASC"
-            )
-            cursor.execute(sh_query, params)
-            source_heatmap = [
-                {"timestamp": r[0], "source_id": r[1], "source_name": r[2], "count": r[3]}
-                for r in cursor.fetchall()
-            ]
-        except Exception:
-            pass
+        source_heatmap = self._fetch_source_heatmap(cursor, where_sql, params, bucket_format)
 
         # 10. Latest AI Insight Snippet
-        latest_insight = None
-        try:
-            insight_query = """
-                SELECT m.content
-                FROM ai_messages m
-                JOIN ai_sessions s ON m.session_id = s.session_id
-                WHERE m.role = 'assistant'
-            """
-            insight_params = []
-            if workspace_id:
-                insight_query += " AND s.workspace_id = ?"
-                insight_params.append(workspace_id)
-
-            insight_query += " ORDER BY m.timestamp DESC LIMIT 1"
-            cursor.execute(insight_query, insight_params)
-            row = cursor.fetchone()
-            if row:
-                content = row[0].strip()
-                pass  # import re
-
-                clean_content = re.sub(r"<think>.*?</think>", "", content, flags=re.DOTALL).strip()
-                latest_insight = (
-                    (clean_content[:150] + "...") if len(clean_content) > 150 else clean_content
-                )
-        except Exception:
-            pass
+        latest_insight = self._fetch_latest_insight(cursor, workspace_id)
 
         return {
             "total_logs": total_logs,
@@ -3298,9 +3363,6 @@ async def run_stdio_async(db_path=DEFAULT_DB, start_http=False, http_port=5000):
         _http_runner = await start_background_http(app, port=http_port)
 
     try:
-        # Use aioconsole or simple async iterator for stdin
-        pass
-
         loop = asyncio.get_event_loop()
 
         while True:
@@ -3311,6 +3373,7 @@ async def run_stdio_async(db_path=DEFAULT_DB, start_http=False, http_port=5000):
             if not line.strip():
                 continue
 
+            req_dict = None
             try:
                 req_dict = json.loads(line)
                 req = JSONRPCRequest(**req_dict)
@@ -3348,6 +3411,4 @@ async def run_stdio_async(db_path=DEFAULT_DB, start_http=False, http_port=5000):
 
 
 def run_stdio(db_path=DEFAULT_DB, start_http=False, http_port=5000):
-    pass
-
     asyncio.run(run_stdio_async(db_path=db_path, start_http=start_http, http_port=http_port))

@@ -1,0 +1,24 @@
+{
+  "include": [
+    "sidecar/src"
+  ],
+  "exclude": [
+    "**/node_modules",
+    "**/__pycache__",
+    "src",
+    "**/__pyrefly_virtual__"
+  ],
+  "venvPath": ".",
+  "venv": ".venv",
+  "extraPaths": [
+    "sidecar/src"
+  ],
+  "executionEnvironments": [
+    {
+      "root": "sidecar/src",
+      "extraPaths": [
+        "sidecar/src"
+      ]
+    }
+  ]
+}

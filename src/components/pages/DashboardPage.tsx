@@ -290,26 +290,11 @@ function SourceHeatmap({ stats }: Readonly<{ stats: DashboardStats | null }>) {
   );
 }
 
-export default function DashboardPage() {
-  // Global State
-  const workspaces = useWorkspaceStore((state) => state.workspaces);
-  const activeWorkspace = useWorkspaceStore(selectActiveWorkspace);
-  const { dashboardWidgets, isSidebarOpen, setSidebarOpen } = useAiStore();
-  // Consume shared ingestion store — no independent polling
-  const ingestionJobs = useIngestionStore((state) => state.jobs);
+function useDashboardData(workspaces: any[], activeWorkspace: any) {
   const [loading, setLoading] = useState(true);
-  const [mode, setMode] = useState<DashboardMode>("static");
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [timeBounds, setTimeBounds] = useState<{ min: string; max: string } | null>(null);
   const [isFirstLoad, setIsFirstLoad] = useState(true);
-
-  // Handle Mode Change with Sidebar auto-open
-  const handleModeChange = (newMode: DashboardMode) => {
-    setMode(newMode);
-    if (newMode === "ai") {
-      setSidebarOpen(true);
-    }
-  };
 
   // Filter State
   const [selectedWorkspaceId, setSelectedWorkspaceId] = useState<string>("all");
@@ -319,18 +304,12 @@ export default function DashboardPage() {
   // Sync selectedWorkspaceId with activeWorkspace on initial load or deletion fallback
   useEffect(() => {
     const exists = workspaces.some((w) => w.id === selectedWorkspaceId);
-    if (!exists && selectedWorkspaceId !== "all") {
-      if (activeWorkspace) {
-        setSelectedWorkspaceId(activeWorkspace.id);
-      } else if (workspaces.length > 0) {
-        setSelectedWorkspaceId(workspaces[0].id);
-      } else {
-        setSelectedWorkspaceId("all");
+    const shouldSync = selectedWorkspaceId === "all" || !exists;
+    if (shouldSync) {
+      const fallbackId = activeWorkspace?.id ?? workspaces[0]?.id ?? "all";
+      if (selectedWorkspaceId !== fallbackId) {
+        setSelectedWorkspaceId(fallbackId);
       }
-    } else if (activeWorkspace && selectedWorkspaceId === "all") {
-      setSelectedWorkspaceId(activeWorkspace.id);
-    } else if (!activeWorkspace && workspaces.length > 0 && selectedWorkspaceId === "all") {
-      setSelectedWorkspaceId(workspaces[0].id);
     }
   }, [activeWorkspace, workspaces, selectedWorkspaceId]);
 
@@ -376,6 +355,230 @@ export default function DashboardPage() {
     fetchStats();
   }, [fetchStats]);
 
+  return {
+    loading,
+    stats,
+    timeBounds,
+    selectedWorkspaceId,
+    setSelectedWorkspaceId,
+    selectedSourceId,
+    setSelectedSourceId,
+    timeRange,
+    setTimeRange,
+    setIsFirstLoad,
+    fetchStats,
+  };
+}
+
+function DashboardLoadingView({ mode }: { readonly mode: DashboardMode }) {
+  const loadingText = mode === "static" ? "Loading Analytics..." : "Scanning for AI Insights...";
+  return (
+    <div className="flex-1 flex items-center justify-center bg-bg-base">
+      <div className="flex flex-col items-center gap-4">
+        <RefreshCcw className="h-8 w-8 text-primary animate-spin" />
+        <p className="text-sm text-text-muted font-mono uppercase tracking-widest">{loadingText}</p>
+      </div>
+    </div>
+  );
+}
+
+function AIObservationCard({
+  stats,
+  setMode,
+}: {
+  readonly stats: DashboardStats;
+  readonly setMode: (mode: DashboardMode) => void;
+}) {
+  if (!stats.latest_ai_insight) {
+    return null;
+  }
+  return (
+    <motion.section
+      initial={{ opacity: 0, y: -10 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="bg-primary/5 border border-primary/20 rounded-2xl p-6 backdrop-blur-md relative overflow-hidden group"
+    >
+      <div className="flex items-start justify-between gap-6 relative z-10">
+        <div className="flex-1">
+          <div className="flex items-center gap-2 mb-3">
+            <Sparkles className="size-4 text-primary animate-pulse" />
+            <span className="text-[10px] font-bold uppercase tracking-widest text-primary">
+              Latest AI Observation
+            </span>
+          </div>
+          <p className="text-sm font-mono text-text-primary leading-relaxed italic">
+            &quot;{stats.latest_ai_insight}&quot;
+          </p>
+        </div>
+        <Button
+          onClick={() => setMode("ai")}
+          className="shrink-0 text-[10px] uppercase tracking-widest shadow-[0_0_15px_var(--primary-glow)] hover:scale-105"
+        >
+          Deep Dive
+        </Button>
+      </div>
+      <div className="absolute -top-20 -right-20 size-64 bg-primary/10 rounded-full blur-[80px] pointer-events-none" />
+    </motion.section>
+  );
+}
+
+interface ClustersSectionProps {
+  readonly stats: DashboardStats | null;
+  readonly selectedWorkspaceId: string;
+}
+
+function ErrorClustersSection({ stats, selectedWorkspaceId }: ClustersSectionProps) {
+  const hasErrors = stats && stats.top_error_clusters.length > 0;
+  return (
+    <section className="bg-bg-surface/50 border border-border rounded-xl p-6 backdrop-blur-sm relative overflow-hidden">
+      <div className="flex items-center gap-2 mb-6">
+        <AlertTriangle className="h-4 w-4 text-error" />
+        <h2 className="text-xs font-bold uppercase tracking-widest text-text-muted">
+          Top Error Clusters
+        </h2>
+      </div>
+      <div className="space-y-2 relative z-10">
+        {hasErrors ? (
+          stats.top_error_clusters.map((c, idx) => (
+            <ClusterRow
+              key={c.template}
+              index={idx}
+              template={c.template}
+              count={c.count}
+              total={stats.total_logs}
+              type="error"
+              clusterId={(c as any).cluster_id}
+              workspaceId={selectedWorkspaceId}
+            />
+          ))
+        ) : (
+          <div className="py-20 text-center text-[10px] font-mono text-text-muted uppercase tracking-widest">
+            No Errors Detected
+          </div>
+        )}
+      </div>
+    </section>
+  );
+}
+
+function NoiseClustersSection({ stats, selectedWorkspaceId }: ClustersSectionProps) {
+  const hasClusters = stats && stats.top_clusters.length > 0;
+  return (
+    <section className="bg-bg-surface/50 border border-border rounded-xl p-6 backdrop-blur-sm relative overflow-hidden">
+      <div className="flex items-center gap-2 mb-6">
+        <AlertCircle className="h-4 w-4 text-debug" />
+        <h2 className="text-xs font-bold uppercase tracking-widest text-text-muted">
+          Top Noise Generators
+        </h2>
+      </div>
+      <div className="space-y-2 relative z-10">
+        {hasClusters ? (
+          stats.top_clusters.map((c, idx) => (
+            <ClusterRow
+              key={c.template}
+              index={idx}
+              template={c.template}
+              count={c.count}
+              total={stats.total_logs}
+              type="noise"
+              clusterId={(c as any).cluster_id}
+              workspaceId={selectedWorkspaceId}
+            />
+          ))
+        ) : (
+          <div className="py-20 text-center text-[10px] font-mono text-text-muted uppercase tracking-widest">
+            No Clusters
+          </div>
+        )}
+      </div>
+    </section>
+  );
+}
+
+interface AICanvasViewProps {
+  readonly dashboardWidgets: any[];
+  readonly isSidebarOpen: boolean;
+  readonly setSidebarOpen: (open: boolean) => void;
+}
+
+function AICanvasView({ dashboardWidgets, isSidebarOpen, setSidebarOpen }: AICanvasViewProps) {
+  const isEmpty = dashboardWidgets.length === 0;
+  return (
+    <div className="flex h-full w-full gap-4">
+      {/* The Canvas */}
+      <div className="flex-1 flex flex-col min-w-0">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-xl font-bold font-mono tracking-tight flex items-center gap-2">
+            <Sparkles className="size-5 text-primary" />
+            AI Dashboard Canvas
+          </h2>
+          {!isSidebarOpen && (
+            <Button variant="outline" size="sm" onClick={() => setSidebarOpen(true)}>
+              Open Chat
+            </Button>
+          )}
+        </div>
+
+        {isEmpty ? (
+          <div className="flex-1 flex items-center justify-center border border-dashed border-border/60 rounded-xl bg-bg-surface/20 min-h-[400px]">
+            <p className="text-sm text-text-muted text-center max-w-sm">
+              No widgets pinned yet. Ask the AI to create a dashboard card.
+              <br />
+              <br />
+              Try asking: "Create a metric for ERROR logs"
+            </p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 auto-rows-max overflow-y-auto custom-scrollbar pr-2 pb-20">
+            {dashboardWidgets.map((widget, i) => {
+              const widgetKey = widget.raw || `widget-${i}`;
+              return <A2UIRenderer key={widgetKey} payload={widget} />;
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* The Chatbox Sidebar */}
+      {isSidebarOpen && (
+        <div className="w-[450px] shrink-0 border border-border/50 rounded-xl overflow-hidden bg-bg-base/80 backdrop-blur shadow-2xl flex flex-col h-[calc(100vh-150px)]">
+          <AIInvestigationSidebar onEngineSettingsOpen={() => {}} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+export default function DashboardPage() {
+  // Global State
+  const workspaces = useWorkspaceStore((state) => state.workspaces);
+  const activeWorkspace = useWorkspaceStore(selectActiveWorkspace);
+  const { dashboardWidgets, isSidebarOpen, setSidebarOpen } = useAiStore();
+  // Consume shared ingestion store — no independent polling
+  const ingestionJobs = useIngestionStore((state) => state.jobs);
+  const [mode, setMode] = useState<DashboardMode>("static");
+
+  const {
+    loading,
+    stats,
+    timeBounds,
+    selectedWorkspaceId,
+    setSelectedWorkspaceId,
+    selectedSourceId,
+    setSelectedSourceId,
+    timeRange,
+    setTimeRange,
+    setIsFirstLoad,
+    fetchStats,
+  } = useDashboardData(workspaces, activeWorkspace);
+
+  // Handle Mode Change with Sidebar auto-open
+  const handleModeChange = (newMode: DashboardMode) => {
+    setMode(newMode);
+    if (newMode === "ai") {
+      setSidebarOpen(true);
+    }
+  };
+
   // Derived Options
   const currentWorkspace = useMemo(
     () => workspaces.find((w) => w.id === selectedWorkspaceId),
@@ -385,17 +588,7 @@ export default function DashboardPage() {
   const sources = useMemo(() => currentWorkspace?.sources || [], [currentWorkspace]);
 
   if (loading && !stats) {
-    const loadingText = mode === "static" ? "Loading Analytics..." : "Scanning for AI Insights...";
-    return (
-      <div className="flex-1 flex items-center justify-center bg-bg-base">
-        <div className="flex flex-col items-center gap-4">
-          <RefreshCcw className="h-8 w-8 text-primary animate-spin" />
-          <p className="text-sm text-text-muted font-mono uppercase tracking-widest">
-            {loadingText}
-          </p>
-        </div>
-      </div>
-    );
+    return <DashboardLoadingView mode={mode} />;
   }
 
   return (
@@ -445,34 +638,7 @@ export default function DashboardPage() {
               <ProcessingHUD jobs={ingestionJobs} />
 
               {/* AI Insight Snippet */}
-              {stats?.latest_ai_insight && (
-                <motion.section
-                  initial={{ opacity: 0, y: -10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="bg-primary/5 border border-primary/20 rounded-2xl p-6 backdrop-blur-md relative overflow-hidden group"
-                >
-                  <div className="flex items-start justify-between gap-6 relative z-10">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-3">
-                        <Sparkles className="size-4 text-primary animate-pulse" />
-                        <span className="text-[10px] font-bold uppercase tracking-widest text-primary">
-                          Latest AI Observation
-                        </span>
-                      </div>
-                      <p className="text-sm font-mono text-text-primary leading-relaxed italic">
-                        &quot;{stats.latest_ai_insight}&quot;
-                      </p>
-                    </div>
-                    <Button
-                      onClick={() => setMode("ai")}
-                      className="shrink-0 text-[10px] uppercase tracking-widest shadow-[0_0_15px_var(--primary-glow)] hover:scale-105"
-                    >
-                      Deep Dive
-                    </Button>
-                  </div>
-                  <div className="absolute -top-20 -right-20 size-64 bg-primary/10 rounded-full blur-[80px] pointer-events-none" />
-                </motion.section>
-              )}
+              {stats && <AIObservationCard stats={stats} setMode={setMode} />}
 
               {/* Stat Cards Grid */}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
@@ -527,63 +693,10 @@ export default function DashboardPage() {
                 }}
               />
 
-              {/* Patterns Row */}
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                {/* Critical Clusters */}
-                <section className="bg-bg-surface/50 border border-border rounded-xl p-6 backdrop-blur-sm relative overflow-hidden">
-                  <div className="flex items-center gap-2 mb-6">
-                    <AlertTriangle className="h-4 w-4 text-error" />
-                    <h2 className="text-xs font-bold uppercase tracking-widest text-text-muted">
-                      Top Error Clusters
-                    </h2>
-                  </div>
-                  <div className="space-y-2 relative z-10">
-                    {stats && stats.top_error_clusters.length > 0 ? (
-                      stats.top_error_clusters.map((c, idx) => (
-                        <ClusterRow
-                          key={c.template}
-                          index={idx}
-                          template={c.template}
-                          count={c.count}
-                          total={stats.total_logs}
-                          type="error"
-                        />
-                      ))
-                    ) : (
-                      <div className="py-20 text-center text-[10px] font-mono text-text-muted uppercase tracking-widest">
-                        No Errors Detected
-                      </div>
-                    )}
-                  </div>
-                </section>
-
-                {/* General Clusters */}
-                <section className="bg-bg-surface/50 border border-border rounded-xl p-6 backdrop-blur-sm relative overflow-hidden">
-                  <div className="flex items-center gap-2 mb-6">
-                    <AlertCircle className="h-4 w-4 text-debug" />
-                    <h2 className="text-xs font-bold uppercase tracking-widest text-text-muted">
-                      Top Noise Generators
-                    </h2>
-                  </div>
-                  <div className="space-y-2 relative z-10">
-                    {stats && stats.top_clusters.length > 0 ? (
-                      stats.top_clusters.map((c, idx) => (
-                        <ClusterRow
-                          key={c.template}
-                          index={idx}
-                          template={c.template}
-                          count={c.count}
-                          total={stats.total_logs}
-                          type="noise"
-                        />
-                      ))
-                    ) : (
-                      <div className="py-20 text-center text-[10px] font-mono text-text-muted uppercase tracking-widest">
-                        No Clusters
-                      </div>
-                    )}
-                  </div>
-                </section>
+              {/* Patterns Row (Stacked) */}
+              <div className="flex flex-col gap-8">
+                <ErrorClustersSection stats={stats} selectedWorkspaceId={selectedWorkspaceId} />
+                <NoiseClustersSection stats={stats} selectedWorkspaceId={selectedWorkspaceId} />
               </div>
 
               {/* Source Heatmap Row */}
@@ -609,45 +722,11 @@ export default function DashboardPage() {
               exit={{ opacity: 0, y: -10 }}
               className="flex h-full w-full gap-4"
             >
-              {/* The Canvas */}
-              <div className="flex-1 flex flex-col min-w-0">
-                <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-xl font-bold font-mono tracking-tight flex items-center gap-2">
-                    <Sparkles className="size-5 text-primary" />
-                    AI Dashboard Canvas
-                  </h2>
-                  {!isSidebarOpen && (
-                    <Button variant="outline" size="sm" onClick={() => setSidebarOpen(true)}>
-                      Open Chat
-                    </Button>
-                  )}
-                </div>
-
-                {dashboardWidgets.length === 0 ? (
-                  <div className="flex-1 flex items-center justify-center border border-dashed border-border/60 rounded-xl bg-bg-surface/20 min-h-[400px]">
-                    <p className="text-sm text-text-muted text-center max-w-sm">
-                      No widgets pinned yet. Ask the AI to create a dashboard card.
-                      <br />
-                      <br />
-                      Try asking: "Create a metric for ERROR logs"
-                    </p>
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 auto-rows-max overflow-y-auto custom-scrollbar pr-2 pb-20">
-                    {dashboardWidgets.map((widget, i) => {
-                      const widgetKey = (widget as any).raw || `widget-${i}`;
-                      return <A2UIRenderer key={widgetKey} payload={widget} />;
-                    })}
-                  </div>
-                )}
-              </div>
-
-              {/* The Chatbox Sidebar */}
-              {isSidebarOpen && (
-                <div className="w-[450px] shrink-0 border border-border/50 rounded-xl overflow-hidden bg-bg-base/80 backdrop-blur shadow-2xl flex flex-col h-[calc(100vh-150px)]">
-                  <AIInvestigationSidebar onEngineSettingsOpen={() => {}} />
-                </div>
-              )}
+              <AICanvasView
+                dashboardWidgets={dashboardWidgets}
+                isSidebarOpen={isSidebarOpen}
+                setSidebarOpen={setSidebarOpen}
+              />
             </motion.div>
           )}
         </AnimatePresence>

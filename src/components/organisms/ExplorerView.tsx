@@ -108,17 +108,9 @@ export function ExplorerView({
 
         {currentFolder.sources.map((source) => (
           <DraggableItem key={source.id} id={`explorer-source-${source.id}`}>
-            {/* biome-ignore lint/a11y/useSemanticElements: custom role="button" container to prevent browser pointer capture in drag-and-drop hierarchy */}
-            <div
-              role="button"
-              tabIndex={0}
+            <button
+              type="button"
               onClick={() => onSelectSource(source.id)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" || e.key === " ") {
-                  e.preventDefault();
-                  onSelectSource(source.id);
-                }
-              }}
               className="group w-full flex flex-col p-5 bg-bg-surface-bright/40 border border-border-subtle rounded-3xl hover:bg-bg-hover hover:border-primary/30 transition-all text-left outline-none cursor-pointer select-none"
             >
               <div className="flex items-start justify-between mb-4">
@@ -131,7 +123,7 @@ export function ExplorerView({
               <p className="text-[10px] text-text-muted uppercase tracking-widest font-semibold opacity-40">
                 {source.type} Source
               </p>
-            </div>
+            </button>
           </DraggableItem>
         ))}
 

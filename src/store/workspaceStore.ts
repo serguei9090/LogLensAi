@@ -98,6 +98,109 @@ function flattenSources(node: HierarchyNode): LogSource[] {
   return list;
 }
 
+// ─── Workspace State Updaters (to prevent deep nesting) ───────────────────────────
+
+const addSourceToWorkspaces = (
+  workspaces: Workspace[],
+  workspaceId: string,
+  newSource: LogSource,
+): Workspace[] => {
+  return workspaces.map((w) => {
+    if (w.id !== workspaceId) {
+      return w;
+    }
+    return {
+      ...w,
+      sources: [...w.sources, newSource],
+      activeSourceId: w.activeSourceId ?? newSource.id,
+    };
+  });
+};
+
+const removeSourceFromWorkspaces = (
+  workspaces: Workspace[],
+  workspaceId: string,
+  sourceId: string,
+): Workspace[] => {
+  return workspaces.map((w) => {
+    if (w.id !== workspaceId) {
+      return w;
+    }
+    const remainingSources = w.sources.filter((s) => s.id !== sourceId);
+    return {
+      ...w,
+      sources: remainingSources,
+      activeSourceId:
+        w.activeSourceId === sourceId ? (remainingSources[0]?.id ?? null) : w.activeSourceId,
+    };
+  });
+};
+
+const renameSourceInWorkspaces = (
+  workspaces: Workspace[],
+  workspaceId: string,
+  sourceId: string,
+  name: string,
+): Workspace[] => {
+  return workspaces.map((w) => {
+    if (w.id !== workspaceId) {
+      return w;
+    }
+    return {
+      ...w,
+      sources: w.sources.map((s) => (s.id === sourceId ? { ...s, name } : s)),
+    };
+  });
+};
+
+const updateSourceInWorkspaces = (
+  workspaces: Workspace[],
+  workspaceId: string,
+  sourceId: string,
+  updates: Partial<LogSource>,
+): Workspace[] => {
+  return workspaces.map((ws) => {
+    if (ws.id !== workspaceId) {
+      return ws;
+    }
+    return {
+      ...ws,
+      sources: ws.sources.map((s) => (s.id === sourceId ? { ...s, ...updates } : s)),
+    };
+  });
+};
+
+const setActiveSourceInWorkspaces = (
+  workspaces: Workspace[],
+  workspaceId: string,
+  sourceId: string | null,
+): Workspace[] => {
+  return workspaces.map((ws) =>
+    ws.id === workspaceId ? { ...ws, activeSourceId: sourceId, activeFolderId: null } : ws,
+  );
+};
+
+const setActiveFolderInWorkspaces = (
+  workspaces: Workspace[],
+  workspaceId: string,
+  folderId: string | null,
+): Workspace[] => {
+  return workspaces.map((ws) =>
+    ws.id === workspaceId ? { ...ws, activeFolderId: folderId, activeSourceId: null } : ws,
+  );
+};
+
+const updateWorkspaceHierarchy = (
+  workspaces: Workspace[],
+  workspaceId: string,
+  root: HierarchyNode,
+  flatSources: LogSource[],
+): Workspace[] => {
+  return workspaces.map((w) =>
+    w.id === workspaceId ? { ...w, hierarchy: root, sources: flatSources } : w,
+  );
+};
+
 // ─── Store ────────────────────────────────────────────────────────────────────
 
 export const useWorkspaceStore = create<WorkspaceStore>()(
@@ -166,16 +269,7 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
           const newSource: LogSource = { id: res.source_id, ...sourceData };
 
           set((state) => ({
-            workspaces: state.workspaces.map((w) => {
-              if (w.id !== workspaceId) {
-                return w;
-              }
-              return {
-                ...w,
-                sources: [...w.sources, newSource],
-                activeSourceId: w.activeSourceId ?? newSource.id,
-              };
-            }),
+            workspaces: addSourceToWorkspaces(state.workspaces, workspaceId, newSource),
           }));
 
           // Refresh hierarchy to show the new source in the tree
@@ -195,21 +289,7 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
           await callSidecar("delete_log_source", { source_id: sourceId });
 
           set((state) => ({
-            workspaces: state.workspaces.map((w) => {
-              if (w.id !== workspaceId) {
-                return w;
-              }
-
-              const remainingSources = w.sources.filter((s) => s.id !== sourceId);
-              return {
-                ...w,
-                sources: remainingSources,
-                activeSourceId:
-                  w.activeSourceId === sourceId
-                    ? (remainingSources[0]?.id ?? null)
-                    : w.activeSourceId,
-              };
-            }),
+            workspaces: removeSourceFromWorkspaces(state.workspaces, workspaceId, sourceId),
           }));
 
           // Refresh hierarchy
@@ -222,9 +302,7 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
 
       setActiveSource: (workspaceId, sourceId) =>
         set((state) => ({
-          workspaces: state.workspaces.map((ws) =>
-            ws.id === workspaceId ? { ...ws, activeSourceId: sourceId, activeFolderId: null } : ws,
-          ),
+          workspaces: setActiveSourceInWorkspaces(state.workspaces, workspaceId, sourceId),
         })),
 
       renameSource: async (workspaceId, sourceId, name) => {
@@ -234,14 +312,7 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
           await callSidecar("update_log_source", { source_id: sourceId, name });
 
           set((state) => ({
-            workspaces: state.workspaces.map((w) =>
-              w.id === workspaceId
-                ? {
-                    ...w,
-                    sources: w.sources.map((s) => (s.id === sourceId ? { ...s, name } : s)),
-                  }
-                : w,
-            ),
+            workspaces: renameSourceInWorkspaces(state.workspaces, workspaceId, sourceId, name),
           }));
 
           // Refresh hierarchy
@@ -254,21 +325,12 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
 
       updateSource: (workspaceId, sourceId, updates) =>
         set((state) => ({
-          workspaces: state.workspaces.map((ws) =>
-            ws.id === workspaceId
-              ? {
-                  ...ws,
-                  sources: ws.sources.map((s) => (s.id === sourceId ? { ...s, ...updates } : s)),
-                }
-              : ws,
-          ),
+          workspaces: updateSourceInWorkspaces(state.workspaces, workspaceId, sourceId, updates),
         })),
 
       setActiveFolder: (workspaceId, folderId) =>
         set((state) => ({
-          workspaces: state.workspaces.map((ws) =>
-            ws.id === workspaceId ? { ...ws, activeFolderId: folderId, activeSourceId: null } : ws,
-          ),
+          workspaces: setActiveFolderInWorkspaces(state.workspaces, workspaceId, folderId),
         })),
 
       fetchHierarchy: async (workspaceId) => {
@@ -284,8 +346,11 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
           if (res) {
             const flatSources = flattenSources(res.root);
             set((state) => ({
-              workspaces: state.workspaces.map((w) =>
-                w.id === workspaceId ? { ...w, hierarchy: res.root, sources: flatSources } : w,
+              workspaces: updateWorkspaceHierarchy(
+                state.workspaces,
+                workspaceId,
+                res.root,
+                flatSources,
               ),
             }));
           }

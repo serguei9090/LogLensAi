@@ -114,10 +114,10 @@ export const useUIStore = create<UIStore>()(
         set((state) => {
           const idx = state.columnOrder.indexOf("message");
           const nextOrder = [...state.columnOrder];
-          if (idx !== -1) {
-            nextOrder.splice(idx, 0, col.id);
-          } else {
+          if (idx === -1) {
             nextOrder.push(col.id);
+          } else {
+            nextOrder.splice(idx, 0, col.id);
           }
           return {
             customColumns: [...state.customColumns, col],

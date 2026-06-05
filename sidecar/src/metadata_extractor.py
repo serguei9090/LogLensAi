@@ -15,18 +15,27 @@ RE_HTTP_CLF = re.compile(
     r'"(GET|POST|PUT|DELETE|PATCH|HEAD|OPTIONS|CONNECT|TRACE)\s[^"]*"\s+(\d{3})\s'
 )
 
+# Date / Time string format constants
+FMT_ISO = "%Y-%m-%d %H:%M:%S"
+FMT_ISO_T = "%Y-%m-%dT%H:%M:%S"
+FMT_APACHE = "%d/%b/%Y:%H:%M:%S"
+FMT_SYSLOG = "%b %d %H:%M:%S"
+FMT_EUROPE = "%d/%m/%Y %H:%M:%S"
+FMT_US = "%m/%d/%Y %H:%M:%S"
+FMT_ALT_ISO = "%Y/%m/%d %H:%M:%S"
+
 # Pre-calculate expected length of each format string using a dummy date
 _DUMMY_DATE = datetime.datetime(2000, 10, 10, 12, 12, 12)
 FORMAT_LENGTHS = {
     fmt: len(_DUMMY_DATE.strftime(fmt))
     for fmt in [
-        "%Y-%m-%d %H:%M:%S",  # ISO 8601 (DB canonical)
-        "%Y-%m-%dT%H:%M:%S",  # ISO 8601 with T separator
-        "%d/%b/%Y:%H:%M:%S",  # Apache CLF: 17/May/2015:10:05:03
-        "%b %d %H:%M:%S",  # Syslog: Jun  1 12:34:56
-        "%d/%m/%Y %H:%M:%S",  # European format
-        "%m/%d/%Y %H:%M:%S",  # US format
-        "%Y/%m/%d %H:%M:%S",  # Alternative ISO
+        FMT_ISO,
+        FMT_ISO_T,
+        FMT_APACHE,
+        FMT_SYSLOG,
+        FMT_EUROPE,
+        FMT_US,
+        FMT_ALT_ISO,
     ]
 }
 
@@ -34,24 +43,22 @@ FORMAT_LENGTHS = {
 AUTO_TIMESTAMP_PATTERNS = [
     # 1. ISO 8601 (e.g. 2026-06-02T13:59:46.123Z, 2026-06-02 13:59:46)
     (
-        re.compile(
-            r"\b(\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:[+-]\d{2}:?\d{2}|Z)?)\b"
-        ),
-        "%Y-%m-%d %H:%M:%S",
+        re.compile(r"\b(\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:[+-][\d:]+|Z)?)\b"),
+        FMT_ISO,
     ),
     # 2. Apache/Nginx CLF (e.g. 26/May/2015:21:05:15 +0000)
     (
         re.compile(r"(\d{2}/[A-Za-z]{3}/\d{4}:\d{2}:\d{2}:\d{2}(?:\s+[+-]\d{4})?)"),
-        "%d/%b/%Y:%H:%M:%S",
+        FMT_APACHE,
     ),
     # 3. Syslog (e.g. Jun  1 12:34:56)
-    (re.compile(r"\b([A-Za-z]{3}\s+\d{1,2}\s+\d{2}:\d{2}:\d{2})\b"), "%b %d %H:%M:%S"),
+    (re.compile(r"\b([A-Za-z]{3}\s+\d{1,2}\s+\d{2}:\d{2}:\d{2})\b"), FMT_SYSLOG),
     # 4. European/Slashed (e.g. 26/05/2015 21:05:15)
-    (re.compile(r"\b(\d{2}[/\-]\d{2}[/\-]\d{4}\s+\d{2}:\d{2}:\d{2})\b"), "%d/%m/%Y %H:%M:%S"),
+    (re.compile(r"\b(\d{2}[/\-]\d{2}[/\-]\d{4}\s+\d{2}:\d{2}:\d{2})\b"), FMT_EUROPE),
     # 5. US/Slashed (e.g. 05/26/2015 21:05:15)
-    (re.compile(r"\b(\d{2}/\d{2}/\d{4}\s+\d{2}:\d{2}:\d{2})\b"), "%m/%d/%Y %H:%M:%S"),
+    (re.compile(r"\b(\d{2}/\d{2}/\d{4}\s+\d{2}:\d{2}:\d{2})\b"), FMT_US),
     # 6. Slashed ISO (e.g. 2015/05/26 21:05:15)
-    (re.compile(r"\b(\d{4}/\d{2}/\d{2}\s+\d{2}:\d{2}:\d{2})\b"), "%Y/%m/%d %H:%M:%S"),
+    (re.compile(r"\b(\d{4}/\d{2}/\d{2}\s+\d{2}:\d{2}:\d{2})\b"), FMT_ALT_ISO),
 ]
 
 
@@ -59,7 +66,7 @@ def _parse_timestamp(extracted_ts: str, fmt: str, tz_offset: float) -> str | Non
     # Strip trailing timezone offsets like " +0000" or " -0500" before parsing
     ts_clean = re.sub(r"\s[+-]\d{4}$", "", extracted_ts.strip())
     # Clean T separator if parsing standard spaces
-    if fmt == "%Y-%m-%d %H:%M:%S" and "T" in ts_clean:
+    if fmt == FMT_ISO and "T" in ts_clean:
         ts_clean = ts_clean.replace("T", " ")
 
     # Check for milliseconds or fraction of a second if %f is not in format
@@ -94,7 +101,7 @@ def _parse_timestamp(extracted_ts: str, fmt: str, tz_offset: float) -> str | Non
 
 
 def _get_timestamp_from_match(
-    match: re.Match, tz_offset: float, format_override: str = None
+    match: re.Match, tz_offset: float, format_override: str | None = None
 ) -> str | None:
     groups = match.groupdict()
     extracted_ts = groups.get("timestamp") or (match.group(1) if match.groups() else match.group(0))
@@ -106,13 +113,13 @@ def _get_timestamp_from_match(
         return _parse_timestamp(extracted_ts, format_override, tz_offset)
 
     formats = [
-        "%Y-%m-%d %H:%M:%S",
-        "%Y-%m-%dT%H:%M:%S",
-        "%d/%b/%Y:%H:%M:%S",
-        "%b %d %H:%M:%S",
-        "%d/%m/%Y %H:%M:%S",
-        "%m/%d/%Y %H:%M:%S",
-        "%Y/%m/%d %H:%M:%S",
+        FMT_ISO,
+        FMT_ISO_T,
+        FMT_APACHE,
+        FMT_SYSLOG,
+        FMT_EUROPE,
+        FMT_US,
+        FMT_ALT_ISO,
     ]
 
     for fmt in formats:
@@ -135,13 +142,9 @@ def _auto_detect_timestamp(raw_line: str, tz_offset: float) -> str | None:
     return None
 
 
-def _extract_base_metadata(
-    raw_line: str, parser_config: dict = None, tz_offset: float = 0
-) -> tuple[str, str, str, dict]:
-    """Extracts timestamp, level, message, and auto-detected facets."""
-    timestamp = None
+def _extract_clf_and_level(raw_line: str) -> tuple[str, dict]:
+    """Derive initial level from HTTP status codes or pre-defined level keywords."""
     level = "INFO"
-    message = raw_line
     clf_facets: dict = {}
 
     # Derive level from HTTP status codes AND extract method/status facets (CLF logs)
@@ -167,7 +170,16 @@ def _extract_base_metadata(
         if level == "WARNING":
             level = "WARN"
 
-    parser_config = parser_config or {}
+    return level, clf_facets
+
+
+def _extract_timestamp_and_message(
+    raw_line: str, parser_config: dict, tz_offset: float, current_level: str
+) -> tuple[str | None, str, str]:
+    """Resolves custom or automatic timestamps and user-defined pattern fields."""
+    timestamp = None
+    level = current_level
+    message = raw_line
 
     # Check for custom user-defined timestamp pattern
     custom_regex = parser_config.get("timestamp_regex")
@@ -192,14 +204,28 @@ def _extract_base_metadata(
     if not timestamp and parser_config.get("timestamp_auto_detect", True):
         timestamp = _auto_detect_timestamp(raw_line, tz_offset)
 
+    return timestamp, level, message
+
+
+def _extract_base_metadata(
+    raw_line: str, parser_config: dict | None = None, tz_offset: float = 0
+) -> tuple[str, str, str, dict]:
+    """Extracts timestamp, level, message, and auto-detected facets."""
+    level, clf_facets = _extract_clf_and_level(raw_line)
+    parser_config = parser_config or {}
+
+    timestamp, level, message = _extract_timestamp_and_message(
+        raw_line, parser_config, tz_offset, level
+    )
+
     # If no log timestamp was parsed, fall back to current time
     if not timestamp:
-        timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        timestamp = datetime.datetime.now().strftime(FMT_ISO)
 
     return timestamp, level, message, clf_facets
 
 
-def _apply_custom_extractions(raw_line: str, custom_rules: list, facets: dict):
+def _apply_custom_extractions(raw_line: str, custom_rules: list | None, facets: dict):
     """Applies user-defined regex extraction rules."""
     if not custom_rules:
         return
@@ -231,7 +257,10 @@ def _apply_single_custom_rule(raw_line: str, rule: dict, facets: dict):
 
 
 def extract_log_metadata(
-    raw_line: str, custom_rules: list = None, parser_config: dict = None, tz_offset: float = 0
+    raw_line: str,
+    custom_rules: list | None = None,
+    parser_config: dict | None = None,
+    tz_offset: float = 0,
 ) -> dict:
     """
     Applies source-specific regex patterns and timezone normalization to a raw log line.
@@ -242,7 +271,7 @@ def extract_log_metadata(
     timestamp, level, message, clf_facets = _extract_base_metadata(
         raw_line, parser_config, tz_offset
     )
-    ingest_timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    ingest_timestamp = datetime.datetime.now().strftime(FMT_ISO)
 
     # Start with auto-extracted facets; custom rules can override them
     facets: dict = dict(clf_facets)

@@ -52,6 +52,19 @@ function SortableColumnRow({
     zIndex: isDragging ? 50 : "auto",
   };
 
+  let badgeClass = "";
+  let badgeText = "regex";
+
+  if (badge === "built-in") {
+    badgeClass = "bg-white/5 text-text-muted border border-white/10";
+    badgeText = "built-in";
+  } else if (badge === "auto") {
+    badgeClass = "bg-blue-500/10 text-blue-400 border border-blue-500/20";
+    badgeText = "auto";
+  } else {
+    badgeClass = "bg-purple-500/10 text-purple-400 border border-purple-500/20";
+  }
+
   return (
     <div
       ref={setNodeRef}
@@ -122,14 +135,10 @@ function SortableColumnRow({
         <span
           className={cn(
             "text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded shrink-0 scale-[0.85] origin-right",
-            badge === "built-in"
-              ? "bg-white/5 text-text-muted border border-white/10"
-              : badge === "auto"
-                ? "bg-blue-500/10 text-blue-400 border border-blue-500/20"
-                : "bg-purple-500/10 text-purple-400 border border-purple-500/20",
+            badgeClass,
           )}
         >
-          {badge === "built-in" ? "built-in" : badge === "auto" ? "auto" : "regex"}
+          {badgeText}
         </span>
       )}
 
@@ -210,7 +219,7 @@ export function ColumnManagerSidebar() {
     if (custom) {
       return {
         label: custom.label,
-        badge: custom.source as "auto" | "user",
+        badge: custom.source,
         onDelete: custom.source === "user" ? () => removeCustomColumn(custom.id) : undefined,
       };
     }

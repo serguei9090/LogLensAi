@@ -1,3 +1,4 @@
+import asyncio
 import json
 import logging
 from typing import Any, Literal
@@ -123,6 +124,7 @@ class ToolRegistry:
 
     async def search_logs(self, _ctx: RunContext[Any], params: SearchLogsParams) -> dict:
         """Search and filter logs in the workspace."""
+        await asyncio.sleep(0)
         logger.info("Tool: search_logs called with %s", params)
         try:
             # We use the internal method from the app instance
@@ -140,6 +142,7 @@ class ToolRegistry:
 
     async def get_clusters(self, _ctx: RunContext[Any], params: GetClustersParams) -> list[dict]:
         """Get the top log clusters/patterns for a workspace."""
+        await asyncio.sleep(0)
         logger.info("Tool: get_clusters called for %s", params.workspace_id)
         try:
             parser = self.app.get_drain_parser(params.workspace_id)
@@ -153,6 +156,7 @@ class ToolRegistry:
 
     async def search_memory(self, _ctx: RunContext[Any], params: SearchMemoryParams) -> list[dict]:
         """Search the collective memory for similar issues and resolutions."""
+        await asyncio.sleep(0)
         logger.info(
             "Tool: search_memory called for %s with query: %s", params.workspace_id, params.query
         )
@@ -164,6 +168,7 @@ class ToolRegistry:
 
     async def get_facets(self, _ctx: RunContext[Any], params: GetFacetsParams) -> dict:
         """Get top unique metadata facets (IPs, users, etc.) for a workspace."""
+        await asyncio.sleep(0)
         logger.info("Tool: get_facets called for %s", params.workspace_id)
         try:
             return self.app.method_get_metadata_facets(workspace_id=params.workspace_id)
@@ -173,6 +178,7 @@ class ToolRegistry:
 
     async def get_hierarchy(self, _ctx: RunContext[Any], params: GetHierarchyParams) -> dict:
         """Get the folder and source hierarchy for a workspace."""
+        await asyncio.sleep(0)
         logger.info("Tool: get_hierarchy called for %s", params.workspace_id)
         try:
             return self.app.method_get_hierarchy(workspace_id=params.workspace_id)
@@ -182,6 +188,7 @@ class ToolRegistry:
 
     async def create_column(self, _ctx: RunContext[Any], params: CreateColumnParams) -> dict:
         """Instruct the UI to create a custom column."""
+        await asyncio.sleep(0)
         logger.info("Tool: create_column called with %s", params)
         return {
             "status": "success",
@@ -191,6 +198,7 @@ class ToolRegistry:
 
     async def create_facet(self, _ctx: RunContext[Any], params: CreateFacetParams) -> dict:
         """Create a backend log parsing facet/mask."""
+        await asyncio.sleep(0)
         logger.info("Tool: create_facet called with %s", params)
         try:
             current_settings = self.app.method_get_settings(params.workspace_id)

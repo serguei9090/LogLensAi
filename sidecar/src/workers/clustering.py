@@ -37,6 +37,31 @@ MAX_PARALLEL_WORKERS = max(1, (os.cpu_count() or 4) - 1)  # leave one core for I
 # ---------------------------------------------------------------------------
 # Top-level picklable worker function (must live at module scope)
 # ---------------------------------------------------------------------------
+def _match_and_extract_parameters(
+    temp_miner: Any, message: str, meta_facets: dict
+) -> tuple[str | None, str | None]:
+    """Matches message against the template miner and extracts parameters into meta_facets."""
+    if not temp_miner:
+        return None, None
+
+    match_result = temp_miner.match(message)
+    if not match_result:
+        return None, None
+
+    cluster_id = str(match_result.cluster_id)
+    template = match_result.get_template()
+    try:
+        params = temp_miner.extract_parameters(template, message, exact_matching=False)
+        if params:
+            for param in params:
+                mask_key = param.mask_name.strip("<>").lower()
+                if mask_key != "*":
+                    meta_facets[mask_key] = param.value
+    except Exception:
+        pass
+    return cluster_id, template
+
+
 def _tag_single_row(
     row: tuple,
     temp_miner: Any,
@@ -57,24 +82,9 @@ def _tag_single_row(
         existing_facets = json.loads(facets_json) if facets_json else {}
         meta["facets"].update(existing_facets)
 
-        message = meta["message"]
-
-        cluster_id = None
-        template = None
-        if temp_miner:
-            match_result = temp_miner.match(message)
-            if match_result:
-                cluster_id = str(match_result.cluster_id)
-                template = match_result.get_template()
-                try:
-                    params = temp_miner.extract_parameters(template, message, exact_matching=False)
-                    if params:
-                        for param in params:
-                            mask_key = param.mask_name.strip("<>").lower()
-                            if mask_key != "*":
-                                meta["facets"][mask_key] = param.value
-                except Exception:
-                    pass
+        cluster_id, template = _match_and_extract_parameters(
+            temp_miner, meta["message"], meta["facets"]
+        )
 
         return {
             "status": "ok",
@@ -373,6 +383,68 @@ class ClusteringWorker:
             len(tag_rows) / t_tag_total if t_tag_total > 0 else 0,
         )
 
+    def _process_single_tag_result(
+        self,
+        result: dict,
+        updates: list,
+        cluster_increments: dict,
+        batch_counts: dict,
+    ):
+        """Processes a single tag result from a parallel chunk worker."""
+        status = result["status"]
+        log_id = result["log_id"]
+        ws_id = result["ws_id"]
+        source_id = result["source_id"]
+
+        if status == "ok":
+            cluster_id = result["cluster_id"]
+            template = result["template"]
+
+            if cluster_id and template:
+                key = (ws_id, cluster_id, template)
+                cluster_increments[key] = cluster_increments.get(key, 0) + 1
+
+            updates.append(
+                (
+                    result["timestamp"],
+                    result["level"],
+                    result["facets_json"],
+                    cluster_id,
+                    log_id,
+                )
+            )
+            job_key = (ws_id, source_id)
+            batch_counts[job_key] = batch_counts.get(job_key, 0) + 1
+
+        elif status == "missing":
+            updates.append((None, "MISSING", "{}", None, log_id))
+
+        else:
+            logger.error(
+                "[Worker] Tag worker error for log %s: %s",
+                log_id,
+                result.get("error"),
+            )
+            updates.append((None, "ERROR", result.get("facets_json"), None, log_id))
+
+    def _process_parallel_results(
+        self,
+        futures: list,
+        updates: list,
+        cluster_increments: dict,
+        batch_counts: dict,
+    ):
+        """Iterates over futures and processes results as they complete."""
+        for fut in as_completed(futures):
+            try:
+                batch_results = fut.result()
+                for result in batch_results:
+                    self._process_single_tag_result(
+                        result, updates, cluster_increments, batch_counts
+                    )
+            except Exception:
+                logger.exception("[Worker] Future resolution failed:")
+
     def _tag_rows_parallel(
         self,
         tag_rows: list,
@@ -385,6 +457,7 @@ class ClusteringWorker:
         cluster_increments: dict,
         batch_counts: dict,
     ):
+        assert self._executor is not None, "ProcessPoolExecutor is not initialized"
         t_tag_start = time.time()
         ws_source_groups: dict[tuple, list] = {}
         for row in tag_rows:
@@ -416,48 +489,7 @@ class ClusteringWorker:
                 )
                 futures.append(fut)
 
-        for fut in as_completed(futures):
-            try:
-                batch_results = fut.result()
-                for result in batch_results:
-                    status = result["status"]
-                    log_id = result["log_id"]
-                    ws_id = result["ws_id"]
-                    source_id = result["source_id"]
-
-                    if status == "ok":
-                        cluster_id = result["cluster_id"]
-                        template = result["template"]
-
-                        if cluster_id and template:
-                            key = (ws_id, cluster_id, template)
-                            cluster_increments[key] = cluster_increments.get(key, 0) + 1
-
-                        updates.append(
-                            (
-                                result["timestamp"],
-                                result["level"],
-                                result["facets_json"],
-                                cluster_id,
-                                log_id,
-                            )
-                        )
-                        job_key = (ws_id, source_id)
-                        batch_counts[job_key] = batch_counts.get(job_key, 0) + 1
-
-                    elif status == "missing":
-                        updates.append((None, "MISSING", "{}", None, log_id))
-
-                    else:
-                        logger.error(
-                            "[Worker] Tag worker error for log %s: %s",
-                            log_id,
-                            result.get("error"),
-                        )  # noqa: E501
-                        updates.append((None, "ERROR", result.get("facets_json"), None, log_id))
-
-            except Exception:
-                logger.exception("[Worker] Future resolution failed:")
+        self._process_parallel_results(futures, updates, cluster_increments, batch_counts)
 
         t_tag_total = time.time() - t_tag_start
         logger.info(

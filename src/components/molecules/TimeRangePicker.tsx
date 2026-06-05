@@ -564,13 +564,13 @@ export function TimeRangePicker({ value, onChange, className }: TimeRangePickerP
         <CalendarHeader
           calendarMonth={calendarMonth}
           view={view}
-          onPrev={() => setMonthLeft((m) => dateFnsSubMonths(m, 1))}
-          onNext={() => setMonthLeft((m) => dateFnsAddMonths(m, 1))}
+          onPrev={() => setMonthLeft(dateFnsSubMonths(monthLeft, 1))}
+          onNext={() => setMonthLeft(dateFnsAddMonths(monthLeft, 1))}
           onToggleView={() => handleToggleView("left")}
         />
       );
     };
-  }, [view, handleToggleView]);
+  }, [view, handleToggleView, monthLeft]);
 
   const MonthCaptionRight = useMemo(() => {
     return function MonthCaptionRightComp({ calendarMonth }: MonthCaptionProps) {
@@ -578,13 +578,13 @@ export function TimeRangePicker({ value, onChange, className }: TimeRangePickerP
         <CalendarHeader
           calendarMonth={calendarMonth}
           view={view}
-          onPrev={() => setMonthRight((m) => dateFnsSubMonths(m, 1))}
-          onNext={() => setMonthRight((m) => dateFnsAddMonths(m, 1))}
+          onPrev={() => setMonthRight(dateFnsSubMonths(monthRight, 1))}
+          onNext={() => setMonthRight(dateFnsAddMonths(monthRight, 1))}
           onToggleView={() => handleToggleView("right")}
         />
       );
     };
-  }, [view, handleToggleView]);
+  }, [view, handleToggleView, monthRight]);
 
   const commonPickerProps = {
     mode: "range" as const,

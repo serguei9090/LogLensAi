@@ -14,7 +14,11 @@ interface DashboardModeToggleProps {
  * A floating pill-shaped toggle for switching between Static and AI dashboard modes.
  * Designed to sit at the bottom center of the viewport.
  */
-export function DashboardModeToggle({ mode, onModeChange, className }: DashboardModeToggleProps) {
+export function DashboardModeToggle({
+  mode,
+  onModeChange,
+  className,
+}: Readonly<DashboardModeToggleProps>) {
   return (
     <div
       className={cn(
@@ -41,19 +45,21 @@ export function DashboardModeToggle({ mode, onModeChange, className }: Dashboard
   );
 }
 
+interface ToggleButtonProps {
+  active: boolean;
+  onClick: () => void;
+  icon: React.ReactNode;
+  label: string;
+  isPremium?: boolean;
+}
+
 function ToggleButton({
   active,
   onClick,
   icon,
   label,
   isPremium = false,
-}: {
-  active: boolean;
-  onClick: () => void;
-  icon: React.ReactNode;
-  label: string;
-  isPremium?: boolean;
-}) {
+}: Readonly<ToggleButtonProps>) {
   return (
     <button
       type="button"
@@ -66,10 +72,7 @@ function ToggleButton({
       {active && (
         <motion.div
           layoutId="mode-bg"
-          className={cn(
-            "absolute inset-0 rounded-full",
-            isPremium ? "bg-primary" : "bg-primary", // Can differentiate colors if needed
-          )}
+          className={cn("absolute inset-0 rounded-full", isPremium ? "bg-debug" : "bg-primary")}
           transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
         />
       )}

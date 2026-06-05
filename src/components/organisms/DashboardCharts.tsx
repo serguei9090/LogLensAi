@@ -118,7 +118,6 @@ export function DashboardCharts({
   const [refAreaLeft, setRefAreaLeft] = useState<string | null>(null);
   const [refAreaRight, setRefAreaRight] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
-  const [_hoveredBucket, _setHoveredBucket] = useState<string | null>(null);
 
   const isFiltered = useMemo(() => {
     if (!timeBounds?.min || !timeBounds?.max) {

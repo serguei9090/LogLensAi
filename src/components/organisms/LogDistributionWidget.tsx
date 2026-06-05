@@ -1,7 +1,7 @@
 // Assume Role: Frontend Engineer (@frontend)
 import { X, ZoomIn } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Bar, BarChart, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { Bar, BarChart, Rectangle, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import type { FilterEntry } from "@/components/molecules/FilterBuilder";
 import { callSidecar } from "@/lib/hooks/useSidecarBridge";
 import { useInvestigationStore } from "@/store/investigationStore";
@@ -67,7 +67,7 @@ export function LogDistributionWidget({
   query,
   isTailing,
   onClose,
-}: LogDistributionWidgetProps) {
+}: Readonly<LogDistributionWidgetProps>) {
   const { timeRange, setTimeRange, timeRangeBounds, resetTimeRangeToAllTime } =
     useInvestigationStore();
   const [data, setData] = useState<Bucket[]>([]);
@@ -222,7 +222,7 @@ export function LogDistributionWidget({
       let durationMs = 3600 * 1000; // default 1 hour
       if (bucketInterval) {
         const parts = bucketInterval.split(" ");
-        const val = parseInt(parts[0], 10);
+        const val = Number.parseInt(parts[0], 10);
         const unit = parts[1]?.toLowerCase();
         if (!Number.isNaN(val) && unit) {
           if (unit.startsWith("second")) {
@@ -483,20 +483,29 @@ export function LogDistributionWidget({
                 animationDuration={400}
                 animationEasing="ease-out"
                 onClick={handleBarClick}
-              >
-                {formattedData.map((entry, index) => (
-                  <Cell
-                    key={`cell-${index}`}
-                    fill="var(--color-error)"
-                    stroke={entry.hasAnomaly ? "var(--color-text-primary)" : "none"}
-                    strokeWidth={entry.hasAnomaly ? 2 : 0}
-                  />
-                ))}
-              </Bar>
+                shape={<AnomalyBar />}
+              />
             </BarChart>
           </ResponsiveContainer>
         )}
       </div>
     </div>
+  );
+}
+
+interface AnomalyBarProps {
+  payload?: {
+    hasAnomaly?: boolean;
+  };
+}
+
+function AnomalyBar(props: Readonly<AnomalyBarProps>) {
+  const hasAnomaly = props.payload?.hasAnomaly;
+  return (
+    <Rectangle
+      {...props}
+      stroke={hasAnomaly ? "var(--color-text-primary)" : "none"}
+      strokeWidth={hasAnomaly ? 2 : 0}
+    />
   );
 }

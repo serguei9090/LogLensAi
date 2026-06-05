@@ -8,12 +8,12 @@
   "files": {
     "includes": [
       "**",
-      "!**/.vscode/**",
-      "!**/.agents/**",
-      "!**/.git/**",
-      "!**/node_modules/**",
-      "!**/dist/**",
-      "!**/src-tauri/target/**"
+      "!**/.vscode",
+      "!**/.agents",
+      "!**/.git",
+      "!**/node_modules",
+      "!**/dist",
+      "!**/src-tauri/target"
     ]
   },
   "assist": { "actions": { "source": { "organizeImports": "on" } } },

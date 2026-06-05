@@ -125,6 +125,25 @@ class GraphManager:
 
         return state
 
+    async def _execute_single_tool(self, name: str, args: dict) -> dict:
+        """Executes a single tool and returns its output dictionary."""
+        ctx = None
+        tool_mapping = {
+            "search_logs": (SearchLogsParams, self.tools.search_logs),
+            "get_clusters": (GetClustersParams, self.tools.get_clusters),
+            "search_memory": (SearchMemoryParams, self.tools.search_memory),
+            "get_facets": (GetFacetsParams, self.tools.get_facets),
+            "get_hierarchy": (GetHierarchyParams, self.tools.get_hierarchy),
+            "create_column": (CreateColumnParams, self.tools.create_column),
+            "create_facet": (CreateFacetParams, self.tools.create_facet),
+        }
+
+        if name in tool_mapping:
+            param_cls, func = tool_mapping[name]
+            params = param_cls(**args)
+            return await func(ctx, params)
+        return {"error": f"Tool {name} not found"}
+
     async def _node_tool_execution(self, state: MissionState):
         """Node for executing tools based on AI decision."""
         logger.info("Node: tool_execution")
@@ -132,8 +151,6 @@ class GraphManager:
         last_msg = state["messages"][-1]
 
         if last_msg.get("tool_calls"):
-            ctx = None
-
             for call in last_msg["tool_calls"]:
                 try:
                     name = call["function"]["name"]
@@ -141,29 +158,7 @@ class GraphManager:
                     call_id = call["id"]
 
                     logger.info("Executing tool: %s with args: %s", name, args)
-
-                    result = {"error": f"Tool {name} not found"}
-                    if name == "search_logs":
-                        params = SearchLogsParams(**args)
-                        result = await self.tools.search_logs(ctx, params)
-                    elif name == "get_clusters":
-                        params = GetClustersParams(**args)
-                        result = await self.tools.get_clusters(ctx, params)
-                    elif name == "search_memory":
-                        params = SearchMemoryParams(**args)
-                        result = await self.tools.search_memory(ctx, params)
-                    elif name == "get_facets":
-                        params = GetFacetsParams(**args)
-                        result = await self.tools.get_facets(ctx, params)
-                    elif name == "get_hierarchy":
-                        params = GetHierarchyParams(**args)
-                        result = await self.tools.get_hierarchy(ctx, params)
-                    elif name == "create_column":
-                        params = CreateColumnParams(**args)
-                        result = await self.tools.create_column(ctx, params)
-                    elif name == "create_facet":
-                        params = CreateFacetParams(**args)
-                        result = await self.tools.create_facet(ctx, params)
+                    result = await self._execute_single_tool(name, args)
 
                     state["messages"].append(
                         {
