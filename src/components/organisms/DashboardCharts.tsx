@@ -193,7 +193,7 @@ export function DashboardCharts({
       if (isDragging) {
         return; // Don't fire click if user was dragging
       }
-      const bucket = data?.activePayload?.[0]?.payload?.timestamp;
+      const bucket = data?.activeLabel || data?.activePayload?.[0]?.payload?.timestamp;
       if (!bucket) {
         return;
       }
@@ -204,16 +204,76 @@ export function DashboardCharts({
     [isDragging, bucketInterval, onZoom],
   );
 
-  // ── X-axis label formatter ─────────────────────────────────────────────────
+  // ── X-axis tick renderer ───────────────────────────────────────────────────
 
-  const formatXTick = useCallback((val: string) => {
-    if (!val) {
-      return "";
+  const renderXAxisTick = (props: any) => {
+    const { x, y, payload, index } = props;
+    if (!payload?.value) {
+      return null;
     }
-    // Show only the time part if it has one, otherwise the date
-    const parts = val.split(" ");
-    return parts.length > 1 ? parts[1] : val;
-  }, []);
+
+    const bucketStr = payload.value;
+    const parts = bucketStr.split(" ");
+    const datePart = parts[0] || "";
+    let timePart = parts[1] || "";
+
+    if (timePart.includes(":") && timePart.split(":").length === 3) {
+      const intervalParts = bucketInterval.split(" ");
+      const unit = intervalParts[1]?.toLowerCase();
+      if (!unit?.startsWith("second")) {
+        const [hh, mm] = timePart.split(":");
+        timePart = `${hh}:${mm}`;
+      }
+    }
+
+    const primaryLabel = timePart || datePart;
+    const secondaryLabel = timePart ? datePart : "";
+
+    // Show date if index is 0, or if the date has changed from the previous item
+    let showDate = false;
+    if (index === 0) {
+      showDate = true;
+    } else {
+      const prevItem = chartData[index - 1];
+      if (prevItem) {
+        const prevDate = prevItem.timestamp.split(" ")[0];
+        if (prevDate !== datePart) {
+          showDate = true;
+        }
+      }
+    }
+
+    return (
+      <g transform={`translate(${x},${y})`}>
+        <text
+          x={0}
+          y={0}
+          dy={10}
+          textAnchor="middle"
+          fill="var(--text-muted)"
+          fontSize={9}
+          fontFamily="JetBrains Mono"
+        >
+          {primaryLabel}
+        </text>
+        {showDate && secondaryLabel && (
+          <text
+            x={0}
+            y={0}
+            dy={20}
+            textAnchor="middle"
+            fill="var(--text-muted)"
+            fontSize={8}
+            fontFamily="JetBrains Mono"
+            fontWeight="600"
+            opacity={0.8}
+          >
+            {secondaryLabel}
+          </text>
+        )}
+      </g>
+    );
+  };
 
   return (
     <div className="w-full">
@@ -284,6 +344,7 @@ export function DashboardCharts({
                 onMouseUp={handleMouseUp}
                 onClick={handleBarClick}
                 style={{ cursor: isDragging ? "col-resize" : "pointer" }}
+                margin={{ bottom: 20 }}
               >
                 <CartesianGrid
                   strokeDasharray="3 3"
@@ -295,13 +356,7 @@ export function DashboardCharts({
                   axisLine={false}
                   tickLine={false}
                   padding={{ left: 10, right: 10 }}
-                  tick={{
-                    fontSize: 9,
-                    fill: "var(--text-muted)",
-                    fontFamily: "JetBrains Mono",
-                  }}
-                  minTickGap={30}
-                  tickFormatter={formatXTick}
+                  tick={renderXAxisTick}
                 />
                 <YAxis
                   axisLine={false}

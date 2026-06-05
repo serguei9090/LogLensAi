@@ -1,10 +1,30 @@
 // Assume Role: Frontend Engineer (@frontend)
 import { X } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Bar, BarChart, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import type { FilterEntry } from "@/components/molecules/FilterBuilder";
 import { callSidecar } from "@/lib/hooks/useSidecarBridge";
 import { useInvestigationStore } from "@/store/investigationStore";
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+function parseDbDate(str: string): Date {
+  const [datePart, timePart] = str.split(" ");
+  const [year, month, day] = datePart.split("-").map(Number);
+  const [hour, minute, second] = (timePart || "00:00:00").split(":").map(Number);
+  return new Date(year, month - 1, day, hour, minute || 0, second || 0);
+}
+
+function formatToDbString(date: Date): string {
+  const pad = (n: number) => n.toString().padStart(2, "0");
+  const yyyy = date.getFullYear();
+  const mm = pad(date.getMonth() + 1);
+  const dd = pad(date.getDate());
+  const hh = pad(date.getHours());
+  const min = pad(date.getMinutes());
+  const ss = pad(date.getSeconds());
+  return `${yyyy}-${mm}-${dd}T${hh}:${min}:${ss}`;
+}
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -44,8 +64,9 @@ export function LogDistributionWidget({
   isTailing,
   onClose,
 }: LogDistributionWidgetProps) {
-  const { timeRange } = useInvestigationStore();
+  const { timeRange, setTimeRange } = useInvestigationStore();
   const [data, setData] = useState<Bucket[]>([]);
+  const [bucketInterval, setBucketInterval] = useState<string>("1 hour");
   const [anomalies, setAnomalies] = useState<Anomaly[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -62,7 +83,7 @@ export function LogDistributionWidget({
       setError(null);
       try {
         const [distRes, anomalyRes] = await Promise.all([
-          callSidecar<{ buckets: Bucket[] }>({
+          callSidecar<{ buckets: Bucket[]; bucket_interval?: string }>({
             method: "get_log_distribution",
             params: {
               workspace_id: workspaceId,
@@ -82,6 +103,7 @@ export function LogDistributionWidget({
 
         if (mounted) {
           setData(distRes.buckets || []);
+          setBucketInterval(distRes.bucket_interval || "1 hour");
           setAnomalies(anomalyRes.anomalies || []);
         }
       } catch (err) {
@@ -171,6 +193,110 @@ export function LogDistributionWidget({
     return null;
   }, [loading, error, data.length, isTailing]);
 
+  const handleBarClick = useCallback(
+    (clickData: any) => {
+      const bucket = clickData?.activeLabel || clickData?.activePayload?.[0]?.payload?.bucket;
+      if (!bucket) {
+        return;
+      }
+      const start = parseDbDate(bucket);
+      let durationMs = 3600 * 1000; // default 1 hour
+      if (bucketInterval) {
+        const parts = bucketInterval.split(" ");
+        const val = parseInt(parts[0], 10);
+        const unit = parts[1]?.toLowerCase();
+        if (!Number.isNaN(val) && unit) {
+          if (unit.startsWith("second")) {
+            durationMs = val * 1000;
+          } else if (unit.startsWith("minute")) {
+            durationMs = val * 60 * 1000;
+          } else if (unit.startsWith("hour")) {
+            durationMs = val * 3600 * 1000;
+          } else if (unit.startsWith("day")) {
+            durationMs = val * 24 * 3600 * 1000;
+          } else if (unit.startsWith("month")) {
+            durationMs = val * 30 * 24 * 3600 * 1000;
+          }
+        }
+      }
+      const end = new Date(start.getTime() + durationMs);
+
+      const startStr = formatToDbString(start);
+      const endStr = formatToDbString(end);
+
+      // Extract display label
+      const parts = bucket.split(" ");
+      const displayTime = parts.length === 2 ? parts[1] : bucket;
+
+      setTimeRange({
+        start: startStr,
+        end: endStr,
+        label: `${displayTime} (Zoomed)`,
+      });
+    },
+    [bucketInterval, setTimeRange],
+  );
+
+  const renderXAxisTick = (props: any) => {
+    const { x, y, payload, index } = props;
+    if (!payload?.value) {
+      return null;
+    }
+
+    const bucketStr = payload.value;
+    const parts = bucketStr.split(" ");
+    const datePart = parts[0] || "";
+    let timePart = parts[1] || "";
+
+    if (timePart.includes(":") && timePart.split(":").length === 3) {
+      const intervalParts = bucketInterval.split(" ");
+      const unit = intervalParts[1]?.toLowerCase();
+      if (!unit?.startsWith("second")) {
+        const [hh, mm] = timePart.split(":");
+        timePart = `${hh}:${mm}`;
+      }
+    }
+
+    const primaryLabel = timePart || datePart;
+    const secondaryLabel = timePart ? datePart : "";
+
+    // Show date if index is 0, or if the date has changed from the previous item
+    let showDate = false;
+    if (index === 0) {
+      showDate = true;
+    } else {
+      const prevItem = formattedData[index - 1];
+      if (prevItem) {
+        const prevDate = prevItem.bucket.split(" ")[0];
+        if (prevDate !== datePart) {
+          showDate = true;
+        }
+      }
+    }
+
+    return (
+      <g transform={`translate(${x},${y})`}>
+        <text x={0} y={0} dy={10} textAnchor="middle" fill="var(--color-text-muted)" fontSize={10}>
+          {primaryLabel}
+        </text>
+        {showDate && secondaryLabel && (
+          <text
+            x={0}
+            y={0}
+            dy={22}
+            textAnchor="middle"
+            fill="var(--color-text-muted)"
+            fontSize={9}
+            fontWeight="600"
+            opacity={0.8}
+          >
+            {secondaryLabel}
+          </text>
+        )}
+      </g>
+    );
+  };
+
   return (
     <div className="min-h-[220px] h-[220px] w-full bg-bg-base border-b border-border/40 shrink-0 flex flex-col relative group">
       {/* Header */}
@@ -223,14 +349,13 @@ export function LogDistributionWidget({
         */}
         {formattedData.length > 0 && (
           <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
-            <BarChart data={formattedData} margin={{ top: 0, right: 10, left: -20, bottom: 0 }}>
-              <XAxis
-                dataKey="displayTime"
-                tick={{ fill: "var(--color-text-muted)", fontSize: 10 }}
-                tickLine={false}
-                axisLine={false}
-                dy={5}
-              />
+            <BarChart
+              data={formattedData}
+              margin={{ top: 0, right: 10, left: -20, bottom: 20 }}
+              onClick={handleBarClick}
+              style={{ cursor: "pointer" }}
+            >
+              <XAxis dataKey="bucket" tick={renderXAxisTick} tickLine={false} axisLine={false} />
               <YAxis
                 tick={{ fill: "var(--color-text-muted)", fontSize: 10 }}
                 tickLine={false}

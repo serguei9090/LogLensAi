@@ -81,14 +81,15 @@ export function useLogFetching(workspaceId: string | null, activeSourceId: strin
           },
           silent: true,
         });
-        if (bounds && bounds.min_time && bounds.max_time && currentSourceRef === activeSourceId) {
+        if (bounds?.min_time && bounds.max_time && currentSourceRef === activeSourceId) {
           const minIso = bounds.min_time.replace(" ", "T");
           const maxIso = bounds.max_time.replace(" ", "T");
           const store = useInvestigationStore.getState();
+          const boundsChanged =
+            store.timeRangeBounds.start !== minIso || store.timeRangeBounds.end !== maxIso;
           store.setTimeRangeBounds({ start: minIso, end: maxIso });
-          if (!store.timeRange.start && !store.timeRange.end) {
+          if (boundsChanged || (!store.timeRange.start && !store.timeRange.end)) {
             store.setTimeRange({ start: minIso, end: maxIso, label: "All Time" });
-            return;
           }
         }
       } catch (err) {
