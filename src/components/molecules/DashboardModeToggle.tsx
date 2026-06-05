@@ -68,7 +68,7 @@ function ToggleButton({
           layoutId="mode-bg"
           className={cn(
             "absolute inset-0 rounded-full",
-            isPremium ? "bg-primary-green" : "bg-primary-green", // Can differentiate colors if needed
+            isPremium ? "bg-primary" : "bg-primary", // Can differentiate colors if needed
           )}
           transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
         />

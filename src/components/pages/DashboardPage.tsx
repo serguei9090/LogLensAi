@@ -399,7 +399,7 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="flex-1 bg-bg-base overflow-y-auto p-8 custom-scrollbar pb-32">
+    <div className="flex-1 bg-bg-base overflow-y-auto p-8 custom-scrollbar pb-48">
       <div
         className={cn(
           "mx-auto flex flex-col h-full transition-all duration-300",
@@ -598,6 +598,8 @@ export default function DashboardPage() {
                 <SourceHeatmap stats={stats} />
                 <Activity className="absolute -bottom-4 -right-4 size-32 text-text-muted/5 opacity-5 pointer-events-none" />
               </section>
+              {/* Permanent spacer to prevent floating mode button overlap */}
+              <div className="h-20" />
             </motion.div>
           ) : (
             <motion.div
