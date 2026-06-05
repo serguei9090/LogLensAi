@@ -1148,9 +1148,26 @@ class App:
         dt_start = _parse_ts(start_ts) if start_ts else None
         dt_end = _parse_ts(end_ts) if end_ts else None
 
+        def _floor_to_bucket(dt: datetime, ivl: timedelta) -> datetime:
+            """Floor a datetime to the nearest interval boundary, matching DuckDB time_bucket().
+
+            DuckDB's time_bucket() uses epoch-aligned boundaries.  We replicate
+            that here so that every generated slot label matches the key the DB
+            will produce for the same interval.
+            """
+            epoch = datetime(1970, 1, 1)
+            total_secs = (dt - epoch).total_seconds()
+            ivl_secs = ivl.total_seconds()
+            if ivl_secs <= 0:
+                return dt
+            floored_secs = (total_secs // ivl_secs) * ivl_secs
+            return epoch + timedelta(seconds=floored_secs)
+
         all_slots: list[str] = []
         if dt_start and dt_end and delta:
-            current = dt_start
+            # Align start to the same bucket boundary DuckDB uses so generated
+            # slot keys exactly match the keys coming back from the DB query.
+            current = _floor_to_bucket(dt_start, delta)
             # Safety cap: max 500 slots to prevent runaway allocations
             while current <= dt_end and len(all_slots) < 500:
                 slot_label = current.strftime(format_str)
@@ -2894,6 +2911,14 @@ class App:
                 _e2 = _ts_max.replace("T", " ").replace("Z", "")[:19]
                 cur_dt = datetime.strptime(_s2, "%Y-%m-%d %H:%M:%S")
                 end_dt = datetime.strptime(_e2, "%Y-%m-%d %H:%M:%S")
+                # Align to epoch-anchored bucket boundary (matches DuckDB time_bucket)
+                _epoch_dash = datetime(1970, 1, 1)
+                _ivl_secs_dash = delta_dash.total_seconds()
+                if _ivl_secs_dash > 0:
+                    _elapsed = (cur_dt - _epoch_dash).total_seconds()
+                    cur_dt = _epoch_dash + timedelta(
+                        seconds=(_elapsed // _ivl_secs_dash) * _ivl_secs_dash
+                    )
                 while cur_dt <= end_dt and len(filled_slots) < 500:
                     slot = cur_dt.strftime(bucket_format)
                     if len(slot) == 13:

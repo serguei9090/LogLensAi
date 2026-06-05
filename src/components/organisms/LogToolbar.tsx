@@ -134,6 +134,7 @@ export function LogToolbar({
         <Button
           variant="secondary"
           onClick={onExport}
+          disabled={!_activeSourceId}
           className="gap-2 text-xs font-semibold px-3 py-1.5 shrink-0"
         >
           <Download className="h-3.5 w-3.5" />
@@ -143,7 +144,8 @@ export function LogToolbar({
         <Button
           variant="outline"
           onClick={onOrchestrateOpen}
-          className="gap-2 px-3 py-1.5 text-xs font-bold shrink-0 border-violet-500/20 bg-violet-500/10 text-violet-400 hover:bg-violet-500/20 hover:border-violet-500/40"
+          disabled={!_activeSourceId}
+          className="gap-2 px-3 py-1.5 text-xs font-bold shrink-0 border-violet-500/20 bg-violet-500/10 text-violet-400 hover:bg-violet-500/20 hover:border-violet-500/40 disabled:opacity-50 disabled:pointer-events-none"
         >
           <Cpu className="size-3.5" />
           Orchestrate
@@ -153,6 +155,7 @@ export function LogToolbar({
           variant="outline"
           size="icon"
           onClick={toggleFacetSidebar}
+          disabled={!_activeSourceId}
           className={cn(
             "size-8 shrink-0",
             facetSidebarCollapsed
@@ -168,6 +171,7 @@ export function LogToolbar({
           variant="outline"
           size="icon"
           onClick={toggleColumnManager}
+          disabled={!_activeSourceId}
           className={cn(
             "size-8 shrink-0",
             columnManagerCollapsed
@@ -182,7 +186,12 @@ export function LogToolbar({
         <div className="h-5 w-px bg-zinc-800 shrink-0" />
 
         {/* Tail control moved to left */}
-        <div className="flex items-center gap-3 shrink-0">
+        <div
+          className={cn(
+            "flex items-center gap-3 shrink-0",
+            !_activeSourceId && "opacity-50 pointer-events-none",
+          )}
+        >
           <TailSwitch checked={isTailing} onCheckedChange={onTailToggle} />
         </div>
       </div>
@@ -192,19 +201,30 @@ export function LogToolbar({
 
       {/* Middle Group - Search (Centered) */}
       <div className="w-full max-w-sm shrink-0">
-        <SearchBar ref={searchRef} value={searchQuery} onChange={onSearch} />
+        <SearchBar
+          ref={searchRef}
+          value={searchQuery}
+          onChange={onSearch}
+          disabled={!_activeSourceId}
+        />
       </div>
 
       {/* Spacer to center search */}
       <div className="flex-1" />
 
       {/* Right Group */}
-      <div className="flex items-center gap-3 shrink-0">
+      <div
+        className={cn(
+          "flex items-center gap-3 shrink-0",
+          !_activeSourceId && "opacity-50 pointer-events-none",
+        )}
+      >
         {isFiltered && (
           <Button
             type="button"
             variant="outline"
             onClick={resetTimeRangeToAllTime}
+            disabled={!_activeSourceId}
             className="text-[11px] h-7 px-2 border-primary/20 bg-primary/5 text-primary hover:bg-primary hover:text-text-inverse transition-all rounded cursor-pointer font-semibold"
           >
             Reset Time
@@ -220,7 +240,8 @@ export function LogToolbar({
 
           <DropdownMenu>
             <DropdownMenuTrigger
-              className="p-1.5 rounded-md hover:bg-bg-hover text-text-muted hover:text-text-primary transition-colors ml-1"
+              disabled={!_activeSourceId}
+              className="p-1.5 rounded-md hover:bg-bg-hover text-text-muted hover:text-text-primary transition-colors ml-1 disabled:opacity-50 disabled:pointer-events-none"
               title="Toggle Columns"
             >
               <Columns className="size-4" />
@@ -254,7 +275,8 @@ export function LogToolbar({
 
           <DropdownMenu>
             <DropdownMenuTrigger
-              className="p-1.5 rounded-md hover:bg-bg-hover text-text-muted hover:text-text-primary transition-colors ml-1"
+              disabled={!_activeSourceId}
+              className="p-1.5 rounded-md hover:bg-bg-hover text-text-muted hover:text-text-primary transition-colors ml-1 disabled:opacity-50 disabled:pointer-events-none"
               title="Template Actions"
             >
               <LayoutTemplate className="size-4" />
@@ -295,6 +317,7 @@ export function LogToolbar({
             variant="outline"
             size="icon"
             onClick={() => setSidebarOpen(!isSidebarOpen)}
+            disabled={!_activeSourceId}
             className={cn(
               "size-8 shrink-0",
               isSidebarOpen

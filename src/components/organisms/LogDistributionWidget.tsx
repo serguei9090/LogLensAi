@@ -1,5 +1,5 @@
 // Assume Role: Frontend Engineer (@frontend)
-import { X } from "lucide-react";
+import { X, ZoomIn } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Bar, BarChart, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import type { FilterEntry } from "@/components/molecules/FilterBuilder";
@@ -9,10 +9,14 @@ import { useInvestigationStore } from "@/store/investigationStore";
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function parseDbDate(str: string): Date {
-  const [datePart, timePart] = str.split(" ");
+  const normalized = str.replace("T", " ");
+  const [datePart, timePart] = normalized.split(" ");
   const [year, month, day] = datePart.split("-").map(Number);
-  const [hour, minute, second] = (timePart || "00:00:00").split(":").map(Number);
-  return new Date(year, month - 1, day, hour, minute || 0, second || 0);
+  const timeSegs = (timePart || "00:00:00").split(":");
+  const hour = Number(timeSegs[0] || 0);
+  const minute = Number(timeSegs[1] || 0);
+  const second = Number(timeSegs[2] || 0);
+  return new Date(year, month - 1, day, hour, minute, second);
 }
 
 function formatToDbString(date: Date): string {
@@ -64,12 +68,23 @@ export function LogDistributionWidget({
   isTailing,
   onClose,
 }: LogDistributionWidgetProps) {
-  const { timeRange, setTimeRange } = useInvestigationStore();
+  const { timeRange, setTimeRange, timeRangeBounds, resetTimeRangeToAllTime } =
+    useInvestigationStore();
   const [data, setData] = useState<Bucket[]>([]);
   const [bucketInterval, setBucketInterval] = useState<string>("1 hour");
   const [anomalies, setAnomalies] = useState<Anomaly[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const isFiltered = useMemo(() => {
+    if (!timeRangeBounds.start || !timeRangeBounds.end) {
+      return false;
+    }
+    return (
+      (timeRange.start && timeRange.start !== timeRangeBounds.start) ||
+      (timeRange.end && timeRange.end !== timeRangeBounds.end)
+    );
+  }, [timeRange, timeRangeBounds]);
 
   useEffect(() => {
     let mounted = true;
@@ -237,65 +252,129 @@ export function LogDistributionWidget({
     [bucketInterval, setTimeRange],
   );
 
-  const renderXAxisTick = (props: any) => {
-    const { x, y, payload, index } = props;
-    if (!payload?.value) {
-      return null;
-    }
-
-    const bucketStr = payload.value;
-    const parts = bucketStr.split(" ");
-    const datePart = parts[0] || "";
-    let timePart = parts[1] || "";
-
-    if (timePart.includes(":") && timePart.split(":").length === 3) {
-      const intervalParts = bucketInterval.split(" ");
-      const unit = intervalParts[1]?.toLowerCase();
-      if (!unit?.startsWith("second")) {
-        const [hh, mm] = timePart.split(":");
-        timePart = `${hh}:${mm}`;
+  const renderXAxisTick = useCallback(
+    (props: any) => {
+      const { x, y, payload, index } = props;
+      if (!payload?.value) {
+        return null;
       }
-    }
 
-    const primaryLabel = timePart || datePart;
-    const secondaryLabel = timePart ? datePart : "";
+      const bucketStr = payload.value;
+      const parts = bucketStr.split(" ");
+      const datePart = parts[0] || "";
+      let timePart = parts[1] || "";
 
-    // Show date if index is 0, or if the date has changed from the previous item
-    let showDate = false;
-    if (index === 0) {
-      showDate = true;
-    } else {
-      const prevItem = formattedData[index - 1];
-      if (prevItem) {
-        const prevDate = prevItem.bucket.split(" ")[0];
-        if (prevDate !== datePart) {
-          showDate = true;
+      if (timePart.includes(":") && timePart.split(":").length === 3) {
+        const intervalParts = bucketInterval.split(" ");
+        const unit = intervalParts[1]?.toLowerCase();
+        if (!unit?.startsWith("second")) {
+          const [hh, mm] = timePart.split(":");
+          timePart = `${hh}:${mm}`;
         }
       }
-    }
 
-    return (
-      <g transform={`translate(${x},${y})`}>
-        <text x={0} y={0} dy={10} textAnchor="middle" fill="var(--color-text-muted)" fontSize={10}>
-          {primaryLabel}
-        </text>
-        {showDate && secondaryLabel && (
+      const primaryLabel = timePart || datePart;
+      const secondaryLabel = timePart ? datePart : "";
+
+      // Show date if index is 0, or if the date has changed from the previous item
+      let showDate = false;
+      if (index === 0) {
+        showDate = true;
+      } else {
+        const prevItem = formattedData[index - 1];
+        if (prevItem) {
+          const prevDate = prevItem.bucket.split(" ")[0];
+          if (prevDate !== datePart) {
+            showDate = true;
+          }
+        }
+      }
+
+      return (
+        <g transform={`translate(${x},${y})`}>
           <text
             x={0}
             y={0}
-            dy={22}
+            dy={10}
             textAnchor="middle"
             fill="var(--color-text-muted)"
-            fontSize={9}
-            fontWeight="600"
-            opacity={0.8}
+            fontSize={10}
           >
-            {secondaryLabel}
+            {primaryLabel}
           </text>
-        )}
-      </g>
+          {showDate && secondaryLabel && (
+            <text
+              x={0}
+              y={0}
+              dy={22}
+              textAnchor="middle"
+              fill="var(--color-primary)"
+              fontSize={9}
+              fontWeight="700"
+              opacity={0.9}
+            >
+              {secondaryLabel}
+            </text>
+          )}
+        </g>
+      );
+    },
+    [bucketInterval, formattedData],
+  );
+
+  const CustomTooltip = useCallback(({ active, payload, label }: any) => {
+    if (!active || !payload?.length) {
+      return null;
+    }
+    // label === the bucket key from XAxis dataKey
+    const fullDateTime = label || "";
+    const parts = fullDateTime.split(" ");
+    const datePart = parts[0] || "";
+    const timePart = parts[1] || "";
+
+    return (
+      <div
+        style={{
+          backgroundColor: "var(--color-bg-tooltip)",
+          borderColor: "var(--color-border-subtle)",
+          borderWidth: 1,
+          borderStyle: "solid",
+          borderRadius: 8,
+          padding: "8px 12px",
+          fontSize: 12,
+          minWidth: 140,
+        }}
+      >
+        <div style={{ marginBottom: 6, fontWeight: 700, color: "var(--color-text-primary)" }}>
+          {datePart && (
+            <span style={{ color: "var(--color-primary)", marginRight: 4 }}>{datePart}</span>
+          )}
+          {timePart && <span>{timePart}</span>}
+          {!timePart && !datePart && <span>{fullDateTime}</span>}
+        </div>
+        {payload.map((entry: any) => (
+          <div
+            key={entry.dataKey}
+            style={{ display: "flex", justifyContent: "space-between", gap: 16, color: entry.fill }}
+          >
+            <span>{entry.dataKey}</span>
+            <span style={{ fontWeight: 600 }}>{entry.value.toLocaleString()}</span>
+          </div>
+        ))}
+        <div
+          style={{
+            marginTop: 6,
+            fontSize: 9,
+            color: "var(--color-text-muted)",
+            opacity: 0.6,
+            textAlign: "center",
+          }}
+        >
+          Click to zoom into this window
+        </div>
+      </div>
     );
-  };
+  }, []);
 
   return (
     <div className="min-h-[220px] h-[220px] w-full bg-bg-base border-b border-border/40 shrink-0 flex flex-col relative group">
@@ -305,6 +384,16 @@ export function LogDistributionWidget({
           <span className="text-[10px] font-bold uppercase tracking-widest text-text-muted">
             Distribution Insights
           </span>
+          {isFiltered && (
+            <button
+              type="button"
+              onClick={resetTimeRangeToAllTime}
+              className="ml-2 flex items-center gap-1 px-2 py-0.5 text-[10px] font-semibold text-primary hover:text-text-inverse bg-primary/10 hover:bg-primary border border-primary/20 rounded transition-all cursor-pointer"
+            >
+              <ZoomIn className="size-2.5" />
+              Reset Zoom
+            </button>
+          )}
         </div>
 
         <div className="flex items-center gap-4">
@@ -362,16 +451,7 @@ export function LogDistributionWidget({
                 axisLine={false}
                 dx={-5}
               />
-              <Tooltip
-                cursor={{ fill: "var(--color-bg-hover)" }}
-                contentStyle={{
-                  backgroundColor: "var(--color-bg-tooltip)",
-                  borderColor: "var(--color-border-subtle)",
-                  borderRadius: "8px",
-                  fontSize: "12px",
-                }}
-                itemStyle={{ fontSize: "12px" }}
-              />
+              <Tooltip content={CustomTooltip} cursor={{ fill: "var(--color-bg-hover)" }} />
               <Bar dataKey="INFO" stackId="a" fill="var(--color-info)" radius={[0, 0, 4, 4]} />
               <Bar dataKey="WARN" stackId="a" fill="var(--color-warning)" />
               <Bar dataKey="ERROR" stackId="a" fill="var(--color-error)" radius={[4, 4, 0, 0]}>

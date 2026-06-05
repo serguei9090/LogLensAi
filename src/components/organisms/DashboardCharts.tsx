@@ -41,23 +41,31 @@ const DISPLAY_LEVELS = [
   { key: "ERROR", label: "ERROR", color: LEVEL_COLORS.ERROR },
 ];
 
-/** Parses a bucket-format label (e.g. "2023-01-15 14:00") and adds one interval step. */
-function addInterval(label: string, interval: string): string {
-  const s = label.replace(" ", "T");
-  // Fill to full ISO so Date.parse works
-  const padded =
-    s.length === 10
-      ? `${s}T00:00:00`
-      : s.length === 13
-        ? `${s}:00:00`
-        : s.length === 16
-          ? `${s}:00`
-          : s;
-  const ms = Date.parse(padded);
-  if (Number.isNaN(ms)) {
-    return label;
-  }
+function parseDbDate(str: string): Date {
+  const normalized = str.replace("T", " ");
+  const [datePart, timePart] = normalized.split(" ");
+  const [year, month, day] = datePart.split("-").map(Number);
+  const timeSegs = (timePart || "00:00:00").split(":");
+  const hour = Number(timeSegs[0] || 0);
+  const minute = Number(timeSegs[1] || 0);
+  const second = Number(timeSegs[2] || 0);
+  return new Date(year, month - 1, day, hour, minute, second);
+}
 
+function formatToDbString(date: Date): string {
+  const pad = (n: number) => n.toString().padStart(2, "0");
+  const yyyy = date.getFullYear();
+  const mm = pad(date.getMonth() + 1);
+  const dd = pad(date.getDate());
+  const hh = pad(date.getHours());
+  const min = pad(date.getMinutes());
+  const ss = pad(date.getSeconds());
+  return `${yyyy}-${mm}-${dd}T${hh}:${min}:${ss}`;
+}
+
+/** Parses a bucket-format label (e.g. "2023-01-15 14:00") and adds one interval step without timezone shifting. */
+function addInterval(label: string, interval: string): string {
+  const start = parseDbDate(label);
   const _intervalMs: Record<string, number> = {
     "1 second": 1_000,
     "5 seconds": 5_000,
@@ -72,8 +80,8 @@ function addInterval(label: string, interval: string): string {
     "30 days": 2_592_000_000,
   };
   const delta = _intervalMs[interval] ?? 3_600_000;
-  const end = new Date(ms + delta - 1);
-  return end.toISOString().replace("T", " ").replace("Z", "").slice(0, 19);
+  const end = new Date(start.getTime() + delta - 1);
+  return formatToDbString(end);
 }
 
 function padToIso(ts: string): string {

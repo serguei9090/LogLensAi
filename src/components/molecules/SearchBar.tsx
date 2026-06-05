@@ -8,6 +8,7 @@ interface SearchBarProps {
   readonly onChange: (value: string) => void;
   readonly placeholder?: string;
   readonly className?: string;
+  readonly disabled?: boolean;
 }
 
 export const SearchBar = forwardRef<HTMLInputElement, SearchBarProps>(
@@ -17,6 +18,7 @@ export const SearchBar = forwardRef<HTMLInputElement, SearchBarProps>(
       onChange,
       placeholder = "Search logs (e.g., level:error AND 'database')...",
       className,
+      disabled,
     },
     ref,
   ) => {
@@ -46,7 +48,8 @@ export const SearchBar = forwardRef<HTMLInputElement, SearchBarProps>(
           placeholder={placeholder}
           value={localValue}
           onChange={(e) => setLocalValue(e.target.value)}
-          className="pl-9 pr-9 h-9 bg-bg-surface-bright border-border text-sm placeholder:text-text-muted focus-visible:ring-1 focus-visible:ring-primary focus-visible:border-primary transition-colors"
+          disabled={disabled}
+          className="pl-9 pr-9 h-9 bg-bg-surface-bright border-border text-sm placeholder:text-text-muted focus-visible:ring-1 focus-visible:ring-primary focus-visible:border-primary transition-colors disabled:opacity-50 disabled:pointer-events-none"
         />
         {localValue && (
           <button

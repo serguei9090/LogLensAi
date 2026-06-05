@@ -522,7 +522,7 @@ function InvestigationPageImpl() {
         onRemoveSource={handleRemoveSource}
         onEditFusion={handleEditFusion}
         onRenameSource={renameSource}
-        showDistribution={showDistribution}
+        showDistribution={showDistribution && !!activeSourceId}
         onDistributionClose={() => setShowDistribution(!showDistribution)}
         workspaceId={activeWorkspaceId}
         leftPanel={

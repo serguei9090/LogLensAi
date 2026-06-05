@@ -51,7 +51,7 @@ export function ExplorerView({
       <div className="flex items-center justify-between mb-8">
         <div>
           <h1 className="text-2xl font-black text-text-primary tracking-tight mb-1">
-            {folderId ? currentFolder.name : `${workspaceName || "Workspace"} Workspace`}
+            {folderId ? currentFolder.name : workspaceName || "Workspace"}
           </h1>
           <p className="text-xs text-text-muted opacity-60">
             {currentFolder.children.length} folders, {currentFolder.sources.length} sources
