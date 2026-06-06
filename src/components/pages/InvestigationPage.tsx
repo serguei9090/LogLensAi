@@ -18,6 +18,7 @@ import { useLogFetching } from "@/lib/hooks/useLogFetching";
 import { useLogIngestion } from "@/lib/hooks/useLogIngestion";
 import { callSidecar } from "@/lib/hooks/useSidecarBridge";
 import { useAiStore } from "@/store/aiStore";
+import { useIngestionStore } from "@/store/ingestionStore";
 import { useInvestigationStore } from "@/store/investigationStore";
 import { useSettingsStore } from "@/store/settingsStore";
 import { type LogSource, selectActiveWorkspace, useWorkspaceStore } from "@/store/workspaceStore";
@@ -57,6 +58,8 @@ function InvestigationPageImpl() {
     updateSource,
     setActiveFolder,
     createFolder,
+    deleteFolder,
+    updateFolder,
   } = useWorkspaceStore();
   const { fetchSettings } = useSettingsStore();
   const activeWorkspace = useWorkspaceStore(selectActiveWorkspace);
@@ -120,8 +123,13 @@ function InvestigationPageImpl() {
     handleImportLive,
   } = useLogIngestion(activeWorkspaceId, fetchLogs);
 
+  const ingestingSourceIds = useIngestionStore((state) => state.ingestingSourceIds);
+
   // Combined loading state for the table
   const isSourceLoading = useMemo(() => {
+    if (activeSourceId && ingestingSourceIds.includes(activeSourceId)) {
+      return true;
+    }
     if (transitioningSourceId === activeSourceId) {
       return true;
     }
@@ -130,7 +138,14 @@ function InvestigationPageImpl() {
     }
     // Only block the whole view if we don't have any logs loaded yet
     return isFetching && logs.length === 0;
-  }, [transitioningSourceId, activeSourceId, activeJobForSource, isFetching, logs.length]);
+  }, [
+    activeSourceId,
+    ingestingSourceIds,
+    transitioningSourceId,
+    activeJobForSource,
+    isFetching,
+    logs.length,
+  ]);
 
   // Sync the currently active source's tailing status to the global isTailing store state
   useEffect(() => {
@@ -210,6 +225,7 @@ function InvestigationPageImpl() {
           id: "ingest",
           description: "Check sidecar logs for details.",
         });
+        useIngestionStore.getState().stopIngestion(lastJob.source_id);
       }
 
       lastJobId.current = lastJob.id;
@@ -582,6 +598,20 @@ function InvestigationPageImpl() {
             onCreateFolder={(name) => createFolder(activeWorkspaceId ?? "", name)}
             onImportOpen={() => setIsImportOpen(true)}
             workspaceName={activeWorkspace?.name}
+            onRenameFolder={async (id, name) => {
+              await updateFolder(id, name);
+            }}
+            onDeleteFolder={async (id) => {
+              await deleteFolder(id);
+            }}
+            onRenameSource={(id, name) => {
+              if (activeWorkspaceId) {
+                renameSource(activeWorkspaceId, id, name);
+              }
+            }}
+            onDeleteSource={(id) => {
+              handleRemoveSource(id);
+            }}
           />
         )}
       </InvestigationLayout>

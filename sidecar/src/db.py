@@ -713,11 +713,11 @@ class LogDatabase:
     def _build_where_clauses(
         self,
         workspace_id: str,
-        query: str = None,
-        filters: list = None,
-        source_ids: list = None,
-        start_time: str = None,
-        end_time: str = None,
+        query: str | None = None,
+        filters: list[Any] | None = None,
+        source_ids: list[Any] | None = None,
+        start_time: str | None = None,
+        end_time: str | None = None,
     ) -> tuple[list[str], list[Any]]:
         """Constructs WHERE clauses and gathers parameters."""
         where_clauses = ["l.workspace_id = ?"]
@@ -769,15 +769,15 @@ class LogDatabase:
     def query_logs(
         self,
         workspace_id: str,
-        query: str = None,
-        filters: list = None,
+        query: str | None = None,
+        filters: list[Any] | None = None,
         limit: int = 100,
         offset: int = 0,
         sort_by: str = "id",
         sort_order: str = "DESC",
-        source_ids: list = None,
-        start_time: str = None,
-        end_time: str = None,
+        source_ids: list[Any] | None = None,
+        start_time: str | None = None,
+        end_time: str | None = None,
     ) -> dict:
         cursor = self.get_cursor()
 
@@ -801,7 +801,8 @@ class LogDatabase:
 
         count_query = f"SELECT COUNT(*) FROM logs l WHERE {where_sql}"
         cursor.execute(count_query, params)
-        total = cursor.fetchone()[0]
+        row = cursor.fetchone()
+        total = row[0] if (row is not None) else 0
 
         allowed_sort = [
             "id",
@@ -888,7 +889,7 @@ class LogDatabase:
         return keys
 
     def _get_facet_aggregations(
-        self, workspace_id: str, keys: list[str], source_ids: list = None
+        self, workspace_id: str, keys: list[str], source_ids: list[Any] | None = None
     ) -> dict:
         """Query top 10 unique values for each facet key."""
         cursor = self.get_cursor()
@@ -933,12 +934,12 @@ class LogDatabase:
 
         return results
 
-    def get_metadata_facets(self, workspace_id: str, source_ids: list = None) -> dict:
+    def get_metadata_facets(self, workspace_id: str, source_ids: list[Any] | None = None) -> dict:
         """Return the top unique metadata facets across all logs in a workspace."""
         keys = self._get_facet_keys(workspace_id)
         return self._get_facet_aggregations(workspace_id, keys, source_ids)
 
-    def delete_logs(self, workspace_id: str, source_id: str = None):
+    def delete_logs(self, workspace_id: str, source_id: str | None = None):
         """Delete logs for a workspace. Optionally filter by source_id."""
         cursor = self.get_cursor()
         if source_id:
@@ -990,7 +991,9 @@ class LogDatabase:
 
     # --- Hierarchy Management ---
 
-    def create_folder(self, workspace_id: str, folder_id: str, name: str, parent_id: str = None):
+    def create_folder(
+        self, workspace_id: str, folder_id: str, name: str, parent_id: str | None = None
+    ):
         cursor = self.get_cursor()
         cursor.execute(
             "INSERT INTO folders (id, workspace_id, name, parent_id) VALUES (?, ?, ?, ?)",
@@ -998,7 +1001,7 @@ class LogDatabase:
         )
         self.commit()
 
-    def update_folder(self, folder_id: str, name: str = None, parent_id: str = None):
+    def update_folder(self, folder_id: str, name: str | None = None, parent_id: str | None = None):
         cursor = self.get_cursor()
         if name:
             cursor.execute("UPDATE folders SET name = ? WHERE id = ?", (name, folder_id))
@@ -1040,7 +1043,7 @@ class LogDatabase:
         name: str,
         type: str,
         path: str,
-        folder_id: str = None,
+        folder_id: str | None = None,
     ):
         cursor = self.get_cursor()
         cursor.execute(
@@ -1134,7 +1137,8 @@ class LogDatabase:
             "INSERT INTO ingestion_jobs (workspace_id, source_id, total_lines, status) VALUES (?, ?, ?, 'processing') RETURNING id",
             (workspace_id, source_id, total_lines),
         )
-        job_id = cursor.fetchone()[0]
+        row = cursor.fetchone()
+        job_id = row[0] if (row is not None) else 0
         self.commit()
         return job_id
 

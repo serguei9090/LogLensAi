@@ -132,14 +132,19 @@ def _get_timestamp_from_match(
 
 
 def _auto_detect_timestamp(raw_line: str, tz_offset: float) -> str | None:
+    best_start = len(raw_line)
+    best_parsed = None
+
     for regex, fmt in AUTO_TIMESTAMP_PATTERNS:
         match = regex.search(raw_line)
-        if match:
+        if match and match.start() < best_start:
             extracted_ts = match.group(1)
             parsed = _parse_timestamp(extracted_ts, fmt, tz_offset)
             if parsed:
-                return parsed
-    return None
+                best_start = match.start()
+                best_parsed = parsed
+
+    return best_parsed
 
 
 def _extract_clf_and_level(raw_line: str) -> tuple[str, dict]:

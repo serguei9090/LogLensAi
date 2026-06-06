@@ -1,4 +1,5 @@
 import { useCallback, useMemo, useRef, useState } from "react";
+import { useIngestionStore } from "@/store/ingestionStore";
 import { useInvestigationStore } from "@/store/investigationStore";
 import { type LogSource, selectActiveWorkspace, useWorkspaceStore } from "@/store/workspaceStore";
 import type { LogEntry } from "@/types/log";
@@ -212,6 +213,22 @@ export function useLogFetching(workspaceId: string | null, activeSourceId: strin
           await fetchAllLogsAndMetadata(workspaceId, currentSourceRef, queryParams, sourceKey);
         } else {
           await fetchPartialLogs(workspaceId, currentSourceRef, queryParams);
+        }
+
+        const state = useIngestionStore.getState();
+        const hasActiveJob = state.jobs.some(
+          (j) =>
+            j.source_id === currentSourceRef &&
+            (j.status === "processing" || j.status === "pending"),
+        );
+        const hasFinishedJob = state.jobs.some(
+          (j) =>
+            j.source_id === currentSourceRef && (j.status === "completed" || j.status === "failed"),
+        );
+        const hasData = useInvestigationStore.getState().total > 0;
+
+        if ((hasFinishedJob || hasData) && !hasActiveJob) {
+          state.stopIngestion(currentSourceRef);
         }
       } catch (e) {
         console.error("[useLogFetching] Data retrieval failed:", e);

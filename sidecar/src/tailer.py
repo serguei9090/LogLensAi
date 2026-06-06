@@ -20,7 +20,7 @@ class FileTailer:
         parser: DrainParser,
         db,
         log_store,
-        source_id: str = None,
+        source_id: str | None = None,
     ) -> None:
         # Normalize to forward slashes for consistent source_id across OS
         self.filepath = os.path.abspath(filepath).replace("\\", "/")
@@ -99,7 +99,7 @@ class FileTailer:
         now = time.time()
         if not hasattr(self, "_p_config_cache"):
             self._p_config_cache = None
-            self._p_config_expiry = 0
+            self._p_config_expiry = 0.0
 
         if self._p_config_cache is not None and now < self._p_config_expiry:
             return self._p_config_cache
@@ -128,7 +128,7 @@ class FileTailer:
         # Initialize instance cache if not exists
         if not hasattr(self, "_rules_cache"):
             self._rules_cache = None
-            self._rules_expiry = 0
+            self._rules_expiry = 0.0
 
         if self._rules_cache is not None and now < self._rules_expiry:
             return self._rules_cache

@@ -33,6 +33,7 @@ export function useLogIngestion(workspaceId: string | null, fetchLogs: () => voi
       }
 
       const normalizedPath = path.replaceAll("\\", "/");
+      let newSourceId: string | null = null;
       try {
         const newSource = await createSource(
           workspaceId,
@@ -43,9 +44,11 @@ export function useLogIngestion(workspaceId: string | null, fetchLogs: () => voi
           },
           folderId,
         );
+        newSourceId = newSource.id;
 
         setActiveSource(workspaceId, newSource.id);
         setTransitioningSourceId(newSource.id);
+        useIngestionStore.getState().startIngestion(newSource.id);
         setLogs([], 0);
 
         await callSidecar({
@@ -79,6 +82,9 @@ export function useLogIngestion(workspaceId: string | null, fetchLogs: () => voi
         }
       } catch (e: unknown) {
         setTransitioningSourceId(null);
+        if (newSourceId) {
+          useIngestionStore.getState().stopIngestion(newSourceId);
+        }
         toast.error(e instanceof Error ? e.message : "Failed to import file.", { id: "ingest" });
       }
     },
@@ -137,6 +143,7 @@ export function useLogIngestion(workspaceId: string | null, fetchLogs: () => voi
       }
 
       const connectionPath = `${user}@${host}:${path}`;
+      let newSourceId: string | null = null;
       try {
         const newSource = await createSource(
           workspaceId,
@@ -147,6 +154,7 @@ export function useLogIngestion(workspaceId: string | null, fetchLogs: () => voi
           },
           folderId,
         );
+        newSourceId = newSource.id;
 
         setActiveSource(workspaceId, newSource.id);
 
@@ -156,6 +164,7 @@ export function useLogIngestion(workspaceId: string | null, fetchLogs: () => voi
         }
 
         setTransitioningSourceId(newSource.id);
+        useIngestionStore.getState().startIngestion(newSource.id);
         setLogs([], 0);
 
         await callSidecar({
@@ -180,6 +189,10 @@ export function useLogIngestion(workspaceId: string | null, fetchLogs: () => voi
         setTailing(true);
         toast.success(`SSH tailing started for ${connectionPath}`);
       } catch (e: unknown) {
+        setTransitioningSourceId(null);
+        if (newSourceId) {
+          useIngestionStore.getState().stopIngestion(newSourceId);
+        }
         toast.error(e instanceof Error ? e.message : "SSH connection failed.");
       }
     },
@@ -201,6 +214,7 @@ export function useLogIngestion(workspaceId: string | null, fetchLogs: () => voi
         return;
       }
 
+      let newSourceId: string | null = null;
       try {
         const newSource = await createSource(
           workspaceId,
@@ -211,6 +225,7 @@ export function useLogIngestion(workspaceId: string | null, fetchLogs: () => voi
           },
           folderId,
         );
+        newSourceId = newSource.id;
 
         setActiveSource(workspaceId, newSource.id);
 
@@ -226,6 +241,7 @@ export function useLogIngestion(workspaceId: string | null, fetchLogs: () => voi
         }
 
         setTransitioningSourceId(newSource.id);
+        useIngestionStore.getState().startIngestion(newSource.id);
         setLogs([], 0);
 
         await callSidecar({ method: "ingest_logs", params: { logs: entries } });
@@ -235,6 +251,9 @@ export function useLogIngestion(workspaceId: string | null, fetchLogs: () => voi
         fetchLogs();
       } catch (error) {
         setTransitioningSourceId(null);
+        if (newSourceId) {
+          useIngestionStore.getState().stopIngestion(newSourceId);
+        }
         toast.error(error instanceof Error ? error.message : "Manual ingestion failed.", {
           id: "ingest",
         });

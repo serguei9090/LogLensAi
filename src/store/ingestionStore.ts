@@ -20,6 +20,8 @@ interface IngestionState {
   /** Count of active live sources (tails, SSH streams, syslog/HTTP listeners). */
   liveSourceCount: number;
   error: string | null;
+  /** Tracks sources that are currently ingesting or finalizing logs. */
+  ingestingSourceIds: string[];
 
   // Actions
   fetchJobs: (workspaceId: string) => Promise<void>;
@@ -39,6 +41,8 @@ interface IngestionState {
    * When it reaches zero and no active job is queued, polling stops automatically.
    */
   removeLiveSource: () => void;
+  startIngestion: (sourceId: string) => void;
+  stopIngestion: (sourceId: string) => void;
   clearState: () => void;
 }
 
@@ -57,6 +61,7 @@ export const useIngestionStore = create<IngestionState>((set, get) => ({
   isPolling: false,
   liveSourceCount: 0,
   error: null,
+  ingestingSourceIds: [],
 
   fetchJobs: async (workspaceId: string) => {
     if (!workspaceId) {
@@ -133,7 +138,19 @@ export const useIngestionStore = create<IngestionState>((set, get) => ({
     }));
   },
 
+  startIngestion: (sourceId: string) => {
+    set((state) => ({
+      ingestingSourceIds: [...state.ingestingSourceIds.filter((id) => id !== sourceId), sourceId],
+    }));
+  },
+
+  stopIngestion: (sourceId: string) => {
+    set((state) => ({
+      ingestingSourceIds: state.ingestingSourceIds.filter((id) => id !== sourceId),
+    }));
+  },
+
   clearState: () => {
-    set({ jobs: [], activeJob: null, lastJob: null, error: null });
+    set({ jobs: [], activeJob: null, lastJob: null, error: null, ingestingSourceIds: [] });
   },
 }));

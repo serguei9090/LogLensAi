@@ -313,10 +313,13 @@ function useDashboardData(workspaces: any[], activeWorkspace: any) {
     }
   }, [activeWorkspace, workspaces, selectedWorkspaceId]);
 
-  // Reset selected source to "all" when workspace changes
+  // Reset selected source, time bounds, and time range to "all" when workspace changes
   useEffect(() => {
     if (selectedWorkspaceId) {
       setSelectedSourceId("all");
+      setTimeRange({ start: "", end: "" });
+      setTimeBounds(null);
+      setIsFirstLoad(true);
     }
   }, [selectedWorkspaceId]);
 
@@ -328,8 +331,8 @@ function useDashboardData(workspaces: any[], activeWorkspace: any) {
         params: {
           workspace_id: selectedWorkspaceId === "all" ? undefined : selectedWorkspaceId,
           source_id: selectedSourceId === "all" ? undefined : selectedSourceId,
-          start_time: timeRange.start || undefined,
-          end_time: timeRange.end || undefined,
+          start_time: isFirstLoad ? undefined : timeRange.start || undefined,
+          end_time: isFirstLoad ? undefined : timeRange.end || undefined,
           active_workspace_ids: workspaces.map((w) => w.id),
         },
         silent: true,
@@ -341,6 +344,12 @@ function useDashboardData(workspaces: any[], activeWorkspace: any) {
         setTimeBounds(bounds);
         if (isFirstLoad) {
           setTimeRange({ start: bounds.min, end: bounds.max, label: "All Time" });
+          setIsFirstLoad(false);
+        }
+      } else {
+        setTimeBounds(null);
+        if (isFirstLoad) {
+          setTimeRange({ start: "", end: "" });
           setIsFirstLoad(false);
         }
       }

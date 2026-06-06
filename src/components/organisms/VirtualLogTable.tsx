@@ -25,6 +25,7 @@ import type { IngestionJob } from "@/lib/hooks/useIngestionStatus";
 import { callSidecar } from "@/lib/hooks/useSidecarBridge";
 import { cn } from "@/lib/utils";
 import { useAiStore } from "@/store/aiStore";
+import { useIngestionStore } from "@/store/ingestionStore";
 import { useInvestigationStore } from "@/store/investigationStore";
 import { useSettingsStore } from "@/store/settingsStore";
 import { useUIStore } from "@/store/uiStore";
@@ -101,6 +102,14 @@ export function VirtualLogTable({
   } = useInvestigationStore();
   const { logSessionMap, fetchMapping } = useAiStore();
   const activeWorkspace = useWorkspaceStore(selectActiveWorkspace);
+  const ingestingSourceIds = useIngestionStore((state) => state.ingestingSourceIds);
+  const isCurrentlyIngesting = useMemo(() => {
+    return !!(
+      activeWorkspace?.id &&
+      activeWorkspace?.activeSourceId &&
+      ingestingSourceIds.includes(activeWorkspace.activeSourceId)
+    );
+  }, [activeWorkspace, ingestingSourceIds]);
   const { visibleColumns, customColumns, columnOrder, columnWidths, setColumnWidth } = useUIStore();
 
   // Active visible columns ordered by store order
@@ -414,9 +423,10 @@ export function VirtualLogTable({
       >
         {/* ─── State Management Overlays ────────────────────────────────────── */}
         {(() => {
+          const isIngesting = isCurrentlyIngesting || !!activeJob;
           const showOverlay =
-            (activeJob || showTransitioningLoader) && (logs.length === 0 || !isTailing);
-          const isEmpty = logs.length === 0 && !activeJob && !showTransitioningLoader;
+            isIngesting || (showTransitioningLoader && (logs.length === 0 || !isTailing));
+          const isEmpty = logs.length === 0 && !isIngesting && !showTransitioningLoader;
 
           if (showOverlay) {
             return (
@@ -430,33 +440,49 @@ export function VirtualLogTable({
                   </div>
                   <div className="space-y-2">
                     <h3 className="text-xl font-bold text-text-primary">
-                      {activeJob ? "Indexing Dataset..." : "Retrieving Logs..."}
+                      {isIngesting ? "Indexing Dataset..." : "Retrieving Logs..."}
                     </h3>
                     <p className="text-sm text-text-muted leading-relaxed">
-                      {activeJob
+                      {isIngesting
                         ? "Building database indices and mapping patterns for the complete file. Almost ready."
                         : "Hydrating log records from storage and applying active filters."}
                     </p>
                   </div>
-                  {activeJob && (
+                  {isIngesting && (
                     <div className="w-full space-y-3">
-                      <div className="flex justify-between text-[10px] font-bold uppercase tracking-widest text-text-muted">
-                        <span>
-                          {activeJob.processed_lines.toLocaleString()} /{" "}
-                          {activeJob.total_lines.toLocaleString()} lines
-                        </span>
-                        <span className="text-primary">
-                          {Math.round((activeJob.processed_lines / activeJob.total_lines) * 100)}%
-                        </span>
-                      </div>
-                      <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden border border-white/5">
-                        <div
-                          className="h-full bg-primary transition-all duration-500 ease-out shadow-[0_0_10px_rgba(34,197,94,0.5)]"
-                          style={{
-                            width: `${(activeJob.processed_lines / activeJob.total_lines) * 100}%`,
-                          }}
-                        />
-                      </div>
+                      {activeJob ? (
+                        <>
+                          <div className="flex justify-between text-[10px] font-bold uppercase tracking-widest text-text-muted">
+                            <span>
+                              {activeJob.processed_lines.toLocaleString()} /{" "}
+                              {activeJob.total_lines.toLocaleString()} lines
+                            </span>
+                            <span className="text-primary">
+                              {Math.round(
+                                (activeJob.processed_lines / activeJob.total_lines) * 100,
+                              )}
+                              %
+                            </span>
+                          </div>
+                          <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden border border-white/5">
+                            <div
+                              className="h-full bg-primary transition-all duration-500 ease-out shadow-[0_0_10px_rgba(34,197,94,0.5)]"
+                              style={{
+                                width: `${(activeJob.processed_lines / activeJob.total_lines) * 100}%`,
+                              }}
+                            />
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          <div className="flex justify-between text-[10px] font-bold uppercase tracking-widest text-text-muted">
+                            <span>Preparing Ingestion...</span>
+                          </div>
+                          <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden border border-white/5 relative">
+                            <div className="h-full w-full bg-gradient-to-r from-transparent via-primary/80 to-transparent animate-shimmer absolute inset-0" />
+                          </div>
+                        </>
+                      )}
                     </div>
                   )}
                 </div>

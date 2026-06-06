@@ -544,7 +544,10 @@ class App:
         def run_mcp():
             try:
                 config = uvicorn.Config(
-                    mcp_server.application, host="127.0.0.1", port=5002, log_level="error"
+                    mcp_server.application,  # type: ignore
+                    host="127.0.0.1",
+                    port=5002,
+                    log_level="error",
                 )
                 self._mcp_server_instance = uvicorn.Server(config)
                 self._mcp_server_instance.run()
@@ -664,9 +667,7 @@ class App:
                 id=req.id, error={"code": -32603, "message": "Internal error", "data": str(e)}
             )
 
-    def _process_single_filter(
-        self, f: dict, allowed_fields: set[str], field_groups: dict
-    ):
+    def _process_single_filter(self, f: dict, allowed_fields: set[str], field_groups: dict):
         """Processes a single filter dict and appends the resulting SQL clause to field_groups."""
         field = f.get("field")
         value = f.get("value")
@@ -687,7 +688,7 @@ class App:
         if clause:
             field_groups[field_sql].append((clause, param))
 
-    def _parse_filters(self, filters: list[dict]) -> tuple[list[str], list[Any]]:
+    def _parse_filters(self, filters: list) -> tuple[list[str], list[Any]]:
         from collections import defaultdict
 
         field_groups = defaultdict(list)
@@ -827,7 +828,8 @@ class App:
 
         count_query = "SELECT COUNT(*) FROM logs l WHERE " + where_sql
         cursor.execute(count_query, params)
-        total = cursor.fetchone()[0]
+        row = cursor.fetchone()
+        total = row[0] if row else 0
 
         # Use a CTE or join to get total_logs count for percent calculation safely
         base_query = f"""
@@ -994,7 +996,8 @@ class App:
 
         # Safeguard: Check if logs exist first to prevent DuckDB assertions on empty datasets
         cursor.execute(f"SELECT EXISTS(SELECT 1 FROM logs WHERE {where_sql})", sql_params)
-        exists = cursor.fetchone()[0]
+        row = cursor.fetchone()
+        exists = row[0] if row else False
         if not exists:
             return {"min_time": "", "max_time": ""}
 
@@ -1123,7 +1126,8 @@ class App:
 
         # Safeguard: Check if logs exist first to prevent DuckDB assertions on empty datasets
         cursor.execute(f"SELECT EXISTS(SELECT 1 FROM logs l WHERE {where_sql})", sql_params)
-        exists = cursor.fetchone()[0]
+        row = cursor.fetchone()
+        exists = row[0] if row else False
         if not exists:
             return {"buckets": []}
 
@@ -1356,35 +1360,45 @@ class App:
         source_id: str | None = None,
     ) -> dict:
 
-        key = source_id if source_id else f"ssh:{workspace_id}:{host}:{filepath}"
+        # Type narrowing to resolve type checker warnings
+        eff_workspace_id = workspace_id or "default"
+        eff_filepath = filepath or ""
+        eff_source_id = source_id or f"ssh:{eff_workspace_id}:{host}:{eff_filepath}"
+
+        key = eff_source_id
         if key in self.tailers:
             return {"status": "already tailing"}
 
         # 1. Start/Get the Shared Ingestor (SSHLoader)
-        ingestor_key = f"ingestor:ssh:{source_id}"
+        ingestor_key = f"ingestor:ssh:{eff_source_id}"
         if ingestor_key not in self.tailers:
             ingestor = SSHLoader(
                 host,
                 port,
                 username,
                 password,
-                filepath,
+                eff_filepath,
                 self.log_store,
-                source_id=source_id,
+                source_id=eff_source_id,
             )
             self.tailers[ingestor_key] = ingestor
             ingestor.start()
-            logger.info("[SSH] Started shared ingestor for source: %s", source_id)
+            logger.info("[SSH] Started shared ingestor for source: %s", eff_source_id)
 
         # 2. Start the Workspace Subscriber (FileTailer)
         # Note: we pass filepath=None to SharedSource so it doesn't try local tailing
         subscriber = FileTailer(
-            filepath, workspace_id, self.parser, self.db, self.log_store, source_id=source_id
+            eff_filepath,
+            eff_workspace_id,
+            self.parser,
+            self.db,
+            self.log_store,
+            source_id=eff_source_id,
         )
         self.tailers[key] = subscriber
         subscriber.start()
 
-        return {"status": "started", "source_id": source_id}
+        return {"status": "started", "source_id": eff_source_id}
 
     def _stop_all_workspace_tailers(self, workspace_id: str) -> int:
         """Internal helper to stop all tailers for a workspace."""
@@ -1552,8 +1566,9 @@ class App:
         # 1. Count total lines for progress tracking (quick scan)
         total_lines = 0
         with open(filepath, encoding="utf-8", errors="replace") as f:
-            for _ in f:
-                total_lines += 1
+            for line in f:
+                if line.strip():
+                    total_lines += 1
 
         if total_lines == 0:
             return {"status": "ok", "count": 0, "job_id": None}
@@ -1754,9 +1769,7 @@ class App:
 
     def _extract_match_parameters(self, parser, template: str, message: str, facets: dict):
         try:
-            params = parser.miner.extract_parameters(
-                template, message, exact_matching=False
-            )
+            params = parser.miner.extract_parameters(template, message, exact_matching=False)
             if not params:
                 return
             for p in params:
@@ -1817,7 +1830,6 @@ class App:
             True,
         )
 
-
     def _tag_chunk_remaining(
         self,
         workspace_id: str,
@@ -1850,7 +1862,6 @@ class App:
                 cluster_increments,
             )
             batch_data.append(item)
-
 
     def _process_chunk_ram_first(
         self,
@@ -3065,7 +3076,13 @@ class App:
         ts_raw = cursor.fetchall()
 
         time_series = self._build_dashboard_time_series(
-            ts_raw, start_time, end_time, ts_min_time, ts_max_time, bucket_interval_str, bucket_format
+            ts_raw,
+            start_time,
+            end_time,
+            ts_min_time,
+            ts_max_time,
+            bucket_interval_str,
+            bucket_format,
         )
 
         # 7. Top Error Clusters
