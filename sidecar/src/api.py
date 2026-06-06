@@ -2798,11 +2798,11 @@ class App:
             where_clauses.append("l.source_id = ?")
             params.append(source_id)
         if start_time:
-            norm_start = start_time.replace("T", " ").split(".")[0].replace("Z", "")
+            norm_start = self._normalize_query_timestamp(start_time)
             where_clauses.append("l.timestamp >= ?")
             params.append(norm_start)
         if end_time:
-            norm_end = end_time.replace("T", " ").split(".")[0].replace("Z", "")
+            norm_end = self._normalize_query_timestamp(end_time)
             where_clauses.append("l.timestamp <= ?")
             params.append(norm_end)
         if active_workspace_ids:
