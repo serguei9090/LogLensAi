@@ -22,7 +22,7 @@ export function DashboardModeToggle({
   return (
     <div
       className={cn(
-        "fixed bottom-8 left-1/2 -translate-x-1/2 z-50",
+        "absolute bottom-8 left-1/2 -translate-x-1/2 z-50",
         "bg-bg-surface/80 backdrop-blur-md border border-border/50 rounded-full p-1.5",
         "shadow-[0_8px_32px_rgba(0,0,0,0.4)] flex items-center gap-1",
         className,

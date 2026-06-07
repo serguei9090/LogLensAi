@@ -20,10 +20,10 @@ interface DashboardChartsProps {
 }
 
 const LEVEL_COLORS: Record<string, string> = {
-  DEBUG: "#8a949f",
-  INFO: "var(--primary)",
-  WARN: "var(--warning)",
-  ERROR: "var(--error)",
+  DEBUG: "#a78bfa",
+  INFO: "#22c55e",
+  WARN: "#f59e0b",
+  ERROR: "#ef4444",
 };
 
 const DISPLAY_LEVELS = [
@@ -160,10 +160,23 @@ export function DashboardCharts({
     }
   }, [chartInstance, chartData]);
 
+  // Clear ECharts brush overlay when zoom is reset
+  useEffect(() => {
+    if (chartInstance && !isFiltered) {
+      chartInstance.dispatchAction({
+        type: "brush",
+        areas: [],
+      });
+    }
+  }, [chartInstance, isFiltered]);
+
   // ── Drag-to-zoom & Click Handlers ──────────────────────────────────────────
 
   const handleBrushSelected = useCallback(
     (params: any) => {
+      if (params.isEvent === false) {
+        return;
+      }
       const brushComponent = params.batch?.[0];
       if (brushComponent?.areas && brushComponent.areas.length > 0) {
         const area = brushComponent.areas[0];
@@ -204,7 +217,7 @@ export function DashboardCharts({
 
   const onEvents = useMemo(() => {
     return {
-      brushSelected: handleBrushSelected,
+      brushselected: handleBrushSelected,
       click: handleChartClick,
     };
   }, [handleBrushSelected, handleChartClick]);
@@ -215,6 +228,9 @@ export function DashboardCharts({
     return {
       backgroundColor: "transparent",
       color: [LEVEL_COLORS.DEBUG, LEVEL_COLORS.INFO, LEVEL_COLORS.WARN, LEVEL_COLORS.ERROR],
+      toolbox: {
+        show: false,
+      },
       tooltip: {
         trigger: "axis" as const,
         axisPointer: {
@@ -223,12 +239,12 @@ export function DashboardCharts({
             color: "rgba(34, 197, 94, 0.06)",
           },
         },
-        backgroundColor: "var(--bg-surface-bright)",
-        borderColor: "var(--border)",
+        backgroundColor: "#111312",
+        borderColor: "#2a3430",
         borderWidth: 1,
         borderRadius: 8,
         textStyle: {
-          color: "var(--text-primary)",
+          color: "#e8f5ec",
           fontSize: 10,
           fontFamily: "JetBrains Mono",
         },
@@ -243,7 +259,7 @@ export function DashboardCharts({
 
           let html = `<div style="font-weight: bold; margin-bottom: 4px; font-family: 'JetBrains Mono', monospace;">`;
           if (datePart) {
-            html += `<span style="color: var(--primary); margin-right: 4px;">${datePart}</span>`;
+            html += `<span style="color: #22c55e; margin-right: 4px;">${datePart}</span>`;
           }
           if (timePart) {
             html += `<span>${timePart}</span>`;
@@ -260,7 +276,7 @@ export function DashboardCharts({
             </div>`;
           }
           if (params.length > 1) {
-            html += `<div style="display: flex; justify-content: space-between; gap: 16px; margin-top: 4px; border-top: 1px solid var(--border-muted); padding-top: 4px; font-family: 'JetBrains Mono', monospace; color: var(--text-secondary);">
+            html += `<div style="display: flex; justify-content: space-between; gap: 16px; margin-top: 4px; border-top: 1px solid #1d2420; padding-top: 4px; font-family: 'JetBrains Mono', monospace; color: #8fa898;">
               <span>TOTAL</span>
               <span style="font-weight: 600;">${total.toLocaleString()}</span>
             </div>`;
@@ -281,7 +297,7 @@ export function DashboardCharts({
         axisLine: { show: false },
         axisTick: { show: false },
         axisLabel: {
-          color: "var(--text-muted)",
+          color: "#4d6057",
           fontSize: 9,
           fontFamily: "JetBrains Mono",
           formatter: (value: string, index: number) => {
@@ -320,7 +336,7 @@ export function DashboardCharts({
           },
           rich: {
             date: {
-              color: "var(--color-primary)",
+              color: "#22c55e",
               fontWeight: "bold" as const,
               fontSize: 8,
               lineHeight: 12,
@@ -332,14 +348,14 @@ export function DashboardCharts({
         type: "value" as const,
         splitLine: {
           lineStyle: {
-            color: "var(--border-muted)",
+            color: "#1d2420",
             type: "dashed" as const,
           },
         },
         axisLine: { show: false },
         axisTick: { show: false },
         axisLabel: {
-          color: "var(--text-muted)",
+          color: "#4d6057",
           fontSize: 9,
           fontFamily: "JetBrains Mono",
         },
@@ -355,7 +371,7 @@ export function DashboardCharts({
         brushStyle: {
           borderWidth: 1,
           color: "rgba(34, 197, 94, 0.15)",
-          borderColor: "var(--primary)",
+          borderColor: "#22c55e",
         },
       },
       series: [

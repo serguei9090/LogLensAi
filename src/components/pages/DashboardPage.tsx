@@ -1,6 +1,5 @@
 // Assume Role: Frontend Engineer (@frontend)
 
-import { AnimatePresence, motion } from "framer-motion";
 import {
   Activity,
   AlertCircle,
@@ -27,6 +26,7 @@ import { useInView } from "@/lib/hooks/useInView";
 const DashboardCharts = lazy(() =>
   import("@/components/organisms/DashboardCharts").then((m) => ({ default: m.DashboardCharts })),
 );
+
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -289,16 +289,15 @@ function SourceHeatmap({ stats }: Readonly<{ stats: DashboardStats | null }>) {
               <span className="text-[10px] font-mono text-text-muted w-32 truncate">
                 {sourceName}
               </span>
-              <div className="flex-1 flex gap-1 h-4">
+              <div className="flex-1 grid grid-cols-[repeat(50,minmax(0,1fr))] gap-1 h-4">
                 {sourceData.slice(-50).map((d) => {
                   const intensity = maxCount > 0 ? d.count / maxCount : 0;
                   return (
                     <div
                       key={`${d.source_name}-${d.timestamp}`}
-                      className="h-full flex-1 rounded-sm border border-white/5 transition-[transform,background-color] duration-200 hover:scale-115"
+                      className="h-full rounded-sm border border-white/5 transition-[transform,background-color] duration-200 hover:scale-115"
                       style={{
-                        backgroundColor: `color-mix(in srgb, var(--primary) ${intensity * 100}%, transparent)`,
-                        minWidth: "4px",
+                        backgroundColor: `rgba(34, 197, 94, ${intensity})`,
                       }}
                       title={`${d.timestamp}: ${d.count} logs`}
                     />
@@ -392,8 +391,8 @@ function useDashboardData(workspaces: any[], activeWorkspace: any) {
       // Auto-initialize time range from data bounds on first load
       if (res?.time_bounds?.min && res.time_bounds.max) {
         const bounds = { min: res.time_bounds.min, max: res.time_bounds.max };
-        setTimeBounds(bounds);
         if (isFirstLoad) {
+          setTimeBounds(bounds);
           // Pre-cache parameters to avoid redundant sync call on subsequent render pass
           lastFetchedParamsRef.current = {
             workspaceId: selectedWorkspaceId,
@@ -407,8 +406,8 @@ function useDashboardData(workspaces: any[], activeWorkspace: any) {
           lastFetchedParamsRef.current = params;
         }
       } else {
-        setTimeBounds(null);
         if (isFirstLoad) {
+          setTimeBounds(null);
           lastFetchedParamsRef.current = {
             workspaceId: selectedWorkspaceId,
             sourceId: selectedSourceId,
@@ -458,9 +457,7 @@ function AIObservationCard({
     return null;
   }
   return (
-    <section
-      className="bg-primary/5 border border-primary/20 rounded-2xl p-6 backdrop-blur-md relative overflow-hidden group animate-fade-in-up"
-    >
+    <section className="bg-primary/5 border border-primary/20 rounded-2xl p-6 backdrop-blur-md relative overflow-hidden group animate-fade-in-up">
       <div className="flex items-start justify-between gap-6 relative z-10">
         <div className="flex-1">
           <div className="flex items-center gap-2 mb-3">
@@ -657,8 +654,14 @@ function AICanvasView({ dashboardWidgets, isSidebarOpen, setSidebarOpen }: AICan
 }
 
 export default function DashboardPage() {
-  const [patternsRef, patternsInView] = useInView<HTMLDivElement>({ rootMargin: "200px", triggerOnce: true });
-  const [heatmapRef, heatmapInView] = useInView<HTMLElement>({ rootMargin: "200px", triggerOnce: true });
+  const [patternsRef, patternsInView] = useInView<HTMLDivElement>({
+    rootMargin: "200px",
+    triggerOnce: true,
+  });
+  const [heatmapRef, heatmapInView] = useInView<HTMLElement>({
+    rootMargin: "200px",
+    triggerOnce: true,
+  });
 
   // Global State
   const workspaces = useWorkspaceStore((state) => state.workspaces);
@@ -701,48 +704,42 @@ export default function DashboardPage() {
   // Layout frame is rendered immediately; components handle their own skeletons when stats is null.
 
   return (
-    <div className="flex-1 bg-bg-base overflow-y-auto p-8 custom-scrollbar pb-48">
-      <div
-        className={cn(
-          "mx-auto flex flex-col h-full transition-[max-width] duration-300",
-          mode === "ai" ? "max-w-full px-6" : "max-w-6xl w-full",
-        )}
-      >
-        <header className="mb-10">
-          <DashboardHeader mode={mode} loading={loading} onRefresh={fetchStats} />
-          <DashboardFilters
-            selectedWorkspaceId={selectedWorkspaceId}
-            onWorkspaceChange={(v) => {
-              setSelectedWorkspaceId(v || "all");
-              setSelectedSourceId("all");
-              setIsFirstLoad(true); // Re-auto-init when workspace changes
-            }}
-            workspaces={workspaces}
-            selectedSourceId={selectedSourceId}
-            onSourceChange={(v) => setSelectedSourceId(v || "all")}
-            sources={sources}
-            timeRange={timeRange}
-            onTimeRangeChange={setTimeRange}
-            timeBounds={timeBounds}
-            onResetTime={() => {
-              if (timeBounds) {
-                setTimeRange({ start: timeBounds.min, end: timeBounds.max, label: "All Time" });
-              } else {
-                setTimeRange({ start: "", end: "" });
-              }
-            }}
-          />
-        </header>
+    <div className="flex-1 bg-bg-base relative flex flex-col h-full overflow-hidden">
+      <div className="flex-1 overflow-y-auto p-8 custom-scrollbar pb-48">
+        <div
+          className={cn(
+            "mx-auto flex flex-col h-full transition-[max-width] duration-300",
+            mode === "ai" ? "max-w-full px-6" : "max-w-6xl w-full",
+          )}
+        >
+          <header className="mb-10">
+            <DashboardHeader mode={mode} loading={loading} onRefresh={fetchStats} />
+            <DashboardFilters
+              selectedWorkspaceId={selectedWorkspaceId}
+              onWorkspaceChange={(v) => {
+                setSelectedWorkspaceId(v || "all");
+                setSelectedSourceId("all");
+                setIsFirstLoad(true); // Re-auto-init when workspace changes
+              }}
+              workspaces={workspaces}
+              selectedSourceId={selectedSourceId}
+              onSourceChange={(v) => setSelectedSourceId(v || "all")}
+              sources={sources}
+              timeRange={timeRange}
+              onTimeRangeChange={setTimeRange}
+              timeBounds={timeBounds}
+              onResetTime={() => {
+                if (timeBounds) {
+                  setTimeRange({ start: timeBounds.min, end: timeBounds.max, label: "All Time" });
+                } else {
+                  setTimeRange({ start: "", end: "" });
+                }
+              }}
+            />
+          </header>
 
-        <AnimatePresence mode="wait">
           {mode === "static" ? (
-            <motion.div
-              key="static"
-              initial={{ opacity: 0, x: -10 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: 10 }}
-              className="space-y-10"
-            >
+            <div key="static" className="space-y-10 animate-fade-in-up">
               {/* Processing HUD */}
               <ProcessingHUD jobs={ingestionJobs} />
 
@@ -807,7 +804,11 @@ export default function DashboardPage() {
                   onZoom={(start, end) => setTimeRange({ start, end, label: "Zoomed Range" })}
                   onReset={() => {
                     if (timeBounds) {
-                      setTimeRange({ start: timeBounds.min, end: timeBounds.max, label: "All Time" });
+                      setTimeRange({
+                        start: timeBounds.min,
+                        end: timeBounds.max,
+                        label: "All Time",
+                      });
                     } else {
                       setTimeRange({ start: "", end: "" });
                     }
@@ -848,26 +849,19 @@ export default function DashboardPage() {
               </section>
               {/* Permanent spacer to prevent floating mode button overlap */}
               <div className="h-20" />
-            </motion.div>
+            </div>
           ) : (
-            <motion.div
-              key="ai"
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              className="flex h-full w-full gap-4"
-            >
+            <div key="ai" className="flex h-full w-full gap-4 animate-fade-in-up">
               <AICanvasView
                 dashboardWidgets={dashboardWidgets}
                 isSidebarOpen={isSidebarOpen}
                 setSidebarOpen={setSidebarOpen}
               />
-            </motion.div>
+            </div>
           )}
-        </AnimatePresence>
-
-        <DashboardModeToggle mode={mode} onModeChange={handleModeChange} />
+        </div>
       </div>
+      <DashboardModeToggle mode={mode} onModeChange={handleModeChange} />
     </div>
   );
 }

@@ -288,7 +288,7 @@ export function LogDistributionWidget({
   const option = useMemo(() => {
     return {
       backgroundColor: "transparent",
-      color: ["var(--color-info)", "var(--color-warning)", "var(--color-error)"],
+      color: ["#38bdf8", "#f59e0b", "#ef4444"],
       tooltip: {
         trigger: "axis" as const,
         axisPointer: {
@@ -297,12 +297,12 @@ export function LogDistributionWidget({
             color: "rgba(30, 37, 32, 0.3)",
           },
         },
-        backgroundColor: "var(--color-bg-tooltip)",
-        borderColor: "var(--color-border-subtle)",
+        backgroundColor: "#111312",
+        borderColor: "#1d2420",
         borderWidth: 1,
         borderRadius: 8,
         textStyle: {
-          color: "var(--color-text-primary)",
+          color: "#e8f5ec",
           fontSize: 12,
           fontFamily: "JetBrains Mono",
         },
@@ -357,7 +357,7 @@ export function LogDistributionWidget({
         axisLine: { show: false },
         axisTick: { show: false },
         axisLabel: {
-          color: "var(--color-text-muted)",
+          color: "#4d6057",
           fontSize: 10,
           fontFamily: "Inter, sans-serif",
           formatter: (value: string, index: number) => {
@@ -396,7 +396,7 @@ export function LogDistributionWidget({
           },
           rich: {
             date: {
-              color: "var(--color-primary)",
+              color: "#22c55e",
               fontWeight: "bold" as const,
               fontSize: 9,
               lineHeight: 12,
@@ -410,7 +410,7 @@ export function LogDistributionWidget({
         axisLine: { show: false },
         axisTick: { show: false },
         axisLabel: {
-          color: "var(--color-text-muted)",
+          color: "#4d6057",
           fontSize: 10,
           fontFamily: "Inter, sans-serif",
         },

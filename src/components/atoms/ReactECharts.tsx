@@ -36,9 +36,13 @@ export function ReactECharts({
       onChartInit(chart);
     }
 
-    // Handle Resize using ResizeObserver to avoid layout delays
+    // Handle Resize using ResizeObserver throttled to requestAnimationFrame for crisp, instant sizing
+    let animationFrameId: number | null = null;
     const resizeObserver = new ResizeObserver((_entries) => {
-      window.requestAnimationFrame(() => {
+      if (animationFrameId !== null) {
+        cancelAnimationFrame(animationFrameId);
+      }
+      animationFrameId = requestAnimationFrame(() => {
         if (!containerRef.current) {
           return;
         }
@@ -49,6 +53,9 @@ export function ReactECharts({
     resizeObserver.observe(containerRef.current);
 
     return () => {
+      if (animationFrameId !== null) {
+        cancelAnimationFrame(animationFrameId);
+      }
       resizeObserver.disconnect();
       chart.dispose();
       chartInstanceRef.current = null;
@@ -71,8 +78,8 @@ export function ReactECharts({
     if (loading) {
       chartInstanceRef.current.showLoading({
         text: "Synchronizing...",
-        color: "var(--color-primary)",
-        textColor: "var(--color-text-primary)",
+        color: "#22c55e",
+        textColor: "#e8f5ec",
         maskColor: "rgba(13, 15, 14, 0.8)",
       });
     } else {
