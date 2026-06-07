@@ -127,176 +127,154 @@ export function ExplorerView({
             className="rounded-3xl transition-all"
             activeClassName="ring-2 ring-primary bg-primary/5"
           >
-            {/* biome-ignore lint/a11y/useSemanticElements: div wrapper required to allow nested DropdownMenu triggers without invalid HTML button nesting */}
-            <div
-              onClick={() => onSelectFolder(child.id)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" || e.key === " ") {
-                  onSelectFolder(child.id);
-                }
-              }}
-              role="button"
-              tabIndex={0}
-              className="group w-full flex flex-col p-5 bg-bg-surface-bright/40 border border-border-subtle rounded-3xl hover:bg-bg-hover hover:border-primary/30 transition-all text-left outline-none cursor-pointer"
-            >
-              <div className="flex items-start justify-between mb-4 w-full">
-                <div className="p-3 bg-primary/10 rounded-2xl">
+            <div className="relative group w-full">
+              <button
+                type="button"
+                onClick={() => onSelectFolder(child.id)}
+                className="w-full flex flex-col p-5 bg-bg-surface-bright/40 border border-border-subtle rounded-3xl hover:bg-bg-hover hover:border-primary/30 transition-all text-left outline-none cursor-pointer"
+              >
+                <div className="p-3 bg-primary/10 rounded-2xl mb-4">
                   <Folder className="size-6 text-primary" />
                 </div>
+                {renamingFolderId === child.id ? (
+                  <input
+                    type="text"
+                    defaultValue={child.name}
+                    // biome-ignore lint/a11y/noAutofocus: autoFocus is necessary to focus the inline renaming input instantly when displayed
+                    autoFocus
+                    onClick={(e) => e.stopPropagation()}
+                    onBlur={(e) => {
+                      const newName = e.target.value.trim();
+                      if (newName && newName !== child.name) {
+                        onRenameFolder?.(child.id, newName);
+                      }
+                      setRenamingFolderId(null);
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        const newName = (e.target as HTMLInputElement).value.trim();
+                        if (newName && newName !== child.name) {
+                          onRenameFolder?.(child.id, newName);
+                        }
+                        setRenamingFolderId(null);
+                      }
+                      if (e.key === "Escape") {
+                        setRenamingFolderId(null);
+                      }
+                    }}
+                    className="w-full bg-black/40 border border-primary/30 rounded px-2 py-1 text-sm text-text-primary outline-none font-sans"
+                  />
+                ) : (
+                  <>
+                    <h3 className="font-bold text-text-primary mb-1 truncate w-full">
+                      {child.name}
+                    </h3>
+                    <p className={labelCls}>{child.children.length + child.sources.length} items</p>
+                  </>
+                )}
+              </button>
+              <div className="absolute top-5 right-5 z-10">
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <button
                       type="button"
-                      onClick={(e) => e.stopPropagation()}
                       className="p-1.5 hover:bg-white/5 rounded-xl text-text-muted opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer outline-none"
                     >
                       <MoreVertical className="size-4" />
                     </button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end" className="bg-bg-surface border-border-subtle">
-                    <DropdownMenuItem
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setRenamingFolderId(child.id);
-                      }}
-                    >
+                    <DropdownMenuItem onClick={() => setRenamingFolderId(child.id)}>
                       Rename
                     </DropdownMenuItem>
                     <DropdownMenuItem
                       className="text-error focus:text-error"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setDeleteTarget({ id: child.id, type: "folder", name: child.name });
-                      }}
+                      onClick={() =>
+                        setDeleteTarget({ id: child.id, type: "folder", name: child.name })
+                      }
                     >
                       Delete
                     </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
               </div>
-              {renamingFolderId === child.id ? (
-                <input
-                  type="text"
-                  defaultValue={child.name}
-                  // biome-ignore lint/a11y/noAutofocus: autoFocus is necessary to focus the inline renaming input instantly when displayed
-                  autoFocus
-                  onClick={(e) => e.stopPropagation()}
-                  onBlur={(e) => {
-                    const newName = e.target.value.trim();
-                    if (newName && newName !== child.name) {
-                      onRenameFolder?.(child.id, newName);
-                    }
-                    setRenamingFolderId(null);
-                  }}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      const newName = (e.target as HTMLInputElement).value.trim();
-                      if (newName && newName !== child.name) {
-                        onRenameFolder?.(child.id, newName);
-                      }
-                      setRenamingFolderId(null);
-                    }
-                    if (e.key === "Escape") {
-                      setRenamingFolderId(null);
-                    }
-                  }}
-                  className="w-full bg-black/40 border border-primary/30 rounded px-2 py-1 text-sm text-text-primary outline-none font-sans"
-                />
-              ) : (
-                <>
-                  <h3 className="font-bold text-text-primary mb-1 truncate w-full">{child.name}</h3>
-                  <p className={labelCls}>{child.children.length + child.sources.length} items</p>
-                </>
-              )}
             </div>
           </DroppableArea>
         ))}
 
         {currentFolder.sources.map((source) => (
           <DraggableItem key={source.id} id={`explorer-source-${source.id}`}>
-            {/* biome-ignore lint/a11y/useSemanticElements: div wrapper required to allow nested DropdownMenu triggers without invalid HTML button nesting */}
-            <div
-              onClick={() => onSelectSource(source.id)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" || e.key === " ") {
-                  onSelectSource(source.id);
-                }
-              }}
-              role="button"
-              tabIndex={0}
-              className="group w-full flex flex-col p-5 bg-bg-surface-bright/40 border border-border-subtle rounded-3xl hover:bg-bg-hover hover:border-primary/30 transition-all text-left outline-none cursor-pointer select-none"
-            >
-              <div className="flex items-start justify-between mb-4 w-full">
-                <div className="p-3 bg-text-muted/10 rounded-2xl">
+            <div className="relative group w-full">
+              <button
+                type="button"
+                onClick={() => onSelectSource(source.id)}
+                className="w-full flex flex-col p-5 bg-bg-surface-bright/40 border border-border-subtle rounded-3xl hover:bg-bg-hover hover:border-primary/30 transition-all text-left outline-none cursor-pointer select-none"
+              >
+                <div className="p-3 bg-text-muted/10 rounded-2xl mb-4">
                   <FileText className="size-6 text-text-muted" />
                 </div>
+                {renamingSourceId === source.id ? (
+                  <input
+                    type="text"
+                    defaultValue={source.name}
+                    // biome-ignore lint/a11y/noAutofocus: autoFocus is necessary to focus the inline renaming input instantly when displayed
+                    autoFocus
+                    onClick={(e) => e.stopPropagation()}
+                    onBlur={(e) => {
+                      const newName = e.target.value.trim();
+                      if (newName && newName !== source.name) {
+                        onRenameSource?.(source.id, newName);
+                      }
+                      setRenamingSourceId(null);
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        const newName = (e.target as HTMLInputElement).value.trim();
+                        if (newName && newName !== source.name) {
+                          onRenameSource?.(source.id, newName);
+                        }
+                        setRenamingSourceId(null);
+                      }
+                      if (e.key === "Escape") {
+                        setRenamingSourceId(null);
+                      }
+                    }}
+                    className="w-full bg-black/40 border border-primary/30 rounded px-2 py-1 text-sm text-text-primary outline-none font-sans"
+                  />
+                ) : (
+                  <>
+                    <h3 className="font-bold text-text-primary mb-1 truncate w-full">
+                      {source.name}
+                    </h3>
+                    <p className={labelCls}>{source.type} Source</p>
+                  </>
+                )}
+              </button>
+              <div className="absolute top-5 right-5 z-10">
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <button
                       type="button"
-                      onClick={(e) => e.stopPropagation()}
                       className="p-1.5 hover:bg-white/5 rounded-xl text-text-muted opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer outline-none"
                     >
                       <MoreVertical className="size-4" />
                     </button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end" className="bg-bg-surface border-border-subtle">
-                    <DropdownMenuItem
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setRenamingSourceId(source.id);
-                      }}
-                    >
+                    <DropdownMenuItem onClick={() => setRenamingSourceId(source.id)}>
                       Rename
                     </DropdownMenuItem>
                     <DropdownMenuItem
                       className="text-error focus:text-error"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setDeleteTarget({ id: source.id, type: "source", name: source.name });
-                      }}
+                      onClick={() =>
+                        setDeleteTarget({ id: source.id, type: "source", name: source.name })
+                      }
                     >
                       Delete
                     </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
               </div>
-              {renamingSourceId === source.id ? (
-                <input
-                  type="text"
-                  defaultValue={source.name}
-                  // biome-ignore lint/a11y/noAutofocus: autoFocus is necessary to focus the inline renaming input instantly when displayed
-                  autoFocus
-                  onClick={(e) => e.stopPropagation()}
-                  onBlur={(e) => {
-                    const newName = e.target.value.trim();
-                    if (newName && newName !== source.name) {
-                      onRenameSource?.(source.id, newName);
-                    }
-                    setRenamingSourceId(null);
-                  }}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      const newName = (e.target as HTMLInputElement).value.trim();
-                      if (newName && newName !== source.name) {
-                        onRenameSource?.(source.id, newName);
-                      }
-                      setRenamingSourceId(null);
-                    }
-                    if (e.key === "Escape") {
-                      setRenamingSourceId(null);
-                    }
-                  }}
-                  className="w-full bg-black/40 border border-primary/30 rounded px-2 py-1 text-sm text-text-primary outline-none font-sans"
-                />
-              ) : (
-                <>
-                  <h3 className="font-bold text-text-primary mb-1 truncate w-full">
-                    {source.name}
-                  </h3>
-                  <p className={labelCls}>{source.type} Source</p>
-                </>
-              )}
             </div>
           </DraggableItem>
         ))}

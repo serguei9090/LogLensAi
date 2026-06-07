@@ -633,8 +633,16 @@ class App:
             # Perform Pydantic validation if a model is defined
             model = self.RPC_MODELS.get(req.method)
 
-            # Methods that handle large payloads and must not block the event loop
-            offload_to_thread = {"ingest_logs", "ingest_local_file", "export_logs"}
+            # Methods that handle large payloads/heavy DB queries and must not block the event loop
+            offload_to_thread = {
+                "ingest_logs",
+                "ingest_local_file",
+                "export_logs",
+                "get_dashboard_stats",
+                "get_logs",
+                "get_fused_logs",
+                "get_metadata_facets",
+            }
 
             if model:
                 try:
