@@ -1,17 +1,26 @@
 // Assume Role: Frontend Engineer (@frontend)
 
-import { memo, useEffect, useMemo, useRef, useState } from "react";
+import { lazy, memo, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { AIInvestigationSidebar } from "@/components/organisms/AIInvestigationSidebar";
 import { ColumnManagerSidebar } from "@/components/organisms/ColumnManagerSidebar";
-import { CustomParserModal } from "@/components/organisms/CustomParserModal";
 import { ExplorerView } from "@/components/organisms/ExplorerView";
 import { FacetSidebar } from "@/components/organisms/FacetSidebar";
-import { ImportFeedModal } from "@/components/organisms/ImportFeedModal";
-import { OrchestratorHub } from "@/components/organisms/OrchestratorHub";
 import { VirtualLogTable } from "@/components/organisms/VirtualLogTable";
-import { WorkspaceEngineSettings } from "@/components/organisms/WorkspaceEngineSettings";
 import { InvestigationLayout } from "@/components/templates/InvestigationLayout";
+
+const CustomParserModal = lazy(() =>
+  import("@/components/organisms/CustomParserModal").then((m) => ({ default: m.CustomParserModal })),
+);
+const ImportFeedModal = lazy(() =>
+  import("@/components/organisms/ImportFeedModal").then((m) => ({ default: m.ImportFeedModal })),
+);
+const OrchestratorHub = lazy(() =>
+  import("@/components/organisms/OrchestratorHub").then((m) => ({ default: m.OrchestratorHub })),
+);
+const WorkspaceEngineSettings = lazy(() =>
+  import("@/components/organisms/WorkspaceEngineSettings").then((m) => ({ default: m.WorkspaceEngineSettings })),
+);
 import { useIngestionStatus } from "@/lib/hooks/useIngestionStatus";
 import { useKeyboardShortcuts } from "@/lib/hooks/useKeyboardShortcuts";
 import { useLogFetching } from "@/lib/hooks/useLogFetching";
@@ -616,62 +625,78 @@ function InvestigationPageImpl() {
         )}
       </InvestigationLayout>
 
-      <CustomParserModal
-        workspaceId={activeWorkspaceId ?? ""}
-        sourceId={activeParserSource ?? ""}
-        isOpen={!!activeParserSource}
-        onClose={() => setActiveParserSource(null)}
-        initialConfig={initialParserConfig}
-        onSaved={async (config) => {
-          if (!activeWorkspaceId || !activeParserSource) {
-            return;
-          }
-          try {
-            // Update the source-specific parser in the DB
-            // This is typically stored in fusion_configs or a dedicated table
-            // For now, we'll assume we update the fusion config for the active source
-            await callSidecar({
-              method: "update_source_parser",
-              params: {
-                workspace_id: activeWorkspaceId,
-                source_id: activeParserSource,
-                parser_config: config,
-              },
-            });
-            toast.success("Log parser re-calibrated.");
-            fetchLogs();
-          } catch (e) {
-            console.error("Failed to update parser", e);
-            toast.error("Failed to update log parser.");
-          }
-        }}
-      />
-      <ImportFeedModal
-        open={isImportOpen}
-        onOpenChange={setIsImportOpen}
-        onImportLocal={(path, tail) => handleImportLocal(path, tail, activeFolderId)}
-        onImportSSH={(host, port, user, pass, path, tail) =>
-          handleImportSSH(host, port, user, pass, path, tail, activeFolderId)
-        }
-        onIngestManual={(logs) => handleIngestManual(logs, activeFolderId)}
-        onImportLive={(name, types) => handleImportLive(name, types, activeFolderId)}
-      />
+      {activeParserSource && (
+        <Suspense fallback={null}>
+          <CustomParserModal
+            workspaceId={activeWorkspaceId ?? ""}
+            sourceId={activeParserSource}
+            isOpen={!!activeParserSource}
+            onClose={() => setActiveParserSource(null)}
+            initialConfig={initialParserConfig}
+            onSaved={async (config) => {
+              if (!activeWorkspaceId || !activeParserSource) {
+                return;
+              }
+              try {
+                // Update the source-specific parser in the DB
+                // This is typically stored in fusion_configs or a dedicated table
+                // For now, we'll assume we update the fusion config for the active source
+                await callSidecar({
+                  method: "update_source_parser",
+                  params: {
+                    workspace_id: activeWorkspaceId,
+                    source_id: activeParserSource,
+                    parser_config: config,
+                  },
+                });
+                toast.success("Log parser re-calibrated.");
+                fetchLogs();
+              } catch (e) {
+                console.error("Failed to update parser", e);
+                toast.error("Failed to update log parser.");
+              }
+            }}
+          />
+        </Suspense>
+      )}
+      {isImportOpen && (
+        <Suspense fallback={null}>
+          <ImportFeedModal
+            open={isImportOpen}
+            onOpenChange={setIsImportOpen}
+            onImportLocal={(path, tail) => handleImportLocal(path, tail, activeFolderId)}
+            onImportSSH={(host, port, user, pass, path, tail) =>
+              handleImportSSH(host, port, user, pass, path, tail, activeFolderId)
+            }
+            onIngestManual={(logs) => handleIngestManual(logs, activeFolderId)}
+            onImportLive={(name, types) => handleImportLive(name, types, activeFolderId)}
+          />
+        </Suspense>
+      )}
 
-      <OrchestratorHub
-        isOpen={isOrchestratorOpen}
-        onClose={() => setIsOrchestratorOpen(false)}
-        workspaceId={activeWorkspaceId}
-        availableSources={nonFusionSources}
-        editingFusionId={editingFusionId}
-        editingFusionName={editingFusionName}
-        onEngineSettingsOpen={() => setIsEngineSettingsOpen(true)}
-        onFusionSaved={handleFusionSaved}
-      />
-      <WorkspaceEngineSettings
-        isOpen={isEngineSettingsOpen}
-        onClose={() => setIsEngineSettingsOpen(false)}
-        workspaceId={activeWorkspaceId}
-      />
+      {isOrchestratorOpen && (
+        <Suspense fallback={null}>
+          <OrchestratorHub
+            isOpen={isOrchestratorOpen}
+            onClose={() => setIsOrchestratorOpen(false)}
+            workspaceId={activeWorkspaceId}
+            availableSources={nonFusionSources}
+            editingFusionId={editingFusionId}
+            editingFusionName={editingFusionName}
+            onEngineSettingsOpen={() => setIsEngineSettingsOpen(true)}
+            onFusionSaved={handleFusionSaved}
+          />
+        </Suspense>
+      )}
+      {isEngineSettingsOpen && (
+        <Suspense fallback={null}>
+          <WorkspaceEngineSettings
+            isOpen={isEngineSettingsOpen}
+            onClose={() => setIsEngineSettingsOpen(false)}
+            workspaceId={activeWorkspaceId}
+          />
+        </Suspense>
+      )}
     </>
   );
 }

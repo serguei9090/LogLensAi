@@ -1,4 +1,5 @@
-import { motion } from "framer-motion";
+// Assume Role: Frontend Engineer (@frontend)
+
 import { RefreshCcw } from "lucide-react";
 import { useState } from "react";
 import { callSidecar } from "@/lib/hooks/useSidecarBridge";
@@ -98,10 +99,9 @@ export function ClusterRow({
           </p>
           <div className="flex items-center gap-3">
             <div className="h-1 bg-bg-base/50 rounded-full flex-1 overflow-hidden border border-white/5">
-              <motion.div
-                initial={{ width: 0 }}
-                animate={{ width: `${(count / total) * 100}%` }}
-                className={cn("h-full rounded-full", barColor, glow)}
+              <div
+                style={{ width: `${(count / total) * 100}%` }}
+                className={cn("h-full rounded-full transition-[width] duration-1000 ease-out", barColor, glow)}
               />
             </div>
             <span className="text-[10px] font-mono text-text-muted shrink-0 w-16 text-right">

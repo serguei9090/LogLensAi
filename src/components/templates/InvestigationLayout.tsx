@@ -1,9 +1,14 @@
-import type { ReactNode } from "react";
+// Assume Role: Frontend Engineer (@frontend)
+
+import { lazy, Suspense, type ReactNode } from "react";
 import type { FilterEntry } from "@/components/molecules/FilterBuilder";
 import type { HighlightEntry } from "@/components/molecules/HighlightBuilder";
-import { LogDistributionWidget } from "@/components/organisms/LogDistributionWidget";
 import { LogToolbar } from "@/components/organisms/LogToolbar";
 import type { LogSource } from "@/store/workspaceStore";
+
+const LogDistributionWidget = lazy(() =>
+  import("@/components/organisms/LogDistributionWidget").then((m) => ({ default: m.LogDistributionWidget })),
+);
 
 interface InvestigationLayoutProps {
   readonly searchQuery: string;
@@ -93,17 +98,25 @@ export function InvestigationLayout({
         activeWorkspaceId={workspaceId}
       />
       {showDistribution && workspaceId && (
-        <LogDistributionWidget
-          workspaceId={workspaceId}
-          sourceIds={
-            activeSource?.type && activeSource.type !== "fusion" ? [activeSource.id] : null
+        <Suspense
+          fallback={
+            <div className="min-h-[220px] h-[220px] w-full bg-bg-base border-b border-border/40 shrink-0 flex items-center justify-center text-xs text-text-muted animate-pulse">
+              Loading distribution charts...
+            </div>
           }
-          fusionId={activeSource?.type === "fusion" ? activeSource.path : undefined}
-          isTailing={activeSourceId ? tailingSourceIds?.has(activeSourceId) : false}
-          filters={activeFilters}
-          query={searchQuery}
-          onClose={onDistributionClose}
-        />
+        >
+          <LogDistributionWidget
+            workspaceId={workspaceId}
+            sourceIds={
+              activeSource?.type && activeSource.type !== "fusion" ? [activeSource.id] : null
+            }
+            fusionId={activeSource?.type === "fusion" ? activeSource.path : undefined}
+            isTailing={activeSourceId ? tailingSourceIds?.has(activeSourceId) : false}
+            filters={activeFilters}
+            query={searchQuery}
+            onClose={onDistributionClose}
+          />
+        </Suspense>
       )}
       <div className="flex-1 flex min-h-0 min-w-0 overflow-hidden">
         {leftPanel}

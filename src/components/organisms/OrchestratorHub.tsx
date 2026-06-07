@@ -11,8 +11,14 @@ import { cn } from "@/lib/utils";
 import { useClusteringStore } from "@/store/clusteringStore";
 import { useInvestigationStore } from "@/store/investigationStore";
 import type { LogSource } from "@/store/workspaceStore";
-import { CustomParserModal } from "./CustomParserModal";
-import { TimeShiftModal } from "./TimeShiftModal";
+import { lazy, Suspense } from "react";
+
+const CustomParserModal = lazy(() =>
+  import("./CustomParserModal").then((m) => ({ default: m.CustomParserModal })),
+);
+const TimeShiftModal = lazy(() =>
+  import("./TimeShiftModal").then((m) => ({ default: m.TimeShiftModal })),
+);
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -683,32 +689,38 @@ export function OrchestratorHub({
         )}
       </div>
 
-      <CustomParserModal
-        workspaceId={workspaceId}
-        sourceId={activeParserSource ?? ""}
-        isOpen={!!activeParserSource}
-        onClose={() => setActiveParserSource(null)}
-        initialConfig={configs.find((c) => c.source_id === activeParserSource)?.parser_config ?? ""}
-        onSaved={(config) => handleParserSaved(activeParserSource ?? "", config)}
-      />
+      {activeParserSource && (
+        <Suspense fallback={null}>
+          <CustomParserModal
+            workspaceId={workspaceId}
+            sourceId={activeParserSource}
+            isOpen={!!activeParserSource}
+            onClose={() => setActiveParserSource(null)}
+            initialConfig={configs.find((c) => c.source_id === activeParserSource)?.parser_config ?? ""}
+            onSaved={(config) => handleParserSaved(activeParserSource, config)}
+          />
+        </Suspense>
+      )}
 
       {activeTimeShiftSource && (
-        <TimeShiftModal
-          isOpen={true}
-          onClose={() => setActiveTimeShiftSource(null)}
-          sourceLabel={
-            availableSources.find((s) => s.path === activeTimeShiftSource)?.name ??
-            activeTimeShiftSource.split("/").pop() ??
-            "Log Source"
-          }
-          initialShiftSeconds={temporalOffsets[activeTimeShiftSource] ?? 0}
-          onSaved={(secs) => {
-            setTemporalOffsets((prev) => ({
-              ...prev,
-              [activeTimeShiftSource]: secs,
-            }));
-          }}
-        />
+        <Suspense fallback={null}>
+          <TimeShiftModal
+            isOpen={true}
+            onClose={() => setActiveTimeShiftSource(null)}
+            sourceLabel={
+              availableSources.find((s) => s.path === activeTimeShiftSource)?.name ??
+              activeTimeShiftSource.split("/").pop() ??
+              "Log Source"
+            }
+            initialShiftSeconds={temporalOffsets[activeTimeShiftSource] ?? 0}
+            onSaved={(secs) => {
+              setTemporalOffsets((prev) => ({
+                ...prev,
+                [activeTimeShiftSource]: secs,
+              }));
+            }}
+          />
+        </Suspense>
       )}
     </>,
     document.body,

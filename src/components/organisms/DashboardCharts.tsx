@@ -417,7 +417,7 @@ export function DashboardCharts({
                   stackId="a"
                   fill={LEVEL_COLORS.DEBUG}
                   radius={[0, 0, 0, 0]}
-                  isAnimationActive={false}
+                  isAnimationActive={true}
                   onClick={handleBarClick}
                 />
                 <Bar
@@ -425,7 +425,7 @@ export function DashboardCharts({
                   stackId="a"
                   fill={LEVEL_COLORS.INFO}
                   radius={[0, 0, 0, 0]}
-                  isAnimationActive={false}
+                  isAnimationActive={true}
                   onClick={handleBarClick}
                 />
                 <Bar
@@ -433,7 +433,7 @@ export function DashboardCharts({
                   stackId="a"
                   fill={LEVEL_COLORS.WARN}
                   radius={[0, 0, 0, 0]}
-                  isAnimationActive={false}
+                  isAnimationActive={true}
                   onClick={handleBarClick}
                 />
                 <Bar
@@ -441,7 +441,7 @@ export function DashboardCharts({
                   stackId="a"
                   fill={LEVEL_COLORS.ERROR}
                   radius={[4, 4, 0, 0]}
-                  isAnimationActive={false}
+                  isAnimationActive={true}
                   onClick={handleBarClick}
                 />
 

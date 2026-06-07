@@ -1,4 +1,5 @@
-import { motion } from "framer-motion";
+// Assume Role: Frontend Engineer (@frontend)
+
 import type React from "react";
 import { cn } from "@/lib/utils";
 
@@ -38,10 +39,8 @@ export function StatCard({
   }
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      className="bg-bg-surface/40 border border-white/5 rounded-xl p-4 relative overflow-hidden group hover:border-primary/20 transition-[border-color,background-color] duration-200 hover:bg-bg-surface/60"
+    <div
+      className="bg-bg-surface/40 border border-white/5 rounded-xl p-4 relative overflow-hidden group hover:border-primary/20 transition-[border-color,background-color] duration-200 hover:bg-bg-surface/60 animate-fade-in-up"
     >
       <div className="flex items-start justify-between gap-3">
         <div className="flex-1">
@@ -75,6 +74,6 @@ export function StatCard({
 
       {/* Subtle accent line - optimized to use GPU-accelerated transform scaling */}
       <div className="absolute bottom-0 left-0 h-0.5 w-full bg-primary origin-left scale-x-0 group-hover:scale-x-100 transition-transform duration-300 ease-out opacity-30" />
-    </motion.div>
+    </div>
   );
 }

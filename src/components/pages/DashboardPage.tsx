@@ -1,3 +1,5 @@
+// Assume Role: Frontend Engineer (@frontend)
+
 import { AnimatePresence, motion } from "framer-motion";
 import {
   Activity,
@@ -9,7 +11,7 @@ import {
   Sparkles,
   TrendingUp,
 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { A2UIRenderer } from "@/components/atoms/A2UIRenderer";
 // Atomic/Molecule Imports
 import { StatCard } from "@/components/atoms/StatCard";
@@ -20,7 +22,11 @@ import {
 } from "@/components/molecules/DashboardModeToggle";
 import { type TimeRange, TimeRangePicker } from "@/components/molecules/TimeRangePicker";
 import { AIInvestigationSidebar } from "@/components/organisms/AIInvestigationSidebar";
-import { DashboardCharts } from "@/components/organisms/DashboardCharts";
+import { useInView } from "@/lib/hooks/useInView";
+
+const DashboardCharts = lazy(() =>
+  import("@/components/organisms/DashboardCharts").then((m) => ({ default: m.DashboardCharts })),
+);
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -208,11 +214,9 @@ function ProcessingHUD({ jobs }: Readonly<{ jobs: any[] }>) {
         </span>
       </div>
       {activeJobs.map((job) => (
-        <motion.div
+        <div
           key={job.id}
-          initial={{ opacity: 0, height: 0 }}
-          animate={{ opacity: 1, height: "auto" }}
-          className="bg-bg-surface/40 border border-border/50 rounded-xl p-4 backdrop-blur-sm"
+          className="bg-bg-surface/40 border border-border/50 rounded-xl p-4 backdrop-blur-sm animate-fade-in-up"
         >
           <div className="flex justify-between items-center mb-2">
             <div className="flex items-center gap-3">
@@ -228,16 +232,14 @@ function ProcessingHUD({ jobs }: Readonly<{ jobs: any[] }>) {
             </span>
           </div>
           <div className="h-1.5 bg-bg-base/50 rounded-full overflow-hidden border border-white/5">
-            <motion.div
-              className="h-full bg-primary shadow-[0_0_10px_var(--primary-glow)]"
-              initial={{ width: 0 }}
-              animate={{
+            <div
+              className="h-full bg-primary shadow-[0_0_10px_var(--primary-glow)] transition-[width] duration-500 ease-out"
+              style={{
                 width: `${(job.processed_lines / job.total_lines) * 100}%`,
               }}
-              transition={{ type: "spring", stiffness: 50 }}
             />
           </div>
-        </motion.div>
+        </div>
       ))}
     </div>
   );
@@ -456,10 +458,8 @@ function AIObservationCard({
     return null;
   }
   return (
-    <motion.section
-      initial={{ opacity: 0, y: -10 }}
-      animate={{ opacity: 1, y: 0 }}
-      className="bg-primary/5 border border-primary/20 rounded-2xl p-6 backdrop-blur-md relative overflow-hidden group"
+    <section
+      className="bg-primary/5 border border-primary/20 rounded-2xl p-6 backdrop-blur-md relative overflow-hidden group animate-fade-in-up"
     >
       <div className="flex items-start justify-between gap-6 relative z-10">
         <div className="flex-1">
@@ -481,7 +481,7 @@ function AIObservationCard({
         </Button>
       </div>
       <div className="absolute -top-20 -right-20 size-64 bg-primary/10 rounded-full blur-[80px] pointer-events-none" />
-    </motion.section>
+    </section>
   );
 }
 
@@ -594,6 +594,21 @@ interface AICanvasViewProps {
   readonly setSidebarOpen: (open: boolean) => void;
 }
 
+function LazyCanvasWidget({ widget }: { readonly widget: any }) {
+  const [ref, inView] = useInView<HTMLDivElement>({ rootMargin: "200px", triggerOnce: false });
+  return (
+    <div ref={ref} className="min-h-[140px]">
+      {inView ? (
+        <A2UIRenderer payload={widget} />
+      ) : (
+        <div className="h-[140px] bg-bg-surface/20 border border-border/40 rounded-xl p-4 flex flex-col items-center justify-center text-[10px] text-text-muted uppercase tracking-wider font-mono animate-pulse">
+          Paused (Out of View)
+        </div>
+      )}
+    </div>
+  );
+}
+
 function AICanvasView({ dashboardWidgets, isSidebarOpen, setSidebarOpen }: AICanvasViewProps) {
   const isEmpty = dashboardWidgets.length === 0;
   return (
@@ -625,7 +640,7 @@ function AICanvasView({ dashboardWidgets, isSidebarOpen, setSidebarOpen }: AICan
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 auto-rows-max overflow-y-auto custom-scrollbar pr-2 pb-20">
             {dashboardWidgets.map((widget, i) => {
               const widgetKey = widget.raw || `widget-${i}`;
-              return <A2UIRenderer key={widgetKey} payload={widget} />;
+              return <LazyCanvasWidget key={widgetKey} widget={widget} />;
             })}
           </div>
         )}
@@ -642,6 +657,9 @@ function AICanvasView({ dashboardWidgets, isSidebarOpen, setSidebarOpen }: AICan
 }
 
 export default function DashboardPage() {
+  const [patternsRef, patternsInView] = useInView<HTMLDivElement>({ rootMargin: "200px", triggerOnce: true });
+  const [heatmapRef, heatmapInView] = useInView<HTMLElement>({ rootMargin: "200px", triggerOnce: true });
+
   // Global State
   const workspaces = useWorkspaceStore((state) => state.workspaces);
   const activeWorkspace = useWorkspaceStore(selectActiveWorkspace);
@@ -774,29 +792,46 @@ export default function DashboardPage() {
               </div>
 
               {/* Main Charts Row */}
-              <DashboardCharts
-                stats={stats}
-                bucketInterval={stats?.bucket_interval}
-                timeBounds={timeBounds ?? undefined}
-                timeRange={timeRange}
-                onZoom={(start, end) => setTimeRange({ start, end, label: "Zoomed Range" })}
-                onReset={() => {
-                  if (timeBounds) {
-                    setTimeRange({ start: timeBounds.min, end: timeBounds.max, label: "All Time" });
-                  } else {
-                    setTimeRange({ start: "", end: "" });
-                  }
-                }}
-              />
+              <Suspense
+                fallback={
+                  <div className="w-full bg-bg-surface/50 border border-border rounded-xl p-6 h-[340px] flex items-center justify-center text-xs text-text-muted animate-pulse">
+                    Synchronizing severity charts...
+                  </div>
+                }
+              >
+                <DashboardCharts
+                  stats={stats}
+                  bucketInterval={stats?.bucket_interval}
+                  timeBounds={timeBounds ?? undefined}
+                  timeRange={timeRange}
+                  onZoom={(start, end) => setTimeRange({ start, end, label: "Zoomed Range" })}
+                  onReset={() => {
+                    if (timeBounds) {
+                      setTimeRange({ start: timeBounds.min, end: timeBounds.max, label: "All Time" });
+                    } else {
+                      setTimeRange({ start: "", end: "" });
+                    }
+                  }}
+                />
+              </Suspense>
 
               {/* Patterns Row (Stacked) */}
-              <div className="flex flex-col gap-8">
-                <ErrorClustersSection stats={stats} selectedWorkspaceId={selectedWorkspaceId} />
-                <NoiseClustersSection stats={stats} selectedWorkspaceId={selectedWorkspaceId} />
+              <div ref={patternsRef} className="flex flex-col gap-8 min-h-[300px]">
+                {patternsInView ? (
+                  <>
+                    <ErrorClustersSection stats={stats} selectedWorkspaceId={selectedWorkspaceId} />
+                    <NoiseClustersSection stats={stats} selectedWorkspaceId={selectedWorkspaceId} />
+                  </>
+                ) : (
+                  <div className="h-[300px] w-full bg-bg-surface/20 rounded-xl animate-pulse" />
+                )}
               </div>
 
               {/* Source Heatmap Row */}
-              <section className="bg-bg-surface/50 border border-border rounded-xl p-6 backdrop-blur-sm relative overflow-hidden">
+              <section
+                ref={heatmapRef}
+                className="bg-bg-surface/50 border border-border rounded-xl p-6 backdrop-blur-sm relative overflow-hidden min-h-[180px]"
+              >
                 <div className="flex items-center gap-2 mb-6">
                   <Activity className="h-4 w-4 text-primary" />
                   <h2 className="text-xs font-bold uppercase tracking-widest text-text-muted">
@@ -804,7 +839,11 @@ export default function DashboardPage() {
                   </h2>
                 </div>
 
-                <SourceHeatmap stats={stats} />
+                {heatmapInView ? (
+                  <SourceHeatmap stats={stats} />
+                ) : (
+                  <div className="h-[80px] w-full bg-bg-surface/20 rounded animate-pulse" />
+                )}
                 <Activity className="absolute -bottom-4 -right-4 size-32 text-text-muted/5 opacity-5 pointer-events-none" />
               </section>
               {/* Permanent spacer to prevent floating mode button overlap */}
