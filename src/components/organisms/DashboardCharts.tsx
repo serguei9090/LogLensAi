@@ -1,17 +1,9 @@
 // Assume Role: Frontend Engineer (@frontend)
 
+import type * as echarts from "echarts";
 import { History, ZoomIn } from "lucide-react";
-import { useCallback, useMemo, useState } from "react";
-import {
-  Bar,
-  BarChart,
-  CartesianGrid,
-  ReferenceArea,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from "recharts";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { ReactECharts } from "../atoms/ReactECharts";
 
 interface DashboardChartsProps {
   stats: any;
@@ -98,15 +90,6 @@ function padToIso(ts: string): string {
   return n;
 }
 
-/**
- * DashboardCharts organism — Kibana-style severity histogram.
- *
- * Supports:
- * - Single bar click → drilldown into that exact bucket's time range.
- * - Mouse drag → marquee selection across multiple bars.
- * - "Reset Zoom" button when a filter is active.
- * - Tooltip showing exact count per level.
- */
 export function DashboardCharts({
   stats,
   bucketInterval = "1 hour",
@@ -115,9 +98,7 @@ export function DashboardCharts({
   onZoom,
   onReset,
 }: Readonly<DashboardChartsProps>) {
-  const [refAreaLeft, setRefAreaLeft] = useState<string | null>(null);
-  const [refAreaRight, setRefAreaRight] = useState<string | null>(null);
-  const [isDragging, setIsDragging] = useState(false);
+  const [chartInstance, setChartInstance] = useState<echarts.EChartsType | null>(null);
 
   const isFiltered = useMemo(() => {
     if (!timeBounds?.min || !timeBounds?.max) {
@@ -160,135 +141,261 @@ export function DashboardCharts({
     }));
   }, [stats?.time_series]);
 
-  // ── Drag-to-zoom handlers ──────────────────────────────────────────────────
+  const xAxisData = useMemo(() => chartData.map((d: any) => d.timestamp), [chartData]);
+  const debugData = useMemo(() => chartData.map((d: any) => d.DEBUG), [chartData]);
+  const infoData = useMemo(() => chartData.map((d: any) => d.INFO), [chartData]);
+  const warnData = useMemo(() => chartData.map((d: any) => d.WARN), [chartData]);
+  const errorData = useMemo(() => chartData.map((d: any) => d.ERROR), [chartData]);
 
-  const handleMouseDown = useCallback((e: any) => {
-    if (e?.activeLabel) {
-      setRefAreaLeft(e.activeLabel);
-      setIsDragging(false);
+  // Keep brush active across updates
+  useEffect(() => {
+    if (chartInstance && chartData.length > 0) {
+      chartInstance.dispatchAction({
+        type: "takeBrush",
+        brushOption: {
+          brushType: "lineX",
+          brushMode: "single",
+        },
+      });
     }
-  }, []);
+  }, [chartInstance, chartData]);
 
-  const handleMouseMove = useCallback(
-    (e: any) => {
-      if (refAreaLeft && e?.activeLabel) {
-        setRefAreaRight(e.activeLabel);
-        setIsDragging(true);
-      }
-    },
-    [refAreaLeft],
-  );
+  // ── Drag-to-zoom & Click Handlers ──────────────────────────────────────────
 
-  const handleMouseUp = useCallback(() => {
-    if (isDragging && refAreaLeft && refAreaRight) {
-      let start = refAreaLeft;
-      let end = refAreaRight;
-      if (start > end) {
-        [start, end] = [end, start];
-      }
-      onZoom(padToIso(start), padToIso(addInterval(end, bucketInterval)));
-    }
-    setRefAreaLeft(null);
-    setRefAreaRight(null);
-    setIsDragging(false);
-  }, [isDragging, refAreaLeft, refAreaRight, bucketInterval, onZoom]);
+  const handleBrushSelected = useCallback(
+    (params: any) => {
+      const brushComponent = params.batch?.[0];
+      if (brushComponent?.areas && brushComponent.areas.length > 0) {
+        const area = brushComponent.areas[0];
+        const coordRange = area.coordRange;
+        if (coordRange && coordRange[0] !== undefined && coordRange[1] !== undefined) {
+          const startVal = Math.round(coordRange[0]);
+          const endVal = Math.round(coordRange[1]);
 
-  // ── Single-click drilldown ─────────────────────────────────────────────────
+          const startTimestamp = chartData[startVal]?.timestamp;
+          const endTimestamp = chartData[endVal]?.timestamp;
 
-  const handleBarClick = useCallback(
-    (data: any) => {
-      if (isDragging) {
-        return; // Don't fire click if user was dragging
-      }
-      const bucket =
-        data?.timestamp ||
-        data?.payload?.timestamp ||
-        data?.activeLabel ||
-        data?.activePayload?.[0]?.payload?.timestamp;
-      if (!bucket) {
-        return;
-      }
-      const bucketStart = padToIso(bucket);
-      const bucketEnd = addInterval(bucket, bucketInterval);
-      onZoom(bucketStart, bucketEnd);
-    },
-    [isDragging, bucketInterval, onZoom],
-  );
-
-  // ── X-axis tick renderer ───────────────────────────────────────────────────
-
-  const renderXAxisTick = (props: any) => {
-    const { x, y, payload, index } = props;
-    if (!payload?.value) {
-      return null;
-    }
-
-    const bucketStr = payload.value;
-    const parts = bucketStr.split(" ");
-    const datePart = parts[0] || "";
-    let timePart = parts[1] || "";
-
-    if (timePart.includes(":") && timePart.split(":").length === 3) {
-      const intervalParts = bucketInterval.split(" ");
-      const unit = intervalParts[1]?.toLowerCase();
-      if (!unit?.startsWith("second")) {
-        const [hh, mm] = timePart.split(":");
-        timePart = `${hh}:${mm}`;
-      }
-    }
-
-    const primaryLabel = timePart || datePart;
-    const secondaryLabel = timePart ? datePart : "";
-
-    // Show date if index is 0, or if the date has changed from the previous item
-    let showDate = false;
-    if (index === 0) {
-      showDate = true;
-    } else {
-      const prevItem = chartData[index - 1];
-      if (prevItem) {
-        const prevDate = prevItem.timestamp.split(" ")[0];
-        if (prevDate !== datePart) {
-          showDate = true;
+          if (startTimestamp && endTimestamp) {
+            let start = startTimestamp;
+            let end = endTimestamp;
+            if (start > end) {
+              [start, end] = [end, start];
+            }
+            onZoom(padToIso(start), padToIso(addInterval(end, bucketInterval)));
+          }
         }
       }
-    }
+    },
+    [chartData, bucketInterval, onZoom],
+  );
 
-    return (
-      <g transform={`translate(${x},${y})`}>
-        <text
-          x={0}
-          y={0}
-          dy={10}
-          textAnchor="middle"
-          fill="var(--text-muted)"
-          fontSize={9}
-          fontFamily="JetBrains Mono"
-        >
-          {primaryLabel}
-        </text>
-        {showDate && secondaryLabel && (
-          <text
-            x={0}
-            y={0}
-            dy={20}
-            textAnchor="middle"
-            fill="var(--text-muted)"
-            fontSize={8}
-            fontFamily="JetBrains Mono"
-            fontWeight="600"
-            opacity={0.8}
-          >
-            {secondaryLabel}
-          </text>
-        )}
-      </g>
-    );
-  };
+  const handleChartClick = useCallback(
+    (params: any) => {
+      if (params.componentType === "series") {
+        const dataIndex = params.dataIndex;
+        const timestamp = chartData[dataIndex]?.timestamp;
+        if (timestamp) {
+          onZoom(padToIso(timestamp), addInterval(timestamp, bucketInterval));
+        }
+      }
+    },
+    [chartData, bucketInterval, onZoom],
+  );
+
+  const onEvents = useMemo(() => {
+    return {
+      brushSelected: handleBrushSelected,
+      click: handleChartClick,
+    };
+  }, [handleBrushSelected, handleChartClick]);
+
+  // ── ECharts Options Configuration ──────────────────────────────────────────
+
+  const option = useMemo(() => {
+    return {
+      backgroundColor: "transparent",
+      color: [LEVEL_COLORS.DEBUG, LEVEL_COLORS.INFO, LEVEL_COLORS.WARN, LEVEL_COLORS.ERROR],
+      tooltip: {
+        trigger: "axis" as const,
+        axisPointer: {
+          type: "shadow" as const,
+          shadowStyle: {
+            color: "rgba(34, 197, 94, 0.06)",
+          },
+        },
+        backgroundColor: "var(--bg-surface-bright)",
+        borderColor: "var(--border)",
+        borderWidth: 1,
+        borderRadius: 8,
+        textStyle: {
+          color: "var(--text-primary)",
+          fontSize: 10,
+          fontFamily: "JetBrains Mono",
+        },
+        formatter: (params: any) => {
+          if (!params || params.length === 0) {
+            return "";
+          }
+          const timestamp = params[0].name;
+          const parts = timestamp.split(" ");
+          const datePart = parts[0] || "";
+          const timePart = parts[1] || "";
+
+          let html = `<div style="font-weight: bold; margin-bottom: 4px; font-family: 'JetBrains Mono', monospace;">`;
+          if (datePart) {
+            html += `<span style="color: var(--primary); margin-right: 4px;">${datePart}</span>`;
+          }
+          if (timePart) {
+            html += `<span>${timePart}</span>`;
+          }
+          html += `</div>`;
+
+          let total = 0;
+          for (const param of params) {
+            const val = param.value || 0;
+            total += val;
+            html += `<div style="display: flex; justify-content: space-between; gap: 16px; font-family: 'JetBrains Mono', monospace; color: ${param.color};">
+              <span>${param.seriesName}</span>
+              <span style="font-weight: 600;">${val.toLocaleString()}</span>
+            </div>`;
+          }
+          if (params.length > 1) {
+            html += `<div style="display: flex; justify-content: space-between; gap: 16px; margin-top: 4px; border-top: 1px solid var(--border-muted); padding-top: 4px; font-family: 'JetBrains Mono', monospace; color: var(--text-secondary);">
+              <span>TOTAL</span>
+              <span style="font-weight: 600;">${total.toLocaleString()}</span>
+            </div>`;
+          }
+          return html;
+        },
+      },
+      grid: {
+        top: 15,
+        right: 10,
+        bottom: 25,
+        left: 45,
+        containLabel: false,
+      },
+      xAxis: {
+        type: "category" as const,
+        data: xAxisData,
+        axisLine: { show: false },
+        axisTick: { show: false },
+        axisLabel: {
+          color: "var(--text-muted)",
+          fontSize: 9,
+          fontFamily: "JetBrains Mono",
+          formatter: (value: string, index: number) => {
+            const parts = value.split(" ");
+            const datePart = parts[0] || "";
+            let timePart = parts[1] || "";
+
+            if (timePart.includes(":") && timePart.split(":").length === 3) {
+              const intervalParts = bucketInterval.split(" ");
+              const unit = intervalParts[1]?.toLowerCase();
+              if (!unit?.startsWith("second")) {
+                const [hh, mm] = timePart.split(":");
+                timePart = `${hh}:${mm}`;
+              }
+            }
+
+            const primaryLabel = timePart || datePart;
+
+            let showDate = false;
+            if (index === 0) {
+              showDate = true;
+            } else {
+              const prevItem = chartData[index - 1];
+              if (prevItem) {
+                const prevDate = prevItem.timestamp.split(" ")[0];
+                if (prevDate !== datePart) {
+                  showDate = true;
+                }
+              }
+            }
+
+            if (showDate && timePart) {
+              return `${primaryLabel}\n{date|${datePart}}`;
+            }
+            return primaryLabel;
+          },
+          rich: {
+            date: {
+              color: "var(--color-primary)",
+              fontWeight: "bold" as const,
+              fontSize: 8,
+              lineHeight: 12,
+            },
+          },
+        },
+      },
+      yAxis: {
+        type: "value" as const,
+        splitLine: {
+          lineStyle: {
+            color: "var(--border-muted)",
+            type: "dashed" as const,
+          },
+        },
+        axisLine: { show: false },
+        axisTick: { show: false },
+        axisLabel: {
+          color: "var(--text-muted)",
+          fontSize: 9,
+          fontFamily: "JetBrains Mono",
+        },
+      },
+      brush: {
+        brushType: "lineX" as const,
+        brushMode: "single" as const,
+        toolbox: [],
+        xAxisIndex: 0,
+        outOfBrush: {
+          colorAlpha: 0.3,
+        },
+        brushStyle: {
+          borderWidth: 1,
+          color: "rgba(34, 197, 94, 0.15)",
+          borderColor: "var(--primary)",
+        },
+      },
+      series: [
+        {
+          name: "DEBUG",
+          type: "bar" as const,
+          stack: "total",
+          data: debugData,
+          barMaxWidth: 28,
+        },
+        {
+          name: "INFO",
+          type: "bar" as const,
+          stack: "total",
+          data: infoData,
+          barMaxWidth: 28,
+        },
+        {
+          name: "WARN",
+          type: "bar" as const,
+          stack: "total",
+          data: warnData,
+          barMaxWidth: 28,
+        },
+        {
+          name: "ERROR",
+          type: "bar" as const,
+          stack: "total",
+          data: errorData,
+          barMaxWidth: 28,
+          itemStyle: {
+            borderRadius: [4, 4, 0, 0] as [number, number, number, number],
+          },
+        },
+      ],
+    };
+  }, [xAxisData, debugData, infoData, warnData, errorData, bucketInterval, chartData]);
 
   return (
     <div className="w-full">
-      {/* Combined Severity Timeline Panel */}
       <section className="w-full bg-bg-surface/50 border border-border rounded-xl p-6 backdrop-blur-sm relative overflow-hidden h-[340px] flex flex-col">
         <div className="flex flex-wrap items-center justify-between gap-4 mb-5">
           <div className="flex items-center gap-2">
@@ -297,12 +404,10 @@ export function DashboardCharts({
               Severity Over Time
             </h2>
 
-            {/* Bucket indicator */}
             <span className="text-[9px] font-mono text-text-muted/50 ml-1 border border-border/30 rounded px-1 py-px">
               {bucketInterval}/bar
             </span>
 
-            {/* Reset Zoom button — visible when a filter is active */}
             {isFiltered && (
               <button
                 type="button"
@@ -315,7 +420,6 @@ export function DashboardCharts({
             )}
           </div>
 
-          {/* Inline Legend */}
           <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[11px] font-mono">
             {DISPLAY_LEVELS.map((lvl) => {
               const count = aggregatedCounts[lvl.key as keyof typeof aggregatedCounts] || 0;
@@ -338,7 +442,6 @@ export function DashboardCharts({
           </div>
         </div>
 
-        {/* Drag hint */}
         <p className="text-[9px] font-mono text-text-muted/40 mb-2 -mt-3">
           Click a bar to drill down · Drag to select a range
         </p>
@@ -363,102 +466,12 @@ export function DashboardCharts({
               <div className="h-4 bg-white/5 rounded w-1/3 mx-auto" />
             </div>
           ) : chartData.length > 0 ? (
-            <ResponsiveContainer
-              width="100%"
-              height="100%"
-              minWidth={0}
-              minHeight={0}
-              debounce={100}
-            >
-              <BarChart
-                data={chartData}
-                maxBarSize={28}
-                barCategoryGap="2%"
-                onMouseDown={handleMouseDown}
-                onMouseMove={handleMouseMove}
-                onMouseUp={handleMouseUp}
-                style={{ cursor: isDragging ? "col-resize" : "pointer" }}
-                margin={{ bottom: 20 }}
-              >
-                <CartesianGrid
-                  strokeDasharray="3 3"
-                  vertical={false}
-                  stroke="var(--border-muted)"
-                />
-                <XAxis
-                  dataKey="timestamp"
-                  axisLine={false}
-                  tickLine={false}
-                  padding={{ left: 10, right: 10 }}
-                  tick={renderXAxisTick}
-                />
-                <YAxis
-                  axisLine={false}
-                  tickLine={false}
-                  tick={{
-                    fontSize: 9,
-                    fill: "var(--text-muted)",
-                    fontFamily: "JetBrains Mono",
-                  }}
-                />
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: "var(--bg-surface-bright)",
-                    border: "1px solid var(--border)",
-                    borderRadius: "8px",
-                    fontSize: "10px",
-                    fontFamily: "JetBrains Mono",
-                  }}
-                  labelStyle={{ fontWeight: "bold", color: "var(--text-primary)" }}
-                  cursor={{ fill: "var(--primary)", fillOpacity: 0.06 }}
-                />
-                <Bar
-                  dataKey="DEBUG"
-                  stackId="a"
-                  fill={LEVEL_COLORS.DEBUG}
-                  radius={[0, 0, 0, 0]}
-                  isAnimationActive={true}
-                  onClick={handleBarClick}
-                />
-                <Bar
-                  dataKey="INFO"
-                  stackId="a"
-                  fill={LEVEL_COLORS.INFO}
-                  radius={[0, 0, 0, 0]}
-                  isAnimationActive={true}
-                  onClick={handleBarClick}
-                />
-                <Bar
-                  dataKey="WARN"
-                  stackId="a"
-                  fill={LEVEL_COLORS.WARN}
-                  radius={[0, 0, 0, 0]}
-                  isAnimationActive={true}
-                  onClick={handleBarClick}
-                />
-                <Bar
-                  dataKey="ERROR"
-                  stackId="a"
-                  fill={LEVEL_COLORS.ERROR}
-                  radius={[4, 4, 0, 0]}
-                  isAnimationActive={true}
-                  onClick={handleBarClick}
-                />
-
-                {/* Drag-selection highlight */}
-                {refAreaLeft && refAreaRight && (
-                  <ReferenceArea
-                    x1={refAreaLeft}
-                    x2={refAreaRight}
-                    strokeOpacity={0.4}
-                    fill="var(--primary)"
-                    fillOpacity={0.15}
-                    stroke="var(--primary)"
-                    strokeDasharray="4 2"
-                  />
-                )}
-              </BarChart>
-            </ResponsiveContainer>
+            <ReactECharts
+              option={option}
+              onEvents={onEvents}
+              onChartInit={setChartInstance}
+              style={{ cursor: "pointer" }}
+            />
           ) : (
             <div className="h-full flex items-center justify-center text-[10px] font-mono text-text-muted uppercase tracking-widest">
               No Time Data Available

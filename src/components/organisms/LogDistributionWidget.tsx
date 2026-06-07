@@ -1,10 +1,10 @@
 // Assume Role: Frontend Engineer (@frontend)
 import { X, ZoomIn } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Bar, BarChart, Rectangle, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import type { FilterEntry } from "@/components/molecules/FilterBuilder";
 import { callSidecar } from "@/lib/hooks/useSidecarBridge";
 import { useInvestigationStore } from "@/store/investigationStore";
+import { ReactECharts } from "../atoms/ReactECharts";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -147,11 +147,10 @@ export function LogDistributionWidget({
     };
   }, [workspaceId, sourceIds, fusionId, filters, query, isTailing, timeRange]);
 
-  // Format the time bucket for display — memoized to avoid recalculation every render
   const formattedData = useMemo(
     () =>
       data.map((d) => {
-        const timeStr = d.bucket; // "YYYY-MM-DD HH:MM:SS" or similar
+        const timeStr = d.bucket;
         const parts = timeStr.split(" ");
         const displayTime = parts.length === 2 ? parts[1] : timeStr;
 
@@ -169,10 +168,6 @@ export function LogDistributionWidget({
     [data, anomalies],
   );
 
-  // Memoized status overlay — prevents the "setState during render" error that
-  // occurs when an inline function interacts with parent store updates mid-render.
-  // The specific error was: "Cannot update SystemDiagnosticConsole while rendering
-  // a different component (ForwardRef [ResponsiveContainer])".
   const statusOverlay = useMemo(() => {
     if (loading && data.length === 0) {
       return (
@@ -208,177 +203,243 @@ export function LogDistributionWidget({
     return null;
   }, [loading, error, data.length, isTailing]);
 
-  const handleBarClick = useCallback(
-    (clickData: any) => {
-      const bucket =
-        clickData?.bucket ||
-        clickData?.payload?.bucket ||
-        clickData?.activeLabel ||
-        clickData?.activePayload?.[0]?.payload?.bucket;
-      if (!bucket) {
-        return;
-      }
-      const start = parseDbDate(bucket);
-      let durationMs = 3600 * 1000; // default 1 hour
-      if (bucketInterval) {
-        const parts = bucketInterval.split(" ");
-        const val = Number.parseInt(parts[0], 10);
-        const unit = parts[1]?.toLowerCase();
-        if (!Number.isNaN(val) && unit) {
-          if (unit.startsWith("second")) {
-            durationMs = val * 1000;
-          } else if (unit.startsWith("minute")) {
-            durationMs = val * 60 * 1000;
-          } else if (unit.startsWith("hour")) {
-            durationMs = val * 3600 * 1000;
-          } else if (unit.startsWith("day")) {
-            durationMs = val * 24 * 3600 * 1000;
-          } else if (unit.startsWith("month")) {
-            durationMs = val * 30 * 24 * 3600 * 1000;
+  // ─── Event Handlers ──────────────────────────────────────────────────────────
+
+  const handleChartClick = useCallback(
+    (params: any) => {
+      if (params.componentType === "series") {
+        const dataIndex = params.dataIndex;
+        const bucketItem = formattedData[dataIndex];
+        if (!bucketItem) {
+          return;
+        }
+        const bucket = bucketItem.bucket;
+
+        const start = parseDbDate(bucket);
+        let durationMs = 3600 * 1000;
+        if (bucketInterval) {
+          const parts = bucketInterval.split(" ");
+          const val = Number.parseInt(parts[0], 10);
+          const unit = parts[1]?.toLowerCase();
+          if (!Number.isNaN(val) && unit) {
+            if (unit.startsWith("second")) {
+              durationMs = val * 1000;
+            } else if (unit.startsWith("minute")) {
+              durationMs = val * 60 * 1000;
+            } else if (unit.startsWith("hour")) {
+              durationMs = val * 3600 * 1000;
+            } else if (unit.startsWith("day")) {
+              durationMs = val * 24 * 3600 * 1000;
+            } else if (unit.startsWith("month")) {
+              durationMs = val * 30 * 24 * 3600 * 1000;
+            }
           }
         }
+        const end = new Date(start.getTime() + durationMs);
+
+        const startStr = formatToDbString(start);
+        const endStr = formatToDbString(end);
+
+        const parts = bucket.split(" ");
+        const displayTime = parts.length === 2 ? parts[1] : bucket;
+
+        setTimeRange({
+          start: startStr,
+          end: endStr,
+          label: `${displayTime} (Zoomed)`,
+        });
       }
-      const end = new Date(start.getTime() + durationMs);
-
-      const startStr = formatToDbString(start);
-      const endStr = formatToDbString(end);
-
-      // Extract display label
-      const parts = bucket.split(" ");
-      const displayTime = parts.length === 2 ? parts[1] : bucket;
-
-      setTimeRange({
-        start: startStr,
-        end: endStr,
-        label: `${displayTime} (Zoomed)`,
-      });
     },
-    [bucketInterval, setTimeRange],
+    [formattedData, bucketInterval, setTimeRange],
   );
 
-  const renderXAxisTick = useCallback(
-    (props: any) => {
-      const { x, y, payload, index } = props;
-      if (!payload?.value) {
-        return null;
+  const onEvents = useMemo(() => {
+    return {
+      click: handleChartClick,
+    };
+  }, [handleChartClick]);
+
+  // ─── ECharts Options ─────────────────────────────────────────────────────────
+
+  const infoData = useMemo(() => formattedData.map((d) => d.INFO), [formattedData]);
+  const warnData = useMemo(() => formattedData.map((d) => d.WARN), [formattedData]);
+  const errorData = useMemo(() => {
+    return formattedData.map((d) => {
+      if (d.hasAnomaly) {
+        return {
+          value: d.ERROR,
+          itemStyle: {
+            borderRadius: [4, 4, 0, 0] as [number, number, number, number],
+            borderColor: "var(--color-text-primary)",
+            borderWidth: 2,
+            borderType: "solid" as const,
+          },
+        };
       }
+      return {
+        value: d.ERROR,
+        itemStyle: {
+          borderRadius: [4, 4, 0, 0] as [number, number, number, number],
+        },
+      };
+    });
+  }, [formattedData]);
 
-      const bucketStr = payload.value;
-      const parts = bucketStr.split(" ");
-      const datePart = parts[0] || "";
-      let timePart = parts[1] || "";
-
-      if (timePart.includes(":") && timePart.split(":").length === 3) {
-        const intervalParts = bucketInterval.split(" ");
-        const unit = intervalParts[1]?.toLowerCase();
-        if (!unit?.startsWith("second")) {
-          const [hh, mm] = timePart.split(":");
-          timePart = `${hh}:${mm}`;
-        }
-      }
-
-      const primaryLabel = timePart || datePart;
-      const secondaryLabel = timePart ? datePart : "";
-
-      // Show date if index is 0, or if the date has changed from the previous item
-      let showDate = false;
-      if (index === 0) {
-        showDate = true;
-      } else {
-        const prevItem = formattedData[index - 1];
-        if (prevItem) {
-          const prevDate = prevItem.bucket.split(" ")[0];
-          if (prevDate !== datePart) {
-            showDate = true;
-          }
-        }
-      }
-
-      return (
-        <g transform={`translate(${x},${y})`}>
-          <text
-            x={0}
-            y={0}
-            dy={10}
-            textAnchor="middle"
-            fill="var(--color-text-muted)"
-            fontSize={10}
-          >
-            {primaryLabel}
-          </text>
-          {showDate && secondaryLabel && (
-            <text
-              x={0}
-              y={0}
-              dy={22}
-              textAnchor="middle"
-              fill="var(--color-primary)"
-              fontSize={9}
-              fontWeight="700"
-              opacity={0.9}
-            >
-              {secondaryLabel}
-            </text>
-          )}
-        </g>
-      );
-    },
-    [bucketInterval, formattedData],
-  );
-
-  const CustomTooltip = useCallback(({ active, payload, label }: any) => {
-    if (!active || !payload?.length) {
-      return null;
-    }
-    // label === the bucket key from XAxis dataKey
-    const fullDateTime = label || "";
-    const parts = fullDateTime.split(" ");
-    const datePart = parts[0] || "";
-    const timePart = parts[1] || "";
-
-    return (
-      <div
-        style={{
-          backgroundColor: "var(--color-bg-tooltip)",
-          borderColor: "var(--color-border-subtle)",
-          borderWidth: 1,
-          borderStyle: "solid",
-          borderRadius: 8,
-          padding: "8px 12px",
+  const option = useMemo(() => {
+    return {
+      backgroundColor: "transparent",
+      color: ["var(--color-info)", "var(--color-warning)", "var(--color-error)"],
+      tooltip: {
+        trigger: "axis" as const,
+        axisPointer: {
+          type: "shadow" as const,
+          shadowStyle: {
+            color: "rgba(30, 37, 32, 0.3)",
+          },
+        },
+        backgroundColor: "var(--color-bg-tooltip)",
+        borderColor: "var(--color-border-subtle)",
+        borderWidth: 1,
+        borderRadius: 8,
+        textStyle: {
+          color: "var(--color-text-primary)",
           fontSize: 12,
-          minWidth: 140,
-        }}
-      >
-        <div style={{ marginBottom: 6, fontWeight: 700, color: "var(--color-text-primary)" }}>
-          {datePart && (
-            <span style={{ color: "var(--color-primary)", marginRight: 4 }}>{datePart}</span>
-          )}
-          {timePart && <span>{timePart}</span>}
-          {!timePart && !datePart && <span>{fullDateTime}</span>}
-        </div>
-        {payload.map((entry: any) => (
-          <div
-            key={entry.dataKey}
-            style={{ display: "flex", justifyContent: "space-between", gap: 16, color: entry.fill }}
-          >
-            <span>{entry.dataKey}</span>
-            <span style={{ fontWeight: 600 }}>{entry.value.toLocaleString()}</span>
-          </div>
-        ))}
-        <div
-          style={{
-            marginTop: 6,
-            fontSize: 9,
-            color: "var(--color-text-muted)",
-            opacity: 0.6,
-            textAlign: "center",
-          }}
-        >
-          Click to zoom into this window
-        </div>
-      </div>
-    );
-  }, []);
+          fontFamily: "JetBrains Mono",
+        },
+        formatter: (params: any) => {
+          if (!params || params.length === 0) {
+            return "";
+          }
+          const fullDateTime = params[0].name || "";
+          const parts = fullDateTime.split(" ");
+          const datePart = parts[0] || "";
+          const timePart = parts[1] || "";
+
+          let html = `<div style="font-weight: 700; margin-bottom: 6px; font-family: 'JetBrains Mono', monospace;">`;
+          if (datePart) {
+            html += `<span style="color: var(--color-primary); margin-right: 4px;">${datePart}</span>`;
+          }
+          if (timePart) {
+            html += `<span>${timePart}</span>`;
+          }
+          if (!timePart && !datePart) {
+            html += `<span>${fullDateTime}</span>`;
+          }
+          html += `</div>`;
+
+          for (const param of params) {
+            // value might be an object if customized (anomalous bars)
+            const rawVal = param.value;
+            const val = typeof rawVal === "object" && rawVal !== null ? rawVal.value : rawVal;
+            const displayVal = val || 0;
+            html += `<div style="display: flex; justify-content: space-between; gap: 16px; font-family: 'JetBrains Mono', monospace; color: ${param.color};">
+              <span>${param.seriesName}</span>
+              <span style="font-weight: 600;">${displayVal.toLocaleString()}</span>
+            </div>`;
+          }
+
+          html += `<div style="margin-top: 6px; font-size: 9px; color: var(--color-text-muted); opacity: 0.6; text-align: center; font-family: 'JetBrains Mono', monospace;">
+            Click to zoom into this window
+          </div>`;
+          return html;
+        },
+      },
+      grid: {
+        top: 10,
+        right: 10,
+        bottom: 25,
+        left: 35,
+        containLabel: false,
+      },
+      xAxis: {
+        type: "category" as const,
+        data: formattedData.map((d) => d.bucket),
+        axisLine: { show: false },
+        axisTick: { show: false },
+        axisLabel: {
+          color: "var(--color-text-muted)",
+          fontSize: 10,
+          fontFamily: "Inter, sans-serif",
+          formatter: (value: string, index: number) => {
+            const parts = value.split(" ");
+            const datePart = parts[0] || "";
+            let timePart = parts[1] || "";
+
+            if (timePart.includes(":") && timePart.split(":").length === 3) {
+              const intervalParts = bucketInterval.split(" ");
+              const unit = intervalParts[1]?.toLowerCase();
+              if (!unit?.startsWith("second")) {
+                const [hh, mm] = timePart.split(":");
+                timePart = `${hh}:${mm}`;
+              }
+            }
+
+            const primaryLabel = timePart || datePart;
+
+            let showDate = false;
+            if (index === 0) {
+              showDate = true;
+            } else {
+              const prevItem = formattedData[index - 1];
+              if (prevItem) {
+                const prevDate = prevItem.bucket.split(" ")[0];
+                if (prevDate !== datePart) {
+                  showDate = true;
+                }
+              }
+            }
+
+            if (showDate && timePart) {
+              return `${primaryLabel}\n{date|${datePart}}`;
+            }
+            return primaryLabel;
+          },
+          rich: {
+            date: {
+              color: "var(--color-primary)",
+              fontWeight: "bold" as const,
+              fontSize: 9,
+              lineHeight: 12,
+            },
+          },
+        },
+      },
+      yAxis: {
+        type: "value" as const,
+        splitLine: { show: false },
+        axisLine: { show: false },
+        axisTick: { show: false },
+        axisLabel: {
+          color: "var(--color-text-muted)",
+          fontSize: 10,
+          fontFamily: "Inter, sans-serif",
+        },
+      },
+      series: [
+        {
+          name: "INFO",
+          type: "bar" as const,
+          stack: "total",
+          data: infoData,
+          itemStyle: {
+            borderRadius: [0, 0, 4, 4] as [number, number, number, number],
+          },
+        },
+        {
+          name: "WARN",
+          type: "bar" as const,
+          stack: "total",
+          data: warnData,
+        },
+        {
+          name: "ERROR",
+          type: "bar" as const,
+          stack: "total",
+          data: errorData,
+        },
+      ],
+    };
+  }, [formattedData, infoData, warnData, errorData, bucketInterval]);
 
   return (
     <div className="min-h-[220px] h-[220px] w-full bg-bg-base border-b border-border/40 shrink-0 flex flex-col relative group select-none">
@@ -426,86 +487,13 @@ export function LogDistributionWidget({
         </div>
       </div>
 
-      {/*
-        Chart container — flex-1 + min-h-0 ensures flexbox resolves to a real
-        pixel height before Recharts measures it.  Without min-h-0, a flex child
-        inside a fixed-height parent can report -1 to ResponsiveContainer on the
-        first paint, triggering the "width(-1) and height(-1)" warning.
-      */}
       <div className="flex-1 min-h-0 p-4 relative overflow-hidden">
         {statusOverlay}
 
-        {/*
-          Only mount the chart when there is data.
-          Skipping it while empty/loading prevents the width(-1)/height(-1)
-          Recharts warning that fires when the container hasn't laid out yet.
-        */}
         {formattedData.length > 0 && (
-          <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
-            <BarChart
-              data={formattedData}
-              margin={{ top: 0, right: 10, left: -20, bottom: 20 }}
-              style={{ cursor: "pointer" }}
-            >
-              <XAxis dataKey="bucket" tick={renderXAxisTick} tickLine={false} axisLine={false} />
-              <YAxis
-                tick={{ fill: "var(--color-text-muted)", fontSize: 10 }}
-                tickLine={false}
-                axisLine={false}
-                dx={-5}
-              />
-              <Tooltip content={CustomTooltip} cursor={{ fill: "var(--color-bg-hover)" }} />
-              <Bar
-                dataKey="INFO"
-                stackId="a"
-                fill="var(--color-info)"
-                radius={[0, 0, 4, 4]}
-                isAnimationActive={true}
-                animationDuration={400}
-                animationEasing="ease-out"
-                onClick={handleBarClick}
-              />
-              <Bar
-                dataKey="WARN"
-                stackId="a"
-                fill="var(--color-warning)"
-                isAnimationActive={true}
-                animationDuration={400}
-                animationEasing="ease-out"
-                onClick={handleBarClick}
-              />
-              <Bar
-                dataKey="ERROR"
-                stackId="a"
-                fill="var(--color-error)"
-                radius={[4, 4, 0, 0]}
-                isAnimationActive={true}
-                animationDuration={400}
-                animationEasing="ease-out"
-                onClick={handleBarClick}
-                shape={<AnomalyBar />}
-              />
-            </BarChart>
-          </ResponsiveContainer>
+          <ReactECharts option={option} onEvents={onEvents} style={{ cursor: "pointer" }} />
         )}
       </div>
     </div>
-  );
-}
-
-interface AnomalyBarProps {
-  payload?: {
-    hasAnomaly?: boolean;
-  };
-}
-
-function AnomalyBar(props: Readonly<AnomalyBarProps>) {
-  const hasAnomaly = props.payload?.hasAnomaly;
-  return (
-    <Rectangle
-      {...props}
-      stroke={hasAnomaly ? "var(--color-text-primary)" : "none"}
-      strokeWidth={hasAnomaly ? 2 : 0}
-    />
   );
 }
