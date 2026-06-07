@@ -425,7 +425,7 @@ export function VirtualLogTable({
         {(() => {
           const isIngesting = isCurrentlyIngesting || !!activeJob;
           const showOverlay =
-            isIngesting || (showTransitioningLoader && (logs.length === 0 || !isTailing));
+            (isIngesting && logs.length === 0) || (showTransitioningLoader && (logs.length === 0 || !isTailing));
           const isEmpty = logs.length === 0 && !isIngesting && !showTransitioningLoader;
 
           if (showOverlay) {

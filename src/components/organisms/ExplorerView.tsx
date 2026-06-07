@@ -175,13 +175,10 @@ export function ExplorerView({
               </button>
               <div className="absolute top-5 right-5 z-10">
                 <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <button
-                      type="button"
-                      className="p-1.5 hover:bg-white/5 rounded-xl text-text-muted opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer outline-none"
-                    >
-                      <MoreVertical className="size-4" />
-                    </button>
+                  <DropdownMenuTrigger
+                    className="p-1.5 hover:bg-white/5 rounded-xl text-text-muted opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer outline-none flex items-center justify-center"
+                  >
+                    <MoreVertical className="size-4" />
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end" className="bg-bg-surface border-border-subtle">
                     <DropdownMenuItem onClick={() => setRenamingFolderId(child.id)}>
@@ -252,13 +249,10 @@ export function ExplorerView({
               </button>
               <div className="absolute top-5 right-5 z-10">
                 <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <button
-                      type="button"
-                      className="p-1.5 hover:bg-white/5 rounded-xl text-text-muted opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer outline-none"
-                    >
-                      <MoreVertical className="size-4" />
-                    </button>
+                  <DropdownMenuTrigger
+                    className="p-1.5 hover:bg-white/5 rounded-xl text-text-muted opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer outline-none flex items-center justify-center"
+                  >
+                    <MoreVertical className="size-4" />
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end" className="bg-bg-surface border-border-subtle">
                     <DropdownMenuItem onClick={() => setRenamingSourceId(source.id)}>

@@ -9,7 +9,7 @@ import {
   Sparkles,
   TrendingUp,
 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { A2UIRenderer } from "@/components/atoms/A2UIRenderer";
 // Atomic/Molecule Imports
 import { StatCard } from "@/components/atoms/StatCard";
@@ -244,7 +244,28 @@ function ProcessingHUD({ jobs }: Readonly<{ jobs: any[] }>) {
 }
 
 function SourceHeatmap({ stats }: Readonly<{ stats: DashboardStats | null }>) {
-  if (!stats || stats.source_heatmap.length === 0) {
+  if (!stats) {
+    return (
+      <div className="space-y-4 animate-pulse">
+        {Array.from({ length: 2 }).map((_, idx) => (
+          <div key={idx} className="flex items-center gap-4">
+            <div className="h-3 w-32 bg-white/10 rounded" />
+            <div className="flex-1 flex gap-1 h-4">
+              {Array.from({ length: 24 }).map((_, sIdx) => (
+                <div
+                  key={sIdx}
+                  className="h-full flex-1 rounded-sm bg-white/5"
+                  style={{ minWidth: "4px" }}
+                />
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  if (stats.source_heatmap.length === 0) {
     return (
       <div className="py-20 text-center text-[10px] font-mono text-text-muted uppercase tracking-widest">
         Insufficient Source Data
@@ -297,9 +318,19 @@ function useDashboardData(workspaces: any[], activeWorkspace: any) {
   const [isFirstLoad, setIsFirstLoad] = useState(true);
 
   // Filter State
-  const [selectedWorkspaceId, setSelectedWorkspaceId] = useState<string>("all");
+  const [selectedWorkspaceId, setSelectedWorkspaceId] = useState<string>(() => {
+    const activeId = useWorkspaceStore.getState().activeWorkspaceId;
+    return activeId || "all";
+  });
   const [selectedSourceId, setSelectedSourceId] = useState<string>("all");
   const [timeRange, setTimeRange] = useState<TimeRange>({ start: "", end: "" });
+
+  const lastFetchedParamsRef = useRef<{
+    workspaceId: string;
+    sourceId: string;
+    start: string;
+    end: string;
+  } | null>(null);
 
   // Sync selectedWorkspaceId with activeWorkspace on initial load or deletion fallback
   useEffect(() => {
@@ -324,6 +355,24 @@ function useDashboardData(workspaces: any[], activeWorkspace: any) {
   }, [selectedWorkspaceId]);
 
   const fetchStats = useCallback(async () => {
+    const params = {
+      workspaceId: selectedWorkspaceId,
+      sourceId: selectedSourceId,
+      start: isFirstLoad ? "" : timeRange.start || "",
+      end: isFirstLoad ? "" : timeRange.end || "",
+    };
+
+    // Skip if parameters are identical to last fetch
+    if (
+      lastFetchedParamsRef.current &&
+      lastFetchedParamsRef.current.workspaceId === params.workspaceId &&
+      lastFetchedParamsRef.current.sourceId === params.sourceId &&
+      lastFetchedParamsRef.current.start === params.start &&
+      lastFetchedParamsRef.current.end === params.end
+    ) {
+      return;
+    }
+
     setLoading(true);
     try {
       const res = await callSidecar<DashboardStats>({
@@ -343,14 +392,31 @@ function useDashboardData(workspaces: any[], activeWorkspace: any) {
         const bounds = { min: res.time_bounds.min, max: res.time_bounds.max };
         setTimeBounds(bounds);
         if (isFirstLoad) {
+          // Pre-cache parameters to avoid redundant sync call on subsequent render pass
+          lastFetchedParamsRef.current = {
+            workspaceId: selectedWorkspaceId,
+            sourceId: selectedSourceId,
+            start: bounds.min,
+            end: bounds.max,
+          };
           setTimeRange({ start: bounds.min, end: bounds.max, label: "All Time" });
           setIsFirstLoad(false);
+        } else {
+          lastFetchedParamsRef.current = params;
         }
       } else {
         setTimeBounds(null);
         if (isFirstLoad) {
+          lastFetchedParamsRef.current = {
+            workspaceId: selectedWorkspaceId,
+            sourceId: selectedSourceId,
+            start: "",
+            end: "",
+          };
           setTimeRange({ start: "", end: "" });
           setIsFirstLoad(false);
+        } else {
+          lastFetchedParamsRef.current = params;
         }
       }
     } catch (e) {
@@ -377,18 +443,6 @@ function useDashboardData(workspaces: any[], activeWorkspace: any) {
     setIsFirstLoad,
     fetchStats,
   };
-}
-
-function DashboardLoadingView({ mode }: { readonly mode: DashboardMode }) {
-  const loadingText = mode === "static" ? "Loading Analytics..." : "Scanning for AI Insights...";
-  return (
-    <div className="flex-1 flex items-center justify-center bg-bg-base">
-      <div className="flex flex-col items-center gap-4">
-        <RefreshCcw className="h-8 w-8 text-primary animate-spin" />
-        <p className="text-sm text-text-muted font-mono uppercase tracking-widest">{loadingText}</p>
-      </div>
-    </div>
-  );
 }
 
 function AIObservationCard({
@@ -447,7 +501,22 @@ function ErrorClustersSection({ stats, selectedWorkspaceId }: ClustersSectionPro
         </h2>
       </div>
       <div className="space-y-2 relative z-10">
-        {hasErrors ? (
+        {!stats ? (
+          Array.from({ length: 3 }).map((_, idx) => (
+            <div
+              key={idx}
+              className="flex flex-col gap-3 p-3 rounded-lg border border-white/5 bg-bg-surface/30 animate-pulse"
+            >
+              <div className="flex items-center gap-4">
+                <div className="h-3 w-6 bg-white/5 rounded" />
+                <div className="flex-1 space-y-2">
+                  <div className="h-3 w-3/4 bg-white/10 rounded" />
+                  <div className="h-2 w-full bg-white/5 rounded" />
+                </div>
+              </div>
+            </div>
+          ))
+        ) : hasErrors ? (
           stats.top_error_clusters.map((c, idx) => (
             <ClusterRow
               key={c.template}
@@ -481,7 +550,22 @@ function NoiseClustersSection({ stats, selectedWorkspaceId }: ClustersSectionPro
         </h2>
       </div>
       <div className="space-y-2 relative z-10">
-        {hasClusters ? (
+        {!stats ? (
+          Array.from({ length: 3 }).map((_, idx) => (
+            <div
+              key={idx}
+              className="flex flex-col gap-3 p-3 rounded-lg border border-white/5 bg-bg-surface/30 animate-pulse"
+            >
+              <div className="flex items-center gap-4">
+                <div className="h-3 w-6 bg-white/5 rounded" />
+                <div className="flex-1 space-y-2">
+                  <div className="h-3 w-3/4 bg-white/10 rounded" />
+                  <div className="h-2 w-full bg-white/5 rounded" />
+                </div>
+              </div>
+            </div>
+          ))
+        ) : hasClusters ? (
           stats.top_clusters.map((c, idx) => (
             <ClusterRow
               key={c.template}
@@ -596,15 +680,13 @@ export default function DashboardPage() {
 
   const sources = useMemo(() => currentWorkspace?.sources || [], [currentWorkspace]);
 
-  if (loading && !stats) {
-    return <DashboardLoadingView mode={mode} />;
-  }
+  // Layout frame is rendered immediately; components handle their own skeletons when stats is null.
 
   return (
     <div className="flex-1 bg-bg-base overflow-y-auto p-8 custom-scrollbar pb-48">
       <div
         className={cn(
-          "mx-auto flex flex-col h-full transition-all duration-300",
+          "mx-auto flex flex-col h-full transition-[max-width] duration-300",
           mode === "ai" ? "max-w-full px-6" : "max-w-6xl w-full",
         )}
       >
@@ -656,24 +738,28 @@ export default function DashboardPage() {
                   label="Total Index"
                   value={stats?.total_logs.toLocaleString() ?? "0"}
                   subValue="Records in context"
+                  loading={!stats}
                 />
                 <StatCard
                   icon={<Layers className="h-4 w-4 text-debug" />}
                   label="Patterns"
                   value={stats?.total_clusters.toLocaleString() ?? "0"}
                   subValue="Drain3 Templates"
+                  loading={!stats}
                 />
                 <StatCard
                   icon={<Activity className="h-4 w-4 text-primary" />}
                   label="Live Streams"
                   value={stats?.active_tailers.toString() ?? "0"}
                   subValue="Active ingestion"
+                  loading={!stats}
                 />
                 <StatCard
                   icon={<Database className="h-4 w-4 text-info" />}
                   label="Catalogs"
                   value={stats?.workspace_count.toString() ?? "0"}
                   subValue="Active workspaces"
+                  loading={!stats}
                 />
                 <StatCard
                   icon={<TrendingUp className="h-4 w-4 text-primary" />}
@@ -683,6 +769,7 @@ export default function DashboardPage() {
                   trend={
                     stats?.new_patterns_count && stats.new_patterns_count > 0 ? "up" : "stable"
                   }
+                  loading={!stats}
                 />
               </div>
 

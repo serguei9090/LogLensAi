@@ -61,3 +61,4 @@ final_debug*
 /scripts/logs/**
 **/.lancedb/**
 __pyrefly_virtual__/
+scratch/

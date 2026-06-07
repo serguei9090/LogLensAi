@@ -8,13 +8,21 @@ interface StatCardProps {
   value: string;
   subValue: string;
   trend?: "up" | "down" | "stable";
+  loading?: boolean;
 }
 
 /**
  * StatCard component for displaying dashboard metrics with trend indicators.
  * Follows atomic design (Atom).
  */
-export function StatCard({ icon, label, value, subValue, trend }: Readonly<StatCardProps>) {
+export function StatCard({
+  icon,
+  label,
+  value,
+  subValue,
+  trend,
+  loading,
+}: Readonly<StatCardProps>) {
   let trendColor = "text-text-muted opacity-40";
   if (trend === "up") {
     trendColor = "text-error";
@@ -41,16 +49,24 @@ export function StatCard({ icon, label, value, subValue, trend }: Readonly<StatC
             {label}
           </p>
           <div className="flex items-baseline gap-2">
-            <h3 className="text-xl font-mono font-bold text-text-primary tracking-tight">
-              {value}
-            </h3>
-            {trend && (
+            {loading ? (
+              <div className="h-6 w-16 bg-white/10 rounded animate-pulse my-0.5" />
+            ) : (
+              <h3 className="text-xl font-mono font-bold text-text-primary tracking-tight">
+                {value}
+              </h3>
+            )}
+            {trend && !loading && (
               <span className={cn("text-[10px] font-bold", trendColor)}>{trendSymbol}</span>
             )}
           </div>
-          <p className="text-[9px] text-text-muted mt-1 font-medium opacity-60 group-hover:opacity-100 transition-opacity uppercase tracking-tighter">
-            {subValue}
-          </p>
+          {loading ? (
+            <div className="h-3 w-24 bg-white/5 rounded animate-pulse mt-1.5" />
+          ) : (
+            <p className="text-[9px] text-text-muted mt-1 font-medium opacity-60 group-hover:opacity-100 transition-opacity uppercase tracking-tighter">
+              {subValue}
+            </p>
+          )}
         </div>
         <div className="p-2 rounded-lg bg-bg-base/50 border border-white/5 group-hover:border-primary/10 transition-colors duration-200">
           {icon}

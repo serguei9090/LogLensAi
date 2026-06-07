@@ -133,9 +133,9 @@ class LogDatabase:
                         },
                     ]
                 ),
-                "ingestion_syslog_enabled": "true",
+                "ingestion_syslog_enabled": "false",
                 "ingestion_syslog_port": "514",
-                "ingestion_http_enabled": "true",
+                "ingestion_http_enabled": "false",
                 "ingestion_http_port": "5002",
                 "facet_extractions": "[]",
                 "ui_command_palette_shortcut": json.dumps({"key": "k", "ctrl": True}),

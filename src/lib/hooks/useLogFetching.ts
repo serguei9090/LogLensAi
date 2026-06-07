@@ -20,6 +20,7 @@ export function useLogFetching(workspaceId: string | null, activeSourceId: strin
     showAnomalies,
     setLogs,
     setAvailableFacets,
+    isTailing,
   } = useInvestigationStore();
 
   const activeWorkspace = useWorkspaceStore(selectActiveWorkspace);
@@ -32,6 +33,17 @@ export function useLogFetching(workspaceId: string | null, activeSourceId: strin
   // Keep track of the active source key to prevent fetching bounds, anomalies,
   // and facets redundantly on every search/filter/sort action.
   const lastSourceKeyRef = useRef<string | null>(null);
+
+  // Keep track of the last fetched parameters to prevent duplicate fetching
+  const lastFetchedParamsRef = useRef<{
+    searchQuery: string;
+    filters: string;
+    sortBy: string;
+    sortOrder: "asc" | "desc";
+    startTime: string;
+    endTime: string;
+    showAnomalies: boolean;
+  } | null>(null);
 
   /**
    * Memoized query parameters derived from the active source and active filters.
@@ -81,9 +93,18 @@ export function useLogFetching(workspaceId: string | null, activeSourceId: strin
       if (currentSourceRef === activeSourceId) {
         setLogs(logResult.logs ?? [], logResult.total ?? 0);
         setIsConnected(true);
+        lastFetchedParamsRef.current = {
+          searchQuery,
+          filters: JSON.stringify(queryParams.combinedFilters),
+          sortBy,
+          sortOrder,
+          startTime: timeRange.start || "",
+          endTime: timeRange.end || "",
+          showAnomalies,
+        };
       }
     },
-    [searchQuery, sortBy, sortOrder, timeRange, activeSourceId, setLogs],
+    [searchQuery, sortBy, sortOrder, timeRange, activeSourceId, setLogs, showAnomalies],
   );
 
   const fetchAllLogsAndMetadata = useCallback(
@@ -155,6 +176,17 @@ export function useLogFetching(workspaceId: string | null, activeSourceId: strin
           store.timeRangeBounds.start !== minIso || store.timeRangeBounds.end !== maxIso;
         store.setTimeRangeBounds({ start: minIso, end: maxIso });
         if (boundsChanged || (!store.timeRange.start && !store.timeRange.end)) {
+          // Pre-cache parameters with updated bounds start/end so that setting the store timeRange
+          // does not trigger a duplicate log fetch on the next render pass.
+          lastFetchedParamsRef.current = {
+            searchQuery,
+            filters: JSON.stringify(queryParams.combinedFilters),
+            sortBy,
+            sortOrder,
+            startTime: minIso,
+            endTime: maxIso,
+            showAnomalies,
+          };
           store.setTimeRange({ start: minIso, end: maxIso, label: "All Time" });
         }
       }
@@ -173,6 +205,18 @@ export function useLogFetching(workspaceId: string | null, activeSourceId: strin
       setAvailableFacets(facetRes);
       setIsConnected(true);
       lastSourceKeyRef.current = sourceKey;
+
+      if (!lastFetchedParamsRef.current || lastFetchedParamsRef.current.startTime !== timeRange.start) {
+        lastFetchedParamsRef.current = {
+          searchQuery,
+          filters: JSON.stringify(queryParams.combinedFilters),
+          sortBy,
+          sortOrder,
+          startTime: timeRange.start || "",
+          endTime: timeRange.end || "",
+          showAnomalies,
+        };
+      }
     },
     [
       searchQuery,
@@ -205,6 +249,42 @@ export function useLogFetching(workspaceId: string | null, activeSourceId: strin
       const isSourceChanged = lastSourceKeyRef.current !== sourceKey;
       const forceFull = options?.forceFull ?? false;
       const shouldFetchAll = isSourceChanged || forceFull;
+
+      // Check for redundant parameter fetching if not tailing/ingesting
+      const state = useIngestionStore.getState();
+      const hasActiveJob = state.jobs.some(
+        (j) =>
+          j.source_id === currentSourceRef &&
+          (j.status === "processing" || j.status === "pending"),
+      );
+
+      const filtersStr = JSON.stringify(queryParams.combinedFilters);
+      const currentParams = {
+        searchQuery,
+        filters: filtersStr,
+        sortBy,
+        sortOrder,
+        startTime: timeRange.start || "",
+        endTime: timeRange.end || "",
+        showAnomalies,
+      };
+
+      const shouldSkipFetch =
+        !shouldFetchAll &&
+        !isTailing &&
+        !hasActiveJob &&
+        lastFetchedParamsRef.current &&
+        lastFetchedParamsRef.current.searchQuery === currentParams.searchQuery &&
+        lastFetchedParamsRef.current.filters === currentParams.filters &&
+        lastFetchedParamsRef.current.sortBy === currentParams.sortBy &&
+        lastFetchedParamsRef.current.sortOrder === currentParams.sortOrder &&
+        lastFetchedParamsRef.current.startTime === currentParams.startTime &&
+        lastFetchedParamsRef.current.endTime === currentParams.endTime &&
+        lastFetchedParamsRef.current.showAnomalies === currentParams.showAnomalies;
+
+      if (shouldSkipFetch) {
+        return;
+      }
 
       setIsFetching(true);
 
@@ -245,6 +325,12 @@ export function useLogFetching(workspaceId: string | null, activeSourceId: strin
       fetchPartialLogs,
       setLogs,
       setAvailableFacets,
+      isTailing,
+      searchQuery,
+      sortBy,
+      sortOrder,
+      timeRange,
+      showAnomalies,
     ],
   );
 

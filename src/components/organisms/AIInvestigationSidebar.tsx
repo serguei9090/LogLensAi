@@ -450,11 +450,14 @@ export function AIInvestigationSidebar({
   const displayTitle = currentSession?.name || pendingSessionName || "Investigation Hub";
 
   useEffect(() => {
+    if (!isSidebarOpen) {
+      return;
+    }
     if (activeWorkspace?.id) {
       fetchSessions(activeWorkspace.id);
     }
     fetchSettings();
-  }, [activeWorkspace?.id, fetchSessions, fetchSettings]);
+  }, [activeWorkspace?.id, isSidebarOpen, fetchSessions, fetchSettings]);
 
   useEffect(() => {
     if (!currentSessionId && !pendingSessionName) {

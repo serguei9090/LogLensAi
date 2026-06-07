@@ -344,8 +344,32 @@ export function DashboardCharts({
         </p>
 
         <div className="flex-1 w-full min-h-0 select-none">
-          {chartData.length > 0 ? (
-            <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
+          {!stats ? (
+            <div className="h-full w-full flex flex-col justify-end gap-2 animate-pulse px-4">
+              <div className="flex-1 flex items-end gap-1 px-2 pb-1 border-b border-white/5">
+                {Array.from({ length: 32 }).map((_, idx) => {
+                  const h = [25, 45, 15, 60, 30, 80, 45, 10, 55, 35, 70, 25, 50, 90, 15, 40][
+                    idx % 16
+                  ];
+                  return (
+                    <div
+                      key={idx}
+                      className="flex-1 bg-white/5 rounded-t-sm"
+                      style={{ height: `${h}%` }}
+                    />
+                  );
+                })}
+              </div>
+              <div className="h-4 bg-white/5 rounded w-1/3 mx-auto" />
+            </div>
+          ) : chartData.length > 0 ? (
+            <ResponsiveContainer
+              width="100%"
+              height="100%"
+              minWidth={0}
+              minHeight={0}
+              debounce={100}
+            >
               <BarChart
                 data={chartData}
                 maxBarSize={28}
@@ -393,9 +417,7 @@ export function DashboardCharts({
                   stackId="a"
                   fill={LEVEL_COLORS.DEBUG}
                   radius={[0, 0, 0, 0]}
-                  isAnimationActive={true}
-                  animationDuration={400}
-                  animationEasing="ease-out"
+                  isAnimationActive={false}
                   onClick={handleBarClick}
                 />
                 <Bar
@@ -403,9 +425,7 @@ export function DashboardCharts({
                   stackId="a"
                   fill={LEVEL_COLORS.INFO}
                   radius={[0, 0, 0, 0]}
-                  isAnimationActive={true}
-                  animationDuration={400}
-                  animationEasing="ease-out"
+                  isAnimationActive={false}
                   onClick={handleBarClick}
                 />
                 <Bar
@@ -413,9 +433,7 @@ export function DashboardCharts({
                   stackId="a"
                   fill={LEVEL_COLORS.WARN}
                   radius={[0, 0, 0, 0]}
-                  isAnimationActive={true}
-                  animationDuration={400}
-                  animationEasing="ease-out"
+                  isAnimationActive={false}
                   onClick={handleBarClick}
                 />
                 <Bar
@@ -423,9 +441,7 @@ export function DashboardCharts({
                   stackId="a"
                   fill={LEVEL_COLORS.ERROR}
                   radius={[4, 4, 0, 0]}
-                  isAnimationActive={true}
-                  animationDuration={400}
-                  animationEasing="ease-out"
+                  isAnimationActive={false}
                   onClick={handleBarClick}
                 />
 

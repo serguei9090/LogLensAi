@@ -200,3 +200,9 @@
 .animate-shimmer {
   animation: shimmer 2s infinite linear;
 }
+
+/* Disable transitions and animations globally during window resize to prevent layout lag */
+.is-resizing * {
+  transition: none !important;
+  animation: none !important;
+}

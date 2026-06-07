@@ -1,10 +1,19 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, lazy, Suspense } from "react";
 import { CommandPalette } from "@/components/organisms/CommandPalette";
 import { SystemDiagnosticConsole } from "@/components/organisms/SystemDiagnosticConsole";
-import DashboardPage from "@/components/pages/DashboardPage";
-import { InvestigationPage } from "@/components/pages/InvestigationPage";
-import { SettingsPage } from "@/components/pages/SettingsPage";
 import { AppLayout } from "@/components/templates/AppLayout";
+
+const DashboardPage = lazy(() => import("@/components/pages/DashboardPage"));
+const InvestigationPage = lazy(() =>
+  import("@/components/pages/InvestigationPage").then((module) => ({
+    default: module.InvestigationPage,
+  })),
+);
+const SettingsPage = lazy(() =>
+  import("@/components/pages/SettingsPage").then((module) => ({
+    default: module.SettingsPage,
+  })),
+);
 import { Toaster } from "@/components/ui/sonner";
 import { useHealthStatus } from "@/lib/hooks/useHealthStatus";
 import { useKeyboardShortcuts } from "@/lib/hooks/useKeyboardShortcuts";
@@ -15,6 +24,25 @@ import { useUIStore } from "@/store/uiStore";
 import { useWorkspaceStore } from "@/store/workspaceStore";
 
 export type NavTab = "investigation" | "settings" | "dashboard";
+
+function PageLoader() {
+  return (
+    <div className="flex-1 flex flex-col items-center justify-center min-h-[400px] h-full w-full bg-bg-base/20 backdrop-blur-sm select-none animate-in fade-in duration-500">
+      <div className="relative flex flex-col items-center gap-4 p-8 rounded-2xl bg-bg-surface/50 border border-border-muted/50 max-w-sm w-full shadow-2xl">
+        <div className="relative">
+          <div className="absolute -inset-2 bg-primary/20 rounded-full blur-xl animate-pulse" />
+          <div className="relative w-10 h-10 border-2 border-primary/20 border-t-primary rounded-full animate-spin" />
+        </div>
+        <div className="space-y-1 text-center">
+          <h3 className="text-xs font-bold font-mono tracking-widest text-primary uppercase animate-pulse-slow">
+            Initializing Module
+          </h3>
+          <p className="text-[11px] text-text-muted">Loading dependencies...</p>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default function App() {
   const {
@@ -38,6 +66,24 @@ export default function App() {
   useEffect(() => {
     fetchSettings();
   }, [fetchSettings]);
+
+  // Global resize listener to temporarily disable all animations/transitions during window resizing
+  useEffect(() => {
+    let resizeTimer: number;
+    const handleResize = () => {
+      document.body.classList.add("is-resizing");
+      window.clearTimeout(resizeTimer);
+      resizeTimer = window.setTimeout(() => {
+        document.body.classList.remove("is-resizing");
+      }, 150);
+    };
+
+    window.addEventListener("resize", handleResize);
+    return () => {
+      window.removeEventListener("resize", handleResize);
+      window.clearTimeout(resizeTimer);
+    };
+  }, []);
 
   // Guard against StrictMode double-fire adding two default workspaces
   const seededRef = useRef(false);
@@ -158,9 +204,11 @@ export default function App() {
         diagnosticData={null}
         diagnosticLoading={false}
       >
-        {activeNav === "dashboard" && <DashboardPage />}
-        {activeNav === "investigation" && <InvestigationPage />}
-        {activeNav === "settings" && <SettingsPage />}
+        <Suspense fallback={<PageLoader />}>
+          {activeNav === "dashboard" && <DashboardPage />}
+          {activeNav === "investigation" && <InvestigationPage />}
+          {activeNav === "settings" && <SettingsPage />}
+        </Suspense>
       </AppLayout>
     </>
   );
