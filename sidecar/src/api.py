@@ -2942,7 +2942,8 @@ class App:
         time_series.sort(key=lambda b: b.get("timestamp", ""))
         return time_series
 
-    def _fetch_top_error_clusters(self, cursor, where_sql: str, params: list) -> list[dict]:
+    def _fetch_top_error_clusters(self, where_sql: str, params: list) -> list[dict]:
+        cursor = self.db.get_cursor()
         error_where = (
             f"{where_sql} AND l.level IN ('ERROR', 'FATAL', 'CRITICAL') AND l.cluster_id IS NOT NULL"
             if where_sql
@@ -2960,7 +2961,8 @@ class App:
             for row in cursor.fetchall()
         ]
 
-    def _fetch_pattern_drift(self, cursor, start_time: str | None, norm_start: str | None) -> int:
+    def _fetch_pattern_drift(self, start_time: str | None, norm_start: str | None) -> int:
+        cursor = self.db.get_cursor()
         new_patterns_count = 0
         try:
             cursor.execute(
@@ -2976,9 +2978,8 @@ class App:
             pass
         return new_patterns_count
 
-    def _fetch_source_heatmap(
-        self, cursor, where_sql: str, params: list, bucket_format: str
-    ) -> list[dict]:
+    def _fetch_source_heatmap(self, where_sql: str, params: list, bucket_format: str) -> list[dict]:
+        cursor = self.db.get_cursor()
         source_heatmap = []
         try:
             sh_query = (
@@ -2996,7 +2997,8 @@ class App:
             pass
         return source_heatmap
 
-    def _fetch_latest_insight(self, cursor, workspace_id: str | None) -> str | None:
+    def _fetch_latest_insight(self, workspace_id: str | None) -> str | None:
+        cursor = self.db.get_cursor()
         latest_insight = None
         try:
             insight_query = """
@@ -3022,6 +3024,88 @@ class App:
         except Exception:
             pass
         return latest_insight
+
+    def _fetch_total_logs(self, where_sql: str, params: list) -> int:
+        cur = self.db.get_cursor()
+        q = "SELECT COUNT(*) FROM logs l" + where_sql
+        cur.execute(q, params)
+        row = cur.fetchone()
+        return row[0] if row else 0
+
+    def _fetch_level_counts(self, where_sql: str, params: list) -> dict:
+        cur = self.db.get_cursor()
+        q = "SELECT l.level, COUNT(*) FROM logs l" + where_sql + " GROUP BY l.level"
+        cur.execute(q, params)
+        return {row[0]: row[1] for row in cur.fetchall()}
+
+    def _fetch_total_clusters(self, where_sql: str, params: list) -> int:
+        cur = self.db.get_cursor()
+        q = "SELECT COUNT(DISTINCT l.cluster_id) FROM logs l" + where_sql
+        cur.execute(q, params)
+        row = cur.fetchone()
+        return row[0] if row else 0
+
+    def _fetch_top_clusters(self, where_sql: str, params: list) -> list[dict]:
+        cur = self.db.get_cursor()
+        cluster_where = (
+            f"{where_sql} AND l.cluster_id IS NOT NULL"
+            if where_sql
+            else " WHERE l.cluster_id IS NOT NULL"
+        )
+        cluster_query = (
+            "SELECT COALESCE(c.template, 'Pattern ' || l.cluster_id) as template, COUNT(*) as count, l.cluster_id "
+            "FROM logs l LEFT JOIN clusters c ON l.workspace_id = c.workspace_id AND l.cluster_id = c.cluster_id "
+            + cluster_where
+            + " GROUP BY template, l.cluster_id ORDER BY count DESC LIMIT 10"
+        )
+        cur.execute(cluster_query, params)
+        return [
+            {"template": row[0], "count": row[1], "cluster_id": str(row[2])}
+            for row in cur.fetchall()
+        ]
+
+    def _fetch_workspace_count(self, active_workspace_ids: list[str] | None) -> int:
+        cur = self.db.get_cursor()
+        if active_workspace_ids:
+            placeholders = ", ".join(["?"] * len(active_workspace_ids))
+            q = f"SELECT COUNT(DISTINCT workspace_id) FROM logs WHERE workspace_id IN ({placeholders})"
+            cur.execute(q, active_workspace_ids)
+        else:
+            cur.execute("SELECT COUNT(DISTINCT workspace_id) FROM logs")
+        row = cur.fetchone()
+        return row[0] if row else 0
+
+    def _fetch_time_series(
+        self,
+        bucket_interval_str: str,
+        bucket_format: str,
+        where_sql: str,
+        params: list,
+        start_time: str | None,
+        end_time: str | None,
+        ts_min_time: str | None,
+        ts_max_time: str | None,
+    ) -> list[dict]:
+        cur = self.db.get_cursor()
+        ts_null_guard = "l.timestamp IS NOT NULL"
+        ts_where = (
+            (where_sql + " AND " + ts_null_guard) if where_sql else (" WHERE " + ts_null_guard)
+        )
+        ts_query = (
+            f"SELECT strftime(time_bucket(INTERVAL '{bucket_interval_str}', CAST(l.timestamp AS TIMESTAMP)), '{bucket_format}') as bucket, l.level, COUNT(*) as count "
+            f"FROM logs l {ts_where} GROUP BY bucket, l.level ORDER BY bucket ASC"
+        )
+        cur.execute(ts_query, params)
+        ts_raw = cur.fetchall()
+        return self._build_dashboard_time_series(
+            ts_raw,
+            start_time,
+            end_time,
+            ts_min_time,
+            ts_max_time,
+            bucket_interval_str,
+            bucket_format,
+        )
 
     def method_get_dashboard_stats(
         self,
@@ -3053,108 +3137,37 @@ class App:
             self._get_dashboard_bucket_params(cursor, where_sql, params)
         )
 
-        # Helper functions to run on pool threads (each will obtain its own thread-local cursor)
-        def get_total_logs():
-            cur = self.db.get_cursor()
-            q = "SELECT COUNT(*) FROM logs l" + where_sql
-            cur.execute(q, params)
-            row = cur.fetchone()
-            return row[0] if row else 0
-
-        def get_level_counts():
-            cur = self.db.get_cursor()
-            q = "SELECT l.level, COUNT(*) FROM logs l" + where_sql + " GROUP BY l.level"
-            cur.execute(q, params)
-            return {row[0]: row[1] for row in cur.fetchall()}
-
-        def get_total_clusters():
-            cur = self.db.get_cursor()
-            q = "SELECT COUNT(DISTINCT l.cluster_id) FROM logs l" + where_sql
-            cur.execute(q, params)
-            row = cur.fetchone()
-            return row[0] if row else 0
-
-        def get_top_clusters():
-            cur = self.db.get_cursor()
-            cluster_where = (
-                f"{where_sql} AND l.cluster_id IS NOT NULL"
-                if where_sql
-                else " WHERE l.cluster_id IS NOT NULL"
-            )
-            cluster_query = (
-                "SELECT COALESCE(c.template, 'Pattern ' || l.cluster_id) as template, COUNT(*) as count, l.cluster_id "
-                "FROM logs l LEFT JOIN clusters c ON l.workspace_id = c.workspace_id AND l.cluster_id = c.cluster_id "
-                + cluster_where
-                + " GROUP BY template, l.cluster_id ORDER BY count DESC LIMIT 10"
-            )
-            cur.execute(cluster_query, params)
-            return [
-                {"template": row[0], "count": row[1], "cluster_id": str(row[2])}
-                for row in cur.fetchall()
-            ]
-
-        def get_workspace_count():
-            cur = self.db.get_cursor()
-            if active_workspace_ids:
-                placeholders = ", ".join(["?"] * len(active_workspace_ids))
-                q = f"SELECT COUNT(DISTINCT workspace_id) FROM logs WHERE workspace_id IN ({placeholders})"
-                cur.execute(q, active_workspace_ids)
-            else:
-                cur.execute("SELECT COUNT(DISTINCT workspace_id) FROM logs")
-            row = cur.fetchone()
-            return row[0] if row else 0
-
-        def get_time_series():
-            cur = self.db.get_cursor()
-            ts_null_guard = "l.timestamp IS NOT NULL"
-            ts_where = (
-                (where_sql + " AND " + ts_null_guard) if where_sql else (" WHERE " + ts_null_guard)
-            )
-            ts_query = (
-                f"SELECT strftime(time_bucket(INTERVAL '{bucket_interval_str}', CAST(l.timestamp AS TIMESTAMP)), '{bucket_format}') as bucket, l.level, COUNT(*) as count "
-                f"FROM logs l {ts_where} GROUP BY bucket, l.level ORDER BY bucket ASC"
-            )
-            cur.execute(ts_query, params)
-            ts_raw = cur.fetchall()
-            return self._build_dashboard_time_series(
-                ts_raw,
-                start_time,
-                end_time,
-                ts_min_time,
-                ts_max_time,
-                bucket_interval_str,
-                bucket_format,
-            )
-
-        def get_top_error_clusters():
-            cur = self.db.get_cursor()
-            return self._fetch_top_error_clusters(cur, where_sql, params)
-
-        def get_pattern_drift():
-            cur = self.db.get_cursor()
-            return self._fetch_pattern_drift(cur, start_time, norm_start)
-
-        def get_source_heatmap():
-            cur = self.db.get_cursor()
-            return self._fetch_source_heatmap(cur, where_sql, params, bucket_format)
-
-        def get_latest_insight():
-            cur = self.db.get_cursor()
-            return self._fetch_latest_insight(cur, workspace_id)
-
         # Run remaining queries in parallel
         with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
             futures = {
-                "total_logs": executor.submit(get_total_logs),
-                "level_counts": executor.submit(get_level_counts),
-                "total_clusters": executor.submit(get_total_clusters),
-                "top_clusters": executor.submit(get_top_clusters),
-                "workspace_count": executor.submit(get_workspace_count),
-                "time_series": executor.submit(get_time_series),
-                "top_error_clusters": executor.submit(get_top_error_clusters),
-                "new_patterns_count": executor.submit(get_pattern_drift),
-                "source_heatmap": executor.submit(get_source_heatmap),
-                "latest_insight": executor.submit(get_latest_insight),
+                "total_logs": executor.submit(self._fetch_total_logs, where_sql, params),
+                "level_counts": executor.submit(self._fetch_level_counts, where_sql, params),
+                "total_clusters": executor.submit(self._fetch_total_clusters, where_sql, params),
+                "top_clusters": executor.submit(self._fetch_top_clusters, where_sql, params),
+                "workspace_count": executor.submit(
+                    self._fetch_workspace_count, active_workspace_ids
+                ),
+                "time_series": executor.submit(
+                    self._fetch_time_series,
+                    bucket_interval_str,
+                    bucket_format,
+                    where_sql,
+                    params,
+                    start_time,
+                    end_time,
+                    ts_min_time,
+                    ts_max_time,
+                ),
+                "top_error_clusters": executor.submit(
+                    self._fetch_top_error_clusters, where_sql, params
+                ),
+                "new_patterns_count": executor.submit(
+                    self._fetch_pattern_drift, start_time, norm_start
+                ),
+                "source_heatmap": executor.submit(
+                    self._fetch_source_heatmap, where_sql, params, bucket_format
+                ),
+                "latest_insight": executor.submit(self._fetch_latest_insight, workspace_id),
             }
             results = {k: f.result() for k, f in futures.items()}
 

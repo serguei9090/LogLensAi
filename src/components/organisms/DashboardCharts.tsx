@@ -181,7 +181,7 @@ export function DashboardCharts({
       if (brushComponent?.areas && brushComponent.areas.length > 0) {
         const area = brushComponent.areas[0];
         const coordRange = area.coordRange;
-        if (coordRange && coordRange[0] !== undefined && coordRange[1] !== undefined) {
+        if (coordRange?.[0] !== undefined && coordRange?.[1] !== undefined) {
           const startVal = Math.round(coordRange[0]);
           const endVal = Math.round(coordRange[1]);
 
@@ -410,6 +410,43 @@ export function DashboardCharts({
     };
   }, [xAxisData, debugData, infoData, warnData, errorData, bucketInterval, chartData]);
 
+  const chartContent = (() => {
+    if (stats) {
+      if (chartData.length > 0) {
+        return (
+          <ReactECharts
+            option={option}
+            onEvents={onEvents}
+            onChartInit={setChartInstance}
+            style={{ cursor: "pointer" }}
+          />
+        );
+      }
+      return (
+        <div className="h-full flex items-center justify-center text-[10px] font-mono text-text-muted uppercase tracking-widest">
+          No Time Data Available
+        </div>
+      );
+    }
+    return (
+      <div className="h-full w-full flex flex-col justify-end gap-2 animate-pulse px-4">
+        <div className="flex-1 flex items-end gap-1 px-2 pb-1 border-b border-white/5">
+          {Array.from({ length: 32 }, (_, idx) => {
+            const h = [25, 45, 15, 60, 30, 80, 45, 10, 55, 35, 70, 25, 50, 90, 15, 40][idx % 16];
+            return { id: `skeleton-bar-${idx}`, height: h };
+          }).map((bar) => (
+            <div
+              key={bar.id}
+              className="flex-1 bg-white/5 rounded-t-sm"
+              style={{ height: `${bar.height}%` }}
+            />
+          ))}
+        </div>
+        <div className="h-4 bg-white/5 rounded w-1/3 mx-auto" />
+      </div>
+    );
+  })();
+
   return (
     <div className="w-full">
       <section className="w-full bg-bg-surface/50 border border-border rounded-xl p-6 backdrop-blur-sm relative overflow-hidden h-[340px] flex flex-col">
@@ -462,38 +499,7 @@ export function DashboardCharts({
           Click a bar to drill down · Drag to select a range
         </p>
 
-        <div className="flex-1 w-full min-h-0 select-none">
-          {!stats ? (
-            <div className="h-full w-full flex flex-col justify-end gap-2 animate-pulse px-4">
-              <div className="flex-1 flex items-end gap-1 px-2 pb-1 border-b border-white/5">
-                {Array.from({ length: 32 }).map((_, idx) => {
-                  const h = [25, 45, 15, 60, 30, 80, 45, 10, 55, 35, 70, 25, 50, 90, 15, 40][
-                    idx % 16
-                  ];
-                  return (
-                    <div
-                      key={idx}
-                      className="flex-1 bg-white/5 rounded-t-sm"
-                      style={{ height: `${h}%` }}
-                    />
-                  );
-                })}
-              </div>
-              <div className="h-4 bg-white/5 rounded w-1/3 mx-auto" />
-            </div>
-          ) : chartData.length > 0 ? (
-            <ReactECharts
-              option={option}
-              onEvents={onEvents}
-              onChartInit={setChartInstance}
-              style={{ cursor: "pointer" }}
-            />
-          ) : (
-            <div className="h-full flex items-center justify-center text-[10px] font-mono text-text-muted uppercase tracking-widest">
-              No Time Data Available
-            </div>
-          )}
-        </div>
+        <div className="flex-1 w-full min-h-0 select-none">{chartContent}</div>
       </section>
     </div>
   );

@@ -448,6 +448,36 @@ class ClusteringWorker:
             )
             updates.append((None, "ERROR", result.get("facets_json"), None, log_id))
 
+    def _handle_stale_cache(
+        self,
+        sce: StaleCacheError,
+        meta: dict,
+        futures_meta: dict,
+        pending: list,
+    ):
+        """Handles StaleCacheError by resubmitting the future with the full cluster map."""
+        logger.debug(
+            "[Worker] Stale cache encountered for %s (v%d). Re-submitting with full cluster map.",
+            sce.workspace_id,
+            sce.version,
+        )
+        new_fut = self._executor.submit(
+            _tag_log_batch,
+            meta["chunk"],
+            meta["cluster_map"],
+            meta["miner_config"],
+            meta["rules"],
+            meta["p_config"],
+            meta["p_tz"],
+            meta["now"],
+            meta["version"],
+        )
+        futures_meta[new_fut] = meta
+        pending.append(new_fut)
+        if not hasattr(self, "_last_submitted_versions"):
+            self._last_submitted_versions = {}
+        self._last_submitted_versions[sce.workspace_id] = sce.version
+
     def _process_parallel_results(
         self,
         futures_meta: dict,
@@ -469,28 +499,7 @@ class ClusteringWorker:
                             result, updates, cluster_increments, batch_counts
                         )
                 except StaleCacheError as sce:
-                    logger.debug(
-                        "[Worker] Stale cache encountered for %s (v%d). Re-submitting with full cluster map.",
-                        sce.workspace_id,
-                        sce.version,
-                    )
-                    new_fut = self._executor.submit(
-                        _tag_log_batch,
-                        meta["chunk"],
-                        meta["cluster_map"],
-                        meta["miner_config"],
-                        meta["rules"],
-                        meta["p_config"],
-                        meta["p_tz"],
-                        meta["now"],
-                        meta["version"],
-                    )
-                    futures_meta[new_fut] = meta
-                    pending.append(new_fut)
-                    # Update our record of last submitted version to ensure we don't bypass in next batches
-                    if not hasattr(self, "_last_submitted_versions"):
-                        self._last_submitted_versions = {}
-                    self._last_submitted_versions[sce.workspace_id] = sce.version
+                    self._handle_stale_cache(sce, meta, futures_meta, pending)
                     break
                 except Exception:
                     logger.exception("[Worker] Future resolution failed:")
@@ -573,6 +582,80 @@ class ClusteringWorker:
             len(tag_rows) / t_tag_total if t_tag_total > 0 else 0,
         )
 
+    def _train_batch(
+        self,
+        train_rows: list,
+        cursor: Any,
+        rules_cache: dict,
+        global_rules: list,
+        parser_configs: dict,
+        updates: list,
+        cluster_increments: dict,
+        batch_counts: dict,
+    ):
+        """Processes training rows to update the Drain tree."""
+        trained_workspaces = set()
+        for row in train_rows:
+            ws_id = row[1]
+            trained_workspaces.add(ws_id)
+            self._train_single_row(
+                row,
+                cursor,
+                rules_cache,
+                global_rules,
+                parser_configs,
+                updates,
+                cluster_increments,
+                batch_counts,
+            )
+
+        if not hasattr(self, "_cluster_versions"):
+            self._cluster_versions = {}
+        for ws_id in trained_workspaces:
+            self._cluster_versions[ws_id] = self._cluster_versions.get(ws_id, 0) + 1
+
+    def _tag_batch(
+        self,
+        tag_rows: list,
+        cursor: Any,
+        rules_cache: dict,
+        global_rules: list,
+        parser_configs: dict,
+        now: float,
+        updates: list,
+        cluster_increments: dict,
+        batch_counts: dict,
+    ):
+        """Processes tagging rows, either synchronously or in parallel."""
+        if not tag_rows:
+            return
+
+        bypass_parallel = os.environ.get("BYPASS_PARALLEL_TAG") == "1"
+        if bypass_parallel:
+            self._tag_rows_sync(
+                tag_rows,
+                cursor,
+                rules_cache,
+                global_rules,
+                parser_configs,
+                now,
+                updates,
+                cluster_increments,
+                batch_counts,
+            )
+        elif self._executor is not None:
+            self._tag_rows_parallel(
+                tag_rows,
+                cursor,
+                rules_cache,
+                global_rules,
+                parser_configs,
+                now,
+                updates,
+                cluster_increments,
+                batch_counts,
+            )
+
     def _process_batch(self, batch_size: int | None = None) -> int:
         cursor = self.db.get_cursor()
         limit = batch_size or self.batch_size
@@ -613,54 +696,29 @@ class ClusteringWorker:
         # Phase 1: Train
         train_rows = hydrated_rows[:TRAIN_SAMPLE_SIZE]
         tag_rows = hydrated_rows[TRAIN_SAMPLE_SIZE:]
-
-        trained_workspaces = set()
-        for row in train_rows:
-            ws_id = row[1]
-            trained_workspaces.add(ws_id)
-            self._train_single_row(
-                row,
-                cursor,
-                rules_cache,
-                global_rules,
-                parser_configs,
-                updates,
-                cluster_increments,
-                batch_counts,
-            )
-
-        if not hasattr(self, "_cluster_versions"):
-            self._cluster_versions = {}
-        for ws_id in trained_workspaces:
-            self._cluster_versions[ws_id] = self._cluster_versions.get(ws_id, 0) + 1
+        self._train_batch(
+            train_rows,
+            cursor,
+            rules_cache,
+            global_rules,
+            parser_configs,
+            updates,
+            cluster_increments,
+            batch_counts,
+        )
 
         # Phase 2: Tag
-        if tag_rows:
-            bypass_parallel = os.environ.get("BYPASS_PARALLEL_TAG") == "1"
-            if bypass_parallel:
-                self._tag_rows_sync(
-                    tag_rows,
-                    cursor,
-                    rules_cache,
-                    global_rules,
-                    parser_configs,
-                    now,
-                    updates,
-                    cluster_increments,
-                    batch_counts,
-                )
-            elif self._executor is not None:
-                self._tag_rows_parallel(
-                    tag_rows,
-                    cursor,
-                    rules_cache,
-                    global_rules,
-                    parser_configs,
-                    now,
-                    updates,
-                    cluster_increments,
-                    batch_counts,
-                )
+        self._tag_batch(
+            tag_rows,
+            cursor,
+            rules_cache,
+            global_rules,
+            parser_configs,
+            now,
+            updates,
+            cluster_increments,
+            batch_counts,
+        )
 
         # Phase 3: Aggregation
         if updates:

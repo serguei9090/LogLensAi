@@ -30,6 +30,34 @@ function formatToDbString(date: Date): string {
   return `${yyyy}-${mm}-${dd}T${hh}:${min}:${ss}`;
 }
 
+function getBucketDurationMs(bucketInterval?: string): number {
+  if (!bucketInterval) {
+    return 3600 * 1000;
+  }
+  const parts = bucketInterval.split(" ");
+  const val = Number.parseInt(parts[0], 10);
+  const unit = parts[1]?.toLowerCase();
+  if (Number.isNaN(val) || !unit) {
+    return 3600 * 1000;
+  }
+  if (unit.startsWith("second")) {
+    return val * 1000;
+  }
+  if (unit.startsWith("minute")) {
+    return val * 60 * 1000;
+  }
+  if (unit.startsWith("hour")) {
+    return val * 3600 * 1000;
+  }
+  if (unit.startsWith("day")) {
+    return val * 24 * 3600 * 1000;
+  }
+  if (unit.startsWith("month")) {
+    return val * 30 * 24 * 3600 * 1000;
+  }
+  return 3600 * 1000;
+}
+
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 interface Bucket {
@@ -216,25 +244,7 @@ export function LogDistributionWidget({
         const bucket = bucketItem.bucket;
 
         const start = parseDbDate(bucket);
-        let durationMs = 3600 * 1000;
-        if (bucketInterval) {
-          const parts = bucketInterval.split(" ");
-          const val = Number.parseInt(parts[0], 10);
-          const unit = parts[1]?.toLowerCase();
-          if (!Number.isNaN(val) && unit) {
-            if (unit.startsWith("second")) {
-              durationMs = val * 1000;
-            } else if (unit.startsWith("minute")) {
-              durationMs = val * 60 * 1000;
-            } else if (unit.startsWith("hour")) {
-              durationMs = val * 3600 * 1000;
-            } else if (unit.startsWith("day")) {
-              durationMs = val * 24 * 3600 * 1000;
-            } else if (unit.startsWith("month")) {
-              durationMs = val * 30 * 24 * 3600 * 1000;
-            }
-          }
-        }
+        const durationMs = getBucketDurationMs(bucketInterval);
         const end = new Date(start.getTime() + durationMs);
 
         const startStr = formatToDbString(start);
