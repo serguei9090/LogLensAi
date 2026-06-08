@@ -1,3 +1,5 @@
+// Assume Role: Frontend Engineer (@frontend)
+
 import {
   DndContext,
   type DragEndEvent,
@@ -51,7 +53,7 @@ class CustomPointerSensor extends PointerSensor {
 
 const POINTER_SENSOR_OPTIONS = {
   activationConstraint: {
-    distance: 10, // 10px dead-zone avoids triggering drag on accidental pointer jitter during normal clicks
+    distance: 10,
   },
 };
 
@@ -80,9 +82,7 @@ export function AppLayout({
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
     if (over) {
-      // Strip prefixes to extract pure database IDs
       const sourceId = (active.id as string).replace(/^(sidebar-source-|explorer-source-)/, "");
-
       const rawOverId = over.id as string;
       const targetFolderId =
         rawOverId === "root" || rawOverId === "sidebar-folder-root"
@@ -95,7 +95,15 @@ export function AppLayout({
 
   return (
     <DndContext sensors={sensors} modifiers={[restrictToWindowEdges]} onDragEnd={handleDragEnd}>
-      <div className="flex h-screen w-full bg-bg-app overflow-hidden relative font-sans">
+      {/* OPTIMIZATION 1: Force Hardware acceleration context across the application frame */}
+      <div 
+        className="flex h-screen w-full bg-bg-app overflow-hidden relative font-sans"
+        style={{
+          transform: "translate3d(0,0,0)",
+          backfaceVisibility: "hidden",
+          willChange: "transform"
+        }}
+      >
         <Sidebar
           workspaces={workspaces}
           activeWorkspaceId={activeWorkspaceId}
@@ -107,7 +115,19 @@ export function AppLayout({
           onNavSelect={onNavSelect}
           activeFolderId={activeFolderId}
         />
-        <main className="flex-1 flex flex-col min-w-0 relative h-full bg-bg-base">{children}</main>
+        
+        {/* OPTIMIZATION 2: Apply layout boundaries specifically targeting sub-renders (Charts & Logs) */}
+        <main 
+          className="flex-1 flex flex-col min-w-0 relative h-full bg-bg-base"
+          style={{
+            transform: "translate3d(0,0,0)",
+            backfaceVisibility: "hidden",
+            contain: "strict" // Prevents child chart calculations from forcing tree-wide paint updates
+          }}
+        >
+          {children}
+        </main>
+
         <DiagnosticSidebar
           open={diagnosticOpen}
           onClose={onDiagnosticClose}

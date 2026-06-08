@@ -36,25 +36,36 @@ export function ReactECharts({
       onChartInit(chart);
     }
 
-    // Handle Resize using ResizeObserver throttled to requestAnimationFrame for crisp, instant sizing
-    let animationFrameId: number | null = null;
+    // Use a debounce timeout instead of requestAnimationFrame to prevent main-thread 
+    // choking during Tauri native window transitions (maximize, minimize, snap layout)
+    let resizeTimeoutId: ReturnType<typeof setTimeout> | null = null;
+    
     const resizeObserver = new ResizeObserver((_entries) => {
-      if (animationFrameId !== null) {
-        cancelAnimationFrame(animationFrameId);
+      if (resizeTimeoutId !== null) {
+        clearTimeout(resizeTimeoutId);
       }
-      animationFrameId = requestAnimationFrame(() => {
-        if (!containerRef.current) {
+      
+      // Delay canvas recalculations until the window geometry settling point
+      resizeTimeoutId = setTimeout(() => {
+        if (!containerRef.current || !chartInstanceRef.current) {
           return;
         }
-        chart.resize();
-      });
+        
+        // Smoothly transition canvas size bounds instead of instant, pixel-snapping calculations
+        chart.resize({
+          animation: {
+            duration: 250,
+            easing: "cubicOut",
+          },
+        });
+      }, 100); // 100ms quiet threshold allows native window animations to execute fluidly
     });
 
     resizeObserver.observe(containerRef.current);
 
     return () => {
-      if (animationFrameId !== null) {
-        cancelAnimationFrame(animationFrameId);
+      if (resizeTimeoutId !== null) {
+        clearTimeout(resizeTimeoutId);
       }
       resizeObserver.disconnect();
       chart.dispose();

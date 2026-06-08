@@ -223,3 +223,31 @@
   transition: none !important;
   animation: none !important;
 }
+
+/* src/styles/globals.css */
+[data-testid="echarts-container"] {
+  contain: strict; /* Fully shields layout/paint bounds from tree-wide propagation */
+  will-change: width, height;
+}
+
+/* src/styles/globals.css */
+
+/* 1. Fully isolate the virtual layout grid from forcing document-wide layout cycles */
+.virtual-log-table-wrapper,
+[data-testid="virtual-log-table"] {
+  contain: size layout style paint;
+  will-change: transform, width, height;
+}
+
+/* 2. Prevent flexbox text-wrapping calculations from thrashing the CPU during active window changes */
+.log-row-cell-content {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Optional: If rows must expand, add a utility class to decouple calculations during transition windows */
+.resize-active * {
+  pointer-events: none !important;
+  transition: none !important;
+}
