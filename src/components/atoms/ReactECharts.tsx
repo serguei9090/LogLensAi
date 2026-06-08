@@ -36,8 +36,6 @@ export function ReactECharts({
       onChartInit(chart);
     }
 
-    // Use a debounce timeout instead of requestAnimationFrame to prevent main-thread 
-    // choking during Tauri native window transitions (maximize, minimize, snap layout)
     let resizeTimeoutId: ReturnType<typeof setTimeout> | null = null;
     
     const resizeObserver = new ResizeObserver((_entries) => {
@@ -45,20 +43,21 @@ export function ReactECharts({
         clearTimeout(resizeTimeoutId);
       }
       
-      // Delay canvas recalculations until the window geometry settling point
+      // The canvas is stretched instantly by the CSS rules below.
+      // We only use JS to re-render the high-fidelity vector text and grids 
+      // once the layout frame geometry has completely settled.
       resizeTimeoutId = setTimeout(() => {
         if (!containerRef.current || !chartInstanceRef.current) {
           return;
         }
         
-        // Smoothly transition canvas size bounds instead of instant, pixel-snapping calculations
+        // Redraw at perfect resolution with 0ms animation duration to avoid double-transition jumps
         chart.resize({
           animation: {
-            duration: 250,
-            easing: "cubicOut",
+            duration: 0,
           },
         });
-      }, 100); // 100ms quiet threshold allows native window animations to execute fluidly
+      }, 100); 
     });
 
     resizeObserver.observe(containerRef.current);
