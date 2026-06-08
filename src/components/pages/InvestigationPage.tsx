@@ -10,7 +10,9 @@ import { VirtualLogTable } from "@/components/organisms/VirtualLogTable";
 import { InvestigationLayout } from "@/components/templates/InvestigationLayout";
 
 const CustomParserModal = lazy(() =>
-  import("@/components/organisms/CustomParserModal").then((m) => ({ default: m.CustomParserModal })),
+  import("@/components/organisms/CustomParserModal").then((m) => ({
+    default: m.CustomParserModal,
+  })),
 );
 const ImportFeedModal = lazy(() =>
   import("@/components/organisms/ImportFeedModal").then((m) => ({ default: m.ImportFeedModal })),
@@ -19,8 +21,11 @@ const OrchestratorHub = lazy(() =>
   import("@/components/organisms/OrchestratorHub").then((m) => ({ default: m.OrchestratorHub })),
 );
 const WorkspaceEngineSettings = lazy(() =>
-  import("@/components/organisms/WorkspaceEngineSettings").then((m) => ({ default: m.WorkspaceEngineSettings })),
+  import("@/components/organisms/WorkspaceEngineSettings").then((m) => ({
+    default: m.WorkspaceEngineSettings,
+  })),
 );
+
 import { useIngestionStatus } from "@/lib/hooks/useIngestionStatus";
 import { useKeyboardShortcuts } from "@/lib/hooks/useKeyboardShortcuts";
 import { useLogFetching } from "@/lib/hooks/useLogFetching";
@@ -229,6 +234,7 @@ function InvestigationPageImpl() {
           id: "ingest",
           description: `Processed ${lastJob.total_lines.toLocaleString()} lines.`,
         });
+        useIngestionStore.getState().stopIngestion(lastJob.source_id);
       } else if (lastJob.status === "failed") {
         toast.error("Ingestion failed", {
           id: "ingest",
@@ -252,7 +258,7 @@ function InvestigationPageImpl() {
 
     if (sourceJob.status === "completed" && !completedJobIds.current.has(sourceJob.id)) {
       completedJobIds.current.add(sourceJob.id);
-      fetchLogs();
+      fetchLogs({ forceFull: true });
     }
   }, [jobs, activeSourceId, fetchLogs]);
 
