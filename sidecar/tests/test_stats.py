@@ -10,12 +10,12 @@ async def test_get_dashboard_stats(tmp_path):
     # 1. Seed some data
     cursor = app.db.get_cursor()
     cursor.execute("""
-        INSERT INTO logs (workspace_id, source_id, timestamp, level, raw_text, cluster_id) 
-        VALUES ('ws1', 'src1', '2024-01-01 10:00:00', 'ERROR', 'Failure', 'c1')
+        INSERT INTO logs (workspace_id, source_id, timestamp, level, raw_text, cluster_id, processed) 
+        VALUES ('ws1', 'src1', '2024-01-01 10:00:00', 'ERROR', 'Failure', 'c1', TRUE)
     """)
     cursor.execute("""
-        INSERT INTO logs (workspace_id, source_id, timestamp, level, raw_text, cluster_id) 
-        VALUES ('ws1', 'src1', '2024-01-01 10:01:00', 'INFO', 'Success', 'c2')
+        INSERT INTO logs (workspace_id, source_id, timestamp, level, raw_text, cluster_id, processed) 
+        VALUES ('ws1', 'src1', '2024-01-01 10:01:00', 'INFO', 'Success', 'c2', TRUE)
     """)
     cursor.execute("""
         INSERT INTO clusters (workspace_id, cluster_id, template, count) 
@@ -24,13 +24,16 @@ async def test_get_dashboard_stats(tmp_path):
     app.db.commit()
 
     # 2. Call method
-    stats = app.method_get_dashboard_stats(workspace_id="ws1")
+    try:
+        stats = app.method_get_dashboard_stats(workspace_id="ws1")
 
-    # 3. Assertions
-    assert stats["total_logs"] == 2
-    assert stats["total_clusters"] == 2
-    assert stats["level_counts"]["ERROR"] == 1
-    assert stats["level_counts"]["INFO"] == 1
-    assert len(stats["top_clusters"]) == 2
-    assert stats["workspace_count"] == 1
-    assert stats["active_tailers"] == 0
+        # 3. Assertions
+        assert stats["total_logs"] == 2
+        assert stats["total_clusters"] == 2
+        assert stats["level_counts"]["ERROR"] == 1
+        assert stats["level_counts"]["INFO"] == 1
+        assert len(stats["top_clusters"]) == 2
+        assert stats["workspace_count"] == 1
+        assert stats["active_tailers"] == 0
+    finally:
+        app.stop()

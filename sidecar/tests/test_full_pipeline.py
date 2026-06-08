@@ -23,6 +23,7 @@ async def test_full_ingestion_pipeline(tmp_path):
     s.close()
 
     app.ingestion_server.http_port = port
+    app.ingestion_server.http_enabled = True
     app.ingestion_server.start()
 
     # Wait for server to boot

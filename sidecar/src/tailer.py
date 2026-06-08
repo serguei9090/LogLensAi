@@ -1,10 +1,16 @@
+# Assume Role: Backend Engineer (@backend)
 import json
+import logging
 import os
+import queue
+import threading
 import time
 
 from metadata_extractor import extract_log_metadata
 from parser import DrainParser
 from services.shared_core import SharedSourceManager
+
+logger = logging.getLogger("FileTailer")
 
 
 class FileTailer:
@@ -35,6 +41,12 @@ class FileTailer:
         self._manager = SharedSourceManager(log_store)
         self._shared_source = None
 
+        # Micro-batching queue & thread
+        self._queue = queue.Queue()
+        self._flush_lock = threading.Lock()
+        self._flush_running = False
+        self._flush_thread = None
+
     @property
     def running(self) -> bool:
         """Returns True if currently subscribed to a shared source."""
@@ -45,6 +57,12 @@ class FileTailer:
         if self._shared_source:
             return
 
+        self._flush_running = True
+        self._flush_thread = threading.Thread(
+            target=self._flush_loop, name=f"FileTailerFlush-{self.source_id}", daemon=True
+        )
+        self._flush_thread.start()
+
         self._shared_source = self._manager.get_source(self.source_id, self.filepath)
         self._shared_source.subscribe(self._process_line_callback)
 
@@ -53,6 +71,13 @@ class FileTailer:
         if self._shared_source:
             self._shared_source.unsubscribe(self._process_line_callback)
             self._shared_source = None
+
+        if self._flush_running:
+            self._flush_running = False
+            if self._flush_thread:
+                self._flush_thread.join(timeout=1.0)
+                self._flush_thread = None
+            self._flush_remaining()
 
     def _process_line_callback(self, line: str, line_id: int) -> None:
         """Callback from SharedSource when a new line is detected."""
@@ -74,25 +99,59 @@ class FileTailer:
         level = metadata["level"]
         facets = metadata.get("facets", {})
 
-        # 3. Insert the skinny row
+        # Put into the queue for batch insertion
         facets_json = json.dumps(facets) if facets else None
-        cursor = self.db.get_cursor()
-        cursor.execute(
-            """
-            INSERT INTO logs (workspace_id, source_id, line_id, raw_text, timestamp, ingest_timestamp, level, cluster_id, facets, processed)
-            VALUES (?, ?, ?, ?, ?, ?, ?, NULL, ?, FALSE)
-            """,
-            (
-                self.workspace_id,
-                self.source_id,
-                line_id,
-                line,  # raw_text
-                timestamp,
-                ingest_timestamp,
-                level,
-                facets_json,
-            ),
-        )
+        self._queue.put((
+            self.workspace_id,
+            self.source_id,
+            line_id,
+            line,
+            timestamp,
+            ingest_timestamp,
+            level,
+            facets_json,
+        ))
+
+    def _flush_loop(self):
+        while self._flush_running:
+            batch = []
+            while len(batch) < 500:
+                try:
+                    # Timeout of 100ms (0.1 seconds)
+                    item = self._queue.get(timeout=0.1)
+                    batch.append(item)
+                except queue.Empty:
+                    break
+
+            if batch:
+                self._flush_batch(batch)
+
+    def _flush_batch(self, batch: list):
+        with self._flush_lock:
+            cursor = self.db.get_cursor()
+            cursor.execute("BEGIN TRANSACTION")
+            try:
+                cursor.executemany(
+                    """
+                    INSERT INTO logs (workspace_id, source_id, line_id, raw_text, timestamp, ingest_timestamp, level, cluster_id, facets, processed)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, NULL, ?, FALSE)
+                    """,
+                    batch,
+                )
+                cursor.execute("COMMIT")
+            except Exception:
+                cursor.execute("ROLLBACK")
+                logger.exception("Failed to insert log batch in FileTailer:")
+
+    def _flush_remaining(self):
+        batch = []
+        while not self._queue.empty():
+            try:
+                batch.append(self._queue.get_nowait())
+            except queue.Empty:
+                break
+        if batch:
+            self._flush_batch(batch)
 
     def _get_parser_config(self) -> tuple[dict, float]:
         """Fetches and caches parser configuration for the source."""

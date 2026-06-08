@@ -1,7 +1,7 @@
 // Assume Role: Frontend Engineer (@frontend)
 
 import { Check, Clock, Cpu, Layers, Settings2, Sparkles, X, Zap } from "lucide-react";
-import { useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -11,7 +11,6 @@ import { cn } from "@/lib/utils";
 import { useClusteringStore } from "@/store/clusteringStore";
 import { useInvestigationStore } from "@/store/investigationStore";
 import type { LogSource } from "@/store/workspaceStore";
-import { lazy, Suspense } from "react";
 
 const CustomParserModal = lazy(() =>
   import("./CustomParserModal").then((m) => ({ default: m.CustomParserModal })),
@@ -696,7 +695,9 @@ export function OrchestratorHub({
             sourceId={activeParserSource}
             isOpen={!!activeParserSource}
             onClose={() => setActiveParserSource(null)}
-            initialConfig={configs.find((c) => c.source_id === activeParserSource)?.parser_config ?? ""}
+            initialConfig={
+              configs.find((c) => c.source_id === activeParserSource)?.parser_config ?? ""
+            }
             onSaved={(config) => handleParserSaved(activeParserSource, config)}
           />
         </Suspense>

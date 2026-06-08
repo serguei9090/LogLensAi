@@ -5,7 +5,9 @@ from api import App
 @pytest.fixture
 def app():
     # Use memory DB for tests
-    return App(db_path=":memory:", start_ingestion=False, start_anomalies=False, start_mcp=False)
+    a = App(db_path=":memory:", start_ingestion=False, start_anomalies=False, start_mcp=False)
+    yield a
+    a.stop()
 
 
 @pytest.mark.asyncio
@@ -15,18 +17,18 @@ async def test_dashboard_stats_filtering(app):
 
     # Logs for workspace A
     cursor.execute("""
-        INSERT INTO logs (workspace_id, source_id, timestamp, level, raw_text, cluster_id)
+        INSERT INTO logs (workspace_id, source_id, timestamp, level, raw_text, cluster_id, processed)
         VALUES 
-        ('ws_a', 'src_1', '2026-05-01 10:00:00', 'INFO', 'Log 1', '1'),
-        ('ws_a', 'src_1', '2026-05-01 11:00:00', 'ERROR', 'Log 2', '1'),
-        ('ws_a', 'src_2', '2026-05-02 10:00:00', 'WARN', 'Log 3', '2')
+        ('ws_a', 'src_1', '2026-05-01 10:00:00', 'INFO', 'Log 1', '1', TRUE),
+        ('ws_a', 'src_1', '2026-05-01 11:00:00', 'ERROR', 'Log 2', '1', TRUE),
+        ('ws_a', 'src_2', '2026-05-02 10:00:00', 'WARN', 'Log 3', '2', TRUE)
     """)
 
     # Logs for workspace B
     cursor.execute("""
-        INSERT INTO logs (workspace_id, source_id, timestamp, level, raw_text, cluster_id)
+        INSERT INTO logs (workspace_id, source_id, timestamp, level, raw_text, cluster_id, processed)
         VALUES 
-        ('ws_b', 'src_3', '2026-05-01 10:00:00', 'INFO', 'Log 4', '1')
+        ('ws_b', 'src_3', '2026-05-01 10:00:00', 'INFO', 'Log 4', '1', TRUE)
     """)
 
     # Clusters metadata
@@ -70,7 +72,7 @@ async def test_dashboard_stats_filtering(app):
     # Add more variety for Top 10
     for i in range(3, 15):
         cursor.execute(
-            "INSERT INTO logs (workspace_id, source_id, timestamp, level, raw_text, cluster_id) VALUES (?, ?, ?, ?, ?, ?)",
+            "INSERT INTO logs (workspace_id, source_id, timestamp, level, raw_text, cluster_id, processed) VALUES (?, ?, ?, ?, ?, ?, TRUE)",
             ("ws_a", "src_1", "2026-05-03 10:00:00", "INFO", f"Log {i}", str(i)),
         )
     app.db.commit()

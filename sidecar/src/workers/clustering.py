@@ -27,6 +27,15 @@ from metadata_extractor import extract_log_metadata
 
 logger = logging.getLogger("ClusteringWorker")
 
+class StaleCacheError(Exception):
+    def __init__(self, workspace_id: str, version: int):
+        self.workspace_id = workspace_id
+        self.version = version
+        super().__init__(f"Stale cache for {workspace_id}: expected version {version}")
+
+# Process-local cache for reconstructed TemplateMiner instances
+_worker_cluster_cache: dict[str, tuple[int, Any]] = {}
+
 # ---------------------------------------------------------------------------
 # Configuration constants
 # ---------------------------------------------------------------------------
@@ -116,19 +125,20 @@ def _tag_single_row(
 
 def _tag_log_batch(  # noqa: PLR0913
     rows: list[tuple],
-    cluster_map: dict,
+    cluster_map: dict | None,
     miner_config: Any,
     rules: list,
     p_config: dict,
     p_tz: int,
     _now: float,
+    cluster_version: int = 0,
 ) -> list[dict]:
     """
     Pure, picklable function executed in a child process.
 
     Performs metadata extraction and cluster-matching against a snapshot of
-    the Drain tree for a batch of rows. It reconstructs a temporary, in-memory TemplateMiner
-    from the cluster map to leverage the official `match` logic.
+    the Drain tree for a batch of rows. It reconstructs or retrieves a cached,
+    in-memory TemplateMiner to leverage the official `match` logic.
 
     Never writes to the Drain tree or the database.
 
@@ -136,13 +146,24 @@ def _tag_log_batch(  # noqa: PLR0913
       - log_id, ws_id, source_id, cluster_id, template, timestamp, level,
         facets_json, status ('ok' | 'missing' | 'error')
     """
-    # Reconstruct miner once per batch
-    temp_miner = None
-    if cluster_map:
+    global _worker_cluster_cache
+
+    ws_id = rows[0][1] if rows else "default"
+
+    cached = _worker_cluster_cache.get(ws_id)
+    if not cached or cached[0] < cluster_version:
+        if cluster_map is None:
+            # We don't have the map, and cache is missing/stale -> request full map
+            raise StaleCacheError(ws_id, cluster_version)
+
         temp_miner = TemplateMiner(config=miner_config)
         for c in cluster_map.values():
             temp_miner.drain.id_to_cluster[c.cluster_id] = c
             temp_miner.drain.add_seq_to_prefix_tree(temp_miner.drain.root_node, c)
+
+        _worker_cluster_cache[ws_id] = (cluster_version, temp_miner)
+    else:
+        temp_miner = cached[1]
 
     return [_tag_single_row(row, temp_miner, rules, p_config, p_tz) for row in rows]
 
@@ -429,21 +450,50 @@ class ClusteringWorker:
 
     def _process_parallel_results(
         self,
-        futures: list,
+        futures_meta: dict,
         updates: list,
         cluster_increments: dict,
         batch_counts: dict,
     ):
         """Iterates over futures and processes results as they complete."""
-        for fut in as_completed(futures):
-            try:
-                batch_results = fut.result()
-                for result in batch_results:
-                    self._process_single_tag_result(
-                        result, updates, cluster_increments, batch_counts
+        pending = list(futures_meta.keys())
+        while pending:
+            done_futures = as_completed(pending)
+            for fut in done_futures:
+                pending.remove(fut)
+                meta = futures_meta[fut]
+                try:
+                    batch_results = fut.result()
+                    for result in batch_results:
+                        self._process_single_tag_result(
+                            result, updates, cluster_increments, batch_counts
+                        )
+                except StaleCacheError as sce:
+                    logger.debug(
+                        "[Worker] Stale cache encountered for %s (v%d). Re-submitting with full cluster map.",
+                        sce.workspace_id,
+                        sce.version,
                     )
-            except Exception:
-                logger.exception("[Worker] Future resolution failed:")
+                    new_fut = self._executor.submit(
+                        _tag_log_batch,
+                        meta["chunk"],
+                        meta["cluster_map"],
+                        meta["miner_config"],
+                        meta["rules"],
+                        meta["p_config"],
+                        meta["p_tz"],
+                        meta["now"],
+                        meta["version"],
+                    )
+                    futures_meta[new_fut] = meta
+                    pending.append(new_fut)
+                    # Update our record of last submitted version to ensure we don't bypass in next batches
+                    if not hasattr(self, "_last_submitted_versions"):
+                        self._last_submitted_versions = {}
+                    self._last_submitted_versions[sce.workspace_id] = sce.version
+                    break
+                except Exception:
+                    logger.exception("[Worker] Future resolution failed:")
 
     def _tag_rows_parallel(
         self,
@@ -464,7 +514,12 @@ class ClusteringWorker:
             key = (row[1], row[2])
             ws_source_groups.setdefault(key, []).append(row)
 
-        futures = []
+        if not hasattr(self, "_cluster_versions"):
+            self._cluster_versions = {}
+        if not hasattr(self, "_last_submitted_versions"):
+            self._last_submitted_versions = {}
+
+        futures_meta = {}
         for (ws_id, source_id), rows in ws_source_groups.items():
             parser = self.app.get_drain_parser(ws_id)
             cluster_map = {c.cluster_id: c for c in parser.get_clusters()}
@@ -473,23 +528,42 @@ class ClusteringWorker:
             )
             p_config, p_tz = self._get_parser_config(cursor, ws_id, source_id, parser_configs)
 
+            version = self._cluster_versions.get(ws_id, 0)
+            last_sent = self._last_submitted_versions.get(ws_id)
+
+            if last_sent is None or last_sent < version:
+                cluster_map_to_send = cluster_map
+                self._last_submitted_versions[ws_id] = version
+            else:
+                cluster_map_to_send = None
+
             miner_config = parser.miner.config
-            chunk_size = max(100, len(rows) // MAX_PARALLEL_WORKERS)
+            chunk_size = max(500, len(rows) // MAX_PARALLEL_WORKERS)
             for i in range(0, len(rows), chunk_size):
                 chunk = rows[i : i + chunk_size]
                 fut = self._executor.submit(
                     _tag_log_batch,
                     chunk,
-                    cluster_map,
+                    cluster_map_to_send,
                     miner_config,
                     rules,
                     p_config,
                     p_tz,
                     now,
+                    version,
                 )
-                futures.append(fut)
+                futures_meta[fut] = {
+                    "chunk": chunk,
+                    "cluster_map": cluster_map,
+                    "miner_config": miner_config,
+                    "rules": rules,
+                    "p_config": p_config,
+                    "p_tz": p_tz,
+                    "now": now,
+                    "version": version,
+                }
 
-        self._process_parallel_results(futures, updates, cluster_increments, batch_counts)
+        self._process_parallel_results(futures_meta, updates, cluster_increments, batch_counts)
 
         t_tag_total = time.time() - t_tag_start
         logger.info(
@@ -540,7 +614,10 @@ class ClusteringWorker:
         train_rows = hydrated_rows[:TRAIN_SAMPLE_SIZE]
         tag_rows = hydrated_rows[TRAIN_SAMPLE_SIZE:]
 
+        trained_workspaces = set()
         for row in train_rows:
+            ws_id = row[1]
+            trained_workspaces.add(ws_id)
             self._train_single_row(
                 row,
                 cursor,
@@ -551,6 +628,11 @@ class ClusteringWorker:
                 cluster_increments,
                 batch_counts,
             )
+
+        if not hasattr(self, "_cluster_versions"):
+            self._cluster_versions = {}
+        for ws_id in trained_workspaces:
+            self._cluster_versions[ws_id] = self._cluster_versions.get(ws_id, 0) + 1
 
         # Phase 2: Tag
         if tag_rows:
@@ -627,6 +709,22 @@ class ClusteringWorker:
                         processed = TRUE
                     FROM updates_temp
                     WHERE logs.id = updates_temp.lid
+                """)
+
+                # 3.5. Incrementally update pre-aggregated hourly stats
+                cursor.execute("""
+                    INSERT INTO hourly_cluster_counts (workspace_id, cluster_id, hour_bucket, count)
+                    SELECT 
+                        logs.workspace_id,
+                        updates_temp.cid,
+                        SUBSTRING(REPLACE(COALESCE(updates_temp.ts, logs.timestamp), 'T', ' '), 1, 13) as hr,
+                        COUNT(*)
+                    FROM updates_temp
+                    JOIN logs ON logs.id = updates_temp.lid
+                    WHERE updates_temp.cid IS NOT NULL AND COALESCE(updates_temp.ts, logs.timestamp) IS NOT NULL
+                    GROUP BY logs.workspace_id, updates_temp.cid, hr
+                    ON CONFLICT (workspace_id, cluster_id, hour_bucket)
+                    DO UPDATE SET count = count + excluded.count
                 """)
 
                 # 4. Clean up

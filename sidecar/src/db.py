@@ -331,6 +331,7 @@ class LogDatabase:
         self._migrate_fast_path_schema(cursor)
         self._migrate_indexes(cursor)
         self._migrate_drain_masks(cursor)
+        self._migrate_hourly_stats(cursor)
 
     def _migrate_drain_masks(self, cursor):
         """Fix the broken IP lookbehind regex in stored drain_masks setting.
@@ -391,6 +392,29 @@ class LogDatabase:
                 "UPDATE settings SET value = ? WHERE key = 'drain_masks'",
                 (json.dumps(masks),),
             )
+
+    def _migrate_hourly_stats(self, cursor):
+        """Creates hourly_cluster_counts table and backfills it from existing logs if empty."""
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS hourly_cluster_counts (
+                workspace_id TEXT,
+                cluster_id TEXT,
+                hour_bucket TEXT,
+                count INTEGER,
+                PRIMARY KEY (workspace_id, cluster_id, hour_bucket)
+            );
+        """)
+        cursor.execute("SELECT count(*) FROM hourly_cluster_counts")
+        if cursor.fetchone()[0] == 0:
+            logger.info("[DB] Backfilling hourly_cluster_counts from existing logs...")
+            cursor.execute("""
+                INSERT INTO hourly_cluster_counts (workspace_id, cluster_id, hour_bucket, count)
+                SELECT workspace_id, cluster_id, SUBSTRING(REPLACE(timestamp, 'T', ' '), 1, 13) as hr, count(*)
+                FROM logs
+                WHERE cluster_id IS NOT NULL AND timestamp IS NOT NULL AND length(timestamp) >= 13
+                GROUP BY workspace_id, cluster_id, hr
+                ON CONFLICT DO NOTHING
+            """)
 
     def _migrate_fast_path_schema(self, cursor):
         """Migration: upgrade existing logs table to the Skinny / Fast-Path schema.

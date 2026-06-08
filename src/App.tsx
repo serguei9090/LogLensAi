@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, lazy, Suspense } from "react";
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { CommandPalette } from "@/components/organisms/CommandPalette";
 import { SystemDiagnosticConsole } from "@/components/organisms/SystemDiagnosticConsole";
 import { AppLayout } from "@/components/templates/AppLayout";
@@ -14,6 +14,7 @@ const SettingsPage = lazy(() =>
     default: module.SettingsPage,
   })),
 );
+
 import { Toaster } from "@/components/ui/sonner";
 import { useHealthStatus } from "@/lib/hooks/useHealthStatus";
 import { useKeyboardShortcuts } from "@/lib/hooks/useKeyboardShortcuts";
@@ -69,19 +70,19 @@ export default function App() {
 
   // Global resize listener to temporarily disable all animations/transitions during window resizing
   useEffect(() => {
-    let resizeTimer: number;
+    let resizeTimer: any;
     const handleResize = () => {
       document.body.classList.add("is-resizing");
-      window.clearTimeout(resizeTimer);
-      resizeTimer = window.setTimeout(() => {
+      globalThis.clearTimeout(resizeTimer);
+      resizeTimer = globalThis.setTimeout(() => {
         document.body.classList.remove("is-resizing");
       }, 150);
     };
 
-    window.addEventListener("resize", handleResize);
+    globalThis.addEventListener("resize", handleResize);
     return () => {
-      window.removeEventListener("resize", handleResize);
-      window.clearTimeout(resizeTimer);
+      globalThis.removeEventListener("resize", handleResize);
+      globalThis.clearTimeout(resizeTimer);
     };
   }, []);
 

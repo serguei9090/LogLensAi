@@ -10,7 +10,16 @@ import {
   Sparkles,
   TrendingUp,
 } from "lucide-react";
-import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  lazy,
+  type ReactNode,
+  Suspense,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { A2UIRenderer } from "@/components/atoms/A2UIRenderer";
 // Atomic/Molecule Imports
 import { StatCard } from "@/components/atoms/StatCard";
@@ -245,17 +254,20 @@ function ProcessingHUD({ jobs }: Readonly<{ jobs: any[] }>) {
   );
 }
 
+const SKELETON_ROWS = ["sk-row-1", "sk-row-2"];
+const SKELETON_CELLS = Array.from({ length: 24 }, (_, i) => `sk-cell-${i}`);
+
 function SourceHeatmap({ stats }: Readonly<{ stats: DashboardStats | null }>) {
   if (!stats) {
     return (
       <div className="space-y-4 animate-pulse">
-        {Array.from({ length: 2 }).map((_, idx) => (
-          <div key={idx} className="flex items-center gap-4">
+        {SKELETON_ROWS.map((rowKey) => (
+          <div key={rowKey} className="flex items-center gap-4">
             <div className="h-3 w-32 bg-white/10 rounded" />
             <div className="flex-1 flex gap-1 h-4">
-              {Array.from({ length: 24 }).map((_, sIdx) => (
+              {SKELETON_CELLS.map((cellKey) => (
                 <div
-                  key={sIdx}
+                  key={cellKey}
                   className="h-full flex-1 rounded-sm bg-white/5"
                   style={{ minWidth: "4px" }}
                 />
@@ -355,6 +367,44 @@ function useDashboardData(workspaces: any[], activeWorkspace: any) {
     }
   }, [selectedWorkspaceId]);
 
+  const syncTimeBounds = useCallback(
+    (
+      res: DashboardStats | null,
+      params: { workspaceId: string; sourceId: string; start: string; end: string },
+    ) => {
+      if (res?.time_bounds?.min && res.time_bounds.max) {
+        const bounds = { min: res.time_bounds.min, max: res.time_bounds.max };
+        if (isFirstLoad) {
+          setTimeBounds(bounds);
+          // Pre-cache parameters to avoid redundant sync call on subsequent render pass
+          lastFetchedParamsRef.current = {
+            workspaceId: selectedWorkspaceId,
+            sourceId: selectedSourceId,
+            start: bounds.min,
+            end: bounds.max,
+          };
+          setTimeRange({ start: bounds.min, end: bounds.max, label: "All Time" });
+          setIsFirstLoad(false);
+        } else {
+          lastFetchedParamsRef.current = params;
+        }
+      } else if (isFirstLoad) {
+        setTimeBounds(null);
+        lastFetchedParamsRef.current = {
+          workspaceId: selectedWorkspaceId,
+          sourceId: selectedSourceId,
+          start: "",
+          end: "",
+        };
+        setTimeRange({ start: "", end: "" });
+        setIsFirstLoad(false);
+      } else {
+        lastFetchedParamsRef.current = params;
+      }
+    },
+    [isFirstLoad, selectedWorkspaceId, selectedSourceId],
+  );
+
   const fetchStats = useCallback(async () => {
     const params = {
       workspaceId: selectedWorkspaceId,
@@ -364,12 +414,12 @@ function useDashboardData(workspaces: any[], activeWorkspace: any) {
     };
 
     // Skip if parameters are identical to last fetch
+    const current = lastFetchedParamsRef.current;
     if (
-      lastFetchedParamsRef.current &&
-      lastFetchedParamsRef.current.workspaceId === params.workspaceId &&
-      lastFetchedParamsRef.current.sourceId === params.sourceId &&
-      lastFetchedParamsRef.current.start === params.start &&
-      lastFetchedParamsRef.current.end === params.end
+      current?.workspaceId === params.workspaceId &&
+      current?.sourceId === params.sourceId &&
+      current?.start === params.start &&
+      current?.end === params.end
     ) {
       return;
     }
@@ -388,44 +438,13 @@ function useDashboardData(workspaces: any[], activeWorkspace: any) {
         silent: true,
       });
       setStats(res);
-      // Auto-initialize time range from data bounds on first load
-      if (res?.time_bounds?.min && res.time_bounds.max) {
-        const bounds = { min: res.time_bounds.min, max: res.time_bounds.max };
-        if (isFirstLoad) {
-          setTimeBounds(bounds);
-          // Pre-cache parameters to avoid redundant sync call on subsequent render pass
-          lastFetchedParamsRef.current = {
-            workspaceId: selectedWorkspaceId,
-            sourceId: selectedSourceId,
-            start: bounds.min,
-            end: bounds.max,
-          };
-          setTimeRange({ start: bounds.min, end: bounds.max, label: "All Time" });
-          setIsFirstLoad(false);
-        } else {
-          lastFetchedParamsRef.current = params;
-        }
-      } else {
-        if (isFirstLoad) {
-          setTimeBounds(null);
-          lastFetchedParamsRef.current = {
-            workspaceId: selectedWorkspaceId,
-            sourceId: selectedSourceId,
-            start: "",
-            end: "",
-          };
-          setTimeRange({ start: "", end: "" });
-          setIsFirstLoad(false);
-        } else {
-          lastFetchedParamsRef.current = params;
-        }
-      }
+      syncTimeBounds(res, params);
     } catch (e) {
       console.error("Failed to fetch dashboard stats", e);
     } finally {
       setLoading(false);
     }
-  }, [selectedWorkspaceId, selectedSourceId, timeRange, workspaces, isFirstLoad]);
+  }, [selectedWorkspaceId, selectedSourceId, timeRange, workspaces, isFirstLoad, syncTimeBounds]);
 
   useEffect(() => {
     fetchStats();
@@ -487,8 +506,46 @@ interface ClustersSectionProps {
   readonly selectedWorkspaceId: string;
 }
 
+const SKELETON_CLUSTERS = ["sk-cluster-1", "sk-cluster-2", "sk-cluster-3"];
+
 function ErrorClustersSection({ stats, selectedWorkspaceId }: ClustersSectionProps) {
-  const hasErrors = stats && stats.top_error_clusters.length > 0;
+  let content: ReactNode;
+  if (stats === null) {
+    content = SKELETON_CLUSTERS.map((rowKey) => (
+      <div
+        key={rowKey}
+        className="flex flex-col gap-3 p-3 rounded-lg border border-white/5 bg-bg-surface/30 animate-pulse"
+      >
+        <div className="flex items-center gap-4">
+          <div className="h-3 w-6 bg-white/5 rounded" />
+          <div className="flex-1 space-y-2">
+            <div className="h-3 w-3/4 bg-white/10 rounded" />
+            <div className="h-2 w-full bg-white/5 rounded" />
+          </div>
+        </div>
+      </div>
+    ));
+  } else if (stats.top_error_clusters.length > 0) {
+    content = stats.top_error_clusters.map((c, idx) => (
+      <ClusterRow
+        key={c.template}
+        index={idx}
+        template={c.template}
+        count={c.count}
+        total={stats.total_logs}
+        type="error"
+        clusterId={(c as any).cluster_id}
+        workspaceId={selectedWorkspaceId}
+      />
+    ));
+  } else {
+    content = (
+      <div className="py-20 text-center text-[10px] font-mono text-text-muted uppercase tracking-widest">
+        No Errors Detected
+      </div>
+    );
+  }
+
   return (
     <section className="bg-bg-surface/50 border border-border rounded-xl p-6 backdrop-blur-sm relative overflow-hidden">
       <div className="flex items-center gap-2 mb-6">
@@ -497,47 +554,49 @@ function ErrorClustersSection({ stats, selectedWorkspaceId }: ClustersSectionPro
           Top Error Clusters
         </h2>
       </div>
-      <div className="space-y-2 relative z-10">
-        {!stats ? (
-          Array.from({ length: 3 }).map((_, idx) => (
-            <div
-              key={idx}
-              className="flex flex-col gap-3 p-3 rounded-lg border border-white/5 bg-bg-surface/30 animate-pulse"
-            >
-              <div className="flex items-center gap-4">
-                <div className="h-3 w-6 bg-white/5 rounded" />
-                <div className="flex-1 space-y-2">
-                  <div className="h-3 w-3/4 bg-white/10 rounded" />
-                  <div className="h-2 w-full bg-white/5 rounded" />
-                </div>
-              </div>
-            </div>
-          ))
-        ) : hasErrors ? (
-          stats.top_error_clusters.map((c, idx) => (
-            <ClusterRow
-              key={c.template}
-              index={idx}
-              template={c.template}
-              count={c.count}
-              total={stats.total_logs}
-              type="error"
-              clusterId={(c as any).cluster_id}
-              workspaceId={selectedWorkspaceId}
-            />
-          ))
-        ) : (
-          <div className="py-20 text-center text-[10px] font-mono text-text-muted uppercase tracking-widest">
-            No Errors Detected
-          </div>
-        )}
-      </div>
+      <div className="space-y-2 relative z-10">{content}</div>
     </section>
   );
 }
 
 function NoiseClustersSection({ stats, selectedWorkspaceId }: ClustersSectionProps) {
-  const hasClusters = stats && stats.top_clusters.length > 0;
+  let content: ReactNode;
+  if (stats === null) {
+    content = SKELETON_CLUSTERS.map((rowKey) => (
+      <div
+        key={rowKey}
+        className="flex flex-col gap-3 p-3 rounded-lg border border-white/5 bg-bg-surface/30 animate-pulse"
+      >
+        <div className="flex items-center gap-4">
+          <div className="h-3 w-6 bg-white/5 rounded" />
+          <div className="flex-1 space-y-2">
+            <div className="h-3 w-3/4 bg-white/10 rounded" />
+            <div className="h-2 w-full bg-white/5 rounded" />
+          </div>
+        </div>
+      </div>
+    ));
+  } else if (stats.top_clusters.length > 0) {
+    content = stats.top_clusters.map((c, idx) => (
+      <ClusterRow
+        key={c.template}
+        index={idx}
+        template={c.template}
+        count={c.count}
+        total={stats.total_logs}
+        type="noise"
+        clusterId={(c as any).cluster_id}
+        workspaceId={selectedWorkspaceId}
+      />
+    ));
+  } else {
+    content = (
+      <div className="py-20 text-center text-[10px] font-mono text-text-muted uppercase tracking-widest">
+        No Clusters
+      </div>
+    );
+  }
+
   return (
     <section className="bg-bg-surface/50 border border-border rounded-xl p-6 backdrop-blur-sm relative overflow-hidden">
       <div className="flex items-center gap-2 mb-6">
@@ -546,41 +605,7 @@ function NoiseClustersSection({ stats, selectedWorkspaceId }: ClustersSectionPro
           Top Noise Generators
         </h2>
       </div>
-      <div className="space-y-2 relative z-10">
-        {!stats ? (
-          Array.from({ length: 3 }).map((_, idx) => (
-            <div
-              key={idx}
-              className="flex flex-col gap-3 p-3 rounded-lg border border-white/5 bg-bg-surface/30 animate-pulse"
-            >
-              <div className="flex items-center gap-4">
-                <div className="h-3 w-6 bg-white/5 rounded" />
-                <div className="flex-1 space-y-2">
-                  <div className="h-3 w-3/4 bg-white/10 rounded" />
-                  <div className="h-2 w-full bg-white/5 rounded" />
-                </div>
-              </div>
-            </div>
-          ))
-        ) : hasClusters ? (
-          stats.top_clusters.map((c, idx) => (
-            <ClusterRow
-              key={c.template}
-              index={idx}
-              template={c.template}
-              count={c.count}
-              total={stats.total_logs}
-              type="noise"
-              clusterId={(c as any).cluster_id}
-              workspaceId={selectedWorkspaceId}
-            />
-          ))
-        ) : (
-          <div className="py-20 text-center text-[10px] font-mono text-text-muted uppercase tracking-widest">
-            No Clusters
-          </div>
-        )}
-      </div>
+      <div className="space-y-2 relative z-10">{content}</div>
     </section>
   );
 }

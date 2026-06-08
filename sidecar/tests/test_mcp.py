@@ -9,14 +9,15 @@ def app():
     a = App(":memory:")
     cursor = a.db.get_cursor()
     cursor.execute("""
-        INSERT INTO logs (workspace_id, source_id, timestamp, level, raw_text, cluster_id) VALUES
-        ('ws1', 'src1', '2023-10-25 09:00:00', 'INFO', 'test message', 'c1')
+        INSERT INTO logs (workspace_id, source_id, timestamp, level, raw_text, cluster_id, processed) VALUES
+        ('ws1', 'src1', '2023-10-25 09:00:00', 'INFO', 'test message', 'c1', TRUE)
     """)
     cursor.execute("""
         INSERT INTO clusters (workspace_id, cluster_id, count, template) VALUES
         ('ws1', 'c1', 1, 'test message template')
     """)
-    return a
+    yield a
+    a.stop()
 
 
 def test_mcp_tools(app):

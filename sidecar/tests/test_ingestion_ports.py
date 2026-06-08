@@ -26,6 +26,8 @@ def app(monkeypatch):
         settings = original_get_settings(self, workspace_id)
         settings["ingestion_syslog_port"] = str(syslog_port)
         settings["ingestion_http_port"] = str(http_port)
+        settings["ingestion_syslog_enabled"] = "true"
+        settings["ingestion_http_enabled"] = "true"
         return settings
 
     monkeypatch.setattr(App, "method_get_settings", mock_get_settings)

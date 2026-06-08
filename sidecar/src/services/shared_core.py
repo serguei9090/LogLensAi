@@ -1,4 +1,6 @@
+# Assume Role: Backend Engineer (@backend)
 import logging
+import os
 import threading
 import time
 from collections.abc import Callable
@@ -23,6 +25,7 @@ class SharedSource:
         self._lock = threading.Lock()
         self._tailer_thread = None
         self._running = False
+        self._modified_event = threading.Event()
 
     def subscribe(self, callback: Callable[[str, int], None]):
         """
@@ -43,13 +46,14 @@ class SharedSource:
 
     def _start_tailing(self):
         self._running = True
+        self._modified_event.clear()
         self._tailer_thread = threading.Thread(target=self._run_tail, daemon=True)
         self._tailer_thread.start()
         logger.info("[SharedSource] Started tailing %s", self.filepath)
 
     def _stop_tailing(self):
         self._running = False
-        # Thread will exit on next loop or timeout
+        self._modified_event.set()
         logger.info("[SharedSource] Stopped tailing %s", self.filepath)
 
     def cleanup(self):
@@ -60,23 +64,66 @@ class SharedSource:
 
     def _run_tail(self):
         try:
-            # We use a dedicated file pointer for tailing
+            from watchdog.observers import Observer
+            from watchdog.events import FileSystemEventHandler
+
+            target_path = os.path.abspath(self.filepath)
+
+            class FileChangeHandler(FileSystemEventHandler):
+                def __init__(self, event):
+                    self.event = event
+                def on_modified(self, event):
+                    if not event.is_directory and os.path.abspath(event.src_path) == target_path:
+                        self.event.set()
+
+            handler = FileChangeHandler(self._modified_event)
+            observer = Observer()
+            dir_to_watch = os.path.dirname(target_path) or "."
+            observer.schedule(handler, path=dir_to_watch, recursive=False)
+            observer.start()
+
+            try:
+                with open(self.filepath, encoding="utf-8", errors="replace") as f:
+                    f.seek(0, 2)
+
+                    while self._running:
+                        lines_read = False
+                        while self._running:
+                            line = f.readline()
+                            if not line:
+                                break
+                            lines_read = True
+                            self._handle_new_line(line.rstrip("\n"))
+
+                        if not self._running:
+                            break
+
+                        # Wait for modifications, with 1.0s timeout as safety pulse
+                        self._modified_event.wait(timeout=1.0)
+                        self._modified_event.clear()
+            finally:
+                observer.stop()
+                observer.join(timeout=1.0)
+
+        except Exception as e:
+            logger.warning("[SharedSource] Watchdog tailing failed, falling back to polling: %s", e)
+            self._run_tail_polling()
+
+    def _run_tail_polling(self):
+        try:
             with open(self.filepath, encoding="utf-8", errors="replace") as f:
-                # Seek to end for live tailing
                 f.seek(0, 2)
 
                 while self._running:
                     line = f.readline()
                     if not line:
-                        # Sleep briefly to avoid CPU spin
                         time_to_sleep = 0.1
-                        # (Simple sleep is fine for background daemon)
                         time.sleep(time_to_sleep)
                         continue
 
                     self._handle_new_line(line.rstrip("\n"))
         except Exception as e:
-            logger.error("[SharedSource] Tailing failed for %s: %s", self.filepath, e)
+            logger.error("[SharedSource] Polling tailer failed for %s: %s", self.filepath, e)
             self._running = False
 
     def push_line(self, line: str):

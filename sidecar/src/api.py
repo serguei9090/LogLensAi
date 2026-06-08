@@ -1558,6 +1558,11 @@ class App:
                 self._ingest_source_logs_batch(
                     cursor, ws_id, src_id, src_logs, rules_cache, global_rules, now_ts
                 )
+                # Trigger anomaly detection for this workspace
+                try:
+                    self.anomaly_detector.detect_anomalies(ws_id)
+                except Exception as e:
+                    logger.error(f"[Anomalies] Failed to run anomaly detection post-streaming: {e}")
             except Exception as exc:
                 logger.exception("[Ingestion] Stream batch failed: %s", exc)
 
@@ -1705,6 +1710,13 @@ class App:
                 (processed_count, job_id),
             )
             db_instance.commit()
+
+            # Trigger event-driven anomaly detection on ingestion complete
+            try:
+                self.anomaly_detector.detect_anomalies(workspace_id)
+            except Exception as e:
+                logger.error(f"[Anomalies] Failed to run anomaly detection post-ingestion: {e}")
+
             logger.info(
                 "[Ingestion] Completed background job %d for %s: %d lines",
                 job_id,
@@ -3020,6 +3032,14 @@ class App:
         active_workspace_ids: list[str] | None = None,
     ) -> dict:
         """Fetch high-level metrics for the Dashboard view with advanced filtering in parallel."""
+        # Trigger on-demand anomaly detection (throttled to max once every 10 seconds per workspace)
+        try:
+            self.anomaly_detector.detect_anomalies(workspace_id)
+        except Exception as e:
+            logger.error(
+                f"[Anomalies] Failed to run anomaly detection on dashboard stats request: {e}"
+            )
+
         import concurrent.futures
 
         # Establish base WHERE clause and fetch bounds first to get bucket configuration
