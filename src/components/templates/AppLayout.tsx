@@ -34,7 +34,7 @@ interface AppLayoutProps {
 }
 
 class CustomPointerSensor extends PointerSensor {
-  static activators = [
+  static readonly activators = [
     {
       eventName: "onPointerDown" as const,
       handler: ({ nativeEvent }: { nativeEvent: PointerEvent }) => {

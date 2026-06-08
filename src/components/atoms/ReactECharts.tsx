@@ -1,4 +1,5 @@
-// Assume Role: Frontend Engineer (@frontend)
+/* Assume Role: Frontend Engineer (@frontend) */
+/* File: src/components/atoms/ReactECharts.tsx */
 
 import * as echarts from "echarts";
 import { useEffect, useRef } from "react";
@@ -22,6 +23,9 @@ export function ReactECharts({
 }: ReactEChartsProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const chartInstanceRef = useRef<echarts.EChartsType | null>(null);
+  
+  // Track structural change history using reference flags to bypass duplicate redraw instructions
+  const prevOptionJsonRef = useRef<string>("");
 
   // Initialize ECharts instance
   useEffect(() => {
@@ -29,6 +33,7 @@ export function ReactECharts({
       return;
     }
 
+    // Allocate core chart render context bounds
     const chart = echarts.init(containerRef.current);
     chartInstanceRef.current = chart;
 
@@ -36,35 +41,33 @@ export function ReactECharts({
       onChartInit(chart);
     }
 
-    let resizeTimeoutId: ReturnType<typeof setTimeout> | null = null;
+    // Process initial option config parameters immediately
+    const optionStr = JSON.stringify(option);
+    chart.setOption(option, { notMerge: true });
+    prevOptionJsonRef.current = optionStr;
+
+    // Use a lightweight ResizeObserver tied directly to single animation frames.
+    // This allows the element box structure to mirror Tauri windows instantly 
+    // without invoking expensive JavaScript vector re-draw calculations mid-flight.
+    let animationFrameId: number | null = null;
     
     const resizeObserver = new ResizeObserver((_entries) => {
-      if (resizeTimeoutId !== null) {
-        clearTimeout(resizeTimeoutId);
+      if (animationFrameId !== null) {
+        cancelAnimationFrame(animationFrameId);
       }
       
-      // The canvas is stretched instantly by the CSS rules below.
-      // We only use JS to re-render the high-fidelity vector text and grids 
-      // once the layout frame geometry has completely settled.
-      resizeTimeoutId = setTimeout(() => {
-        if (!containerRef.current || !chartInstanceRef.current) {
-          return;
+      animationFrameId = requestAnimationFrame(() => {
+        if (chartInstanceRef.current) {
+          chartInstanceRef.current.resize();
         }
-        
-        // Redraw at perfect resolution with 0ms animation duration to avoid double-transition jumps
-        chart.resize({
-          animation: {
-            duration: 0,
-          },
-        });
-      }, 100); 
+      });
     });
 
     resizeObserver.observe(containerRef.current);
 
     return () => {
-      if (resizeTimeoutId !== null) {
-        clearTimeout(resizeTimeoutId);
+      if (animationFrameId !== null) {
+        cancelAnimationFrame(animationFrameId);
       }
       resizeObserver.disconnect();
       chart.dispose();
@@ -72,10 +75,21 @@ export function ReactECharts({
     };
   }, [onChartInit]);
 
-  // Update options when they change
+  // Handle data metric option updates safely using an optimization check
   useEffect(() => {
-    if (chartInstanceRef.current) {
-      chartInstanceRef.current.setOption(option, { notMerge: true });
+    const chart = chartInstanceRef.current;
+    if (!chart) {
+      return;
+    }
+
+    const currentOptionJson = JSON.stringify(option);
+    
+    // Only invoke heavy engine updates if the chart data parameters have changed.
+    // Window maximizing changes the wrapper box dimensions but leaves the data unchanged,
+    // so this optimization completely blocks layout flashes.
+    if (currentOptionJson !== prevOptionJsonRef.current) {
+      chart.setOption(option, { notMerge: false, lazyUpdate: true });
+      prevOptionJsonRef.current = currentOptionJson;
     }
   }, [option]);
 
