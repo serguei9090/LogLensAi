@@ -54,14 +54,14 @@ export function HighlightBuilder({ highlights, onChange }: HighlightBuilderProps
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger
           className={cn(
-            "inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium transition-all border",
+            "inline-flex items-center gap-1.5 rounded-md px-2 2xl:px-2.5 py-1.5 text-xs font-medium transition-all border",
             open || highlights.length > 0
               ? "bg-amber-950/40 border-amber-600/40 text-amber-300"
               : "bg-zinc-900 border-zinc-700 text-zinc-400 hover:border-zinc-600 hover:text-zinc-300",
           )}
         >
           <Highlighter className="h-3.5 w-3.5" />
-          Highlights
+          <span className="hidden 2xl:inline">Highlights</span>
           {highlights.length > 0 && (
             <span className="bg-amber-500/20 text-amber-300 rounded px-1 text-[10px] font-bold">
               {highlights.length}

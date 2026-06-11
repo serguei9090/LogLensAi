@@ -54,14 +54,14 @@ export function FilterBuilder({ filters, onChange }: FilterBuilderProps) {
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger
           className={cn(
-            "inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium transition-all border",
+            "inline-flex items-center gap-1.5 rounded-md px-2 2xl:px-2.5 py-1.5 text-xs font-medium transition-all border",
             open || filters.length > 0
               ? "bg-emerald-950/60 border-emerald-600/40 text-emerald-300"
               : "bg-zinc-900 border-zinc-700 text-zinc-400 hover:border-zinc-600 hover:text-zinc-300",
           )}
         >
           <Filter className="h-3.5 w-3.5" />
-          Filters
+          <span className="hidden 2xl:inline">Filters</span>
           {filters.length > 0 && (
             <span className="bg-emerald-500/20 text-emerald-300 rounded px-1 text-[10px] font-bold">
               {filters.length}

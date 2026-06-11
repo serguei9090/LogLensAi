@@ -126,215 +126,233 @@ export function LogToolbar({
       <div className="flex items-center gap-3 shrink-0">
         <StatusDot active={status} />
 
-        <Button onClick={onImportOpen} className="gap-2 text-xs font-semibold px-3 py-1.5 shrink-0">
+        <Button
+          onClick={onImportOpen}
+          className="gap-2 text-xs font-semibold px-2.5 2xl:px-3 py-1.5 shrink-0"
+          title="Import Logs"
+        >
           <Upload className="h-3.5 w-3.5" />
-          Import
+          <span className="hidden 2xl:inline">Import</span>
         </Button>
 
-        <Button
-          variant="secondary"
-          onClick={onExport}
-          disabled={!_activeSourceId}
-          className="gap-2 text-xs font-semibold px-3 py-1.5 shrink-0"
-        >
-          <Download className="h-3.5 w-3.5" />
-          Export
-        </Button>
+        {_activeSourceId && (
+          <>
+            <Button
+              variant="secondary"
+              onClick={onExport}
+              disabled={!_activeSourceId}
+              className="gap-2 text-xs font-semibold px-2.5 2xl:px-3 py-1.5 shrink-0"
+              title="Export Logs"
+            >
+              <Download className="h-3.5 w-3.5" />
+              <span className="hidden 2xl:inline">Export</span>
+            </Button>
 
-        <Button
-          variant="outline"
-          onClick={onOrchestrateOpen}
-          disabled={!_activeSourceId}
-          className="gap-2 px-3 py-1.5 text-xs font-bold shrink-0 border-violet-500/20 bg-violet-500/10 text-violet-400 hover:bg-violet-500/20 hover:border-violet-500/40 disabled:opacity-50 disabled:pointer-events-none"
-        >
-          <Cpu className="size-3.5" />
-          Orchestrate
-        </Button>
+            <Button
+              variant="outline"
+              onClick={onOrchestrateOpen}
+              disabled={!_activeSourceId}
+              className="gap-2 px-2.5 2xl:px-3 py-1.5 text-xs font-bold shrink-0 border-violet-500/20 bg-violet-500/10 text-violet-400 hover:bg-violet-500/20 hover:border-violet-500/40 disabled:opacity-50 disabled:pointer-events-none"
+              title="Orchestrate Streams"
+            >
+              <Cpu className="size-3.5" />
+              <span className="hidden 2xl:inline">Orchestrate</span>
+            </Button>
 
-        <Button
-          variant="outline"
-          size="icon"
-          onClick={toggleFacetSidebar}
-          disabled={!_activeSourceId}
-          className={cn(
-            "size-8 shrink-0",
-            facetSidebarCollapsed
-              ? "bg-bg-surface-bright/50 border-border-subtle text-text-muted hover:text-text-primary"
-              : "bg-primary/10 border-primary/20 text-primary hover:text-primary-hover shadow-[0_0_12px_rgba(var(--color-primary-rgb),0.15)]",
-          )}
-          title={facetSidebarCollapsed ? "Show Facets" : "Hide Facets"}
-        >
-          <Columns className="size-4" />
-        </Button>
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={toggleFacetSidebar}
+              disabled={!_activeSourceId}
+              className={cn(
+                "size-8 shrink-0",
+                facetSidebarCollapsed
+                  ? "bg-bg-surface-bright/50 border-border-subtle text-text-muted hover:text-text-primary"
+                  : "bg-primary/10 border-primary/20 text-primary hover:text-primary-hover shadow-[0_0_12px_rgba(var(--color-primary-rgb),0.15)]",
+              )}
+              title={facetSidebarCollapsed ? "Show Facets" : "Hide Facets"}
+            >
+              <Columns className="size-4" />
+            </Button>
 
-        <Button
-          variant="outline"
-          size="icon"
-          onClick={toggleColumnManager}
-          disabled={!_activeSourceId}
-          className={cn(
-            "size-8 shrink-0",
-            columnManagerCollapsed
-              ? "bg-bg-surface-bright/50 border-border-subtle text-text-muted hover:text-text-primary"
-              : "bg-primary/10 border-primary/20 text-primary hover:text-primary-hover shadow-[0_0_12px_rgba(var(--color-primary-rgb),0.15)]",
-          )}
-          title={columnManagerCollapsed ? "Show Column Manager" : "Hide Column Manager"}
-        >
-          <LayoutTemplate className="size-4" />
-        </Button>
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={toggleColumnManager}
+              disabled={!_activeSourceId}
+              className={cn(
+                "size-8 shrink-0",
+                columnManagerCollapsed
+                  ? "bg-bg-surface-bright/50 border-border-subtle text-text-muted hover:text-text-primary"
+                  : "bg-primary/10 border-primary/20 text-primary hover:text-primary-hover shadow-[0_0_12px_rgba(var(--color-primary-rgb),0.15)]",
+              )}
+              title={columnManagerCollapsed ? "Show Column Manager" : "Hide Column Manager"}
+            >
+              <LayoutTemplate className="size-4" />
+            </Button>
 
-        <div className="h-5 w-px bg-zinc-800 shrink-0" />
+            <div className="h-5 w-px bg-zinc-800 shrink-0" />
 
-        {/* Tail control moved to left */}
+            {/* Tail control moved to left */}
+            <div
+              className={cn(
+                "flex items-center gap-3 shrink-0",
+                !_activeSourceId && "opacity-50 pointer-events-none",
+              )}
+            >
+              <TailSwitch checked={isTailing} onCheckedChange={onTailToggle} />
+            </div>
+          </>
+        )}
+      </div>
+
+      {_activeSourceId && (
+        <>
+          {/* Spacer to center search */}
+          <div className="flex-1" />
+
+          {/* Middle Group - Search (Centered) */}
+          <div className="w-full max-w-sm shrink-0">
+            <SearchBar
+              ref={searchRef}
+              value={searchQuery}
+              onChange={onSearch}
+              disabled={!_activeSourceId}
+            />
+          </div>
+
+          {/* Spacer to center search */}
+          <div className="flex-1" />
+        </>
+      )}
+
+      {/* Right Group */}
+      {_activeSourceId && (
         <div
           className={cn(
             "flex items-center gap-3 shrink-0",
             !_activeSourceId && "opacity-50 pointer-events-none",
           )}
         >
-          <TailSwitch checked={isTailing} onCheckedChange={onTailToggle} />
-        </div>
-      </div>
-
-      {/* Spacer to center search */}
-      <div className="flex-1" />
-
-      {/* Middle Group - Search (Centered) */}
-      <div className="w-full max-w-sm shrink-0">
-        <SearchBar
-          ref={searchRef}
-          value={searchQuery}
-          onChange={onSearch}
-          disabled={!_activeSourceId}
-        />
-      </div>
-
-      {/* Spacer to center search */}
-      <div className="flex-1" />
-
-      {/* Right Group */}
-      <div
-        className={cn(
-          "flex items-center gap-3 shrink-0",
-          !_activeSourceId && "opacity-50 pointer-events-none",
-        )}
-      >
-        {isFiltered && (
-          <Button
-            type="button"
-            variant="outline"
-            onClick={resetTimeRangeToAllTime}
-            disabled={!_activeSourceId}
-            className="text-[11px] h-7 px-2 border-primary/20 bg-primary/5 text-primary hover:bg-primary hover:text-text-inverse transition-all rounded cursor-pointer font-semibold"
-          >
-            Reset Time
-          </Button>
-        )}
-        <TimeRangePicker value={timeRange} onChange={setTimeRange} />
-
-        <div className="h-5 w-px bg-zinc-800 shrink-0" />
-
-        <div className="flex items-center gap-2">
-          <FilterBuilder filters={activeFilters} onChange={onFilterChange} />
-          <HighlightBuilder highlights={activeHighlights} onChange={onHighlightChange} />
-
-          <DropdownMenu>
-            <DropdownMenuTrigger
+          {isFiltered && (
+            <Button
+              type="button"
+              variant="outline"
+              onClick={resetTimeRangeToAllTime}
               disabled={!_activeSourceId}
-              className="p-1.5 rounded-md hover:bg-bg-hover text-text-muted hover:text-text-primary transition-colors ml-1 disabled:opacity-50 disabled:pointer-events-none"
-              title="Toggle Columns"
+              className="text-[11px] h-7 px-2 border-primary/20 bg-primary/5 text-primary hover:bg-primary hover:text-text-inverse transition-all rounded cursor-pointer font-semibold"
+              title="Reset Time Filter"
             >
-              <Columns className="size-4" />
-            </DropdownMenuTrigger>
-            <DropdownMenuContent
-              align="end"
-              className="w-48 bg-bg-surface border-border-subtle p-2"
-            >
-              <div className="text-[9px] font-bold text-text-muted uppercase tracking-wider px-2 py-1 border-b border-border/30 mb-1">
-                Visible Columns
-              </div>
-              {Object.keys(visibleColumns).map((colName) => (
-                <DropdownMenuItem
-                  key={colName}
-                  onClick={(e) => {
-                    e.preventDefault();
-                    toggleColumnVisibility(colName);
-                  }}
-                  className="flex items-center justify-between gap-2 text-xs py-1.5 px-2 hover:bg-white/5 rounded cursor-pointer select-none"
-                >
-                  <span className="capitalize">{colName.replace("_", " ")}</span>
-                  {visibleColumns[colName] ? (
-                    <Eye className="size-3.5 text-primary" />
-                  ) : (
-                    <EyeOff className="size-3.5 text-text-muted/40" />
-                  )}
-                </DropdownMenuItem>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
+              <span className="hidden md:inline">Reset Time</span>
+              <span className="inline md:hidden">Reset</span>
+            </Button>
+          )}
+          <TimeRangePicker value={timeRange} onChange={setTimeRange} />
 
-          <DropdownMenu>
-            <DropdownMenuTrigger
-              disabled={!_activeSourceId}
-              className="p-1.5 rounded-md hover:bg-bg-hover text-text-muted hover:text-text-primary transition-colors ml-1 disabled:opacity-50 disabled:pointer-events-none"
-              title="Template Actions"
-            >
-              <LayoutTemplate className="size-4" />
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-48 bg-bg-surface border-border-subtle">
-              <DropdownMenuItem
-                onClick={() => setIsSaveTemplateModalOpen(true)}
-                className="gap-2 text-xs py-2"
+          <div className="h-5 w-px bg-zinc-800 shrink-0" />
+
+          <div className="flex items-center gap-2">
+            <FilterBuilder filters={activeFilters} onChange={onFilterChange} />
+            <HighlightBuilder highlights={activeHighlights} onChange={onHighlightChange} />
+
+            <DropdownMenu>
+              <DropdownMenuTrigger
+                disabled={!_activeSourceId}
+                className="p-1.5 rounded-md hover:bg-bg-hover text-text-muted hover:text-text-primary transition-colors ml-1 disabled:opacity-50 disabled:pointer-events-none"
+                title="Toggle Columns"
               >
-                <Plus className="size-3.5" />
-                Save as Template
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={() => setIsLoadTemplateModalOpen(true)}
-                className="gap-2 text-xs py-2"
+                <Columns className="size-4" />
+              </DropdownMenuTrigger>
+              <DropdownMenuContent
+                align="end"
+                className="w-48 bg-bg-surface border-border-subtle p-2"
               >
-                <List className="size-3.5" />
-                Load Template
-              </DropdownMenuItem>
-              {onEngineSettingsOpen && (
-                <>
-                  <div className="h-px bg-border/50 my-1" />
+                <div className="text-[9px] font-bold text-text-muted uppercase tracking-wider px-2 py-1 border-b border-border/30 mb-1">
+                  Visible Columns
+                </div>
+                {Object.keys(visibleColumns).map((colName) => (
                   <DropdownMenuItem
-                    onClick={onEngineSettingsOpen}
-                    className="gap-2 text-xs py-2 text-primary hover:text-primary-hover"
+                    key={colName}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      toggleColumnVisibility(colName);
+                    }}
+                    className="flex items-center justify-between gap-2 text-xs py-1.5 px-2 hover:bg-white/5 rounded cursor-pointer select-none"
                   >
-                    <Cpu className="size-3.5" />
-                    Engine Settings
+                    <span className="capitalize">{colName.replace("_", " ")}</span>
+                    {visibleColumns[colName] ? (
+                      <Eye className="size-3.5 text-primary" />
+                    ) : (
+                      <EyeOff className="size-3.5 text-text-muted/40" />
+                    )}
                   </DropdownMenuItem>
-                </>
-              )}
-            </DropdownMenuContent>
-          </DropdownMenu>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
 
-          <div className="h-5 w-px bg-border-subtle shrink-0 mx-1" />
+            <DropdownMenu>
+              <DropdownMenuTrigger
+                disabled={!_activeSourceId}
+                className="p-1.5 rounded-md hover:bg-bg-hover text-text-muted hover:text-text-primary transition-colors ml-1 disabled:opacity-50 disabled:pointer-events-none"
+                title="Template Actions"
+              >
+                <LayoutTemplate className="size-4" />
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-48 bg-bg-surface border-border-subtle">
+                <DropdownMenuItem
+                  onClick={() => setIsSaveTemplateModalOpen(true)}
+                  className="gap-2 text-xs py-2"
+                >
+                  <Plus className="size-3.5" />
+                  Save as Template
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => setIsLoadTemplateModalOpen(true)}
+                  className="gap-2 text-xs py-2"
+                >
+                  <List className="size-3.5" />
+                  Load Template
+                </DropdownMenuItem>
+                {onEngineSettingsOpen && (
+                  <>
+                    <div className="h-px bg-border/50 my-1" />
+                    <DropdownMenuItem
+                      onClick={onEngineSettingsOpen}
+                      className="gap-2 text-xs py-2 text-primary hover:text-primary-hover"
+                    >
+                      <Cpu className="size-3.5" />
+                      Engine Settings
+                    </DropdownMenuItem>
+                  </>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
 
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={() => setSidebarOpen(!isSidebarOpen)}
-            disabled={!_activeSourceId}
-            className={cn(
-              "size-8 shrink-0",
-              isSidebarOpen
-                ? "bg-primary/10 border-primary/20 text-primary ring-1 ring-primary/30 shadow-[0_0_12px_rgba(var(--color-primary-rgb),0.15)]"
-                : "bg-bg-surface-bright/50 border-border-subtle text-text-muted hover:text-text-primary",
-            )}
-            title={isSidebarOpen ? "Close AI Assistant" : "Open AI Assistant"}
-          >
-            <Sparkles
+            <div className="h-5 w-px bg-border-subtle shrink-0 mx-1" />
+
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => setSidebarOpen(!isSidebarOpen)}
+              disabled={!_activeSourceId}
               className={cn(
-                "size-4 transition-transform",
-                isSidebarOpen ? "scale-110" : "group-hover:scale-110",
+                "size-8 shrink-0",
+                isSidebarOpen
+                  ? "bg-primary/10 border-primary/20 text-primary ring-1 ring-primary/30 shadow-[0_0_12px_rgba(var(--color-primary-rgb),0.15)]"
+                  : "bg-bg-surface-bright/50 border-border-subtle text-text-muted hover:text-text-primary",
               )}
-            />
-          </Button>
+              title={isSidebarOpen ? "Close AI Assistant" : "Open AI Assistant"}
+            >
+              <Sparkles
+                className={cn(
+                  "size-4 transition-transform",
+                  isSidebarOpen ? "scale-110" : "group-hover:scale-110",
+                )}
+              />
+            </Button>
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }

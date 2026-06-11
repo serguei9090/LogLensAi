@@ -425,8 +425,14 @@ export function VirtualLogTable({
         {(() => {
           const isIngesting = isCurrentlyIngesting || !!activeJob;
           const showOverlay =
-            (isIngesting && logs.length === 0) || (showTransitioningLoader && (logs.length === 0 || !isTailing));
-          const isEmpty = logs.length === 0 && !isIngesting && !showTransitioningLoader;
+            (isIngesting && logs.length === 0) ||
+            (showTransitioningLoader && (logs.length === 0 || !isTailing));
+          const isEmpty =
+            logs.length === 0 &&
+            !isIngesting &&
+            !isTransitioning &&
+            !isFetching &&
+            !showTransitioningLoader;
 
           if (showOverlay) {
             return (

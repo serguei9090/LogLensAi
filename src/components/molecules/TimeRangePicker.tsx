@@ -623,9 +623,9 @@ export function TimeRangePicker({ value, onChange, className }: TimeRangePickerP
   return (
     <div className={className}>
       <Popover open={open} onOpenChange={handleOpenChange}>
-        <PopoverTrigger className="h-8 inline-flex items-center gap-2 rounded-md border border-border/40 bg-black/40 px-3 text-xs font-medium transition-all hover:bg-black/60 hover:border-border/60 group">
+        <PopoverTrigger className="h-8 inline-flex items-center gap-2 rounded-md border border-border/40 bg-black/40 px-2 2xl:px-3 text-xs font-medium transition-all hover:bg-black/60 hover:border-border/60 group">
           <Clock className="size-3.5 text-text-muted group-hover:text-primary transition-colors" />
-          <span className="text-text-secondary group-hover:text-text-primary transition-colors max-w-[400px] truncate">
+          <span className="text-text-secondary group-hover:text-text-primary transition-colors max-w-[400px] truncate hidden 2xl:inline">
             {displayText}
           </span>
         </PopoverTrigger>
