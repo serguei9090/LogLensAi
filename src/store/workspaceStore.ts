@@ -334,7 +334,13 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
         })),
 
       fetchHierarchy: async (workspaceId) => {
-        set({ isHierarchyLoading: true });
+        const state = (useWorkspaceStore.getState as any)();
+        const ws = state.workspaces.find((w: any) => w.id === workspaceId);
+        const hasHierarchy = !!ws?.hierarchy;
+
+        if (!hasHierarchy) {
+          set({ isHierarchyLoading: true });
+        }
         try {
           const { callSidecar } = await import("../lib/hooks/useSidecarBridge");
           const res = await callSidecar<{ workspace_id: string; root: HierarchyNode }>(
