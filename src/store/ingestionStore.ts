@@ -5,11 +5,18 @@ export interface IngestionJob {
   id: number;
   workspace_id: string;
   source_id: string;
-  status: "pending" | "processing" | "completed" | "failed";
+  status: "queued" | "pending" | "processing" | "completed" | "failed";
   total_lines: number;
   processed_lines: number;
+  /** 1-based position in the active queue. 0 = not queued (completed/failed). */
+  queue_position: number;
   created_at: string;
   updated_at: string;
+}
+
+interface WorkspacePollSession {
+  sessionId: number;
+  timer: ReturnType<typeof setTimeout> | null;
 }
 
 interface IngestionState {
@@ -22,11 +29,19 @@ interface IngestionState {
   error: string | null;
   /** Tracks sources that are currently ingesting or finalizing logs. */
   ingestingSourceIds: string[];
+  /**
+   * Per-source IDs that are transitioning (between callSidecar returning and
+   * the first poll detecting a job). A Set so multiple simultaneous uploads
+   * are each tracked independently without overwriting each other.
+   */
+  transitioningSourceIds: Set<string>;
 
   // Actions
   fetchJobs: (workspaceId: string) => Promise<void>;
   /**
    * Start (or restart) the polling loop for a workspace.
+   * Each workspace has its own independent session so uploads to workspace B
+   * do NOT cancel the polling session for workspace A.
    * Called explicitly by useLogIngestion when an ingest action is triggered.
    * The loop self-terminates when no active jobs remain AND no live sources are open.
    */
@@ -43,6 +58,8 @@ interface IngestionState {
   removeLiveSource: () => void;
   startIngestion: (sourceId: string) => void;
   stopIngestion: (sourceId: string) => void;
+  addTransitioningSource: (sourceId: string) => void;
+  removeTransitioningSource: (sourceId: string) => void;
   clearState: () => void;
 }
 
@@ -51,8 +68,18 @@ const POLL_ACTIVE_MS = 1_000;
 /** Interval (ms) when a live source is open but no job is queued yet. */
 const POLL_LIVE_MS = 3_000;
 
-let pollingTimer: ReturnType<typeof setTimeout> | null = null;
-let pollSessionId = 0;
+/**
+ * Per-workspace poll sessions. Keyed by workspaceId.
+ * Module-level map (not in Zustand state) to avoid re-render cycles from timers.
+ */
+const pollSessions = new Map<string, WorkspacePollSession>();
+
+function getOrCreateSession(workspaceId: string): WorkspacePollSession {
+  if (!pollSessions.has(workspaceId)) {
+    pollSessions.set(workspaceId, { sessionId: 0, timer: null });
+  }
+  return pollSessions.get(workspaceId) as WorkspacePollSession;
+}
 
 export const useIngestionStore = create<IngestionState>((set, get) => ({
   jobs: [],
@@ -62,6 +89,7 @@ export const useIngestionStore = create<IngestionState>((set, get) => ({
   liveSourceCount: 0,
   error: null,
   ingestingSourceIds: [],
+  transitioningSourceIds: new Set<string>(),
 
   fetchJobs: async (workspaceId: string) => {
     if (!workspaceId) {
@@ -74,12 +102,24 @@ export const useIngestionStore = create<IngestionState>((set, get) => ({
         silent: true,
       });
 
-      const active = fetchedJobs.find((j) => j.status === "processing" || j.status === "pending");
+      const active = fetchedJobs.find(
+        (j) => j.status === "processing" || j.status === "pending" || j.status === "queued",
+      );
+
+      // Auto-cleanup: remove sourceIds from ingestingSourceIds when their job is done
+      const { ingestingSourceIds } = get();
+      const finishedSourceIds = ingestingSourceIds.filter((srcId) =>
+        fetchedJobs.some(
+          (j) => j.source_id === srcId && (j.status === "completed" || j.status === "failed"),
+        ),
+      );
+
       set({
         jobs: fetchedJobs,
         activeJob: active ?? null,
         lastJob: fetchedJobs[0] ?? null,
         error: null,
+        ingestingSourceIds: ingestingSourceIds.filter((id) => !finishedSourceIds.includes(id)),
       });
     } catch (err) {
       console.error("Failed to fetch ingestion jobs:", err);
@@ -88,40 +128,53 @@ export const useIngestionStore = create<IngestionState>((set, get) => ({
   },
 
   startPolling: (workspaceId: string) => {
-    // Always create a new session — replaces any stale loop cleanly.
-    pollSessionId++;
-    const currentSession = pollSessionId;
-    if (pollingTimer) {
-      clearTimeout(pollingTimer);
-      pollingTimer = null;
+    const session = getOrCreateSession(workspaceId);
+
+    // Increment session ID to invalidate any in-flight tick from the old session.
+    session.sessionId += 1;
+    const currentSessionId = session.sessionId;
+
+    // Cancel any pending timer for this workspace.
+    if (session.timer) {
+      clearTimeout(session.timer);
+      session.timer = null;
     }
+
     set({ isPolling: true });
 
     const schedule = async () => {
       await get().fetchJobs(workspaceId);
 
       // Co-drive clustering status refresh while work is in-flight.
-      // Lazy import breaks the potential circular-dep at bundle time.
       const { useClusteringStore } = await import("./clusteringStore");
       useClusteringStore.getState().fetchStatus(workspaceId);
 
-      // Session was superseded — abort silently.
-      if (currentSession !== pollSessionId) {
+      // Session was superseded by a newer startPolling call for this workspace — abort.
+      const currentSession = pollSessions.get(workspaceId);
+      if (!currentSession || currentSession.sessionId !== currentSessionId) {
         return;
       }
 
       const { activeJob, liveSourceCount } = get();
 
-      // Self-terminate: nothing left to watch.
+      // Self-terminate: nothing left to watch for this workspace.
       if (!activeJob && liveSourceCount === 0) {
-        set({ isPolling: false });
-        pollingTimer = null;
+        // Only clear isPolling if NO workspace is still actively polling
+        const anyActive = [...pollSessions.values()].some((s) => s.timer !== null);
+        if (!anyActive) {
+          set({ isPolling: false });
+        }
+        currentSession.timer = null;
         return;
       }
 
       // Adaptive interval: fast during active processing, slower during live tail idle.
-      const delay = activeJob ? POLL_ACTIVE_MS : POLL_LIVE_MS;
-      pollingTimer = setTimeout(schedule, delay);
+      const delay =
+        activeJob?.status === "processing" || activeJob?.status === "pending"
+          ? POLL_ACTIVE_MS
+          : POLL_LIVE_MS;
+
+      currentSession.timer = setTimeout(schedule, delay);
     };
 
     // Fire immediately.
@@ -150,7 +203,30 @@ export const useIngestionStore = create<IngestionState>((set, get) => ({
     }));
   },
 
+  addTransitioningSource: (sourceId: string) => {
+    set((state) => {
+      const next = new Set(state.transitioningSourceIds);
+      next.add(sourceId);
+      return { transitioningSourceIds: next };
+    });
+  },
+
+  removeTransitioningSource: (sourceId: string) => {
+    set((state) => {
+      const next = new Set(state.transitioningSourceIds);
+      next.delete(sourceId);
+      return { transitioningSourceIds: next };
+    });
+  },
+
   clearState: () => {
-    set({ jobs: [], activeJob: null, lastJob: null, error: null, ingestingSourceIds: [] });
+    set({
+      jobs: [],
+      activeJob: null,
+      lastJob: null,
+      error: null,
+      ingestingSourceIds: [],
+      transitioningSourceIds: new Set<string>(),
+    });
   },
 }));

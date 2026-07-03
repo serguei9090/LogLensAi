@@ -423,13 +423,17 @@ export function VirtualLogTable({
       >
         {/* ─── State Management Overlays ────────────────────────────────────── */}
         {(() => {
-          const isIngesting = isCurrentlyIngesting || !!activeJob;
+          const isIngesting =
+            isCurrentlyIngesting || !!(activeJob && activeJob.status !== "queued");
+          const isQueued = !!(activeJob && activeJob.status === "queued");
           const showOverlay =
             (isIngesting && logs.length === 0) ||
+            (isQueued && logs.length === 0) ||
             (showTransitioningLoader && (logs.length === 0 || !isTailing));
           const isEmpty =
             logs.length === 0 &&
             !isIngesting &&
+            !isQueued &&
             !isTransitioning &&
             !isFetching &&
             !showTransitioningLoader;
@@ -438,58 +442,90 @@ export function VirtualLogTable({
             return (
               <div className="absolute inset-0 flex flex-col items-center justify-center p-8 text-center animate-in fade-in zoom-in-95 duration-500 bg-bg-base/50 backdrop-blur-sm z-50">
                 <div className="flex flex-col items-center gap-6 max-w-md w-full">
-                  <div className="relative">
-                    <div className="absolute -inset-4 bg-primary/20 rounded-full blur-2xl animate-pulse" />
-                    <div className="relative bg-bg-surface border border-border shadow-2xl rounded-2xl p-6">
-                      <Sparkles className="size-12 text-primary animate-pulse" />
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <h3 className="text-xl font-bold text-text-primary">
-                      {isIngesting ? "Indexing Dataset..." : "Retrieving Logs..."}
-                    </h3>
-                    <p className="text-sm text-text-muted leading-relaxed">
-                      {isIngesting
-                        ? "Building database indices and mapping patterns for the complete file. Almost ready."
-                        : "Hydrating log records from storage and applying active filters."}
-                    </p>
-                  </div>
-                  {isIngesting && (
-                    <div className="w-full space-y-3">
-                      {activeJob ? (
-                        <>
-                          <div className="flex justify-between text-[10px] font-bold uppercase tracking-widest text-text-muted">
-                            <span>
-                              {activeJob.processed_lines.toLocaleString()} /{" "}
-                              {activeJob.total_lines.toLocaleString()} lines
-                            </span>
-                            <span className="text-primary">
-                              {Math.round(
-                                (activeJob.processed_lines / activeJob.total_lines) * 100,
-                              )}
-                              %
-                            </span>
-                          </div>
-                          <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden border border-white/5">
-                            <div
-                              className="h-full bg-primary transition-all duration-500 ease-out shadow-[0_0_10px_rgba(34,197,94,0.5)]"
-                              style={{
-                                width: `${(activeJob.processed_lines / activeJob.total_lines) * 100}%`,
-                              }}
-                            />
-                          </div>
-                        </>
-                      ) : (
-                        <>
-                          <div className="flex justify-between text-[10px] font-bold uppercase tracking-widest text-text-muted">
-                            <span>Preparing Ingestion...</span>
-                          </div>
-                          <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden border border-white/5 relative">
-                            <div className="h-full w-full bg-gradient-to-r from-transparent via-primary/80 to-transparent animate-shimmer absolute inset-0" />
-                          </div>
-                        </>
+                  {/* Queued state: show amber wait banner instead of the indexing spinner */}
+                  {isQueued && activeJob ? (
+                    <>
+                      <div className="relative">
+                        <div className="absolute -inset-4 bg-amber-500/20 rounded-full blur-2xl animate-pulse" />
+                        <div className="relative bg-bg-surface border border-amber-500/30 shadow-2xl rounded-2xl p-6">
+                          <span className="text-4xl">⏳</span>
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <h3 className="text-xl font-bold text-amber-400">Queued for Processing</h3>
+                        <p className="text-sm text-text-muted leading-relaxed">
+                          {activeJob.queue_position > 1
+                            ? `This file is position #${activeJob.queue_position} in the queue. The system processes one file at a time to ensure maximum throughput and data integrity.`
+                            : "This file is next in line. Processing will begin momentarily."}
+                        </p>
+                      </div>
+                      <div className="w-full space-y-2">
+                        <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden border border-white/5 relative">
+                          <div className="h-full w-full bg-gradient-to-r from-transparent via-amber-500/60 to-transparent animate-shimmer absolute inset-0" />
+                        </div>
+                        <p className="text-[10px] text-amber-400/60 font-bold uppercase tracking-widest text-center">
+                          {activeJob.total_lines > 0
+                            ? `${activeJob.total_lines.toLocaleString()} lines ready to index`
+                            : "Counting lines..."}
+                        </p>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div className="relative">
+                        <div className="absolute -inset-4 bg-primary/20 rounded-full blur-2xl animate-pulse" />
+                        <div className="relative bg-bg-surface border border-border shadow-2xl rounded-2xl p-6">
+                          <Sparkles className="size-12 text-primary animate-pulse" />
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <h3 className="text-xl font-bold text-text-primary">
+                          {isIngesting ? "Indexing Dataset..." : "Retrieving Logs..."}
+                        </h3>
+                        <p className="text-sm text-text-muted leading-relaxed">
+                          {isIngesting
+                            ? "Building database indices and mapping patterns for the complete file. Almost ready."
+                            : "Hydrating log records from storage and applying active filters."}
+                        </p>
+                      </div>
+                      {isIngesting && (
+                        <div className="w-full space-y-3">
+                          {activeJob ? (
+                            <>
+                              <div className="flex justify-between text-[10px] font-bold uppercase tracking-widest text-text-muted">
+                                <span>
+                                  {activeJob.processed_lines.toLocaleString()} /{" "}
+                                  {activeJob.total_lines.toLocaleString()} lines
+                                </span>
+                                <span className="text-primary">
+                                  {Math.round(
+                                    (activeJob.processed_lines / activeJob.total_lines) * 100,
+                                  )}
+                                  %
+                                </span>
+                              </div>
+                              <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden border border-white/5">
+                                <div
+                                  className="h-full bg-primary transition-all duration-500 ease-out shadow-[0_0_10px_rgba(34,197,94,0.5)]"
+                                  style={{
+                                    width: `${(activeJob.processed_lines / activeJob.total_lines) * 100}%`,
+                                  }}
+                                />
+                              </div>
+                            </>
+                          ) : (
+                            <>
+                              <div className="flex justify-between text-[10px] font-bold uppercase tracking-widest text-text-muted">
+                                <span>Preparing Ingestion...</span>
+                              </div>
+                              <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden border border-white/5 relative">
+                                <div className="h-full w-full bg-gradient-to-r from-transparent via-primary/80 to-transparent animate-shimmer absolute inset-0" />
+                              </div>
+                            </>
+                          )}
+                        </div>
                       )}
-                    </div>
+                    </>
                   )}
                 </div>
                 <div className="mt-12 flex items-center gap-6 text-[10px] font-bold uppercase tracking-widest text-text-muted/30">

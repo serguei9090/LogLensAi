@@ -1,7 +1,12 @@
 import { FileText, Pencil, Trash2 } from "lucide-react";
-import { memo, useEffect, useState } from "react";
+import { memo, useEffect, useMemo, useState } from "react";
+import {
+  IngestionProgressBadge,
+  type IngestionStatus,
+} from "@/components/atoms/IngestionProgressBadge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { useIngestionStore } from "@/store/ingestionStore";
 import type { LogSource } from "@/store/workspaceStore";
 
 interface SourceItemProps {
@@ -30,6 +35,35 @@ function SourceItemImpl({
       setNameValue(source.name);
     }
   }, [isRenaming, source.name]);
+
+  // Subscribe to the global job list and find this source's active job
+  const jobs = useIngestionStore((state) => state.jobs);
+  const transitioningSourceIds = useIngestionStore((state) => state.transitioningSourceIds);
+
+  const sourceJob = useMemo(
+    () =>
+      jobs.find(
+        (j) =>
+          j.source_id === source.id &&
+          (j.status === "queued" ||
+            j.status === "pending" ||
+            j.status === "processing" ||
+            j.status === "failed"),
+      ),
+    [jobs, source.id],
+  );
+
+  // isTransitioning: between hook call and first poll — treat as "processing" visually
+  const isTransitioning = transitioningSourceIds.has(source.id);
+
+  const badgeStatus: IngestionStatus | null = isTransitioning
+    ? "processing"
+    : sourceJob
+      ? (sourceJob.status as IngestionStatus)
+      : null;
+
+  const progress =
+    sourceJob && sourceJob.total_lines > 0 ? sourceJob.processed_lines / sourceJob.total_lines : 0;
 
   const handleConfirmRename = () => {
     const trimmed = nameValue.trim();
@@ -84,6 +118,14 @@ function SourceItemImpl({
           className={cn("h-3.5 w-3.5 shrink-0", active ? "text-primary" : "text-text-muted/60")}
         />
         <span className="truncate flex-1 min-w-0">{source.name}</span>
+        {badgeStatus && (
+          <IngestionProgressBadge
+            status={badgeStatus}
+            progress={progress}
+            queuePosition={sourceJob?.queue_position}
+            className="shrink-0"
+          />
+        )}
       </div>
       <div className="hidden group-hover:flex items-center gap-0.5 shrink-0 pr-1">
         <Button

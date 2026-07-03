@@ -16,14 +16,22 @@ import { callSidecar } from "./useSidecarBridge";
  * the polling loop only runs when there is actual work to track.
  * For live sources (tail, SSH, syslog, HTTP), it also calls addLiveSource()
  * to keep the loop alive until the source is explicitly stopped.
+ *
+ * transitioningSourceIds lives in ingestionStore (global) so that all consumers
+ * (VirtualLogTable, Sidebar, etc.) can subscribe without prop-drilling.
  */
 export function useLogIngestion(workspaceId: string | null, fetchLogs: () => void) {
   const { createSource, setActiveSource } = useWorkspaceStore();
   const { setLogs, setTailing } = useInvestigationStore();
   const { settings } = useSettingsStore();
-  const { startPolling, addLiveSource, removeLiveSource } = useIngestionStore();
+  const {
+    startPolling,
+    addLiveSource,
+    removeLiveSource,
+    addTransitioningSource,
+    removeTransitioningSource,
+  } = useIngestionStore();
 
-  const [transitioningSourceId, setTransitioningSourceId] = useState<string | null>(null);
   const [tailingSourceIds, setTailingSourceIds] = useState<Set<string>>(new Set());
 
   const handleImportLocal = useCallback(
@@ -47,7 +55,10 @@ export function useLogIngestion(workspaceId: string | null, fetchLogs: () => voi
         newSourceId = newSource.id;
 
         setActiveSource(workspaceId, newSource.id);
-        setTransitioningSourceId(newSource.id);
+
+        // Mark as transitioning BEFORE the RPC call so the loading guard
+        // covers the gap between now and the first poll detecting a job.
+        addTransitioningSource(newSource.id);
         useIngestionStore.getState().startIngestion(newSource.id);
         setLogs([], 0);
 
@@ -81,8 +92,9 @@ export function useLogIngestion(workspaceId: string | null, fetchLogs: () => voi
           toast.success(`Live monitoring active for ${path}`);
         }
       } catch (e: unknown) {
-        setTransitioningSourceId(null);
+        // Remove transitioning guard on error
         if (newSourceId) {
+          removeTransitioningSource(newSourceId);
           useIngestionStore.getState().stopIngestion(newSourceId);
         }
         toast.error(e instanceof Error ? e.message : "Failed to import file.", { id: "ingest" });
@@ -97,6 +109,8 @@ export function useLogIngestion(workspaceId: string | null, fetchLogs: () => voi
       setTailing,
       startPolling,
       addLiveSource,
+      addTransitioningSource,
+      removeTransitioningSource,
     ],
   );
 
@@ -163,7 +177,7 @@ export function useLogIngestion(workspaceId: string | null, fetchLogs: () => voi
           return;
         }
 
-        setTransitioningSourceId(newSource.id);
+        addTransitioningSource(newSource.id);
         useIngestionStore.getState().startIngestion(newSource.id);
         setLogs([], 0);
 
@@ -189,8 +203,8 @@ export function useLogIngestion(workspaceId: string | null, fetchLogs: () => voi
         setTailing(true);
         toast.success(`SSH tailing started for ${connectionPath}`);
       } catch (e: unknown) {
-        setTransitioningSourceId(null);
         if (newSourceId) {
+          removeTransitioningSource(newSourceId);
           useIngestionStore.getState().stopIngestion(newSourceId);
         }
         toast.error(e instanceof Error ? e.message : "SSH connection failed.");
@@ -205,6 +219,8 @@ export function useLogIngestion(workspaceId: string | null, fetchLogs: () => voi
       setTailing,
       addLiveSource,
       startPolling,
+      addTransitioningSource,
+      removeTransitioningSource,
     ],
   );
 
@@ -240,7 +256,7 @@ export function useLogIngestion(workspaceId: string | null, fetchLogs: () => voi
           return;
         }
 
-        setTransitioningSourceId(newSource.id);
+        addTransitioningSource(newSource.id);
         useIngestionStore.getState().startIngestion(newSource.id);
         setLogs([], 0);
 
@@ -250,8 +266,8 @@ export function useLogIngestion(workspaceId: string | null, fetchLogs: () => voi
         startPolling(workspaceId);
         fetchLogs();
       } catch (error) {
-        setTransitioningSourceId(null);
         if (newSourceId) {
+          removeTransitioningSource(newSourceId);
           useIngestionStore.getState().stopIngestion(newSourceId);
         }
         toast.error(error instanceof Error ? error.message : "Manual ingestion failed.", {
@@ -259,7 +275,16 @@ export function useLogIngestion(workspaceId: string | null, fetchLogs: () => voi
         });
       }
     },
-    [workspaceId, createSource, setActiveSource, setLogs, fetchLogs, startPolling],
+    [
+      workspaceId,
+      createSource,
+      setActiveSource,
+      setLogs,
+      fetchLogs,
+      startPolling,
+      addTransitioningSource,
+      removeTransitioningSource,
+    ],
   );
 
   const handleImportLive = useCallback(
@@ -335,8 +360,6 @@ export function useLogIngestion(workspaceId: string | null, fetchLogs: () => voi
   );
 
   return {
-    transitioningSourceId,
-    setTransitioningSourceId,
     tailingSourceIds,
     setTailingSourceIds,
     handleImportLocal,

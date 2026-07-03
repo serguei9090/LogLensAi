@@ -103,10 +103,16 @@ function InvestigationPageImpl() {
 
   // Find the active job for the CURRENTLY SELECTED source
   const activeJobForSource = useMemo(() => {
-    // Check for ANY non-completed job (not just processing/pending)
-    // This ensures the "Commit-Lock" persists until ingestion is explicitly finished
+    // Match any non-completed job (queued, pending, processing)
+    // so the loading guard persists until ingestion is explicitly finished
     // even during tab switches when job state might briefly fluctuate.
-    return jobs.find((j) => j.source_id === activeSourceId && j.status !== "completed") || null;
+    return (
+      jobs.find(
+        (j) =>
+          j.source_id === activeSourceId &&
+          (j.status === "queued" || j.status === "pending" || j.status === "processing"),
+      ) || null
+    );
   }, [jobs, activeSourceId]);
 
   // Clear logs immediately when the source or workspace changes to prevent "ghost data"
@@ -127,8 +133,6 @@ function InvestigationPageImpl() {
   );
 
   const {
-    transitioningSourceId,
-    setTransitioningSourceId,
     tailingSourceIds,
     setTailingSourceIds,
     handleImportLocal,
@@ -138,13 +142,18 @@ function InvestigationPageImpl() {
   } = useLogIngestion(activeWorkspaceId, fetchLogs);
 
   const ingestingSourceIds = useIngestionStore((state) => state.ingestingSourceIds);
+  const transitioningSourceIds = useIngestionStore((state) => state.transitioningSourceIds);
 
-  // Combined loading state for the table
+  // Combined loading state for the table — covers three scenarios:
+  // 1. Source is in the ingestingSourceIds set (startIngestion called)
+  // 2. Source is transitioning (between callSidecar returning and first poll detecting a job)
+  // 3. A queued/pending/processing job exists for this source
+  // 4. Data is being fetched and no logs are loaded yet
   const isSourceLoading = useMemo(() => {
     if (activeSourceId && ingestingSourceIds.includes(activeSourceId)) {
       return true;
     }
-    if (transitioningSourceId === activeSourceId) {
+    if (activeSourceId && transitioningSourceIds.has(activeSourceId)) {
       return true;
     }
     if (activeJobForSource) {
@@ -155,7 +164,7 @@ function InvestigationPageImpl() {
   }, [
     activeSourceId,
     ingestingSourceIds,
-    transitioningSourceId,
+    transitioningSourceIds,
     activeJobForSource,
     isFetching,
     logs.length,
@@ -167,12 +176,17 @@ function InvestigationPageImpl() {
     setTailing(isActiveSourceTailing);
   }, [activeSourceId, tailingSourceIds, setTailing]);
 
-  // Clear transitioning state once a job for that source is detected
+  // Clear transitioning state once a job for that source is detected as processing/completed
   useEffect(() => {
-    if (transitioningSourceId && jobs.some((j) => j.source_id === transitioningSourceId)) {
-      setTransitioningSourceId(null);
+    const { removeTransitioningSource, transitioningSourceIds } = useIngestionStore.getState();
+    for (const srcId of transitioningSourceIds) {
+      const job = jobs.find((j) => j.source_id === srcId && j.status !== "queued");
+      if (job) {
+        // Job is now in processing/completed/failed — no longer just transitioning
+        removeTransitioningSource(srcId);
+      }
     }
-  }, [jobs, transitioningSourceId, setTransitioningSourceId]);
+  }, [jobs]);
 
   // Orchestrator Hub state
 

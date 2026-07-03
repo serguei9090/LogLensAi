@@ -5,6 +5,7 @@ import inspect
 import json
 import logging
 import os
+import queue
 import re
 import shutil
 import sys
@@ -382,6 +383,19 @@ class App:
         if start_mcp and settings.get("mcp_server_enabled", "false").lower() == "true":
             self._start_mcp_server()
 
+        # --- Serial Ingestion Queue ---
+        # A single FIFO queue + one persistent daemon thread ensures files are
+        # processed one-at-a-time. This eliminates DuckDB WAL contention and
+        # thread-racing on the single-threaded Drain3 parser.
+        self._ingestion_queue: queue.Queue = queue.Queue()
+        self._ingestion_worker_thread = threading.Thread(
+            target=self._ingestion_queue_worker,
+            name="ingestion-queue-worker",
+            daemon=True,
+        )
+        self._ingestion_worker_thread.start()
+        logger.info("[IngestionQueue] Serial worker thread started")
+
     def _init_ai_provider(self, settings: dict):
         """Initialize the AI provider using the factory."""
         provider = settings.get("ai_provider", "ollama")
@@ -534,6 +548,16 @@ class App:
             self, self.ai, db_path=os.path.join(ai_data_dir, AI_STATE_DB)
         )
 
+        # FIX: Re-initialize and restart the serial ingestion queue worker
+        self._ingestion_queue = queue.Queue()
+        self._ingestion_worker_thread = threading.Thread(
+            target=self._ingestion_queue_worker,
+            name="ingestion-queue-worker",
+            daemon=True,
+        )
+        self._ingestion_worker_thread.start()
+        logger.info("[IngestionQueue] Serial worker thread restarted post-factory-reset")
+
         return {"status": "ok", "message": "Backend reset complete. System fully re-initialized."}
 
     def _start_mcp_server(self):
@@ -609,6 +633,11 @@ class App:
         # 6. Log Store & Shared Core
         if hasattr(self, "log_store"):
             self.log_store.close_all()
+
+        # 7. Serial Ingestion Queue — send sentinel to unblock the worker
+        if hasattr(self, "_ingestion_queue"):
+            self._ingestion_queue.put(None)  # Sentinel value signals shutdown
+            logger.info("[IngestionQueue] Shutdown sentinel sent")
 
         logger.info("Sidecar: Background workers stopped.")
 
@@ -1589,15 +1618,59 @@ class App:
         # 2. Create ingestion job record
         job_id = self.db.create_ingestion_job(workspace_id, source_id, total_lines)
 
-        # 3. Launch background ingestion
-        thread = threading.Thread(
-            target=self._bg_ingest_local_file,
-            args=(workspace_id, source_id, filepath, job_id),
-            daemon=True,
-        )
-        thread.start()
+        # Ensure the queue worker thread is alive (resurrect if it was stopped/dead)
+        if not hasattr(self, "_ingestion_worker_thread") or not self._ingestion_worker_thread.is_alive():
+            logger.warning("[IngestionQueue] Ingestion worker thread was dead or not started. Starting it now.")
+            if not hasattr(self, "_ingestion_queue"):
+                self._ingestion_queue = queue.Queue()
+            self._ingestion_worker_thread = threading.Thread(
+                target=self._ingestion_queue_worker,
+                name="ingestion-queue-worker",
+                daemon=True,
+            )
+            self._ingestion_worker_thread.start()
 
-        return {"status": "ok", "job_id": job_id, "total_lines": total_lines}
+        # 3. Enqueue for serial processing
+        self._ingestion_queue.put((workspace_id, source_id, filepath, job_id))
+        queue_position = self._ingestion_queue.qsize()  # Approximate position
+        logger.info(
+            "[IngestionQueue] Enqueued job %d for source %s — queue depth: %d",
+            job_id, source_id, queue_position,
+        )
+        return {"status": "queued", "job_id": job_id, "total_lines": total_lines, "queue_position": queue_position}
+
+    def _ingestion_queue_worker(self) -> None:
+        """Serial worker thread — processes file ingestion requests one at a time.
+
+        Blocks on self._ingestion_queue.get() and processes each
+        (workspace_id, source_id, filepath, job_id) tuple sequentially.
+        Receives None as a sentinel to shut down gracefully.
+        """
+        logger.info("[IngestionQueue] Worker started, waiting for jobs...")
+        while True:
+            item = self._ingestion_queue.get()
+            if item is None:  # Shutdown sentinel
+                logger.info("[IngestionQueue] Shutdown signal received, worker exiting.")
+                self._ingestion_queue.task_done()
+                break
+            workspace_id, source_id, filepath, job_id = item
+            logger.info(
+                "[IngestionQueue] Dequeued job %d for source %s (file: %s)",
+                job_id, source_id, filepath,
+            )
+            try:
+                # Mark as processing now that the job is at the front of the queue
+                cursor = self.db.get_cursor()
+                cursor.execute(
+                    "UPDATE ingestion_jobs SET status = 'processing', updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+                    (job_id,),
+                )
+                self.db.commit()
+                self._bg_ingest_local_file(workspace_id, source_id, filepath, job_id)
+            except Exception as exc:
+                logger.exception("[IngestionQueue] Unexpected error for job %d: %s", job_id, exc)
+            finally:
+                self._ingestion_queue.task_done()
 
     def _ingest_chunk(
         self,

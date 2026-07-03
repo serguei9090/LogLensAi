@@ -187,7 +187,7 @@ class LogDatabase:
                 id           INTEGER PRIMARY KEY DEFAULT nextval('ingestion_jobs_id_seq'),
                 workspace_id TEXT,
                 source_id    TEXT,
-                status       TEXT DEFAULT 'pending', -- pending, processing, completed, failed
+                status       TEXT DEFAULT 'queued', -- queued, pending, processing, completed, failed
                 total_lines  INTEGER DEFAULT 0,
                 processed_lines INTEGER DEFAULT 0,
                 last_log_id  INTEGER DEFAULT NULL,
@@ -488,7 +488,13 @@ class LogDatabase:
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_logs_processed ON logs (processed)")
 
     def _migrate_ingestion_jobs(self, cursor):
-        """Ensures source_id column exists in ingestion_jobs table."""
+        """Ensures source_id column exists and cleans up stale jobs from old sessions.
+
+        On startup:
+        - Any 'pending' or 'processing' jobs left over from a previous crashed session
+          are marked 'failed' because no thread is tracking them any more.
+        - The new serial-queue architecture starts fresh on every boot.
+        """
         try:
             # Check if source_id exists
             cursor.execute("SELECT source_id FROM ingestion_jobs LIMIT 1")
@@ -503,6 +509,28 @@ class LogDatabase:
                 # Fallback: drop and recreate since ingestion_jobs is ephemeral
                 cursor.execute("DROP TABLE IF EXISTS ingestion_jobs")
                 self._setup_schema(cursor)
+                return
+
+        # Clean up stale jobs from previous crashed sessions.
+        # 'queued', 'pending', and 'processing' jobs will never complete because
+        # the background threads that were handling them are gone.
+        try:
+            cursor.execute(
+                """
+                UPDATE ingestion_jobs
+                SET status = 'failed', updated_at = CURRENT_TIMESTAMP
+                WHERE status IN ('queued', 'pending', 'processing')
+                """
+            )
+            stale_count = cursor.rowcount if hasattr(cursor, "rowcount") else 0
+            if stale_count:
+                logger.warning(
+                    "[DB] Migration: Marked %d stale ingestion job(s) as 'failed' (leftover from previous session).",
+                    stale_count,
+                )
+        except Exception as e:
+            logger.warning("[DB] Migration: Could not clean up stale ingestion jobs: %s", e)
+
 
     def _migrate_indexes(self, cursor):
         """Ensure all performance indexes exist on legacy databases."""
@@ -1156,9 +1184,14 @@ class LogDatabase:
     # --- Ingestion Job Tracking ---
 
     def create_ingestion_job(self, workspace_id: str, source_id: str, total_lines: int) -> int:
+        """Create an ingestion job in 'queued' state.
+
+        Jobs start as 'queued' and are updated to 'processing' by the serial
+        worker thread when they reach the front of the queue.
+        """
         cursor = self.get_cursor()
         cursor.execute(
-            "INSERT INTO ingestion_jobs (workspace_id, source_id, total_lines, status) VALUES (?, ?, ?, 'processing') RETURNING id",
+            "INSERT INTO ingestion_jobs (workspace_id, source_id, total_lines, status) VALUES (?, ?, ?, 'queued') RETURNING id",
             (workspace_id, source_id, total_lines),
         )
         row = cursor.fetchone()
@@ -1177,6 +1210,12 @@ class LogDatabase:
         self.commit()
 
     def get_ingestion_jobs(self, workspace_id: str | None = None) -> list[dict]:
+        """Return ingestion jobs with a dynamic queue_position field.
+
+        queue_position: 1-based position of this job among all queued/processing
+        jobs ordered by creation time (within the same workspace). 0 means the job
+        is not queued (completed/failed).
+        """
         cursor = self.get_cursor()
         if workspace_id:
             cursor.execute(
@@ -1196,6 +1235,23 @@ class LogDatabase:
                 if job[key]:
                     job[key] = job[key].isoformat()
             results.append(job)
+
+        # Compute queue_position for active jobs (queued/processing) per workspace
+        # Sort active jobs by created_at asc to assign positions 1, 2, 3...
+        active_by_ws: dict[str, list] = {}
+        for job in results:
+            if job["status"] in ("queued", "processing", "pending"):
+                ws = job["workspace_id"]
+                active_by_ws.setdefault(ws, []).append(job)
+        for ws_jobs in active_by_ws.values():
+            ws_jobs.sort(key=lambda j: j["created_at"])
+            for pos, job in enumerate(ws_jobs, start=1):
+                job["queue_position"] = pos
+
+        # Ensure all jobs have the field (inactive jobs get 0)
+        for job in results:
+            job.setdefault("queue_position", 0)
+
         return results
 
 
