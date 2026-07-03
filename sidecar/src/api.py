@@ -1605,6 +1605,22 @@ class App:
         if not os.path.exists(filepath):
             raise FileNotFoundError(f"File not found: {filepath}")
 
+        # Check if already uploaded to support app restarts/skips
+        cursor = self.db.get_cursor()
+        cursor.execute("SELECT is_uploaded FROM log_sources WHERE id = ?", (source_id,))
+        row = cursor.fetchone()
+        if row and row[0]:
+            logger.info("[Ingestion] Source %s already marked as uploaded. Skipping ingestion.", source_id)
+            return {
+                "status": "completed",
+                "job_id": 0,
+                "total_lines": 0,
+                "queue_position": 0,
+            }
+
+        # Clear any existing logs/jobs for this source to ensure a clean overwrite if retrying
+        self.db.delete_logs(workspace_id, source_id)
+
         # 1. Count total lines/entries for progress tracking (quick scan)
         total_lines = 0
         has_content = False
@@ -1829,6 +1845,7 @@ class App:
                 "UPDATE ingestion_jobs SET status = 'completed', processed_lines = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
                 (processed_count, job_id),
             )
+            self.db.mark_source_uploaded(source_id, True)
             db_instance.commit()
 
             # Trigger event-driven anomaly detection on ingestion complete

@@ -113,16 +113,20 @@ function InvestigationPageImpl() {
     );
   }, [jobs, activeSourceId]);
 
-  // Clear logs immediately when the source or workspace changes to prevent "ghost data"
+  // Clear logs immediately when the source or workspace changes to prevent "ghost data",
+  // but avoid clearing it if there is an active job or the source is still transitioning.
   useEffect(() => {
     if (!activeWorkspaceId || !activeSourceId) {
       return;
     }
 
-    setLogs([], 0);
-    setAvailableFacets({});
-    useInvestigationStore.getState().setTimeRange({ start: "", end: "", label: "All Time" });
-  }, [activeWorkspaceId, activeSourceId, setLogs, setAvailableFacets]);
+    const isTransitioning = useIngestionStore.getState().transitioningSourceIds.has(activeSourceId);
+    if (!activeJobForSource && !isTransitioning) {
+      setLogs([], 0);
+      setAvailableFacets({});
+      useInvestigationStore.getState().setTimeRange({ start: "", end: "", label: "All Time" });
+    }
+  }, [activeWorkspaceId, activeSourceId, activeJobForSource, setLogs, setAvailableFacets]);
 
   // Memoize the query params to reduce complexity in fetchLogs
   const { isFetching, isConnected, anomalousClusters, fetchLogs, fetchMoreLogs } = useLogFetching(
@@ -147,6 +151,11 @@ function InvestigationPageImpl() {
   // 2. Source is transitioning (between callSidecar returning and first poll detecting a job)
   // 3. A queued/pending/processing job exists for this source
   // 4. Data is being fetched and no logs are loaded yet
+  // Tracks sources whose job just completed but fetchLogs hasn't returned data yet.
+  // Prevents the overlay from dropping the instant the job flips to "completed"
+  // before the log rows actually arrive in the table.
+  const [retrievingSourceIds, setRetrievingSourceIds] = useState<Set<string>>(new Set());
+
   const isSourceLoading = useMemo(() => {
     if (activeSourceId && ingestingSourceIds.includes(activeSourceId)) {
       return true;
@@ -157,6 +166,10 @@ function InvestigationPageImpl() {
     if (activeJobForSource) {
       return true;
     }
+    // Keep overlay up while we are fetching post-completion logs for this source
+    if (activeSourceId && retrievingSourceIds.has(activeSourceId)) {
+      return true;
+    }
     // Only block the whole view if we don't have any logs loaded yet
     return isFetching && logs.length === 0;
   }, [
@@ -164,6 +177,7 @@ function InvestigationPageImpl() {
     ingestingSourceIds,
     transitioningSourceIds,
     activeJobForSource,
+    retrievingSourceIds,
     isFetching,
     logs.length,
   ]);
@@ -222,7 +236,8 @@ function InvestigationPageImpl() {
   // Reset job tracking refs when activeWorkspaceId changes to prevent phantom notifications
   // (Redundant refs removed, tracking centralized in Zustand store)
 
-  // Specific effect to trigger fetchLogs when the job for the ACTIVE source completes
+  // Specific effect to trigger fetchLogs when the job for the ACTIVE source completes.
+  // We mark the source as "retrieving" so the overlay stays up until logs arrive.
   const completedJobIds = useRef<Set<number>>(new Set());
   useEffect(() => {
     const sourceJob = jobs.find((j) => j.source_id === activeSourceId);
@@ -232,9 +247,32 @@ function InvestigationPageImpl() {
 
     if (sourceJob.status === "completed" && !completedJobIds.current.has(sourceJob.id)) {
       completedJobIds.current.add(sourceJob.id);
-      fetchLogs({ forceFull: true });
+      // Mark retrieving BEFORE fetchLogs so overlay doesn't flash off
+      if (activeSourceId) {
+        setRetrievingSourceIds((prev) => {
+          const next = new Set(prev);
+          next.add(activeSourceId);
+          return next;
+        });
+      }
+      fetchLogs({ forceFull: true }).finally(() => {
+        if (activeSourceId) {
+          setRetrievingSourceIds((prev) => {
+            const next = new Set(prev);
+            next.delete(activeSourceId);
+            return next;
+          });
+        }
+      });
+
+      // Fetch new hierarchy so the UI updates is_uploaded for the source node
+      if (activeWorkspaceId) {
+        useWorkspaceStore.getState().fetchHierarchy(activeWorkspaceId);
+        // Clear completed state from Zustand store so the toast won't repeat
+        useIngestionStore.getState().clearCompletedState(activeWorkspaceId, sourceJob.source_id);
+      }
     }
-  }, [jobs, activeSourceId, fetchLogs]);
+  }, [jobs, activeSourceId, activeWorkspaceId, fetchLogs]);
 
   // Memoized non-fusion sources
   const nonFusionSources = useMemo(() => sources.filter((s) => s.type !== "fusion"), [sources]);

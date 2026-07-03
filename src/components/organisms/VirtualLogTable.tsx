@@ -423,17 +423,55 @@ export function VirtualLogTable({
       >
         {/* ─── State Management Overlays ────────────────────────────────────── */}
         {(() => {
+          const source = activeWorkspace?.sources?.find((s) => s.id === activeWorkspace?.activeSourceId);
+          // Check if any job in the workspace is currently processing.
+          // If a job is processing, other newly queued/pending jobs will show a Queue Screen.
+          const isAnyIngestionProcessing = useIngestionStore.getState().jobs.some(
+            (j) => j.workspace_id === activeWorkspace?.id && j.status === "processing"
+          );
+
           const isIngesting =
             isCurrentlyIngesting || !!(activeJob && activeJob.status !== "queued");
-          const isQueued = !!(activeJob && activeJob.status === "queued");
+          const isQueued = !!(activeJob && (activeJob.status === "queued" || (activeJob.status === "pending" && isAnyIngestionProcessing)));
           const showOverlay = isIngesting || isQueued || (showTransitioningLoader && !isTailing);
+
+          // Rehydrating screen: source is created, but no logs loaded yet and is_uploaded is true (or job was completed/skipped)
+          const isRehydrating =
+            !isIngesting &&
+            !isQueued &&
+            logs.length === 0 &&
+            isFetching &&
+            (source as any)?.is_uploaded;
+
           const isEmpty =
             logs.length === 0 &&
             !isIngesting &&
             !isQueued &&
+            !isRehydrating &&
             !isTransitioning &&
             !isFetching &&
             !showTransitioningLoader;
+
+          if (isRehydrating) {
+            return (
+              <div className="absolute inset-0 flex flex-col items-center justify-center p-8 text-center animate-in fade-in zoom-in-95 duration-500 bg-bg-base/50 backdrop-blur-sm z-50">
+                <div className="flex flex-col items-center gap-6 max-w-md w-full">
+                  <div className="relative">
+                    <div className="absolute -inset-4 bg-primary/20 rounded-full blur-2xl animate-pulse" />
+                    <div className="relative bg-bg-surface border border-border shadow-2xl rounded-2xl p-6">
+                      <Sparkles className="size-12 text-primary animate-spin" style={{ animationDuration: '3s' }} />
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <h3 className="text-xl font-bold text-text-primary">Rehydrating catalog...</h3>
+                    <p className="text-sm text-text-muted leading-relaxed">
+                      Loading pre-parsed log entries and clusters from the database.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            );
+          }
 
           if (showOverlay) {
             return (

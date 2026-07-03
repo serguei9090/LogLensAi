@@ -47,12 +47,15 @@ def test_upload_and_clustering_performance(e2e_api):
     print(f"\nStarting ingestion of {test_file_path}...")
     start_time = time.time()
 
+    # Register/upsert log source first (since background ingestion aborts if source doesn't exist)
+    e2e_api.db.upsert_log_source(workspace_id, source_id, "Apache Logs", "local", test_file_path)
+
     # Trigger local file ingestion
     res = e2e_api.method_ingest_local_file(
         workspace_id=workspace_id, source_id=source_id, filepath=test_file_path
     )
 
-    assert res["status"] in ("success", "started", "ok"), f"Ingestion failed: {res}"
+    assert res["status"] in ("success", "started", "ok", "queued"), f"Ingestion failed: {res}"
     job_id = res.get("job_id")
 
     # Poll until ingestion and clustering are complete

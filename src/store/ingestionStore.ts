@@ -63,7 +63,9 @@ interface IngestionState {
   stopIngestion: (sourceId: string) => void;
   addTransitioningSource: (sourceId: string) => void;
   removeTransitioningSource: (sourceId: string) => void;
+  clearTransitioningJobs: () => void;
   addOrUpdateJob: (job: IngestionJob) => void;
+  clearCompletedState: (workspaceId: string, sourceId: string) => void;
   clearState: () => void;
 }
 
@@ -304,15 +306,52 @@ export const useIngestionStore = create<IngestionState>((set, get) => ({
     });
   },
 
-  clearState: () => {
-    set({
-      jobs: [],
-      activeJob: null,
-      lastJob: null,
-      error: null,
-      ingestingSourceIds: [],
+  clearTransitioningJobs: () => {
+    set((state) => ({
       transitioningSourceIds: new Set<string>(),
-      notifiedJobIds: new Set<number>(),
+    }));
+  },
+
+  clearCompletedState: (workspaceId: string, sourceId: string) => {
+    set((state) => {
+      const nextJobs = state.jobs.filter(
+        (j) => !(j.workspace_id === workspaceId && j.source_id === sourceId && (j.status === "completed" || j.status === "failed")),
+      );
+      const active = nextJobs.find(
+        (j) => j.status === "processing" || j.status === "pending" || j.status === "queued",
+      );
+      return {
+        jobs: nextJobs,
+        activeJob: active ?? null,
+        lastJob: nextJobs[0] ?? null,
+      };
+    });
+  },
+
+  clearState: () => {
+    set((state) => {
+      // Keep jobs that are still actively running (queued, pending, processing)
+      const activeJobs = state.jobs.filter(
+        (j) => j.status === "queued" || j.status === "pending" || j.status === "processing"
+      );
+      
+      const active = activeJobs.find(
+        (j) => j.status === "processing" || j.status === "pending" || j.status === "queued",
+      );
+
+      // Keep ingestingSourceIds that have active jobs or are transitioning
+      const activeSourceIds = activeJobs.map((j) => j.source_id);
+      const nextIngesting = state.ingestingSourceIds.filter((id) => activeSourceIds.includes(id));
+
+      return {
+        jobs: activeJobs,
+        activeJob: active ?? null,
+        lastJob: activeJobs[0] ?? null,
+        error: null,
+        ingestingSourceIds: nextIngesting,
+        transitioningSourceIds: new Set<string>(), // Transitioning is temporary, we can reset it safely
+        notifiedJobIds: new Set<number>(),
+      };
     });
   },
 }));

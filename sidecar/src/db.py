@@ -313,6 +313,7 @@ class LogDatabase:
                 name         TEXT,
                 type         TEXT,
                 path         TEXT,
+                is_uploaded  BOOLEAN DEFAULT FALSE,
                 created_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
 
@@ -338,6 +339,14 @@ class LogDatabase:
         self._migrate_indexes(cursor)
         self._migrate_drain_masks(cursor)
         self._migrate_hourly_stats(cursor)
+        self._migrate_log_sources_uploaded(cursor)
+
+    def _migrate_log_sources_uploaded(self, cursor):
+        try:
+            cursor.execute("SELECT is_uploaded FROM log_sources LIMIT 1")
+        except Exception:
+            logger.info("[DB] Migrating: Adding 'is_uploaded' column to log_sources table")
+            cursor.execute("ALTER TABLE log_sources ADD COLUMN is_uploaded BOOLEAN DEFAULT FALSE")
 
     def _migrate_drain_masks(self, cursor):
         """Fix the broken IP lookbehind regex in stored drain_masks setting.
@@ -1104,10 +1113,18 @@ class LogDatabase:
         cursor = self.get_cursor()
         cursor.execute(
             """
-            INSERT OR REPLACE INTO log_sources (id, workspace_id, folder_id, name, type, path)
-            VALUES (?, ?, ?, ?, ?, ?)
+            INSERT OR REPLACE INTO log_sources (id, workspace_id, folder_id, name, type, path, is_uploaded)
+            VALUES (?, ?, ?, ?, ?, ?, COALESCE((SELECT is_uploaded FROM log_sources WHERE id = ?), FALSE))
             """,
-            (source_id, workspace_id, folder_id, name, type, path),
+            (source_id, workspace_id, folder_id, name, type, path, source_id),
+        )
+        self.commit()
+
+    def mark_source_uploaded(self, source_id: str, is_uploaded: bool):
+        cursor = self.get_cursor()
+        cursor.execute(
+            "UPDATE log_sources SET is_uploaded = ? WHERE id = ?",
+            (is_uploaded, source_id)
         )
         self.commit()
 
@@ -1185,13 +1202,13 @@ class LogDatabase:
             for r in cursor.fetchall()
         ]
 
-        # 2. Fetch all sources
+        # 2. Fetch all sources (including is_uploaded)
         cursor.execute(
-            "SELECT id, name, type, path, folder_id FROM log_sources WHERE workspace_id = ?",
+            "SELECT id, name, type, path, folder_id, is_uploaded FROM log_sources WHERE workspace_id = ?",
             (workspace_id,),
         )
         sources = [
-            {"id": r[0], "name": r[1], "type": r[2], "path": r[3], "folder_id": r[4]}
+            {"id": r[0], "name": r[1], "type": r[2], "path": r[3], "folder_id": r[4], "is_uploaded": bool(r[5])}
             for r in cursor.fetchall()
         ]
 
