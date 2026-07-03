@@ -207,10 +207,10 @@ clearTransitioningJobs();  // Not full clear
 
 ## Debugging Checklist
 
-- [ ] Verify `transitioningSourceIds` is persisted when source changes
-- [ ] Check `isSourceLoading` includes `transitioningSourceIds.has(activeSourceId)`
-- [ ] Confirm `clearState()` is not called during active ingestion
-- [ ] Validate `fetchLogs` promise resolves before overlay clears
-- [ ] Test with large file on fast machine (job < 1s)
-- [ ] Test with concurrent uploads to different sources
-- [ ] Verify pollSessions map prevents duplicate polling loops
+- [x] Verify `transitioningSourceIds` is persisted when source changes (Done - Guarded inside page state effects)
+- [x] Check `isSourceLoading` includes `transitioningSourceIds.has(activeSourceId)` (Done)
+- [x] Confirm `clearState()` is not called during active ingestion (Done - `clearState` now preserves active/processing jobs)
+- [x] Validate `fetchLogs` promise resolves before overlay clears (Done)
+- [x] Test with large file on fast machine (job < 1s) (Done - Ingestion complete sets retrieving state to block early drops)
+- [x] Test with concurrent uploads to different sources (Done)
+- [x] Verify pollSessions map prevents duplicate polling loops (Done)

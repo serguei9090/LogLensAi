@@ -459,13 +459,13 @@ export function VirtualLogTable({
                   <div className="relative">
                     <div className="absolute -inset-4 bg-primary/20 rounded-full blur-2xl animate-pulse" />
                     <div className="relative bg-bg-surface border border-border shadow-2xl rounded-2xl p-6">
-                      <Sparkles className="size-12 text-primary animate-spin" style={{ animationDuration: '3s' }} />
+                      <Sparkles className="size-12 text-primary animate-pulse" />
                     </div>
                   </div>
                   <div className="space-y-2">
-                    <h3 className="text-xl font-bold text-text-primary">Rehydrating catalog...</h3>
+                    <h3 className="text-xl font-bold text-text-primary animate-pulse">Rehydrating catalog...</h3>
                     <p className="text-sm text-text-muted leading-relaxed">
-                      Loading pre-parsed log entries and clusters from the database.
+                      Loading pre-parsed log entries and clusters from storage.
                     </p>
                   </div>
                 </div>
