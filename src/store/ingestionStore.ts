@@ -60,6 +60,7 @@ interface IngestionState {
   stopIngestion: (sourceId: string) => void;
   addTransitioningSource: (sourceId: string) => void;
   removeTransitioningSource: (sourceId: string) => void;
+  addOrUpdateJob: (job: IngestionJob) => void;
   clearState: () => void;
 }
 
@@ -106,13 +107,15 @@ export const useIngestionStore = create<IngestionState>((set, get) => ({
         (j) => j.status === "processing" || j.status === "pending" || j.status === "queued",
       );
 
-      // Auto-cleanup: remove sourceIds from ingestingSourceIds when their job is done
+      // Auto-cleanup: remove sourceIds from ingestingSourceIds when their latest job is done
       const { ingestingSourceIds } = get();
-      const finishedSourceIds = ingestingSourceIds.filter((srcId) =>
-        fetchedJobs.some(
-          (j) => j.source_id === srcId && (j.status === "completed" || j.status === "failed"),
-        ),
-      );
+      const finishedSourceIds = ingestingSourceIds.filter((srcId) => {
+        const latestJobForSource = fetchedJobs.find((j) => j.source_id === srcId);
+        return (
+          latestJobForSource &&
+          (latestJobForSource.status === "completed" || latestJobForSource.status === "failed")
+        );
+      });
 
       set({
         jobs: fetchedJobs,
@@ -216,6 +219,25 @@ export const useIngestionStore = create<IngestionState>((set, get) => ({
       const next = new Set(state.transitioningSourceIds);
       next.delete(sourceId);
       return { transitioningSourceIds: next };
+    });
+  },
+
+  addOrUpdateJob: (job: IngestionJob) => {
+    set((state) => {
+      const exists = state.jobs.some((j) => j.id === job.id);
+      const nextJobs = exists
+        ? state.jobs.map((j) => (j.id === job.id ? { ...j, ...job } : j))
+        : [job, ...state.jobs];
+
+      const active = nextJobs.find(
+        (j) => j.status === "processing" || j.status === "pending" || j.status === "queued",
+      );
+
+      return {
+        jobs: nextJobs,
+        activeJob: active ?? null,
+        lastJob: nextJobs[0] ?? null,
+      };
     });
   },
 

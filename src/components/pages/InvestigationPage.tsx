@@ -100,6 +100,7 @@ function InvestigationPageImpl() {
   const { lastJob, jobs } = useIngestionStatus(activeWorkspaceId ?? "");
   const prevJobStatus = useRef<string | null>(null);
   const lastJobId = useRef<number | null>(null);
+  const notifiedJobIds = useRef<Set<number>>(new Set());
 
   // Find the active job for the CURRENTLY SELECTED source
   const activeJobForSource = useMemo(() => {
@@ -238,18 +239,23 @@ function InvestigationPageImpl() {
     if (lastJobId.current === null) {
       lastJobId.current = lastJob.id;
       prevJobStatus.current = lastJob.status;
+      if (lastJob.status === "completed" || lastJob.status === "failed") {
+        notifiedJobIds.current.add(lastJob.id);
+      }
       return;
     }
 
     // Monitor status transitions for the global lastJob (for toasts)
     if (lastJob.id !== lastJobId.current || lastJob.status !== prevJobStatus.current) {
-      if (lastJob.status === "completed") {
+      if (lastJob.status === "completed" && !notifiedJobIds.current.has(lastJob.id)) {
+        notifiedJobIds.current.add(lastJob.id);
         toast.success("Ingestion complete", {
           id: "ingest",
           description: `Processed ${lastJob.total_lines.toLocaleString()} lines.`,
         });
         useIngestionStore.getState().stopIngestion(lastJob.source_id);
-      } else if (lastJob.status === "failed") {
+      } else if (lastJob.status === "failed" && !notifiedJobIds.current.has(lastJob.id)) {
+        notifiedJobIds.current.add(lastJob.id);
         toast.error("Ingestion failed", {
           id: "ingest",
           description: "Check sidecar logs for details.",

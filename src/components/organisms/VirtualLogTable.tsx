@@ -426,10 +426,7 @@ export function VirtualLogTable({
           const isIngesting =
             isCurrentlyIngesting || !!(activeJob && activeJob.status !== "queued");
           const isQueued = !!(activeJob && activeJob.status === "queued");
-          const showOverlay =
-            (isIngesting && logs.length === 0) ||
-            (isQueued && logs.length === 0) ||
-            (showTransitioningLoader && (logs.length === 0 || !isTailing));
+          const showOverlay = isIngesting || isQueued || (showTransitioningLoader && !isTailing);
           const isEmpty =
             logs.length === 0 &&
             !isIngesting &&
@@ -1280,7 +1277,7 @@ function LogTableCell({
       return (
         <td
           key="message"
-          className="px-3 py-2 text-text-primary/90 align-top whitespace-normal break-words leading-relaxed min-w-0"
+          className="px-3 py-2 text-text-primary/90 align-top whitespace-pre-wrap font-mono text-[11px] break-words leading-normal min-w-0"
         >
           <div className="max-w-full overflow-hidden">{content}</div>
         </td>

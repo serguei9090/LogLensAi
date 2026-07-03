@@ -70,3 +70,22 @@ def test_apply_custom_extractions_invalid_regex():
     facets = {}
     _apply_custom_extractions(line, rules, facets)
     assert "bad" not in facets
+
+
+def test_extract_base_metadata_comma_milliseconds():
+    line = "2025-04-09 00:03:32,688 ERROR [io.undertow.request] message"
+    ts, lvl, msg, _ = _extract_base_metadata(line)
+    assert ts == "2025-04-09 00:03:32.688"
+    assert lvl == "ERROR"
+    assert msg == line
+
+
+def test_extract_base_metadata_multiline():
+    line = "2025-04-09 00:03:32,688 ERROR [io.undertow.request] message\n\tat io.undertow.core\n\t... 15 more"
+    ts, lvl, msg, _ = _extract_base_metadata(line)
+    assert ts == "2025-04-09 00:03:32.688"
+    assert lvl == "ERROR"
+    assert (
+        msg
+        == "2025-04-09 00:03:32,688 ERROR [io.undertow.request] message\n\tat io.undertow.core\n\t... 15 more"
+    )

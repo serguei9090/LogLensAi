@@ -43,7 +43,7 @@ FORMAT_LENGTHS = {
 AUTO_TIMESTAMP_PATTERNS = [
     # 1. ISO 8601 (e.g. 2026-06-02T13:59:46.123Z, 2026-06-02 13:59:46)
     (
-        re.compile(r"\b(\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:[+-][\d:]+|Z)?)\b"),
+        re.compile(r"\b(\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}(?:[.,]\d+)?(?:[+-][\d:]+|Z)?)\b"),
         FMT_ISO,
     ),
     # 2. Apache/Nginx CLF (e.g. 26/May/2015:21:05:15 +0000)
@@ -216,16 +216,22 @@ def _extract_base_metadata(
     raw_line: str, parser_config: dict | None = None, tz_offset: float = 0
 ) -> tuple[str, str, str, dict]:
     """Extracts timestamp, level, message, and auto-detected facets."""
-    level, clf_facets = _extract_clf_and_level(raw_line)
+    # To support multiline logs, extract base metadata from the first line of the block
+    first_line = raw_line.split("\n", 1)[0]
+    level, clf_facets = _extract_clf_and_level(first_line)
     parser_config = parser_config or {}
 
     timestamp, level, message = _extract_timestamp_and_message(
-        raw_line, parser_config, tz_offset, level
+        first_line, parser_config, tz_offset, level
     )
 
     # If no log timestamp was parsed, fall back to current time
     if not timestamp:
         timestamp = datetime.datetime.now().strftime(FMT_ISO)
+
+    if "\n" in raw_line:
+        rest = raw_line.split("\n", 1)[1]
+        message = f"{message}\n{rest}"
 
     return timestamp, level, message, clf_facets
 
@@ -259,6 +265,18 @@ def _apply_single_custom_rule(raw_line: str, rule: dict, facets: dict):
         logging.getLogger("LogLensSidecar").debug(
             "Custom extraction rule %s failed: %s", rule.get("name"), e
         )
+
+
+def is_new_log_header(line: str) -> bool:
+    """Helper to detect if a line starts a new log entry.
+
+    Returns False if the line starts with a whitespace character (tabs/spaces),
+    indicating it is a stack trace continuation or multiline body.
+    Otherwise, returns True (it's a header line).
+    """
+    if not line:
+        return False
+    return not line[0].isspace()
 
 
 def extract_log_metadata(

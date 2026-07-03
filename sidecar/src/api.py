@@ -30,7 +30,7 @@ from db import LogDatabase
 from dotenv import load_dotenv
 from ingestion import IngestionServer
 from mcp_server import init_mcp, mcp_server
-from metadata_extractor import extract_log_metadata
+from metadata_extractor import extract_log_metadata, is_new_log_header
 from models import (
     AnalyzeClusterRequest,
     CreateLogSourceRequest,
@@ -1605,22 +1605,34 @@ class App:
         if not os.path.exists(filepath):
             raise FileNotFoundError(f"File not found: {filepath}")
 
-        # 1. Count total lines for progress tracking (quick scan)
+        # 1. Count total lines/entries for progress tracking (quick scan)
         total_lines = 0
+        has_content = False
         with open(filepath, encoding="utf-8", errors="replace") as f:
             for line in f:
-                if line.strip():
-                    total_lines += 1
+                clean = line.rstrip("\r\n")
+                if clean:
+                    has_content = True
+                    if is_new_log_header(clean):
+                        total_lines += 1
 
-        if total_lines == 0:
+        if has_content and total_lines == 0:
+            total_lines = 1
+
+        if not has_content:
             return {"status": "ok", "count": 0, "job_id": None}
 
         # 2. Create ingestion job record
         job_id = self.db.create_ingestion_job(workspace_id, source_id, total_lines)
 
         # Ensure the queue worker thread is alive (resurrect if it was stopped/dead)
-        if not hasattr(self, "_ingestion_worker_thread") or not self._ingestion_worker_thread.is_alive():
-            logger.warning("[IngestionQueue] Ingestion worker thread was dead or not started. Starting it now.")
+        if (
+            not hasattr(self, "_ingestion_worker_thread")
+            or not self._ingestion_worker_thread.is_alive()
+        ):
+            logger.warning(
+                "[IngestionQueue] Ingestion worker thread was dead or not started. Starting it now."
+            )
             if not hasattr(self, "_ingestion_queue"):
                 self._ingestion_queue = queue.Queue()
             self._ingestion_worker_thread = threading.Thread(
@@ -1635,9 +1647,16 @@ class App:
         queue_position = self._ingestion_queue.qsize()  # Approximate position
         logger.info(
             "[IngestionQueue] Enqueued job %d for source %s — queue depth: %d",
-            job_id, source_id, queue_position,
+            job_id,
+            source_id,
+            queue_position,
         )
-        return {"status": "queued", "job_id": job_id, "total_lines": total_lines, "queue_position": queue_position}
+        return {
+            "status": "queued",
+            "job_id": job_id,
+            "total_lines": total_lines,
+            "queue_position": queue_position,
+        }
 
     def _ingestion_queue_worker(self) -> None:
         """Serial worker thread — processes file ingestion requests one at a time.
@@ -1656,7 +1675,9 @@ class App:
             workspace_id, source_id, filepath, job_id = item
             logger.info(
                 "[IngestionQueue] Dequeued job %d for source %s (file: %s)",
-                job_id, source_id, filepath,
+                job_id,
+                source_id,
+                filepath,
             )
             try:
                 # Mark as processing now that the job is at the front of the queue
@@ -1701,18 +1722,32 @@ class App:
         return len(chunk_lines)
 
     def _read_file_chunks(self, filepath: str, initial_chunk_size: int, max_chunk_size: int):
-        """Generator that reads filepath and yields chunks of stripped non-empty lines."""
+        """Generator that reads filepath and yields chunks of grouped multiline log entries."""
         current_chunk_size = initial_chunk_size
         with open(filepath, encoding="utf-8", errors="replace") as f:
             chunk_lines: list[str] = []
+            current_entry: list[str] = []
+
             for raw_line in f:
-                clean = raw_line.strip()
-                if clean:
-                    chunk_lines.append(clean)
-                    if len(chunk_lines) >= current_chunk_size:
-                        yield chunk_lines
-                        chunk_lines = []
-                        current_chunk_size = min(max_chunk_size, current_chunk_size * 2)
+                line = raw_line.rstrip("\r\n")
+                if not line:
+                    continue
+
+                if is_new_log_header(line):
+                    if current_entry:
+                        chunk_lines.append("\n".join(current_entry))
+                        current_entry = []
+                    current_entry.append(line)
+                else:
+                    current_entry.append(line)
+
+                if len(chunk_lines) >= current_chunk_size:
+                    yield chunk_lines
+                    chunk_lines = []
+                    current_chunk_size = min(max_chunk_size, current_chunk_size * 2)
+
+            if current_entry:
+                chunk_lines.append("\n".join(current_entry))
             if chunk_lines:
                 yield chunk_lines
 
@@ -1755,6 +1790,18 @@ class App:
             parser = self.get_drain_parser(workspace_id)
 
             for chunk_lines in self._read_file_chunks(filepath, initial_chunk_size, max_chunk_size):
+                # Check if the source has been deleted (cancelled)
+                cursor.execute("SELECT 1 FROM log_sources WHERE id = ?", (source_id,))
+                if not cursor.fetchone():
+                    logger.warning(
+                        "[Ingestion] Source %s was deleted. Aborting ingestion job %d.",
+                        source_id,
+                        job_id,
+                    )
+                    cursor.execute("DELETE FROM ingestion_jobs WHERE id = ?", (job_id,))
+                    db_instance.commit()
+                    return
+
                 n = self._ingest_chunk(
                     cursor,
                     workspace_id,

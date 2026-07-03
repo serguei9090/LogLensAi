@@ -1,6 +1,6 @@
 import { useCallback, useState } from "react";
 import { toast } from "sonner";
-import { useIngestionStore } from "@/store/ingestionStore";
+import { type IngestionJob, useIngestionStore } from "@/store/ingestionStore";
 import { useInvestigationStore } from "@/store/investigationStore";
 import { useSettingsStore } from "@/store/settingsStore";
 import { useWorkspaceStore } from "@/store/workspaceStore";
@@ -62,7 +62,12 @@ export function useLogIngestion(workspaceId: string | null, fetchLogs: () => voi
         useIngestionStore.getState().startIngestion(newSource.id);
         setLogs([], 0);
 
-        await callSidecar({
+        const result = await callSidecar<{
+          status: string;
+          job_id: number;
+          total_lines: number;
+          queue_position: number;
+        }>({
           method: "ingest_local_file",
           params: {
             filepath: normalizedPath,
@@ -70,6 +75,20 @@ export function useLogIngestion(workspaceId: string | null, fetchLogs: () => voi
             source_id: newSource.id,
           },
         });
+
+        // Add the job directly to the store to prevent polling lag visual flutters
+        const newJob: IngestionJob = {
+          id: result.job_id,
+          workspace_id: workspaceId,
+          source_id: newSource.id,
+          status: result.status as "queued" | "pending" | "processing" | "completed" | "failed",
+          total_lines: result.total_lines,
+          processed_lines: 0,
+          queue_position: result.queue_position,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        };
+        useIngestionStore.getState().addOrUpdateJob(newJob);
 
         // Fire polling NOW — the ingest job has just been enqueued.
         startPolling(workspaceId);

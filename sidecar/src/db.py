@@ -20,6 +20,8 @@ DELETE_CLUSTERS_BY_WORKSPACE = "DELETE FROM clusters WHERE workspace_id = ?"
 class LogDatabase:
     _instance = None
     _lock = threading.Lock()
+    _connections = set()
+    _connections_lock = threading.Lock()
 
     def __new__(cls, db_path=None):
         with cls._lock:
@@ -60,6 +62,8 @@ class LogDatabase:
         if self.db_path == MEMORY_DB:
             if not hasattr(self, "_shared_conn") or self._shared_conn is None:
                 self._shared_conn = duckdb.connect(self.db_path)
+                with self._connections_lock:
+                    self._connections.add(self._shared_conn)
             return self._shared_conn
 
         if not hasattr(self._local, "conn"):
@@ -68,6 +72,8 @@ class LogDatabase:
                 self._local.conn = duckdb.connect(self.db_path)
             except Exception as e:
                 self._local.conn = self._recover_wal(e)
+            with self._connections_lock:
+                self._connections.add(self._local.conn)
         return self._local.conn
 
     def get_cursor(self):
@@ -531,7 +537,6 @@ class LogDatabase:
         except Exception as e:
             logger.warning("[DB] Migration: Could not clean up stale ingestion jobs: %s", e)
 
-
     def _migrate_indexes(self, cursor):
         """Ensure all performance indexes exist on legacy databases."""
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_logs_workspace_id ON logs (workspace_id);")
@@ -680,14 +685,13 @@ class LogDatabase:
     def reset(cls):
         with cls._lock:
             if cls._instance is not None:
-                # Close all connections in all threads is hard, but we can at least
-                # close the one in the current thread if it exists.
-                # Usually reset is called during shutdown/cleanup.
-                if hasattr(cls._instance, "_shared_conn") and cls._instance._shared_conn:
-                    cls._instance._shared_conn.close()
-                    cls._instance._shared_conn = None
+                with cls._connections_lock:
+                    for conn in list(cls._connections):
+                        with contextlib.suppress(Exception):
+                            conn.close()
+                    cls._connections.clear()
                 if hasattr(cls._instance, "_local") and hasattr(cls._instance._local, "conn"):
-                    cls._instance._local.conn.close()
+                    cls._instance._local.conn = None
                 cls._instance = None
 
     def _get_filter_condition(self, field: str, op: str, value: Any) -> tuple[str, Any]:
@@ -1121,12 +1125,39 @@ class LogDatabase:
         self.commit()
 
     def delete_log_source(self, source_id: str):
-        cursor = self.get_cursor()
-        # Wipe the actual logs first
-        cursor.execute("DELETE FROM logs WHERE source_id = ?", (source_id,))
-        # Then the source entry
-        cursor.execute("DELETE FROM log_sources WHERE id = ?", (source_id,))
-        self.commit()
+        import time
+
+        import duckdb
+
+        max_retries = 20
+        for attempt in range(max_retries):
+            try:
+                cursor = self.get_cursor()
+                cursor.execute("BEGIN TRANSACTION")
+                # Wipe the actual logs first
+                cursor.execute("DELETE FROM logs WHERE source_id = ?", (source_id,))
+                # Wipe any related ingestion jobs
+                cursor.execute("DELETE FROM ingestion_jobs WHERE source_id = ?", (source_id,))
+                # Then the source entry
+                cursor.execute("DELETE FROM log_sources WHERE id = ?", (source_id,))
+                cursor.execute("COMMIT")
+                return
+            except duckdb.Error as e:
+                with contextlib.suppress(Exception):
+                    cursor.execute("ROLLBACK")
+                if attempt == max_retries - 1:
+                    logger.error("[DB] Failed to delete log source %s: %s", source_id, e)
+                    raise e
+                time.sleep(0.15)
+            except Exception as e:
+                if "transaction" in str(e).lower() or "lock" in str(e).lower():
+                    with contextlib.suppress(Exception):
+                        cursor.execute("ROLLBACK")
+                    if attempt == max_retries - 1:
+                        raise e
+                    time.sleep(0.15)
+                else:
+                    raise e
 
     def get_hierarchy(self, workspace_id: str) -> dict:
         """Returns the tree structure for a workspace."""
@@ -1190,6 +1221,11 @@ class LogDatabase:
         worker thread when they reach the front of the queue.
         """
         cursor = self.get_cursor()
+        # Clean up any existing job tracking for this specific source in the workspace
+        cursor.execute(
+            "DELETE FROM ingestion_jobs WHERE workspace_id = ? AND source_id = ?",
+            (workspace_id, source_id),
+        )
         cursor.execute(
             "INSERT INTO ingestion_jobs (workspace_id, source_id, total_lines, status) VALUES (?, ?, ?, 'queued') RETURNING id",
             (workspace_id, source_id, total_lines),
