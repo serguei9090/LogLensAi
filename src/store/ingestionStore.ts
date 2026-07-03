@@ -1,3 +1,4 @@
+import { toast } from "sonner";
 import { create } from "zustand";
 import { callSidecar } from "@/lib/hooks/useSidecarBridge";
 
@@ -35,6 +36,8 @@ interface IngestionState {
    * are each tracked independently without overwriting each other.
    */
   transitioningSourceIds: Set<string>;
+  /** Tracks job IDs that have already triggered a completed/failed notification. */
+  notifiedJobIds: Set<number>;
 
   // Actions
   fetchJobs: (workspaceId: string) => Promise<void>;
@@ -91,6 +94,7 @@ export const useIngestionStore = create<IngestionState>((set, get) => ({
   error: null,
   ingestingSourceIds: [],
   transitioningSourceIds: new Set<string>(),
+  notifiedJobIds: new Set<number>(),
 
   fetchJobs: async (workspaceId: string) => {
     if (!workspaceId) {
@@ -107,15 +111,40 @@ export const useIngestionStore = create<IngestionState>((set, get) => ({
         (j) => j.status === "processing" || j.status === "pending" || j.status === "queued",
       );
 
-      // Auto-cleanup: remove sourceIds from ingestingSourceIds when their latest job is done
-      const { ingestingSourceIds } = get();
-      const finishedSourceIds = ingestingSourceIds.filter((srcId) => {
-        const latestJobForSource = fetchedJobs.find((j) => j.source_id === srcId);
-        return (
-          latestJobForSource &&
-          (latestJobForSource.status === "completed" || latestJobForSource.status === "failed")
-        );
-      });
+      const { notifiedJobIds: prevNotified, jobs: prevJobs, ingestingSourceIds } = get();
+      const nextNotified = new Set(prevNotified);
+      const finishedSourceIds: string[] = [];
+
+      for (const job of fetchedJobs) {
+        if (job.status === "completed" || job.status === "failed") {
+          // Check if this job transitioned from active to done
+          const prevJob = prevJobs.find((j) => j.id === job.id);
+          const wasActive =
+            prevJob &&
+            (prevJob.status === "processing" ||
+              prevJob.status === "queued" ||
+              prevJob.status === "pending");
+
+          if (wasActive && !nextNotified.has(job.id)) {
+            nextNotified.add(job.id);
+            if (job.status === "completed") {
+              toast.success("Ingestion complete", {
+                id: "ingest",
+                description: `Processed ${job.total_lines.toLocaleString()} lines.`,
+              });
+            } else {
+              toast.error("Ingestion failed", {
+                id: "ingest",
+                description: "Check sidecar logs for details.",
+              });
+            }
+            finishedSourceIds.push(job.source_id);
+          } else {
+            // Silently mark existing completed jobs as notified
+            nextNotified.add(job.id);
+          }
+        }
+      }
 
       set({
         jobs: fetchedJobs,
@@ -123,6 +152,7 @@ export const useIngestionStore = create<IngestionState>((set, get) => ({
         lastJob: fetchedJobs[0] ?? null,
         error: null,
         ingestingSourceIds: ingestingSourceIds.filter((id) => !finishedSourceIds.includes(id)),
+        notifiedJobIds: nextNotified,
       });
     } catch (err) {
       console.error("Failed to fetch ingestion jobs:", err);
@@ -233,10 +263,43 @@ export const useIngestionStore = create<IngestionState>((set, get) => ({
         (j) => j.status === "processing" || j.status === "pending" || j.status === "queued",
       );
 
+      const nextNotified = new Set(state.notifiedJobIds);
+      const finishedSourceIds = [...state.ingestingSourceIds];
+
+      if ((job.status === "completed" || job.status === "failed") && !nextNotified.has(job.id)) {
+        const prevJob = state.jobs.find((j) => j.id === job.id);
+        const wasActive =
+          prevJob &&
+          (prevJob.status === "processing" ||
+            prevJob.status === "queued" ||
+            prevJob.status === "pending");
+
+        nextNotified.add(job.id);
+        if (wasActive) {
+          if (job.status === "completed") {
+            toast.success("Ingestion complete", {
+              id: "ingest",
+              description: `Processed ${job.total_lines.toLocaleString()} lines.`,
+            });
+          } else {
+            toast.error("Ingestion failed", {
+              id: "ingest",
+              description: "Check sidecar logs for details.",
+            });
+          }
+          const idx = finishedSourceIds.indexOf(job.source_id);
+          if (idx !== -1) {
+            finishedSourceIds.splice(idx, 1);
+          }
+        }
+      }
+
       return {
         jobs: nextJobs,
         activeJob: active ?? null,
         lastJob: nextJobs[0] ?? null,
+        notifiedJobIds: nextNotified,
+        ingestingSourceIds: finishedSourceIds,
       };
     });
   },
@@ -249,6 +312,7 @@ export const useIngestionStore = create<IngestionState>((set, get) => ({
       error: null,
       ingestingSourceIds: [],
       transitioningSourceIds: new Set<string>(),
+      notifiedJobIds: new Set<number>(),
     });
   },
 }));

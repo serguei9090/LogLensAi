@@ -686,7 +686,7 @@ class LogDatabase:
         with cls._lock:
             if cls._instance is not None:
                 with cls._connections_lock:
-                    for conn in list(cls._connections):
+                    for conn in cls._connections:
                         with contextlib.suppress(Exception):
                             conn.close()
                     cls._connections.clear()
@@ -1124,40 +1124,53 @@ class LogDatabase:
         cursor.execute(f"UPDATE log_sources SET {', '.join(fields)} WHERE id = ?", params)
         self.commit()
 
-    def delete_log_source(self, source_id: str):
-        import time
+    def _try_delete_log_source(self, source_id: str) -> bool:
+        """Helper to run log source deletion in a transaction. Returns True on success, False to retry."""
+        import contextlib
 
         import duckdb
+
+        cursor = None
+        try:
+            cursor = self.get_cursor()
+            cursor.execute("BEGIN TRANSACTION")
+            # Wipe the actual logs first
+            cursor.execute("DELETE FROM logs WHERE source_id = ?", (source_id,))
+            # Wipe any related ingestion jobs
+            cursor.execute("DELETE FROM ingestion_jobs WHERE source_id = ?", (source_id,))
+            # Then the source entry
+            cursor.execute("DELETE FROM log_sources WHERE id = ?", (source_id,))
+            cursor.execute("COMMIT")
+            return True
+        except duckdb.Error as e:
+            if cursor is not None:
+                with contextlib.suppress(Exception):
+                    cursor.execute("ROLLBACK")
+            logger.warning("[DB] DuckDB error during delete attempt: %s", e)
+            return False
+        except Exception as e:
+            if "transaction" in str(e).lower() or "lock" in str(e).lower():
+                if cursor is not None:
+                    with contextlib.suppress(Exception):
+                        cursor.execute("ROLLBACK")
+                return False
+            raise e
+
+    def delete_log_source(self, source_id: str):
+        import time
 
         max_retries = 20
         for attempt in range(max_retries):
             try:
-                cursor = self.get_cursor()
-                cursor.execute("BEGIN TRANSACTION")
-                # Wipe the actual logs first
-                cursor.execute("DELETE FROM logs WHERE source_id = ?", (source_id,))
-                # Wipe any related ingestion jobs
-                cursor.execute("DELETE FROM ingestion_jobs WHERE source_id = ?", (source_id,))
-                # Then the source entry
-                cursor.execute("DELETE FROM log_sources WHERE id = ?", (source_id,))
-                cursor.execute("COMMIT")
-                return
-            except duckdb.Error as e:
-                with contextlib.suppress(Exception):
-                    cursor.execute("ROLLBACK")
+                if self._try_delete_log_source(source_id):
+                    return
+            except Exception as e:
                 if attempt == max_retries - 1:
                     logger.error("[DB] Failed to delete log source %s: %s", source_id, e)
                     raise e
-                time.sleep(0.15)
-            except Exception as e:
-                if "transaction" in str(e).lower() or "lock" in str(e).lower():
-                    with contextlib.suppress(Exception):
-                        cursor.execute("ROLLBACK")
-                    if attempt == max_retries - 1:
-                        raise e
-                    time.sleep(0.15)
-                else:
-                    raise e
+            time.sleep(0.15)
+        logger.error("[DB] Failed to delete log source %s after max retries", source_id)
+        raise RuntimeError(f"Lock timeout: failed to delete log source {source_id}")
 
     def get_hierarchy(self, workspace_id: str) -> dict:
         """Returns the tree structure for a workspace."""
@@ -1253,24 +1266,27 @@ class LogDatabase:
         is not queued (completed/failed).
         """
         cursor = self.get_cursor()
-        if workspace_id:
-            cursor.execute(
-                "SELECT id, workspace_id, source_id, status, total_lines, processed_lines, created_at, updated_at FROM ingestion_jobs WHERE workspace_id = ? ORDER BY created_at DESC",
-                (workspace_id,),
-            )
-        else:
-            cursor.execute(
-                "SELECT id, workspace_id, source_id, status, total_lines, processed_lines, created_at, updated_at FROM ingestion_jobs ORDER BY created_at DESC LIMIT 50"
-            )
-        columns = [desc[0] for desc in cursor.description]
-        results = []
-        for row in cursor.fetchall():
-            job = dict(zip(columns, row, strict=False))
-            # Format timestamps for JSON serialization
-            for key in ["created_at", "updated_at"]:
-                if job[key]:
-                    job[key] = job[key].isoformat()
-            results.append(job)
+        try:
+            if workspace_id:
+                cursor.execute(
+                    "SELECT id, workspace_id, source_id, status, total_lines, processed_lines, created_at, updated_at FROM ingestion_jobs WHERE workspace_id = ? ORDER BY created_at DESC",
+                    (workspace_id,),
+                )
+            else:
+                cursor.execute(
+                    "SELECT id, workspace_id, source_id, status, total_lines, processed_lines, created_at, updated_at FROM ingestion_jobs ORDER BY created_at DESC LIMIT 50"
+                )
+            columns = [desc[0] for desc in cursor.description]
+            results = []
+            for row in cursor.fetchall():
+                job = dict(zip(columns, row, strict=False))
+                # Format timestamps for JSON serialization
+                for key in ["created_at", "updated_at"]:
+                    if job[key]:
+                        job[key] = job[key].isoformat()
+                results.append(job)
+        finally:
+            self.commit()
 
         # Compute queue_position for active jobs (queued/processing) per workspace
         # Sort active jobs by created_at asc to assign positions 1, 2, 3...

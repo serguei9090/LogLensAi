@@ -101,16 +101,18 @@ class FileTailer:
 
         # Put into the queue for batch insertion
         facets_json = json.dumps(facets) if facets else None
-        self._queue.put((
-            self.workspace_id,
-            self.source_id,
-            line_id,
-            line,
-            timestamp,
-            ingest_timestamp,
-            level,
-            facets_json,
-        ))
+        self._queue.put(
+            (
+                self.workspace_id,
+                self.source_id,
+                line_id,
+                line,
+                timestamp,
+                ingest_timestamp,
+                level,
+                facets_json,
+            )
+        )
 
     def _flush_loop(self):
         while self._flush_running:

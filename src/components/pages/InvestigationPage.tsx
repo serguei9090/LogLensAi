@@ -97,10 +97,7 @@ function InvestigationPageImpl() {
   const [initialParserConfig, setInitialParserConfig] = useState<string | null>(null);
 
   // Ingestion status & notifications
-  const { lastJob, jobs } = useIngestionStatus(activeWorkspaceId ?? "");
-  const prevJobStatus = useRef<string | null>(null);
-  const lastJobId = useRef<number | null>(null);
-  const notifiedJobIds = useRef<Set<number>>(new Set());
+  const { jobs } = useIngestionStatus(activeWorkspaceId ?? "");
 
   // Find the active job for the CURRENTLY SELECTED source
   const activeJobForSource = useMemo(() => {
@@ -223,50 +220,7 @@ function InvestigationPageImpl() {
   const searchRef = useRef<HTMLInputElement>(null);
 
   // Reset job tracking refs when activeWorkspaceId changes to prevent phantom notifications
-  useEffect(() => {
-    if (activeWorkspaceId) {
-      lastJobId.current = null;
-      prevJobStatus.current = null;
-    }
-  }, [activeWorkspaceId]);
-
-  useEffect(() => {
-    if (!lastJob) {
-      return;
-    }
-
-    // Initialize refs on first job discovery to avoid "phantom" toasts for old jobs
-    if (lastJobId.current === null) {
-      lastJobId.current = lastJob.id;
-      prevJobStatus.current = lastJob.status;
-      if (lastJob.status === "completed" || lastJob.status === "failed") {
-        notifiedJobIds.current.add(lastJob.id);
-      }
-      return;
-    }
-
-    // Monitor status transitions for the global lastJob (for toasts)
-    if (lastJob.id !== lastJobId.current || lastJob.status !== prevJobStatus.current) {
-      if (lastJob.status === "completed" && !notifiedJobIds.current.has(lastJob.id)) {
-        notifiedJobIds.current.add(lastJob.id);
-        toast.success("Ingestion complete", {
-          id: "ingest",
-          description: `Processed ${lastJob.total_lines.toLocaleString()} lines.`,
-        });
-        useIngestionStore.getState().stopIngestion(lastJob.source_id);
-      } else if (lastJob.status === "failed" && !notifiedJobIds.current.has(lastJob.id)) {
-        notifiedJobIds.current.add(lastJob.id);
-        toast.error("Ingestion failed", {
-          id: "ingest",
-          description: "Check sidecar logs for details.",
-        });
-        useIngestionStore.getState().stopIngestion(lastJob.source_id);
-      }
-
-      lastJobId.current = lastJob.id;
-      prevJobStatus.current = lastJob.status;
-    }
-  }, [lastJob]);
+  // (Redundant refs removed, tracking centralized in Zustand store)
 
   // Specific effect to trigger fetchLogs when the job for the ACTIVE source completes
   const completedJobIds = useRef<Set<number>>(new Set());

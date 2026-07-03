@@ -88,7 +88,8 @@ class AnomalyDetector:
         ten_mins_ago_bucket = ten_mins_ago[:13]
 
         # Ensure stats are synced for the last 24 hours (heals any direct bypass or out-of-sync states)
-        cursor.execute("""
+        cursor.execute(
+            """
             INSERT INTO hourly_cluster_counts (workspace_id, cluster_id, hour_bucket, count)
             SELECT workspace_id, cluster_id, SUBSTRING(REPLACE(timestamp, 'T', ' '), 1, 13) as hr, count(*)
             FROM logs
@@ -96,7 +97,9 @@ class AnomalyDetector:
             GROUP BY workspace_id, cluster_id, hr
             ON CONFLICT (workspace_id, cluster_id, hour_bucket)
             DO UPDATE SET count = excluded.count
-        """, (day_ago,))
+        """,
+            (day_ago,),
+        )
 
         # 1. Calculate Baseline (Mean and StdDev) for the last 24 hours from pre-aggregated stats
         baseline_query = """

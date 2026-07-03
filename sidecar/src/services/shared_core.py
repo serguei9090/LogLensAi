@@ -63,15 +63,20 @@ class SharedSource:
             self._tailer_thread.join(timeout=1.0)
 
     def _run_tail(self):
+        if not self.filepath:
+            logger.warning("[SharedSource] Cannot tail: filepath is None")
+            return
+
         try:
-            from watchdog.observers import Observer
             from watchdog.events import FileSystemEventHandler
+            from watchdog.observers import Observer
 
             target_path = os.path.abspath(self.filepath)
 
             class FileChangeHandler(FileSystemEventHandler):
                 def __init__(self, event):
                     self.event = event
+
                 def on_modified(self, event):
                     if not event.is_directory and os.path.abspath(event.src_path) == target_path:
                         self.event.set()
@@ -87,12 +92,10 @@ class SharedSource:
                     f.seek(0, 2)
 
                     while self._running:
-                        lines_read = False
                         while self._running:
                             line = f.readline()
                             if not line:
                                 break
-                            lines_read = True
                             self._handle_new_line(line.rstrip("\n"))
 
                         if not self._running:
@@ -110,6 +113,8 @@ class SharedSource:
             self._run_tail_polling()
 
     def _run_tail_polling(self):
+        if not self.filepath:
+            return
         try:
             with open(self.filepath, encoding="utf-8", errors="replace") as f:
                 f.seek(0, 2)
@@ -182,7 +187,7 @@ class SharedSourceManager:
                 cls._instance._initialized = False
             return cls._instance
 
-    def __init__(self, log_store: DiskLogStore = None):
+    def __init__(self, log_store: DiskLogStore | None = None):
         if self._initialized:
             return
         self.log_store = log_store
@@ -194,6 +199,9 @@ class SharedSourceManager:
         """Get or create a shared source for the given file."""
         with self._lock:
             if source_id not in self._sources:
+                assert self.log_store is not None, (
+                    "SharedSourceManager log_store is not initialized"
+                )
                 self._sources[source_id] = SharedSource(source_id, filepath, self.log_store)
             return self._sources[source_id]
 

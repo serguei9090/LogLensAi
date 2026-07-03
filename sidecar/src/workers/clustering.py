@@ -27,11 +27,13 @@ from metadata_extractor import extract_log_metadata
 
 logger = logging.getLogger("ClusteringWorker")
 
+
 class StaleCacheError(Exception):
     def __init__(self, workspace_id: str, version: int):
         self.workspace_id = workspace_id
         self.version = version
         super().__init__(f"Stale cache for {workspace_id}: expected version {version}")
+
 
 # Process-local cache for reconstructed TemplateMiner instances
 _worker_cluster_cache: dict[str, tuple[int, Any]] = {}
@@ -461,6 +463,7 @@ class ClusteringWorker:
             sce.workspace_id,
             sce.version,
         )
+        assert self._executor is not None, "ProcessPoolExecutor is not initialized"
         new_fut = self._executor.submit(
             _tag_log_batch,
             meta["chunk"],
