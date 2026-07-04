@@ -84,7 +84,8 @@ function InvestigationPageImpl() {
   const activeFolderId = activeWorkspace?.activeFolderId ?? null;
   const hierarchy = activeWorkspace?.hierarchy;
 
-  const [isImportOpen, setIsImportOpen] = useState(false);
+  const isImportOpen = useIngestionStore((state) => state.isImportOpen);
+  const setIsImportOpen = useIngestionStore((state) => state.setImportOpen);
   const [isEngineSettingsOpen, setIsEngineSettingsOpen] = useState(false);
 
   // Orchestrator Hub state
@@ -126,7 +127,7 @@ function InvestigationPageImpl() {
   const lastSourceRef = useRef<string | null>(null);
   const lastWorkspaceRef = useRef<string | null>(null);
 
-  // Clear logs immediately when switching to a DIFFERENT source to prevent "ghost data".
+  // Clear logs immediately when switching to a DIFFERENT source or workspace to prevent "ghost data".
   // Do NOT clear if we just deselected the source (activeSourceId is null), so the state
   // is preserved when navigating to the workspace overview and back.
   useEffect(() => {
@@ -134,7 +135,18 @@ function InvestigationPageImpl() {
       return;
     }
 
-    if (activeSourceId && lastSourceRef.current && lastSourceRef.current !== activeSourceId) {
+    const isWorkspaceChanged =
+      lastWorkspaceRef.current && lastWorkspaceRef.current !== activeWorkspaceId;
+
+    if (isWorkspaceChanged) {
+      setLogs([], 0);
+      setAvailableFacets({});
+      useInvestigationStore.getState().setTimeRange({ start: "", end: "", label: "All Time" });
+    } else if (
+      activeSourceId &&
+      lastSourceRef.current &&
+      lastSourceRef.current !== activeSourceId
+    ) {
       // Read transitioningSourceIds reactively via the prop already subscribed at line 165,
       // NOT via getState() which is a stale snapshot at the time this effect runs.
       const isTransitioning = transitioningSourceIds.has(activeSourceId);
@@ -145,12 +157,20 @@ function InvestigationPageImpl() {
         useInvestigationStore.getState().setTimeRange({ start: "", end: "", label: "All Time" });
       }
     }
-    
+
     if (activeSourceId) {
       lastSourceRef.current = activeSourceId;
     }
     lastWorkspaceRef.current = activeWorkspaceId;
-  }, [activeWorkspaceId, activeSourceId, activeJobForSource, retrievingSourceIds, transitioningSourceIds, setLogs, setAvailableFacets]);
+  }, [
+    activeWorkspaceId,
+    activeSourceId,
+    activeJobForSource,
+    retrievingSourceIds,
+    transitioningSourceIds,
+    setLogs,
+    setAvailableFacets,
+  ]);
 
   // Memoize the query params to reduce complexity in fetchLogs
   const { isFetching, isConnected, anomalousClusters, fetchLogs, fetchMoreLogs } = useLogFetching(
@@ -198,8 +218,6 @@ function InvestigationPageImpl() {
     logs.length,
   ]);
 
-
-
   // Sync the currently active source's tailing status to the global isTailing store state
   useEffect(() => {
     const isActiveSourceTailing = activeSourceId ? tailingSourceIds.has(activeSourceId) : false;
@@ -219,6 +237,23 @@ function InvestigationPageImpl() {
       }
     }
   }, [jobs, transitioningSourceIds]);
+
+  // Resume status polling on mount/workspace change if active ingestion jobs exist in the store
+  useEffect(() => {
+    if (!activeWorkspaceId) {
+      return;
+    }
+    const hasActiveJobs = useIngestionStore
+      .getState()
+      .jobs.some(
+        (j) =>
+          j.workspace_id === activeWorkspaceId &&
+          (j.status === "queued" || j.status === "pending" || j.status === "processing"),
+      );
+    if (hasActiveJobs) {
+      useIngestionStore.getState().startPolling(activeWorkspaceId);
+    }
+  }, [activeWorkspaceId]);
 
   // Orchestrator Hub state
 
@@ -740,8 +775,6 @@ function InvestigationPageImpl() {
       {isImportOpen && (
         <Suspense fallback={null}>
           <ImportFeedModal
-            open={isImportOpen}
-            onOpenChange={setIsImportOpen}
             onImportLocal={(path, tail) => handleImportLocal(path, tail, activeFolderId)}
             onImportSSH={(host, port, user, pass, path, tail) =>
               handleImportSSH(host, port, user, pass, path, tail, activeFolderId)

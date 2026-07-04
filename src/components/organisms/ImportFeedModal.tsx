@@ -15,14 +15,13 @@ import { TailSwitch } from "@/components/atoms/TailSwitch";
 import { SourceSelector } from "@/components/molecules/SourceSelector";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { useIngestionStore } from "@/store/ingestionStore";
 import { type AppSettings, useSettingsStore } from "@/store/settingsStore";
 import { useWorkspaceStore } from "@/store/workspaceStore";
 
 const isTauri = globalThis.window !== undefined && "__TAURI_INTERNALS__" in globalThis.window;
 
 interface ImportFeedModalProps {
-  readonly open: boolean;
-  readonly onOpenChange: (open: boolean) => void;
   readonly onImportLocal: (path: string, tail: boolean) => void;
   readonly onImportSSH: (
     host: string,
@@ -59,7 +58,6 @@ interface LocalTabProps {
   readonly setLocalPath: (val: string) => void;
   readonly setLocalTail: (val: boolean) => void;
   readonly onImportLocal: (path: string, tail: boolean) => void;
-  readonly onOpenChange: (open: boolean) => void;
   readonly handleDragOver: (e: React.DragEvent) => void;
   readonly handleDragLeave: () => void;
   readonly handleDrop: (e: React.DragEvent) => void;
@@ -73,12 +71,12 @@ function LocalTab({
   setLocalPath,
   setLocalTail,
   onImportLocal,
-  onOpenChange,
   handleDragOver,
   handleDragLeave,
   handleDrop,
   handleBrowse,
 }: LocalTabProps) {
+  const isProcessing = useIngestionStore((state) => state.isImportProcessing);
   return (
     <div className="space-y-6 animate-in slide-in-from-left-4 duration-500">
       <div className="space-y-4">
@@ -101,6 +99,7 @@ function LocalTab({
             <Button
               variant="ghost"
               size="icon-sm"
+              disabled={isProcessing}
               onClick={() => setLocalPath("")}
               className="text-text-muted hover:text-error transition-colors shrink-0"
             >
@@ -110,6 +109,7 @@ function LocalTab({
         ) : (
           <button
             type="button"
+            disabled={isProcessing}
             onDragOver={handleDragOver}
             onDragLeave={handleDragLeave}
             onDrop={handleDrop}
@@ -119,6 +119,7 @@ function LocalTab({
               isDragOver
                 ? "border-primary bg-primary/10 scale-[1.02] shadow-[0_0_20px_rgba(34,197,94,0.15)]"
                 : "border-border/60 hover:border-primary hover:bg-white/[0.01]",
+              isProcessing && "opacity-50 cursor-not-allowed pointer-events-none",
             )}
           >
             {isDragOver ? (
@@ -138,18 +139,26 @@ function LocalTab({
         )}
       </div>
       <div className="flex items-center justify-between pt-6 border-t border-border/40">
-        <TailSwitch checked={localTail} onCheckedChange={setLocalTail} label="Tail" />
+        <TailSwitch
+          checked={localTail}
+          onCheckedChange={setLocalTail}
+          label="Tail"
+          disabled={isProcessing}
+        />
         <Button
-          disabled={!localPath.trim()}
+          disabled={!localPath.trim() || isProcessing}
           size="lg"
           onClick={() => {
             onImportLocal(localPath.trim(), localTail);
-            onOpenChange(false);
           }}
           className="font-black"
         >
-          <Upload className="size-5" />
-          Initialize
+          {isProcessing ? (
+            <div className="w-5 h-5 border-2 border-current border-t-transparent rounded-full animate-spin mr-2" />
+          ) : (
+            <Upload className="size-5" />
+          )}
+          {isProcessing ? "Processing..." : "Initialize"}
         </Button>
       </div>
     </div>
@@ -177,7 +186,6 @@ interface SshTabProps {
     path: string,
     tail: boolean,
   ) => void;
-  readonly onOpenChange: (open: boolean) => void;
 }
 
 function SshTab({
@@ -194,8 +202,8 @@ function SshTab({
   sshTail,
   setSshTail,
   onImportSSH,
-  onOpenChange,
 }: SshTabProps) {
+  const isProcessing = useIngestionStore((state) => state.isImportProcessing);
   return (
     <div className="space-y-6 animate-in slide-in-from-left-4 duration-500">
       <div className="grid grid-cols-4 gap-4">
@@ -205,6 +213,7 @@ function SshTab({
           </label>
           <input
             id="ssh-host"
+            disabled={isProcessing}
             placeholder="server.prod.local"
             className={cn(inputCls, "h-11")}
             value={sshHost}
@@ -218,6 +227,7 @@ function SshTab({
           <input
             id="ssh-port"
             type="number"
+            disabled={isProcessing}
             className={cn(inputCls, "h-11")}
             value={sshPort}
             onChange={(e) => setSshPort(e.target.value)}
@@ -231,6 +241,7 @@ function SshTab({
           </label>
           <input
             id="ssh-user"
+            disabled={isProcessing}
             className={cn(inputCls, "h-11")}
             value={sshUser}
             onChange={(e) => setSshUser(e.target.value)}
@@ -243,6 +254,7 @@ function SshTab({
           <input
             id="ssh-pass"
             type="password"
+            disabled={isProcessing}
             placeholder="••••••••"
             className={cn(inputCls, "h-11")}
             value={sshPass}
@@ -256,6 +268,7 @@ function SshTab({
         </label>
         <input
           id="ssh-path"
+          disabled={isProcessing}
           placeholder="/var/log/syslog"
           className={cn(inputCls, "font-mono text-xs h-11")}
           value={sshPath}
@@ -263,18 +276,26 @@ function SshTab({
         />
       </div>
       <div className="flex items-center justify-between pt-6 border-t border-border/40">
-        <TailSwitch checked={sshTail} onCheckedChange={setSshTail} label="Stream remotely" />
+        <TailSwitch
+          checked={sshTail}
+          onCheckedChange={setSshTail}
+          label="Stream remotely"
+          disabled={isProcessing}
+        />
         <Button
-          disabled={!sshHost || !sshUser || !sshPath}
+          disabled={!sshHost || !sshUser || !sshPath || isProcessing}
           size="lg"
           onClick={() => {
             onImportSSH(sshHost, Number(sshPort), sshUser, sshPass, sshPath, sshTail);
-            onOpenChange(false);
           }}
           className="font-black"
         >
-          <Terminal className="size-5" />
-          Connect
+          {isProcessing ? (
+            <div className="w-5 h-5 border-2 border-current border-t-transparent rounded-full animate-spin mr-2" />
+          ) : (
+            <Terminal className="size-5" />
+          )}
+          {isProcessing ? "Connecting..." : "Connect"}
         </Button>
       </div>
     </div>
@@ -285,10 +306,10 @@ interface ManualTabProps {
   readonly manualLogs: string;
   readonly setManualLogs: (val: string) => void;
   readonly onIngestManual: (logs: string) => void;
-  readonly onOpenChange: (open: boolean) => void;
 }
 
-function ManualTab({ manualLogs, setManualLogs, onIngestManual, onOpenChange }: ManualTabProps) {
+function ManualTab({ manualLogs, setManualLogs, onIngestManual }: ManualTabProps) {
+  const isProcessing = useIngestionStore((state) => state.isImportProcessing);
   return (
     <div className="space-y-6 animate-in slide-in-from-left-4 duration-500">
       <div className="space-y-3">
@@ -300,6 +321,7 @@ function ManualTab({ manualLogs, setManualLogs, onIngestManual, onOpenChange }: 
           <div className="absolute -inset-0.5 bg-primary/20 rounded-2xl blur opacity-0 group-focus-within:opacity-100 transition duration-500" />
           <textarea
             id="manual-logs"
+            disabled={isProcessing}
             placeholder={
               "[2024-03-27 10:00:00] INFO Engine started...\n[2024-03-27 10:00:01] ERROR Connection refused"
             }
@@ -312,16 +334,19 @@ function ManualTab({ manualLogs, setManualLogs, onIngestManual, onOpenChange }: 
       </div>
       <div className="flex justify-end pt-2">
         <Button
-          disabled={!manualLogs.trim()}
+          disabled={!manualLogs.trim() || isProcessing}
           size="lg"
           onClick={() => {
             onIngestManual(manualLogs.trim());
-            onOpenChange(false);
           }}
           className="font-black"
         >
-          <Upload className="size-5" />
-          Process Buffer
+          {isProcessing ? (
+            <div className="w-5 h-5 border-2 border-current border-t-transparent rounded-full animate-spin mr-2" />
+          ) : (
+            <Upload className="size-5" />
+          )}
+          {isProcessing ? "Processing..." : "Process Buffer"}
         </Button>
       </div>
     </div>
@@ -336,7 +361,6 @@ interface LiveTabProps {
   readonly liveHttp: boolean;
   readonly setLiveHttp: (val: boolean) => void;
   readonly onImportLive: (name: string, types: { syslog: boolean; http: boolean }) => void;
-  readonly onOpenChange: (open: boolean) => void;
   readonly settings: AppSettings;
   readonly activeWorkspaceId: string | null;
 }
@@ -349,10 +373,10 @@ function LiveTab({
   liveHttp,
   setLiveHttp,
   onImportLive,
-  onOpenChange,
   settings,
   activeWorkspaceId,
 }: LiveTabProps) {
+  const isProcessing = useIngestionStore((state) => state.isImportProcessing);
   return (
     <div className="space-y-6 animate-in slide-in-from-left-4 duration-500">
       <div className="space-y-4">
@@ -362,6 +386,7 @@ function LiveTab({
           </label>
           <input
             id="live-name"
+            disabled={isProcessing}
             placeholder="e.g. Production Cluster"
             className={cn(inputCls, "h-12")}
             value={liveName}
@@ -372,6 +397,7 @@ function LiveTab({
         <div className="grid grid-cols-2 gap-4">
           <Button
             variant="ghost"
+            disabled={isProcessing}
             onClick={() => setLiveSyslog(!liveSyslog)}
             className={cn(
               "p-5 rounded-2xl border transition-all text-left flex flex-col gap-2 h-auto",
@@ -399,6 +425,7 @@ function LiveTab({
 
           <Button
             variant="ghost"
+            disabled={isProcessing}
             onClick={() => setLiveHttp(!liveHttp)}
             className={cn(
               "p-5 rounded-2xl border transition-all text-left flex flex-col gap-2 h-auto",
@@ -474,16 +501,19 @@ function LiveTab({
 
       <div className="flex justify-end pt-2">
         <Button
-          disabled={!liveName.trim() || (!liveSyslog && !liveHttp)}
+          disabled={!liveName.trim() || (!liveSyslog && !liveHttp) || isProcessing}
           size="lg"
           onClick={() => {
             onImportLive(liveName.trim(), { syslog: liveSyslog, http: liveHttp });
-            onOpenChange(false);
           }}
           className="font-black"
         >
-          <Wifi className="size-5" />
-          Start Collection
+          {isProcessing ? (
+            <div className="w-5 h-5 border-2 border-current border-t-transparent rounded-full animate-spin mr-2" />
+          ) : (
+            <Wifi className="size-5" />
+          )}
+          {isProcessing ? "Starting..." : "Start Collection"}
         </Button>
       </div>
     </div>
@@ -493,28 +523,43 @@ function LiveTab({
 // ─── Main Component ──────────────────────────────────────────────────────────
 
 export function ImportFeedModal({
-  open,
-  onOpenChange,
   onImportLocal,
   onImportSSH,
   onIngestManual,
   onImportLive,
 }: ImportFeedModalProps) {
-  const [activeTab, setActiveTab] = useState<TabId>("local");
-  const [localPath, setLocalPath] = useState("");
-  const [localTail, setLocalTail] = useState(false);
-
-  const [sshHost, setSshHost] = useState("");
-  const [sshPort, setSshPort] = useState("22");
-  const [sshUser, setSshUser] = useState("");
-  const [sshPass, setSshPass] = useState("");
-  const [sshPath, setSshPath] = useState("");
-  const [sshTail, setSshTail] = useState(false);
-  const [manualLogs, setManualLogs] = useState("");
-
-  const [liveName, setLiveName] = useState("");
-  const [liveSyslog, setLiveSyslog] = useState(true);
-  const [liveHttp, setLiveHttp] = useState(true);
+  const {
+    isImportOpen: open,
+    setImportOpen: onOpenChange,
+    isImportProcessing: isProcessing,
+    importActiveTab: activeTab,
+    setImportActiveTab: setActiveTab,
+    importLocalPath: localPath,
+    setImportLocalPath: setLocalPath,
+    importLocalTail: localTail,
+    setImportLocalTail: setLocalTail,
+    importSshHost: sshHost,
+    setImportSshHost: setSshHost,
+    importSshPort: sshPort,
+    setImportSshPort: setSshPort,
+    importSshUser: sshUser,
+    setImportSshUser: setSshUser,
+    importSshPass: sshPass,
+    setImportSshPass: setSshPass,
+    importSshPath: sshPath,
+    setImportSshPath: setSshPath,
+    importSshTail: sshTail,
+    setImportSshTail: setSshTail,
+    importManualLogs: manualLogs,
+    setImportManualLogs: setManualLogs,
+    importLiveName: liveName,
+    setImportLiveName: setLiveName,
+    importLiveSyslog: liveSyslog,
+    setImportLiveSyslog: setLiveSyslog,
+    importLiveHttp: liveHttp,
+    setImportLiveHttp: setLiveHttp,
+    resetImportForm,
+  } = useIngestionStore();
 
   const [isDragOver, setIsDragOver] = useState(false);
 
@@ -523,21 +568,9 @@ export function ImportFeedModal({
 
   useEffect(() => {
     if (!open) {
-      setLocalPath("");
-      setLocalTail(false);
-      setSshHost("");
-      setSshPort("22");
-      setSshUser("");
-      setSshPass("");
-      setSshPath("");
-      setSshTail(false);
-      setManualLogs("");
-      setLiveName("");
-      setLiveSyslog(true);
-      setLiveHttp(true);
-      setActiveTab("local");
+      resetImportForm();
     }
-  }, [open]);
+  }, [open, resetImportForm]);
 
   useEffect(() => {
     if (!isTauri || !open) {
@@ -577,7 +610,7 @@ export function ImportFeedModal({
         p.then((unlisten) => unlisten());
       }
     };
-  }, [open]);
+  }, [open, setLocalPath]);
 
   if (!open) {
     return null;
@@ -641,8 +674,16 @@ export function ImportFeedModal({
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <button
         type="button"
-        className="absolute inset-0 bg-bg-base/90 backdrop-blur-xl cursor-default border-none outline-none appearance-none"
-        onClick={() => onOpenChange(false)}
+        disabled={isProcessing}
+        className={cn(
+          "absolute inset-0 bg-bg-base/90 backdrop-blur-xl border-none outline-none appearance-none",
+          isProcessing ? "cursor-not-allowed" : "cursor-default",
+        )}
+        onClick={() => {
+          if (!isProcessing) {
+            onOpenChange(false);
+          }
+        }}
         aria-label="Close modal"
       />
 
@@ -659,7 +700,12 @@ export function ImportFeedModal({
           <Button
             variant="ghost"
             size="icon-sm"
-            onClick={() => onOpenChange(false)}
+            disabled={isProcessing}
+            onClick={() => {
+              if (!isProcessing) {
+                onOpenChange(false);
+              }
+            }}
             className="text-text-muted/50 hover:text-text-primary"
           >
             <X className="size-5" />
@@ -683,7 +729,6 @@ export function ImportFeedModal({
               setLocalPath={setLocalPath}
               setLocalTail={setLocalTail}
               onImportLocal={onImportLocal}
-              onOpenChange={onOpenChange}
               handleDragOver={handleDragOver}
               handleDragLeave={handleDragLeave}
               handleDrop={handleDrop}
@@ -706,7 +751,6 @@ export function ImportFeedModal({
               sshTail={sshTail}
               setSshTail={setSshTail}
               onImportSSH={onImportSSH}
-              onOpenChange={onOpenChange}
             />
           )}
 
@@ -715,7 +759,6 @@ export function ImportFeedModal({
               manualLogs={manualLogs}
               setManualLogs={setManualLogs}
               onIngestManual={onIngestManual}
-              onOpenChange={onOpenChange}
             />
           )}
 
@@ -728,7 +771,6 @@ export function ImportFeedModal({
               liveHttp={liveHttp}
               setLiveHttp={setLiveHttp}
               onImportLive={onImportLive}
-              onOpenChange={onOpenChange}
               settings={settings}
               activeWorkspaceId={activeWorkspaceId}
             />

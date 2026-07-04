@@ -4,6 +4,7 @@ import type { NavTab } from "@/App";
 import { Button } from "@/components/ui/button";
 import { DraggableItem, DroppableArea } from "@/lib/dnd-wrappers";
 import { cn } from "@/lib/utils";
+import { useIngestionStore } from "@/store/ingestionStore";
 import { type HierarchyNode, useWorkspaceStore } from "@/store/workspaceStore";
 import { ConfirmationDialog } from "../molecules/ConfirmationDialog";
 import { SourceItem } from "./SourceItem";
@@ -34,6 +35,8 @@ function HierarchyTreeImpl({
     removeSource,
     renameSource,
   } = useWorkspaceStore();
+
+  const jobs = useIngestionStore((state) => state.jobs);
 
   const [isExpanded, setIsExpanded] = useState(true);
   const [isAddingFolder, setIsAddingFolder] = useState(false);
@@ -288,21 +291,33 @@ function HierarchyTreeImpl({
         </div>
       )}
 
-      {deleteTarget && (
-        <ConfirmationDialog
-          isOpen={!!deleteTarget}
-          onOpenChange={(open) => !open && setDeleteTarget(null)}
-          onConfirm={handleConfirmDelete}
-          title={deleteTarget.type === "folder" ? "Delete Folder?" : "Delete Source?"}
-          description={
-            deleteTarget.type === "folder"
-              ? `This will permanently delete the folder "${deleteTarget.name}" and ALL its subfolders and files. This action cannot be undone.`
-              : `This will remove "${deleteTarget.name}" from the workspace. Annotations and parsed data for this source will be deleted.`
-          }
-          variant="destructive"
-          confirmText="Delete"
-        />
-      )}
+      {deleteTarget &&
+        (() => {
+          const isTargetIngesting =
+            deleteTarget.type === "source" &&
+            jobs.some(
+              (j) =>
+                j.source_id === deleteTarget.id &&
+                (j.status === "queued" || j.status === "pending" || j.status === "processing"),
+            );
+          return (
+            <ConfirmationDialog
+              isOpen={!!deleteTarget}
+              onOpenChange={(open) => !open && setDeleteTarget(null)}
+              onConfirm={handleConfirmDelete}
+              title={deleteTarget.type === "folder" ? "Delete Folder?" : "Delete Source?"}
+              description={
+                deleteTarget.type === "folder"
+                  ? `This will permanently delete the folder "${deleteTarget.name}" and ALL its subfolders and files. This action cannot be undone.`
+                  : isTargetIngesting
+                    ? `Warning: This log source is currently importing logs. Deleting it will cancel the ingestion and wipe all partially written log lines. Are you sure you want to proceed?`
+                    : `This will remove "${deleteTarget.name}" from the workspace. Annotations and parsed data for this source will be deleted.`
+              }
+              variant="destructive"
+              confirmText="Delete"
+            />
+          );
+        })()}
     </div>
   );
 }

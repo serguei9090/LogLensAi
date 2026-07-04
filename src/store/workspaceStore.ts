@@ -292,6 +292,10 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
             workspaces: removeSourceFromWorkspaces(state.workspaces, workspaceId, sourceId),
           }));
 
+          // Clean up any pending jobs for this source
+          const { useIngestionStore } = await import("./ingestionStore");
+          useIngestionStore.getState().removeJobsForSource(sourceId);
+
           // Refresh hierarchy
           const get = useWorkspaceStore.getState as any;
           await get().fetchHierarchy(workspaceId);

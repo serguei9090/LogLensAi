@@ -101,15 +101,9 @@ export default function App() {
     }
   }, [workspaces.length, addWorkspace]);
 
-  const handleNavSelect = useCallback(
-    (nav: NavTab) => {
-      setActiveNav(nav);
-      if (nav !== "investigation") {
-        setActive("");
-      }
-    },
-    [setActive],
-  );
+  const handleNavSelect = useCallback((nav: NavTab) => {
+    setActiveNav(nav);
+  }, []);
 
   // Register Global Shortcuts
   useKeyboardShortcuts([

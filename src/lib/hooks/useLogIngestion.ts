@@ -40,6 +40,9 @@ export function useLogIngestion(workspaceId: string | null) {
         return;
       }
 
+      const { setImportProcessing, setImportOpen } = useIngestionStore.getState();
+      setImportProcessing(true);
+
       const normalizedPath = path.replaceAll("\\", "/");
       let newSourceId: string | null = null;
       try {
@@ -113,7 +116,13 @@ export function useLogIngestion(workspaceId: string | null) {
           setTailing(true);
           toast.success(`Live monitoring active for ${path}`);
         }
+
+        setTimeout(() => {
+          setImportOpen(false);
+          setImportProcessing(false);
+        }, 300);
       } catch (e: unknown) {
+        setImportProcessing(false);
         // Remove transitioning guard on error
         if (newSourceId) {
           removeTransitioningSource(newSourceId);
@@ -177,6 +186,9 @@ export function useLogIngestion(workspaceId: string | null) {
         return;
       }
 
+      const { setImportProcessing, setImportOpen } = useIngestionStore.getState();
+      setImportProcessing(true);
+
       const connectionPath = `${user}@${host}:${path}`;
       let newSourceId: string | null = null;
       try {
@@ -195,6 +207,7 @@ export function useLogIngestion(workspaceId: string | null) {
 
         if (!tail) {
           toast.info("Non-tail SSH import is not yet supported. Enable Live Stream.");
+          setImportProcessing(false);
           return;
         }
 
@@ -222,7 +235,13 @@ export function useLogIngestion(workspaceId: string | null) {
         setTailingSourceIds((prev) => new Set(prev).add(newSource.id));
         setTailing(true);
         toast.success(`SSH tailing started for ${connectionPath}`);
+
+        setTimeout(() => {
+          setImportOpen(false);
+          setImportProcessing(false);
+        }, 300);
       } catch (e: unknown) {
+        setImportProcessing(false);
         if (newSourceId) {
           removeTransitioningSource(newSourceId);
           useIngestionStore.getState().stopIngestion(newSourceId);
@@ -249,6 +268,9 @@ export function useLogIngestion(workspaceId: string | null) {
         return;
       }
 
+      const { setImportProcessing, setImportOpen } = useIngestionStore.getState();
+      setImportProcessing(true);
+
       let newSourceId: string | null = null;
       try {
         const newSource = await createSource(
@@ -272,6 +294,7 @@ export function useLogIngestion(workspaceId: string | null) {
 
         if (entries.length === 0) {
           toast.warning("Manual buffer is empty or invalid.");
+          setImportProcessing(false);
           return;
         }
 
@@ -284,7 +307,13 @@ export function useLogIngestion(workspaceId: string | null) {
         // One-shot ingest — starts polling which will self-terminate on completion.
         startPolling(workspaceId);
         // NOTE: Do NOT call fetchLogs() here — stale closure captures old sourceId.
+
+        setTimeout(() => {
+          setImportOpen(false);
+          setImportProcessing(false);
+        }, 300);
       } catch (error) {
+        setImportProcessing(false);
         if (newSourceId) {
           removeTransitioningSource(newSourceId);
           useIngestionStore.getState().stopIngestion(newSourceId);
@@ -310,6 +339,9 @@ export function useLogIngestion(workspaceId: string | null) {
       if (!workspaceId) {
         return;
       }
+
+      const { setImportProcessing, setImportOpen } = useIngestionStore.getState();
+      setImportProcessing(true);
 
       try {
         const promises = [];
@@ -368,7 +400,13 @@ export function useLogIngestion(workspaceId: string | null) {
           id: "live-ingest",
           description: listeningOn ? `Listening on ${listeningOn}` : undefined,
         });
+
+        setTimeout(() => {
+          setImportOpen(false);
+          setImportProcessing(false);
+        }, 300);
       } catch (e: unknown) {
+        setImportProcessing(false);
         toast.error(e instanceof Error ? e.message : "Failed to start live collection.", {
           id: "live-ingest",
         });

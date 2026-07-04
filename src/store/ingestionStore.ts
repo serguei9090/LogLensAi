@@ -39,7 +39,41 @@ interface IngestionState {
   /** Tracks job IDs that have already triggered a completed/failed notification. */
   notifiedJobIds: Set<number>;
 
+  // Import Feed Modal Global States
+  isImportOpen: boolean;
+  isImportProcessing: boolean;
+  importActiveTab: "local" | "ssh" | "manual" | "live";
+  importLocalPath: string;
+  importLocalTail: boolean;
+  importSshHost: string;
+  importSshPort: string;
+  importSshUser: string;
+  importSshPass: string;
+  importSshPath: string;
+  importSshTail: boolean;
+  importManualLogs: string;
+  importLiveName: string;
+  importLiveSyslog: boolean;
+  importLiveHttp: boolean;
+
   // Actions
+  setImportOpen: (open: boolean) => void;
+  setImportProcessing: (processing: boolean) => void;
+  setImportActiveTab: (tab: "local" | "ssh" | "manual" | "live") => void;
+  setImportLocalPath: (path: string) => void;
+  setImportLocalTail: (tail: boolean) => void;
+  setImportSshHost: (host: string) => void;
+  setImportSshPort: (port: string) => void;
+  setImportSshUser: (user: string) => void;
+  setImportSshPass: (pass: string) => void;
+  setImportSshPath: (path: string) => void;
+  setImportSshTail: (tail: boolean) => void;
+  setImportManualLogs: (logs: string) => void;
+  setImportLiveName: (name: string) => void;
+  setImportLiveSyslog: (syslog: boolean) => void;
+  setImportLiveHttp: (http: boolean) => void;
+  resetImportForm: () => void;
+
   fetchJobs: (workspaceId: string) => Promise<void>;
   /**
    * Start (or restart) the polling loop for a workspace.
@@ -67,6 +101,7 @@ interface IngestionState {
   addOrUpdateJob: (job: IngestionJob) => void;
   clearCompletedState: (workspaceId: string, sourceId: string) => void;
   clearState: () => void;
+  removeJobsForSource: (sourceId: string) => void;
 }
 
 /** Interval (ms) when an ingestion job is actively processing. */
@@ -97,6 +132,55 @@ export const useIngestionStore = create<IngestionState>((set, get) => ({
   ingestingSourceIds: [],
   transitioningSourceIds: new Set<string>(),
   notifiedJobIds: new Set<number>(),
+
+  // Import Modal Initial States
+  isImportOpen: false,
+  isImportProcessing: false,
+  importActiveTab: "local",
+  importLocalPath: "",
+  importLocalTail: false,
+  importSshHost: "",
+  importSshPort: "22",
+  importSshUser: "",
+  importSshPass: "",
+  importSshPath: "",
+  importSshTail: false,
+  importManualLogs: "",
+  importLiveName: "",
+  importLiveSyslog: true,
+  importLiveHttp: true,
+
+  setImportOpen: (open) => set({ isImportOpen: open }),
+  setImportProcessing: (processing) => set({ isImportProcessing: processing }),
+  setImportActiveTab: (tab) => set({ importActiveTab: tab }),
+  setImportLocalPath: (path) => set({ importLocalPath: path }),
+  setImportLocalTail: (tail) => set({ importLocalTail: tail }),
+  setImportSshHost: (host) => set({ importSshHost: host }),
+  setImportSshPort: (port) => set({ importSshPort: port }),
+  setImportSshUser: (user) => set({ importSshUser: user }),
+  setImportSshPass: (pass) => set({ importSshPass: pass }),
+  setImportSshPath: (path) => set({ importSshPath: path }),
+  setImportSshTail: (tail) => set({ importSshTail: tail }),
+  setImportManualLogs: (logs) => set({ importManualLogs: logs }),
+  setImportLiveName: (name) => set({ importLiveName: name }),
+  setImportLiveSyslog: (syslog) => set({ importLiveSyslog: syslog }),
+  setImportLiveHttp: (http) => set({ importLiveHttp: http }),
+  resetImportForm: () =>
+    set({
+      importLocalPath: "",
+      importLocalTail: false,
+      importSshHost: "",
+      importSshPort: "22",
+      importSshUser: "",
+      importSshPass: "",
+      importSshPath: "",
+      importSshTail: false,
+      importManualLogs: "",
+      importLiveName: "",
+      importLiveSyslog: true,
+      importLiveHttp: true,
+      importActiveTab: "local",
+    }),
 
   fetchJobs: async (workspaceId: string) => {
     if (!workspaceId) {
@@ -130,9 +214,13 @@ export const useIngestionStore = create<IngestionState>((set, get) => ({
           if (wasActive && !nextNotified.has(job.id)) {
             nextNotified.add(job.id);
             if (job.status === "completed") {
-              console.log(`[useIngestionStore] Ingestion COMPLETE for job ${job.id} (source: ${job.source_id})`);
+              console.log(
+                `[useIngestionStore] Ingestion COMPLETE for job ${job.id} (source: ${job.source_id})`,
+              );
             } else {
-              console.log(`[useIngestionStore] Ingestion FAILED for job ${job.id} (source: ${job.source_id})`);
+              console.log(
+                `[useIngestionStore] Ingestion FAILED for job ${job.id} (source: ${job.source_id})`,
+              );
               toast.error("Ingestion failed", {
                 id: "ingest",
                 description: "Check sidecar logs for details.",
@@ -277,9 +365,13 @@ export const useIngestionStore = create<IngestionState>((set, get) => ({
           nextNotified.add(job.id);
           if (wasActive) {
             if (job.status === "completed") {
-              console.log(`[useIngestionStore] addOrUpdateJob Ingestion COMPLETE for job ${job.id} (source: ${job.source_id})`);
+              console.log(
+                `[useIngestionStore] addOrUpdateJob Ingestion COMPLETE for job ${job.id} (source: ${job.source_id})`,
+              );
             } else {
-              console.log(`[useIngestionStore] addOrUpdateJob Ingestion FAILED for job ${job.id} (source: ${job.source_id})`);
+              console.log(
+                `[useIngestionStore] addOrUpdateJob Ingestion FAILED for job ${job.id} (source: ${job.source_id})`,
+              );
               toast.error("Ingestion failed", {
                 id: "ingest",
                 description: "Check sidecar logs for details.",
@@ -307,7 +399,12 @@ export const useIngestionStore = create<IngestionState>((set, get) => ({
   clearCompletedState: (workspaceId: string, sourceId: string) => {
     set((state) => {
       const nextJobs = state.jobs.filter(
-        (j) => !(j.workspace_id === workspaceId && j.source_id === sourceId && (j.status === "completed" || j.status === "failed")),
+        (j) =>
+          !(
+            j.workspace_id === workspaceId &&
+            j.source_id === sourceId &&
+            (j.status === "completed" || j.status === "failed")
+          ),
       );
       const active = nextJobs.find(
         (j) => j.status === "processing" || j.status === "pending" || j.status === "queued",
@@ -324,9 +421,9 @@ export const useIngestionStore = create<IngestionState>((set, get) => ({
     set((state) => {
       // Keep jobs that are still actively running (queued, pending, processing)
       const activeJobs = state.jobs.filter(
-        (j) => j.status === "queued" || j.status === "pending" || j.status === "processing"
+        (j) => j.status === "queued" || j.status === "pending" || j.status === "processing",
       );
-      
+
       const active = activeJobs.find(
         (j) => j.status === "processing" || j.status === "pending" || j.status === "queued",
       );
@@ -343,6 +440,20 @@ export const useIngestionStore = create<IngestionState>((set, get) => ({
         ingestingSourceIds: nextIngesting,
         transitioningSourceIds: state.transitioningSourceIds, // Keep transitions
         notifiedJobIds: state.notifiedJobIds, // Keep notified log records to prevent double toast alerts or state changes
+      };
+    });
+  },
+
+  removeJobsForSource: (sourceId) => {
+    set((state) => {
+      const nextJobs = state.jobs.filter((j) => j.source_id !== sourceId);
+      const active = nextJobs.find(
+        (j) => j.status === "processing" || j.status === "pending" || j.status === "queued",
+      );
+      return {
+        jobs: nextJobs,
+        activeJob: active ?? null,
+        lastJob: nextJobs[0] ?? null,
       };
     });
   },
