@@ -117,30 +117,33 @@ function InvestigationPageImpl() {
   // Prevents the overlay from dropping the instant the job flips to "completed"
   // before the log rows actually arrive in the table.
   const [retrievingSourceIds, setRetrievingSourceIds] = useState<Set<string>>(new Set());
-  // Stable refs so async callbacks (fetchLogs.finally) always close over the *current* ids,
-  // not the stale ids captured at effect-creation time.
-  const activeSourceIdRef = useRef<string | null>(null);
-  const activeWorkspaceIdRef = useRef<string | null | undefined>(null);
 
-  // Clear logs immediately when the source or workspace changes to prevent "ghost data",
-  // but avoid clearing it if there is an active job or the source is still transitioning,
-  // or if we are in the post-completion retrieval window (retrievingSourceIds).
+
+  const lastSourceRef = useRef<string | null>(null);
+  const lastWorkspaceRef = useRef<string | null>(null);
+
+  // Clear logs immediately when switching to a DIFFERENT source to prevent "ghost data".
+  // Do NOT clear if we just deselected the source (activeSourceId is null), so the state
+  // is preserved when navigating to the workspace overview and back.
   useEffect(() => {
-    if (!activeWorkspaceId || !activeSourceId) {
+    if (!activeWorkspaceId) {
       return;
     }
 
-    const isTransitioning = useIngestionStore.getState().transitioningSourceIds.has(activeSourceId);
-    // CRITICAL: also check retrievingSourceIds — this covers the window between a job
-    // flipping to "completed" (which sets activeJobForSource=null) and fetchLogs resolving.
-    // Without this guard, setLogs([], 0) fires the instant the job completes, wiping
-    // the table just before the logs arrive — the exact bug visible in VirtualLogTable debug logs.
-    const isRetrieving = retrievingSourceIds.has(activeSourceId);
-    if (!activeJobForSource && !isTransitioning && !isRetrieving) {
-      setLogs([], 0);
-      setAvailableFacets({});
-      useInvestigationStore.getState().setTimeRange({ start: "", end: "", label: "All Time" });
+    if (activeSourceId && lastSourceRef.current && lastSourceRef.current !== activeSourceId) {
+      const isTransitioning = useIngestionStore.getState().transitioningSourceIds.has(activeSourceId);
+      const isRetrieving = retrievingSourceIds.has(activeSourceId);
+      if (!activeJobForSource && !isTransitioning && !isRetrieving) {
+        setLogs([], 0);
+        setAvailableFacets({});
+        useInvestigationStore.getState().setTimeRange({ start: "", end: "", label: "All Time" });
+      }
     }
+    
+    if (activeSourceId) {
+      lastSourceRef.current = activeSourceId;
+    }
+    lastWorkspaceRef.current = activeWorkspaceId;
   }, [activeWorkspaceId, activeSourceId, activeJobForSource, retrievingSourceIds, setLogs, setAvailableFacets]);
 
   // Memoize the query params to reduce complexity in fetchLogs
@@ -192,11 +195,7 @@ function InvestigationPageImpl() {
     logs.length,
   ]);
 
-  // Keep refs in sync with the latest ids so async callbacks don't close over stale values.
-  useEffect(() => {
-    activeSourceIdRef.current = activeSourceId;
-    activeWorkspaceIdRef.current = activeWorkspaceId;
-  });
+
 
   // Sync the currently active source's tailing status to the global isTailing store state
   useEffect(() => {
@@ -264,11 +263,10 @@ function InvestigationPageImpl() {
     if (sourceJob.status === "completed" && !completedJobIds.current.has(sourceJob.id)) {
       completedJobIds.current.add(sourceJob.id);
       // Snapshot the current source/workspace IDs at the moment the job completes.
-      // These are used in the async finally() so we always remove the *correct* source
-      // from retrievingSourceIds — even if the user clicks another source before the
-      // fetch resolves (which would change activeSourceId via closure but NOT the ref).
-      const completedSourceId = activeSourceIdRef.current;
-      const completedWorkspaceId = activeWorkspaceIdRef.current;
+      // These are closed over inside the async finally() so we always remove the *correct* source
+      // from retrievingSourceIds — even if the user clicks another source before the fetch resolves.
+      const completedSourceId = activeSourceId;
+      const completedWorkspaceId = activeWorkspaceId;
 
       // Mark retrieving BEFORE fetchLogs so overlay doesn't flash off
       if (completedSourceId) {
@@ -290,6 +288,8 @@ function InvestigationPageImpl() {
               next.delete(completedSourceId);
               return next;
             });
+            // Stop ingestion tracking for this source so switching back doesn't show isIngesting: true
+            useIngestionStore.getState().stopIngestion(completedSourceId);
           }
         }, 300);
       });

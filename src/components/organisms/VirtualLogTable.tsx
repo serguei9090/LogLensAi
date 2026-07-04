@@ -689,30 +689,7 @@ export function VirtualLogTable({
           return (
             logs.length > 0 && (
               <>
-                {/* Subtle background Ingestion Progress for "Streaming" feel */}
-                {activeJob && (
-                  <div className="sticky top-10 left-0 w-full z-40 px-6 py-2 bg-bg-surface/80 backdrop-blur-md border-b border-white/5 animate-in slide-in-from-top duration-300">
-                    <div className="flex items-center justify-between gap-4">
-                      <div className="flex items-center gap-2">
-                        <Sparkles className="size-3 text-primary animate-pulse" />
-                        <span className="text-[10px] font-bold uppercase tracking-widest text-text-muted">
-                          Ingesting: {activeJob.processed_lines.toLocaleString()} lines
-                        </span>
-                      </div>
-                      <div className="flex-1 max-w-xs h-1 bg-white/5 rounded-full overflow-hidden">
-                        <div
-                          className="h-full bg-primary transition-all duration-300"
-                          style={{
-                            width: `${(activeJob.processed_lines / activeJob.total_lines) * 100}%`,
-                          }}
-                        />
-                      </div>
-                      <span className="text-[10px] font-bold text-primary">
-                        {Math.round((activeJob.processed_lines / activeJob.total_lines) * 100)}%
-                      </span>
-                    </div>
-                  </div>
-                )}
+
 
                 <div
                   style={{

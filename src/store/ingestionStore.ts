@@ -151,7 +151,7 @@ export const useIngestionStore = create<IngestionState>((set, get) => ({
         activeJob: active ?? null,
         lastJob: fetchedJobs[0] ?? null,
         error: null,
-        ingestingSourceIds: ingestingSourceIds.filter((id) => !finishedSourceIds.includes(id)),
+        ingestingSourceIds, // Keep ingestingSourceIds as is; let the page handle stopIngestion
         notifiedJobIds: nextNotified,
       });
     } catch (err) {
@@ -264,7 +264,6 @@ export const useIngestionStore = create<IngestionState>((set, get) => ({
       );
 
       const nextNotified = new Set(state.notifiedJobIds);
-      const finishedSourceIds = [...state.ingestingSourceIds];
 
       if (job.status === "completed" || job.status === "failed") {
         const prevJob = state.jobs.find((j) => j.id === job.id);
@@ -288,18 +287,13 @@ export const useIngestionStore = create<IngestionState>((set, get) => ({
             }
           }
         }
-        const idx = finishedSourceIds.indexOf(job.source_id);
-        if (idx !== -1) {
-          finishedSourceIds.splice(idx, 1);
-        }
       }
-
       return {
         jobs: nextJobs,
         activeJob: active ?? null,
         lastJob: nextJobs[0] ?? null,
         notifiedJobIds: nextNotified,
-        ingestingSourceIds: finishedSourceIds,
+        ingestingSourceIds: state.ingestingSourceIds, // Keep ingestingSourceIds as is; let the page handle stopIngestion
       };
     });
   },
