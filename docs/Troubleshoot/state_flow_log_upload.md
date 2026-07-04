@@ -214,3 +214,35 @@ clearTransitioningJobs();  // Not full clear
 - [x] Test with large file on fast machine (job < 1s) (Done - Ingestion complete sets retrieving state to block early drops)
 - [x] Test with concurrent uploads to different sources (Done)
 - [x] Verify pollSessions map prevents duplicate polling loops (Done)
+
+---
+
+## 📂 File Architecture & Responsibilities
+
+This section outlines the primary files responsible for log ingestion state management, coordinate transitions, and UI pages.
+
+### 1. State Management & Hooks (Logic Layer)
+
+* **[ingestionStore.ts](file:///i:/01-Master_Code/Apps/LogLensAi/src/store/ingestionStore.ts)**
+  * **Role**: Single source of truth for all ingestion jobs and polling states.
+  * **Key State**: Tracks active jobs (`activeJob`), job queue (`jobs`), currently ingesting sources (`ingestingSourceIds`), and transient transition states (`transitioningSourceIds`).
+  * **Key Functions**: `startPolling` handles adaptive workspace-level polling intervals; `clearCompletedState` cleanly resets a job context; `clearState` clears idle entries while preserving active jobs.
+* **[useLogIngestion.ts](file:///i:/01-Master_Code/Apps/LogLensAi/src/lib/hooks/useLogIngestion.ts)**
+  * **Role**: Orchestrates the initial ingest operations.
+  * **Key Functions**: `handleImportLocal`, `handleImportSSH`, `handleIngestManual`, and `handleImportLive`. Calls the sidecar, marks sources as transitioning/ingesting, registers the jobs, and initiates polling.
+* **[useLogFetching.ts](file:///i:/01-Master_Code/Apps/LogLensAi/src/lib/hooks/useLogFetching.ts)**
+  * **Role**: Handles fetching ingested log pages from the backend sidecar.
+  * **Key Functions**: `fetchLogs` and `fetchMoreLogs` (infinitely loading log batches).
+* **[useIngestionStatus.ts](file:///i:/01-Master_Code/Apps/LogLensAi/src/lib/hooks/useIngestionStatus.ts)**
+  * **Role**: Provides read-only hooks to read jobs list from `useIngestionStore`.
+
+### 2. Pages & Layout Wrappers (View Layer)
+
+* **[InvestigationPage.tsx](file:///i:/01-Master_Code/Apps/LogLensAi/src/components/pages/InvestigationPage.tsx)**
+  * **Role**: The main page layout containing the log workspace view.
+  * **Key Responsibilities**: Syncs active sources, starts polling intervals, coordinates the transition overlays via `retrievingSourceIds` and refs (`activeSourceIdRef`), and orchestrates cleanups on active source/workspace switches.
+* **[SettingsPage.tsx](file:///i:/01-Master_Code/Apps/LogLensAi/src/components/pages/SettingsPage.tsx)** (if present)
+  * **Role**: Manages general settings, AI provider configuration, and Drain3 templates.
+* **[VirtualLogTable.tsx](file:///i:/01-Master_Code/Apps/LogLensAi/src/components/organisms/VirtualLogTable.tsx)**
+  * **Role**: Organism-level component containing the virtualized rows grid.
+  * **Key Responsibilities**: Renders loading overlays ("Preparing Ingestion...", "Retrieving logs...", "Indexing Dataset...") based on states parsed down from `InvestigationPage` and `useIngestionStore`. Handles pagination scroll triggers and user selection updates.

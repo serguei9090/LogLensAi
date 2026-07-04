@@ -305,7 +305,7 @@ export const useIngestionStore = create<IngestionState>((set, get) => ({
   },
 
   clearTransitioningJobs: () => {
-    set((state) => ({
+    set(() => ({
       transitioningSourceIds: new Set<string>(),
     }));
   },
@@ -347,8 +347,8 @@ export const useIngestionStore = create<IngestionState>((set, get) => ({
         lastJob: activeJobs[0] ?? null,
         error: null,
         ingestingSourceIds: nextIngesting,
-        transitioningSourceIds: new Set<string>(), // Transitioning is temporary, we can reset it safely
-        notifiedJobIds: new Set<number>(),
+        transitioningSourceIds: state.transitioningSourceIds, // Keep transitions
+        notifiedJobIds: state.notifiedJobIds, // Keep notified log records to prevent double toast alerts or state changes
       };
     });
   },

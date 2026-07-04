@@ -131,6 +131,7 @@ export function VirtualLogTable({
       uploaded: (source as any)?.is_uploaded,
       isIngesting,
       isQueued,
+      showOverlay,
       showHydrating,
       isEmpty,
       logsLength: logs.length,
