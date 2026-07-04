@@ -218,27 +218,23 @@ function InvestigationPageImpl() {
   // Orchestrator Hub state
 
   // ── Polling logic ──────────────────────────────────────────────────────────
+  // NOTE: Log polling during ingestion is handled exclusively by ingestionStore.startPolling().
+  // A separate setInterval here was removed because it caused duplicate state transitions
+  // that raced with the ingestionStore poller and caused overlay flickering.
+  // For live tailing, the isTailing flag drives periodic fetches via the effect below.
 
-  // Stabilized polling interval.
+  // Tailing-only fetch interval (only active during live tail, NOT during ingestion).
   useEffect(() => {
-    if (!activeWorkspaceId || !activeSourceId) {
+    if (!activeWorkspaceId || !activeSourceId || !isTailing) {
       return;
     }
-
-    const interval = setInterval(
-      () => {
-        // Only poll if we are tailing OR if there is an active ingestion job for this source.
-        const shouldPoll = isTailing || !!activeJobForSource;
-
-        if (shouldPoll && !isFetching) {
-          fetchLogs();
-        }
-      },
-      isTailing ? 1000 : 3000,
-    ); // 1s for tailing, 3s for background ingestion monitoring
-
+    const interval = setInterval(() => {
+      if (!isFetching) {
+        fetchLogs();
+      }
+    }, 1000);
     return () => clearInterval(interval);
-  }, [activeWorkspaceId, activeSourceId, isTailing, activeJobForSource, isFetching, fetchLogs]);
+  }, [activeWorkspaceId, activeSourceId, isTailing, isFetching, fetchLogs]);
 
   // Initial fetch and fetch-on-demand for filter/search changes
   useEffect(() => {
@@ -252,7 +248,12 @@ function InvestigationPageImpl() {
   // (Redundant refs removed, tracking centralized in Zustand store)
 
   // Specific effect to trigger fetchLogs when the job for the ACTIVE source completes.
-  // We mark the source as "retrieving" so the overlay stays up until logs arrive.
+  // CRITICAL ORDER OF OPERATIONS:
+  //   1. Mark source as "retrieving" so the overlay stays up (no flash to "empty")
+  //   2. Fetch hierarchy FIRST so is_uploaded becomes true before overlay drops
+  //   3. Fetch logs (forceFull) to actually load the data
+  //   4. Only call stopIngestion AFTER logs have confirmed arrival
+  //   5. Remove retrieving marker last
   const completedJobIds = useRef<Set<number>>(new Set());
   useEffect(() => {
     const sourceJob = jobs.find((j) => j.source_id === activeSourceId);
@@ -262,13 +263,13 @@ function InvestigationPageImpl() {
 
     if (sourceJob.status === "completed" && !completedJobIds.current.has(sourceJob.id)) {
       completedJobIds.current.add(sourceJob.id);
-      // Snapshot the current source/workspace IDs at the moment the job completes.
-      // These are closed over inside the async finally() so we always remove the *correct* source
-      // from retrievingSourceIds — even if the user clicks another source before the fetch resolves.
+
+      // Snapshot IDs — closures below always use these, never stale reactive values
       const completedSourceId = activeSourceId;
       const completedWorkspaceId = activeWorkspaceId;
+      const completedJobSourceId = sourceJob.source_id;
 
-      // Mark retrieving BEFORE fetchLogs so overlay doesn't flash off
+      // Step 1: Mark as retrieving BEFORE any async work so overlay never drops prematurely
       if (completedSourceId) {
         setRetrievingSourceIds((prev) => {
           const next = new Set(prev);
@@ -277,29 +278,39 @@ function InvestigationPageImpl() {
         });
       }
 
-      // Delay cleaning the job status slightly to allow React states to settle
-      // and let retrieval overlay stay up continuously.
-      // Use the snapshotted completedSourceId — NOT the stale closure value.
-      fetchLogs({ forceFull: true }).finally(() => {
-        setTimeout(() => {
-          if (completedSourceId) {
+      (async () => {
+        // Step 2: Refresh hierarchy FIRST — this sets is_uploaded=true on the source node.
+        // If we skip this, the overlay drops and is_uploaded is still false, causing
+        // the "No logs detected" screen to flash even though we have data.
+        if (completedWorkspaceId) {
+          await useWorkspaceStore.getState().fetchHierarchy(completedWorkspaceId);
+          // Clear the completed job from the store to prevent repeat toasts/effects
+          useIngestionStore.getState().clearCompletedState(completedWorkspaceId, completedJobSourceId);
+        }
+
+        // Step 3: Fetch logs now that is_uploaded is already true
+        await fetchLogs({ forceFull: true });
+
+        // Step 4: Only stop ingestion tracking when we actually have logs in the store.
+        // This prevents the overlay from dropping to an empty screen if the DB is still
+        // finalizing writes or the network round-trip took longer than expected.
+        const hasLogs = useInvestigationStore.getState().total > 0;
+        if (completedSourceId) {
+          if (hasLogs) {
+            useIngestionStore.getState().stopIngestion(completedSourceId);
+          }
+          // Brief grace period before removing the retrieving marker
+          setTimeout(() => {
             setRetrievingSourceIds((prev) => {
               const next = new Set(prev);
               next.delete(completedSourceId);
               return next;
             });
-            // Stop ingestion tracking for this source so switching back doesn't show isIngesting: true
+            // Ensure ingestion is always cleared even if logs arrived late
             useIngestionStore.getState().stopIngestion(completedSourceId);
-          }
-        }, 300);
-      });
-
-      // Fetch new hierarchy so the UI updates is_uploaded for the source node
-      if (completedWorkspaceId) {
-        useWorkspaceStore.getState().fetchHierarchy(completedWorkspaceId);
-        // Clear completed state from Zustand store so the toast won't repeat
-        useIngestionStore.getState().clearCompletedState(completedWorkspaceId, sourceJob.source_id);
-      }
+          }, 300);
+        }
+      })();
     }
   }, [jobs, activeSourceId, activeWorkspaceId, fetchLogs]);
 

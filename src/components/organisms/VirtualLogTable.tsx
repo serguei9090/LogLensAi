@@ -79,17 +79,6 @@ export function VirtualLogTable({
     sourceId: string;
   } | null>(null);
   const [lastSelectedId, setLastSelectedId] = useState<number | null>(null);
-  const [showTransitioningLoader, setShowTransitioningLoader] = useState(false);
-
-  useEffect(() => {
-    if (isTransitioning) {
-      const timer = setTimeout(() => {
-        setShowTransitioningLoader(true);
-      }, 200);
-      return () => clearTimeout(timer);
-    }
-    setShowTransitioningLoader(false);
-  }, [isTransitioning]);
 
   const {
     filters,
@@ -103,6 +92,14 @@ export function VirtualLogTable({
   const { logSessionMap, fetchMapping } = useAiStore();
   const activeWorkspace = useWorkspaceStore(selectActiveWorkspace);
   const ingestingSourceIds = useIngestionStore((state) => state.ingestingSourceIds);
+  // Reactive subscription — NOT a getState() snapshot — so isQueued derives correctly on every tick
+  const isAnyIngestionProcessing = useIngestionStore((state) =>
+    state.jobs.some(
+      (j) => j.workspace_id === activeWorkspace?.id && j.status === "processing"
+    )
+  );
+  // Reactive transitioning set so showPreparing updates without getState snapshots
+  const transitioningSourceIds = useIngestionStore((state) => state.transitioningSourceIds);
   const isCurrentlyIngesting = useMemo(() => {
     return !!(
       activeWorkspace?.id &&
@@ -111,44 +108,6 @@ export function VirtualLogTable({
     );
   }, [activeWorkspace, ingestingSourceIds]);
   const { visibleColumns, customColumns, columnOrder, columnWidths, setColumnWidth } = useUIStore();
-
-  // Debug State Transitions & Page Flicker Audit
-  useEffect(() => {
-    const source = activeWorkspace?.sources?.find((s) => s.id === activeWorkspace?.activeSourceId);
-    const isAnyIngestionProcessing = useIngestionStore.getState().jobs.some(
-      (j) => j.workspace_id === activeWorkspace?.id && j.status === "processing"
-    );
-    const isIngesting = isCurrentlyIngesting || !!(activeJob && activeJob.status !== "queued");
-    const isQueued = !!(activeJob && (activeJob.status === "queued" || (activeJob.status === "pending" && isAnyIngestionProcessing)));
-    const showOverlay = isIngesting || isQueued || (showTransitioningLoader && !isTailing);
-    const isRehydrating = !isIngesting && !isQueued && logs.length === 0 && isFetching && (source as any)?.is_uploaded;
-    const showHydrating = isRehydrating || (!isIngesting && !isQueued && logs.length === 0 && isFetching);
-    const isEmpty = logs.length === 0 && !isIngesting && !isQueued && !showHydrating && !isTransitioning && !isFetching && !showTransitioningLoader;
-
-    console.log("[VirtualLogTable Debug] State Transition Update:", {
-      sourceId: source?.id,
-      sourceName: source?.name,
-      uploaded: (source as any)?.is_uploaded,
-      isIngesting,
-      isQueued,
-      showOverlay,
-      showHydrating,
-      isEmpty,
-      logsLength: logs.length,
-      isFetching,
-      activeJobStatus: activeJob?.status,
-      showTransitioningLoader,
-    });
-  }, [
-    activeWorkspace,
-    activeJob,
-    isCurrentlyIngesting,
-    showTransitioningLoader,
-    isTailing,
-    logs.length,
-    isFetching,
-    isTransitioning,
-  ]);
 
 
   // Active visible columns ordered by store order
@@ -465,18 +424,19 @@ export function VirtualLogTable({
           const source = activeWorkspace?.sources?.find((s) => s.id === activeWorkspace?.activeSourceId);
           // Check if any job in the workspace is currently processing.
           // If a job is processing, other newly queued/pending jobs will show a Queue Screen.
-          const isAnyIngestionProcessing = useIngestionStore.getState().jobs.some(
-            (j) => j.workspace_id === activeWorkspace?.id && j.status === "processing"
-          );
 
           const isIngesting =
             isCurrentlyIngesting || !!(activeJob && activeJob.status !== "queued");
-          const isQueued = !!(activeJob && (activeJob.status === "queued" || (activeJob.status === "pending" && isAnyIngestionProcessing)));
-          const showOverlay = (isIngesting || isQueued || (showTransitioningLoader && !isTailing)) && logs.length === 0;
+          const isQueued = !!(
+            activeJob &&
+            (activeJob.status === "queued" ||
+              (activeJob.status === "pending" && isAnyIngestionProcessing))
+          );
+          const showOverlay = (isIngesting || isQueued || (isTransitioning && !isTailing)) && logs.length === 0;
 
           const showPreparing = !activeJob && !!(
             activeWorkspace?.activeSourceId &&
-            useIngestionStore.getState().transitioningSourceIds.has(activeWorkspace.activeSourceId)
+            transitioningSourceIds.has(activeWorkspace.activeSourceId)
           ) && logs.length === 0;
           
           // Rehydrating screen: source is created, but no logs loaded yet and is_uploaded is true
@@ -496,8 +456,7 @@ export function VirtualLogTable({
             !showPreparing &&
             !showHydrating &&
             !isTransitioning &&
-            !isFetching &&
-            !showTransitioningLoader;
+            !isFetching;
 
           if (showPreparing) {
             return (
