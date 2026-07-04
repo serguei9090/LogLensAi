@@ -1313,7 +1313,7 @@ class LogDatabase:
                 ws = job["workspace_id"]
                 active_by_ws.setdefault(ws, []).append(job)
         for ws_jobs in active_by_ws.values():
-            ws_jobs.sort(key=lambda j: j["created_at"])
+            ws_jobs.sort(key=lambda j: (j["created_at"], j["id"]))
             for pos, job in enumerate(ws_jobs, start=1):
                 job["queue_position"] = pos
 
