@@ -334,8 +334,7 @@ function InvestigationPageImpl() {
 
       // Snapshot IDs — closures below always use these, never stale reactive values
       const completedSourceId = sourceJob.source_id;
-      // Find the workspace that owns this source
-      const completedWorkspaceId = activeWorkspaceId;
+      const completedWorkspaceId = sourceJob.workspace_id;
 
       // Step 1: Mark as retrieving BEFORE any async work so overlay never drops prematurely
       setRetrievingSourceIds((prev) => {
@@ -350,20 +349,20 @@ function InvestigationPageImpl() {
           await useWorkspaceStore.getState().fetchHierarchy(completedWorkspaceId);
         }
 
-        // Step 3: Fetch logs. Do this BEFORE clearing the job from the store so that
-        // shouldSkipFetch's hasActiveJob guard doesn't falsely short-circuit the fetch.
-        await fetchLogs({ forceFull: true });
+        // Step 3: Fetch logs ONLY if the completed source is currently active on screen
+        const isActive = completedSourceId === activeSourceId;
+        if (isActive) {
+          await fetchLogs({ forceFull: true });
+        }
 
-        // Step 4: Now clear the completed job from the store (after logs have been fetched)
+        // Step 4: Now clear the completed job from the store
         if (completedWorkspaceId) {
           useIngestionStore.getState().clearCompletedState(completedWorkspaceId, completedSourceId);
         }
 
-        // Step 5: Only stop ingestion tracking when we actually have logs in the store.
-        const hasLogs = useInvestigationStore.getState().total > 0;
-        if (hasLogs) {
-          useIngestionStore.getState().stopIngestion(completedSourceId);
-        }
+        // Step 5: Stop ingestion tracking unconditionally for the source
+        useIngestionStore.getState().stopIngestion(completedSourceId);
+
         // Brief grace period before removing the retrieving marker
         setTimeout(() => {
           setRetrievingSourceIds((prev) => {
@@ -371,12 +370,12 @@ function InvestigationPageImpl() {
             next.delete(completedSourceId);
             return next;
           });
-          // Ensure ingestion is always cleared even if logs arrived late
+          // Ensure ingestion is always cleared
           useIngestionStore.getState().stopIngestion(completedSourceId);
         }, 300);
       })();
     }
-  }, [jobs, activeWorkspaceId, fetchLogs]);
+  }, [jobs, activeSourceId, fetchLogs]);
 
   // Memoized non-fusion sources
   const nonFusionSources = useMemo(() => sources.filter((s) => s.type !== "fusion"), [sources]);

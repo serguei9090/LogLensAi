@@ -1678,7 +1678,7 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
             <DialogTitle className="text-xl font-bold text-red-500">
               Total Factory Reset?
             </DialogTitle>
-            <DialogDescription className="text-zinc-400 pt-2">
+            <div className="text-sm text-zinc-400 pt-2">
               This is a <span className="text-red-400 font-bold underline">Nuclear Option</span>.
               <br />
               <br />
@@ -1693,7 +1693,7 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
               <span className="text-red-400 font-bold uppercase text-[10px]">
                 Warning: This action is irreversible. The app will be wiped and reloaded.
               </span>
-            </DialogDescription>
+            </div>
           </DialogHeader>
           <DialogFooter className="gap-2 sm:gap-0">
             <Button

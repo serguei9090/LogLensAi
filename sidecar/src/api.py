@@ -1652,7 +1652,9 @@ class App:
         cursor.execute("SELECT is_uploaded FROM log_sources WHERE id = ?", (source_id,))
         row = cursor.fetchone()
         if row and row[0]:
-            logger.info("[Ingestion] Source %s already marked as uploaded. Skipping ingestion.", source_id)
+            logger.info(
+                "[Ingestion] Source %s already marked as uploaded. Skipping ingestion.", source_id
+            )
             return {
                 "status": "completed",
                 "job_id": 0,
@@ -2123,49 +2125,53 @@ class App:
 
     def _insert_arrow_batch(self, cursor, batch_data, cluster_increments):
         cursor.execute("BEGIN TRANSACTION")
-
-        # PyArrow logs table
-        cols = list(zip(*batch_data, strict=False))
-        arrow_logs = pa.Table.from_arrays(  # noqa: F841
-            [pa.array(c) for c in cols],
-            names=[
-                "workspace_id",
-                "source_id",
-                "line_id",
-                "raw_text",
-                "timestamp",
-                "ingest_timestamp",
-                "level",
-                "cluster_id",
-                "facets",
-                "processed",
-            ],
-        )
-        _ = arrow_logs
-
-        cursor.execute(
-            "INSERT INTO logs (workspace_id, source_id, line_id, raw_text, timestamp, ingest_timestamp, level, cluster_id, facets, processed) SELECT * FROM arrow_logs"
-        )
-
-        # PyArrow clusters table
-        cluster_data = [(w, c, t, count) for (w, c, t), count in cluster_increments.items()]
-        if cluster_data:
-            c_cols = list(zip(*cluster_data, strict=False))
-            arrow_clusters = pa.Table.from_arrays(  # noqa: F841
-                [pa.array(c) for c in c_cols],
-                names=["workspace_id", "cluster_id", "template", "count"],
+        try:
+            # PyArrow logs table
+            cols = list(zip(*batch_data, strict=False))
+            arrow_logs = pa.Table.from_arrays(  # noqa: F841
+                [pa.array(c) for c in cols],
+                names=[
+                    "workspace_id",
+                    "source_id",
+                    "line_id",
+                    "raw_text",
+                    "timestamp",
+                    "ingest_timestamp",
+                    "level",
+                    "cluster_id",
+                    "facets",
+                    "processed",
+                ],
             )
-            _ = arrow_clusters
-            cursor.execute("CREATE TEMP TABLE temp_clusters AS SELECT * FROM arrow_clusters")
-            cursor.execute("""
-                INSERT INTO clusters (workspace_id, cluster_id, template, count)
-                SELECT workspace_id, cluster_id, template, count FROM temp_clusters
-                ON CONFLICT (workspace_id, cluster_id)
-                DO UPDATE SET count = clusters.count + excluded.count, template = excluded.template
-            """)
-            cursor.execute("DROP TABLE temp_clusters")
+            _ = arrow_logs
 
-        cursor.execute("COMMIT")
+            cursor.execute(
+                "INSERT INTO logs (workspace_id, source_id, line_id, raw_text, timestamp, ingest_timestamp, level, cluster_id, facets, processed) SELECT * FROM arrow_logs"
+            )
+
+            # PyArrow clusters table
+            cluster_data = [(w, c, t, count) for (w, c, t), count in cluster_increments.items()]
+            if cluster_data:
+                c_cols = list(zip(*cluster_data, strict=False))
+                arrow_clusters = pa.Table.from_arrays(  # noqa: F841
+                    [pa.array(c) for c in c_cols],
+                    names=["workspace_id", "cluster_id", "template", "count"],
+                )
+                _ = arrow_clusters
+                cursor.execute("CREATE TEMP TABLE temp_clusters AS SELECT * FROM arrow_clusters")
+                cursor.execute("""
+                    INSERT INTO clusters (workspace_id, cluster_id, template, count)
+                    SELECT workspace_id, cluster_id, max(template), sum(count) FROM temp_clusters
+                    GROUP BY workspace_id, cluster_id
+                    ON CONFLICT (workspace_id, cluster_id)
+                    DO UPDATE SET count = clusters.count + excluded.count, template = excluded.template
+                """)
+                cursor.execute("DROP TABLE temp_clusters")
+
+            cursor.execute("COMMIT")
+        except Exception:
+            cursor.execute("ROLLBACK")
+            raise
 
     def method_cleanup_ingestion_jobs(self, workspace_id: str) -> dict:
         """Removes stalled ingestion jobs with no progress."""

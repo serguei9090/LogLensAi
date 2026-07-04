@@ -193,9 +193,7 @@ export const useIngestionStore = create<IngestionState>((set, get) => ({
         silent: true,
       });
 
-      const active = fetchedJobs.find(
-        (j) => j.status === "processing" || j.status === "pending" || j.status === "queued",
-      );
+      // (no longer needed: activeJob is derived from combinedJobs below)
 
       const { notifiedJobIds: prevNotified, jobs: prevJobs, ingestingSourceIds } = get();
       const nextNotified = new Set(prevNotified);
@@ -237,9 +235,17 @@ export const useIngestionStore = create<IngestionState>((set, get) => ({
       const otherWorkspacesJobs = prevJobs.filter((j) => j.workspace_id !== workspaceId);
       const combinedJobs = [...otherWorkspacesJobs, ...fetchedJobs];
 
+      // activeJob must reflect ANY active job across ALL workspaces so the poll
+      // termination check in startPolling does not prematurely kill a session
+      // while another workspace is still ingesting.
+      const globalActiveJob =
+        combinedJobs.find(
+          (j) => j.status === "processing" || j.status === "pending" || j.status === "queued",
+        ) ?? null;
+
       set({
         jobs: combinedJobs,
-        activeJob: active ?? null,
+        activeJob: globalActiveJob,
         lastJob: fetchedJobs[0] ?? null,
         error: null,
         ingestingSourceIds, // Keep ingestingSourceIds as is; let the page handle stopIngestion
@@ -281,8 +287,16 @@ export const useIngestionStore = create<IngestionState>((set, get) => ({
 
       const { activeJob, liveSourceCount } = get();
 
-      // Self-terminate: nothing left to watch for this workspace.
-      if (!activeJob && liveSourceCount === 0) {
+      // Self-terminate: check this workspace specifically has no active jobs.
+      // Using get().jobs filtered to this workspace prevents a global activeJob
+      // field overwrite from another workspace's poll tick killing this session.
+      const wsActiveJob = get().jobs.find(
+        (j) =>
+          j.workspace_id === workspaceId &&
+          (j.status === "processing" || j.status === "pending" || j.status === "queued"),
+      );
+
+      if (!wsActiveJob && liveSourceCount === 0) {
         // Only clear isPolling if NO workspace is still actively polling
         const anyActive = [...pollSessions.values()].some((s) => s.timer !== null);
         if (!anyActive) {

@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { useIngestionStore } from "@/store/ingestionStore";
 
@@ -11,15 +12,19 @@ export type { IngestionJob } from "@/store/ingestionStore";
  * This eliminates idle RPC calls on page mount.
  */
 export function useIngestionStatus(workspaceId: string) {
-  return useIngestionStore(
-    useShallow((state) => {
-      const jobs = state.jobs.filter((j) => j.workspace_id === workspaceId);
-      const activeJob =
-        jobs.find(
-          (j) => j.status === "queued" || j.status === "pending" || j.status === "processing",
-        ) || null;
-      const lastJob = jobs[0] || null;
-      return { activeJob, lastJob, jobs };
-    }),
+  const jobs = useIngestionStore(
+    useShallow((state) => state.jobs.filter((j) => j.workspace_id === workspaceId)),
   );
+
+  const activeJob = useMemo(
+    () =>
+      jobs.find(
+        (j) => j.status === "queued" || j.status === "pending" || j.status === "processing",
+      ) || null,
+    [jobs],
+  );
+
+  const lastJob = useMemo(() => jobs[0] || null, [jobs]);
+
+  return { activeJob, lastJob, jobs };
 }
