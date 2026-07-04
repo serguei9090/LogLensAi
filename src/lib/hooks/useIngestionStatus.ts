@@ -1,3 +1,4 @@
+import { useShallow } from "zustand/react/shallow";
 import { useIngestionStore } from "@/store/ingestionStore";
 
 export type { IngestionJob } from "@/store/ingestionStore";
@@ -9,9 +10,16 @@ export type { IngestionJob } from "@/store/ingestionStore";
  * when an explicit ingest action fires (upload, tail, SSH, stream).
  * This eliminates idle RPC calls on page mount.
  */
-export function useIngestionStatus(_workspaceId: string) {
-  const jobs = useIngestionStore((state) => state.jobs);
-  const activeJob = useIngestionStore((state) => state.activeJob);
-  const lastJob = useIngestionStore((state) => state.lastJob);
-  return { activeJob, lastJob, jobs };
+export function useIngestionStatus(workspaceId: string) {
+  return useIngestionStore(
+    useShallow((state) => {
+      const jobs = state.jobs.filter((j) => j.workspace_id === workspaceId);
+      const activeJob =
+        jobs.find(
+          (j) => j.status === "queued" || j.status === "pending" || j.status === "processing",
+        ) || null;
+      const lastJob = jobs[0] || null;
+      return { activeJob, lastJob, jobs };
+    }),
+  );
 }

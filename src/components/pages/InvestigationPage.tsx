@@ -86,6 +86,15 @@ function InvestigationPageImpl() {
 
   const isImportOpen = useIngestionStore((state) => state.isImportOpen);
   const setIsImportOpen = useIngestionStore((state) => state.setImportOpen);
+
+  const handleOpenImport = () => {
+    const isProcessing = useIngestionStore.getState().isImportProcessing;
+    if (!isProcessing) {
+      useIngestionStore.getState().resetImportForm();
+    }
+    setIsImportOpen(true);
+  };
+
   const [isEngineSettingsOpen, setIsEngineSettingsOpen] = useState(false);
 
   // Orchestrator Hub state
@@ -653,7 +662,7 @@ function InvestigationPageImpl() {
         isTailing={isTailing}
         onTailToggle={handleToggleTail}
         status={isConnected}
-        onImportOpen={() => setIsImportOpen(true)}
+        onImportOpen={handleOpenImport}
         onOrchestrateOpen={handleOrchestrateOpen}
         sources={sources}
         activeSourceId={activeSourceId}
@@ -709,7 +718,7 @@ function InvestigationPageImpl() {
               setActiveParserSource(sourceId);
               setInitialParserConfig(null); // Fetch latest from sidecar if needed
             }}
-            onImport={() => setIsImportOpen(true)}
+            onImport={handleOpenImport}
           />
         ) : (
           <ExplorerView
@@ -718,7 +727,7 @@ function InvestigationPageImpl() {
             onSelectFolder={(id) => setActiveFolder(activeWorkspaceId ?? "", id)}
             onSelectSource={(id) => setActiveSource(activeWorkspaceId ?? "", id)}
             onCreateFolder={(name) => createFolder(activeWorkspaceId ?? "", name)}
-            onImportOpen={() => setIsImportOpen(true)}
+            onImportOpen={handleOpenImport}
             workspaceName={activeWorkspace?.name}
             onRenameFolder={async (id, name) => {
               await updateFolder(id, name);

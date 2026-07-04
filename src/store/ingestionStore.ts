@@ -234,8 +234,11 @@ export const useIngestionStore = create<IngestionState>((set, get) => ({
         }
       }
 
+      const otherWorkspacesJobs = prevJobs.filter((j) => j.workspace_id !== workspaceId);
+      const combinedJobs = [...otherWorkspacesJobs, ...fetchedJobs];
+
       set({
-        jobs: fetchedJobs,
+        jobs: combinedJobs,
         activeJob: active ?? null,
         lastJob: fetchedJobs[0] ?? null,
         error: null,
