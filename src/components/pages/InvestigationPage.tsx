@@ -113,20 +113,35 @@ function InvestigationPageImpl() {
     );
   }, [jobs, activeSourceId]);
 
+  // Tracks sources whose job just completed but fetchLogs hasn't returned data yet.
+  // Prevents the overlay from dropping the instant the job flips to "completed"
+  // before the log rows actually arrive in the table.
+  const [retrievingSourceIds, setRetrievingSourceIds] = useState<Set<string>>(new Set());
+  // Stable refs so async callbacks (fetchLogs.finally) always close over the *current* ids,
+  // not the stale ids captured at effect-creation time.
+  const activeSourceIdRef = useRef<string | null>(null);
+  const activeWorkspaceIdRef = useRef<string | null | undefined>(null);
+
   // Clear logs immediately when the source or workspace changes to prevent "ghost data",
-  // but avoid clearing it if there is an active job or the source is still transitioning.
+  // but avoid clearing it if there is an active job or the source is still transitioning,
+  // or if we are in the post-completion retrieval window (retrievingSourceIds).
   useEffect(() => {
     if (!activeWorkspaceId || !activeSourceId) {
       return;
     }
 
     const isTransitioning = useIngestionStore.getState().transitioningSourceIds.has(activeSourceId);
-    if (!activeJobForSource && !isTransitioning) {
+    // CRITICAL: also check retrievingSourceIds — this covers the window between a job
+    // flipping to "completed" (which sets activeJobForSource=null) and fetchLogs resolving.
+    // Without this guard, setLogs([], 0) fires the instant the job completes, wiping
+    // the table just before the logs arrive — the exact bug visible in VirtualLogTable debug logs.
+    const isRetrieving = retrievingSourceIds.has(activeSourceId);
+    if (!activeJobForSource && !isTransitioning && !isRetrieving) {
       setLogs([], 0);
       setAvailableFacets({});
       useInvestigationStore.getState().setTimeRange({ start: "", end: "", label: "All Time" });
     }
-  }, [activeWorkspaceId, activeSourceId, activeJobForSource, setLogs, setAvailableFacets]);
+  }, [activeWorkspaceId, activeSourceId, activeJobForSource, retrievingSourceIds, setLogs, setAvailableFacets]);
 
   // Memoize the query params to reduce complexity in fetchLogs
   const { isFetching, isConnected, anomalousClusters, fetchLogs, fetchMoreLogs } = useLogFetching(
@@ -146,16 +161,11 @@ function InvestigationPageImpl() {
   const ingestingSourceIds = useIngestionStore((state) => state.ingestingSourceIds);
   const transitioningSourceIds = useIngestionStore((state) => state.transitioningSourceIds);
 
-  // Combined loading state for the table — covers three scenarios:
+  // Combined loading state for the table — covers four scenarios:
   // 1. Source is in the ingestingSourceIds set (startIngestion called)
   // 2. Source is transitioning (between callSidecar returning and first poll detecting a job)
   // 3. A queued/pending/processing job exists for this source
   // 4. Data is being fetched and no logs are loaded yet
-  // Tracks sources whose job just completed but fetchLogs hasn't returned data yet.
-  // Prevents the overlay from dropping the instant the job flips to "completed"
-  // before the log rows actually arrive in the table.
-  const [retrievingSourceIds, setRetrievingSourceIds] = useState<Set<string>>(new Set());
-
   const isSourceLoading = useMemo(() => {
     if (activeSourceId && ingestingSourceIds.includes(activeSourceId)) {
       return true;
@@ -182,19 +192,25 @@ function InvestigationPageImpl() {
     logs.length,
   ]);
 
+  // Keep refs in sync with the latest ids so async callbacks don't close over stale values.
+  useEffect(() => {
+    activeSourceIdRef.current = activeSourceId;
+    activeWorkspaceIdRef.current = activeWorkspaceId;
+  });
+
   // Sync the currently active source's tailing status to the global isTailing store state
   useEffect(() => {
     const isActiveSourceTailing = activeSourceId ? tailingSourceIds.has(activeSourceId) : false;
     setTailing(isActiveSourceTailing);
   }, [activeSourceId, tailingSourceIds, setTailing]);
 
-  // Clear transitioning state once a job for that source is detected as processing/completed
+  // Clear transitioning state once a job for that source is detected
   useEffect(() => {
     const { removeTransitioningSource, transitioningSourceIds } = useIngestionStore.getState();
     for (const srcId of transitioningSourceIds) {
-      const job = jobs.find((j) => j.source_id === srcId && j.status !== "queued");
+      const job = jobs.find((j) => j.source_id === srcId);
       if (job) {
-        // Job is now in processing/completed/failed — no longer just transitioning
+        // Job is enqueued or processing — no longer just preparing
         removeTransitioningSource(srcId);
       }
     }
@@ -247,29 +263,42 @@ function InvestigationPageImpl() {
 
     if (sourceJob.status === "completed" && !completedJobIds.current.has(sourceJob.id)) {
       completedJobIds.current.add(sourceJob.id);
+      // Snapshot the current source/workspace IDs at the moment the job completes.
+      // These are used in the async finally() so we always remove the *correct* source
+      // from retrievingSourceIds — even if the user clicks another source before the
+      // fetch resolves (which would change activeSourceId via closure but NOT the ref).
+      const completedSourceId = activeSourceIdRef.current;
+      const completedWorkspaceId = activeWorkspaceIdRef.current;
+
       // Mark retrieving BEFORE fetchLogs so overlay doesn't flash off
-      if (activeSourceId) {
+      if (completedSourceId) {
         setRetrievingSourceIds((prev) => {
           const next = new Set(prev);
-          next.add(activeSourceId);
+          next.add(completedSourceId);
           return next;
         });
       }
+
+      // Delay cleaning the job status slightly to allow React states to settle
+      // and let retrieval overlay stay up continuously.
+      // Use the snapshotted completedSourceId — NOT the stale closure value.
       fetchLogs({ forceFull: true }).finally(() => {
-        if (activeSourceId) {
-          setRetrievingSourceIds((prev) => {
-            const next = new Set(prev);
-            next.delete(activeSourceId);
-            return next;
-          });
-        }
+        setTimeout(() => {
+          if (completedSourceId) {
+            setRetrievingSourceIds((prev) => {
+              const next = new Set(prev);
+              next.delete(completedSourceId);
+              return next;
+            });
+          }
+        }, 300);
       });
 
       // Fetch new hierarchy so the UI updates is_uploaded for the source node
-      if (activeWorkspaceId) {
-        useWorkspaceStore.getState().fetchHierarchy(activeWorkspaceId);
+      if (completedWorkspaceId) {
+        useWorkspaceStore.getState().fetchHierarchy(completedWorkspaceId);
         // Clear completed state from Zustand store so the toast won't repeat
-        useIngestionStore.getState().clearCompletedState(activeWorkspaceId, sourceJob.source_id);
+        useIngestionStore.getState().clearCompletedState(completedWorkspaceId, sourceJob.source_id);
       }
     }
   }, [jobs, activeSourceId, activeWorkspaceId, fetchLogs]);

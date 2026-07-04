@@ -112,6 +112,44 @@ export function VirtualLogTable({
   }, [activeWorkspace, ingestingSourceIds]);
   const { visibleColumns, customColumns, columnOrder, columnWidths, setColumnWidth } = useUIStore();
 
+  // Debug State Transitions & Page Flicker Audit
+  useEffect(() => {
+    const source = activeWorkspace?.sources?.find((s) => s.id === activeWorkspace?.activeSourceId);
+    const isAnyIngestionProcessing = useIngestionStore.getState().jobs.some(
+      (j) => j.workspace_id === activeWorkspace?.id && j.status === "processing"
+    );
+    const isIngesting = isCurrentlyIngesting || !!(activeJob && activeJob.status !== "queued");
+    const isQueued = !!(activeJob && (activeJob.status === "queued" || (activeJob.status === "pending" && isAnyIngestionProcessing)));
+    const showOverlay = isIngesting || isQueued || (showTransitioningLoader && !isTailing);
+    const isRehydrating = !isIngesting && !isQueued && logs.length === 0 && isFetching && (source as any)?.is_uploaded;
+    const showHydrating = isRehydrating || (!isIngesting && !isQueued && logs.length === 0 && isFetching);
+    const isEmpty = logs.length === 0 && !isIngesting && !isQueued && !showHydrating && !isTransitioning && !isFetching && !showTransitioningLoader;
+
+    console.log("[VirtualLogTable Debug] State Transition Update:", {
+      sourceId: source?.id,
+      sourceName: source?.name,
+      uploaded: (source as any)?.is_uploaded,
+      isIngesting,
+      isQueued,
+      showHydrating,
+      isEmpty,
+      logsLength: logs.length,
+      isFetching,
+      activeJobStatus: activeJob?.status,
+      showTransitioningLoader,
+    });
+  }, [
+    activeWorkspace,
+    activeJob,
+    isCurrentlyIngesting,
+    showTransitioningLoader,
+    isTailing,
+    logs.length,
+    isFetching,
+    isTransitioning,
+  ]);
+
+
   // Active visible columns ordered by store order
   const activeVisibleColumns = useMemo(() => {
     return columnOrder.filter((colId) => visibleColumns[colId] ?? false);
@@ -433,26 +471,34 @@ export function VirtualLogTable({
           const isIngesting =
             isCurrentlyIngesting || !!(activeJob && activeJob.status !== "queued");
           const isQueued = !!(activeJob && (activeJob.status === "queued" || (activeJob.status === "pending" && isAnyIngestionProcessing)));
-          const showOverlay = isIngesting || isQueued || (showTransitioningLoader && !isTailing);
+          const showOverlay = (isIngesting || isQueued || (showTransitioningLoader && !isTailing)) && logs.length === 0;
 
-          // Rehydrating screen: source is created, but no logs loaded yet and is_uploaded is true (or job was completed/skipped)
+          const showPreparing = !activeJob && !!(
+            activeWorkspace?.activeSourceId &&
+            useIngestionStore.getState().transitioningSourceIds.has(activeWorkspace.activeSourceId)
+          ) && logs.length === 0;
+          
+          // Rehydrating screen: source is created, but no logs loaded yet and is_uploaded is true
           const isRehydrating =
             !isIngesting &&
             !isQueued &&
             logs.length === 0 &&
             isFetching &&
             (source as any)?.is_uploaded;
+            
+          const showHydrating = !showPreparing && (isRehydrating || (!isIngesting && !isQueued && logs.length === 0 && isFetching));
 
           const isEmpty =
             logs.length === 0 &&
             !isIngesting &&
             !isQueued &&
-            !isRehydrating &&
+            !showPreparing &&
+            !showHydrating &&
             !isTransitioning &&
             !isFetching &&
             !showTransitioningLoader;
 
-          if (isRehydrating) {
+          if (showPreparing) {
             return (
               <div className="absolute inset-0 flex flex-col items-center justify-center p-8 text-center animate-in fade-in zoom-in-95 duration-500 bg-bg-base/50 backdrop-blur-sm z-50">
                 <div className="flex flex-col items-center gap-6 max-w-md w-full">
@@ -463,9 +509,9 @@ export function VirtualLogTable({
                     </div>
                   </div>
                   <div className="space-y-2">
-                    <h3 className="text-xl font-bold text-text-primary animate-pulse">Rehydrating catalog...</h3>
+                    <h3 className="text-xl font-bold text-text-primary animate-pulse">Preparing Ingestion...</h3>
                     <p className="text-sm text-text-muted leading-relaxed">
-                      Loading pre-parsed log entries and clusters from storage.
+                      Initializing storage buffers and checking queue status.
                     </p>
                   </div>
                 </div>
@@ -473,7 +519,28 @@ export function VirtualLogTable({
             );
           }
 
-          if (showOverlay) {
+          if (showHydrating) {
+            return (
+              <div className="absolute inset-0 flex flex-col items-center justify-center p-8 text-center animate-in fade-in zoom-in-95 duration-500 bg-bg-base/50 backdrop-blur-sm z-50">
+                <div className="flex flex-col items-center gap-6 max-w-md w-full">
+                  <div className="relative">
+                    <div className="absolute -inset-4 bg-primary/20 rounded-full blur-2xl animate-pulse" />
+                    <div className="relative bg-bg-surface border border-border shadow-2xl rounded-2xl p-6">
+                      <Sparkles className="size-12 text-primary animate-pulse" />
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <h3 className="text-xl font-bold text-text-primary animate-pulse">Retrieving logs...</h3>
+                    <p className="text-sm text-text-muted leading-relaxed">
+                      Hydrating log records from storage.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            );
+          }
+
+          if (showOverlay && !showPreparing && !showHydrating) {
             return (
               <div className="absolute inset-0 flex flex-col items-center justify-center p-8 text-center animate-in fade-in zoom-in-95 duration-500 bg-bg-base/50 backdrop-blur-sm z-50">
                 <div className="flex flex-col items-center gap-6 max-w-md w-full">

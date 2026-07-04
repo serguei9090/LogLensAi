@@ -383,10 +383,6 @@ class App:
         if start_mcp and settings.get("mcp_server_enabled", "false").lower() == "true":
             self._start_mcp_server()
 
-        # --- Serial Ingestion Queue ---
-        # A single FIFO queue + one persistent daemon thread ensures files are
-        # processed one-at-a-time. This eliminates DuckDB WAL contention and
-        # thread-racing on the single-threaded Drain3 parser.
         self._ingestion_queue: queue.Queue = queue.Queue()
         self._ingestion_worker_thread = threading.Thread(
             target=self._ingestion_queue_worker,
@@ -395,6 +391,52 @@ class App:
         )
         self._ingestion_worker_thread.start()
         logger.info("[IngestionQueue] Serial worker thread started")
+
+        # --- Ingestion Startup Recovery ---
+        # Find any jobs left in unfinished states (queued, pending, processing) and automatically re-queue them.
+        try:
+            cursor = self.db.get_cursor()
+            cursor.execute(
+                """
+                SELECT ij.id, ij.workspace_id, ij.source_id, ls.path 
+                FROM ingestion_jobs ij 
+                JOIN log_sources ls ON ij.source_id = ls.id
+                WHERE ij.status IN ('queued', 'pending', 'processing')
+                ORDER BY ij.created_at ASC
+                """
+            )
+            interrupted_jobs = cursor.fetchall()
+            for job_id, ws_id, src_id, file_path in interrupted_jobs:
+                if file_path and os.path.exists(file_path):
+                    logger.info(
+                        "[IngestionQueue] Recovering interrupted job %d for source %s (file: %s)",
+                        job_id,
+                        src_id,
+                        file_path,
+                    )
+                    # Wipe any partially written log rows to ensure a clean resume
+                    self.db.delete_logs(ws_id, src_id)
+                    # Reset the status in DB back to queued
+                    cursor.execute(
+                        "UPDATE ingestion_jobs SET status = 'queued', processed_lines = 0, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+                        (job_id,),
+                    )
+                    self.db.commit()
+                    # Enqueue back into worker queue
+                    self._ingestion_queue.put((ws_id, src_id, file_path, job_id))
+                else:
+                    logger.warning(
+                        "[IngestionQueue] Aborting recovery for job %d. Log file not found: %s",
+                        job_id,
+                        file_path,
+                    )
+                    cursor.execute(
+                        "UPDATE ingestion_jobs SET status = 'failed', updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+                        (job_id,),
+                    )
+                    self.db.commit()
+        except Exception as e:
+            logger.error("[IngestionQueue] Startup recovery failed: %s", e)
 
     def _init_ai_provider(self, settings: dict):
         """Initialize the AI provider using the factory."""

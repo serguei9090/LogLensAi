@@ -130,21 +130,19 @@ export const useIngestionStore = create<IngestionState>((set, get) => ({
           if (wasActive && !nextNotified.has(job.id)) {
             nextNotified.add(job.id);
             if (job.status === "completed") {
-              toast.success("Ingestion complete", {
-                id: "ingest",
-                description: `Processed ${job.total_lines.toLocaleString()} lines.`,
-              });
+              console.log(`[useIngestionStore] Ingestion COMPLETE for job ${job.id} (source: ${job.source_id})`);
             } else {
+              console.log(`[useIngestionStore] Ingestion FAILED for job ${job.id} (source: ${job.source_id})`);
               toast.error("Ingestion failed", {
                 id: "ingest",
                 description: "Check sidecar logs for details.",
               });
             }
-            finishedSourceIds.push(job.source_id);
           } else {
             // Silently mark existing completed jobs as notified
             nextNotified.add(job.id);
           }
+          finishedSourceIds.push(job.source_id);
         }
       }
 
@@ -268,7 +266,7 @@ export const useIngestionStore = create<IngestionState>((set, get) => ({
       const nextNotified = new Set(state.notifiedJobIds);
       const finishedSourceIds = [...state.ingestingSourceIds];
 
-      if ((job.status === "completed" || job.status === "failed") && !nextNotified.has(job.id)) {
+      if (job.status === "completed" || job.status === "failed") {
         const prevJob = state.jobs.find((j) => j.id === job.id);
         const wasActive =
           prevJob &&
@@ -276,23 +274,23 @@ export const useIngestionStore = create<IngestionState>((set, get) => ({
             prevJob.status === "queued" ||
             prevJob.status === "pending");
 
-        nextNotified.add(job.id);
-        if (wasActive) {
-          if (job.status === "completed") {
-            toast.success("Ingestion complete", {
-              id: "ingest",
-              description: `Processed ${job.total_lines.toLocaleString()} lines.`,
-            });
-          } else {
-            toast.error("Ingestion failed", {
-              id: "ingest",
-              description: "Check sidecar logs for details.",
-            });
+        if (!nextNotified.has(job.id)) {
+          nextNotified.add(job.id);
+          if (wasActive) {
+            if (job.status === "completed") {
+              console.log(`[useIngestionStore] addOrUpdateJob Ingestion COMPLETE for job ${job.id} (source: ${job.source_id})`);
+            } else {
+              console.log(`[useIngestionStore] addOrUpdateJob Ingestion FAILED for job ${job.id} (source: ${job.source_id})`);
+              toast.error("Ingestion failed", {
+                id: "ingest",
+                description: "Check sidecar logs for details.",
+              });
+            }
           }
-          const idx = finishedSourceIds.indexOf(job.source_id);
-          if (idx !== -1) {
-            finishedSourceIds.splice(idx, 1);
-          }
+        }
+        const idx = finishedSourceIds.indexOf(job.source_id);
+        if (idx !== -1) {
+          finishedSourceIds.splice(idx, 1);
         }
       }
 
