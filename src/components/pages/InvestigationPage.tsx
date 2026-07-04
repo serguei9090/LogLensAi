@@ -118,6 +118,10 @@ function InvestigationPageImpl() {
   // before the log rows actually arrive in the table.
   const [retrievingSourceIds, setRetrievingSourceIds] = useState<Set<string>>(new Set());
 
+  // These subscriptions must be declared BEFORE the source-switch useEffect below,
+  // which references transitioningSourceIds reactively.
+  const ingestingSourceIds = useIngestionStore((state) => state.ingestingSourceIds);
+  const transitioningSourceIds = useIngestionStore((state) => state.transitioningSourceIds);
 
   const lastSourceRef = useRef<string | null>(null);
   const lastWorkspaceRef = useRef<string | null>(null);
@@ -131,7 +135,9 @@ function InvestigationPageImpl() {
     }
 
     if (activeSourceId && lastSourceRef.current && lastSourceRef.current !== activeSourceId) {
-      const isTransitioning = useIngestionStore.getState().transitioningSourceIds.has(activeSourceId);
+      // Read transitioningSourceIds reactively via the prop already subscribed at line 165,
+      // NOT via getState() which is a stale snapshot at the time this effect runs.
+      const isTransitioning = transitioningSourceIds.has(activeSourceId);
       const isRetrieving = retrievingSourceIds.has(activeSourceId);
       if (!activeJobForSource && !isTransitioning && !isRetrieving) {
         setLogs([], 0);
@@ -144,7 +150,7 @@ function InvestigationPageImpl() {
       lastSourceRef.current = activeSourceId;
     }
     lastWorkspaceRef.current = activeWorkspaceId;
-  }, [activeWorkspaceId, activeSourceId, activeJobForSource, retrievingSourceIds, setLogs, setAvailableFacets]);
+  }, [activeWorkspaceId, activeSourceId, activeJobForSource, retrievingSourceIds, transitioningSourceIds, setLogs, setAvailableFacets]);
 
   // Memoize the query params to reduce complexity in fetchLogs
   const { isFetching, isConnected, anomalousClusters, fetchLogs, fetchMoreLogs } = useLogFetching(
@@ -159,10 +165,7 @@ function InvestigationPageImpl() {
     handleImportSSH,
     handleIngestManual,
     handleImportLive,
-  } = useLogIngestion(activeWorkspaceId, fetchLogs);
-
-  const ingestingSourceIds = useIngestionStore((state) => state.ingestingSourceIds);
-  const transitioningSourceIds = useIngestionStore((state) => state.transitioningSourceIds);
+  } = useLogIngestion(activeWorkspaceId);
 
   // Combined loading state for the table — covers four scenarios:
   // 1. Source is in the ingestingSourceIds set (startIngestion called)
@@ -203,9 +206,11 @@ function InvestigationPageImpl() {
     setTailing(isActiveSourceTailing);
   }, [activeSourceId, tailingSourceIds, setTailing]);
 
-  // Clear transitioning state once a job for that source is detected
+  // Clear transitioning state once a job for that source is detected.
+  // Uses the reactive transitioningSourceIds subscription (not getState snapshot)
+  // so this effect sees the latest set on every render.
   useEffect(() => {
-    const { removeTransitioningSource, transitioningSourceIds } = useIngestionStore.getState();
+    const { removeTransitioningSource } = useIngestionStore.getState();
     for (const srcId of transitioningSourceIds) {
       const job = jobs.find((j) => j.source_id === srcId);
       if (job) {
@@ -213,7 +218,7 @@ function InvestigationPageImpl() {
         removeTransitioningSource(srcId);
       }
     }
-  }, [jobs]);
+  }, [jobs, transitioningSourceIds]);
 
   // Orchestrator Hub state
 
@@ -254,65 +259,80 @@ function InvestigationPageImpl() {
   //   3. Fetch logs (forceFull) to actually load the data
   //   4. Only call stopIngestion AFTER logs have confirmed arrival
   //   5. Remove retrieving marker last
-  const completedJobIds = useRef<Set<number>>(new Set());
-  useEffect(() => {
-    const sourceJob = jobs.find((j) => j.source_id === activeSourceId);
-    if (!sourceJob) {
-      return;
-    }
+  // Tracks job completions across ALL sources in the workspace, not just the active one.
+  // The ref is keyed by sourceId so re-importing the same file (new job) is not suppressed.
+  const completedJobIds = useRef<Map<string, Set<number>>>(new Map());
 
-    if (sourceJob.status === "completed" && !completedJobIds.current.has(sourceJob.id)) {
-      completedJobIds.current.add(sourceJob.id);
+  // Reset a source's completed-job tracker when activeSourceId changes so a re-import
+  // of the same file (new job ID) always triggers the overlay → data sequence.
+  useEffect(() => {
+    if (activeSourceId) {
+      // Clear the tracking set for this source only — not all sources.
+      completedJobIds.current.delete(activeSourceId);
+    }
+  }, [activeSourceId]);
+
+  useEffect(() => {
+    for (const sourceJob of jobs) {
+      if (sourceJob.status !== "completed") {
+        continue;
+      }
+
+      const sourceSet = completedJobIds.current.get(sourceJob.source_id) ?? new Set<number>();
+      if (sourceSet.has(sourceJob.id)) {
+        // Already handled for this source
+        continue;
+      }
+
+      // Mark handled immediately so a re-render doesn't double-fire
+      sourceSet.add(sourceJob.id);
+      completedJobIds.current.set(sourceJob.source_id, sourceSet);
 
       // Snapshot IDs — closures below always use these, never stale reactive values
-      const completedSourceId = activeSourceId;
+      const completedSourceId = sourceJob.source_id;
+      // Find the workspace that owns this source
       const completedWorkspaceId = activeWorkspaceId;
-      const completedJobSourceId = sourceJob.source_id;
 
       // Step 1: Mark as retrieving BEFORE any async work so overlay never drops prematurely
-      if (completedSourceId) {
-        setRetrievingSourceIds((prev) => {
-          const next = new Set(prev);
-          next.add(completedSourceId);
-          return next;
-        });
-      }
+      setRetrievingSourceIds((prev) => {
+        const next = new Set(prev);
+        next.add(completedSourceId);
+        return next;
+      });
 
       (async () => {
         // Step 2: Refresh hierarchy FIRST — this sets is_uploaded=true on the source node.
-        // If we skip this, the overlay drops and is_uploaded is still false, causing
-        // the "No logs detected" screen to flash even though we have data.
         if (completedWorkspaceId) {
           await useWorkspaceStore.getState().fetchHierarchy(completedWorkspaceId);
-          // Clear the completed job from the store to prevent repeat toasts/effects
-          useIngestionStore.getState().clearCompletedState(completedWorkspaceId, completedJobSourceId);
         }
 
-        // Step 3: Fetch logs now that is_uploaded is already true
+        // Step 3: Fetch logs. Do this BEFORE clearing the job from the store so that
+        // shouldSkipFetch's hasActiveJob guard doesn't falsely short-circuit the fetch.
         await fetchLogs({ forceFull: true });
 
-        // Step 4: Only stop ingestion tracking when we actually have logs in the store.
-        // This prevents the overlay from dropping to an empty screen if the DB is still
-        // finalizing writes or the network round-trip took longer than expected.
-        const hasLogs = useInvestigationStore.getState().total > 0;
-        if (completedSourceId) {
-          if (hasLogs) {
-            useIngestionStore.getState().stopIngestion(completedSourceId);
-          }
-          // Brief grace period before removing the retrieving marker
-          setTimeout(() => {
-            setRetrievingSourceIds((prev) => {
-              const next = new Set(prev);
-              next.delete(completedSourceId);
-              return next;
-            });
-            // Ensure ingestion is always cleared even if logs arrived late
-            useIngestionStore.getState().stopIngestion(completedSourceId);
-          }, 300);
+        // Step 4: Now clear the completed job from the store (after logs have been fetched)
+        if (completedWorkspaceId) {
+          useIngestionStore.getState().clearCompletedState(completedWorkspaceId, completedSourceId);
         }
+
+        // Step 5: Only stop ingestion tracking when we actually have logs in the store.
+        const hasLogs = useInvestigationStore.getState().total > 0;
+        if (hasLogs) {
+          useIngestionStore.getState().stopIngestion(completedSourceId);
+        }
+        // Brief grace period before removing the retrieving marker
+        setTimeout(() => {
+          setRetrievingSourceIds((prev) => {
+            const next = new Set(prev);
+            next.delete(completedSourceId);
+            return next;
+          });
+          // Ensure ingestion is always cleared even if logs arrived late
+          useIngestionStore.getState().stopIngestion(completedSourceId);
+        }, 300);
       })();
     }
-  }, [jobs, activeSourceId, activeWorkspaceId, fetchLogs]);
+  }, [jobs, activeWorkspaceId, fetchLogs]);
 
   // Memoized non-fusion sources
   const nonFusionSources = useMemo(() => sources.filter((s) => s.type !== "fusion"), [sources]);

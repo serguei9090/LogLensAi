@@ -20,7 +20,7 @@ import { callSidecar } from "./useSidecarBridge";
  * transitioningSourceIds lives in ingestionStore (global) so that all consumers
  * (VirtualLogTable, Sidebar, etc.) can subscribe without prop-drilling.
  */
-export function useLogIngestion(workspaceId: string | null, fetchLogs: () => void) {
+export function useLogIngestion(workspaceId: string | null) {
   const { createSource, setActiveSource } = useWorkspaceStore();
   const { setLogs, setTailing } = useInvestigationStore();
   const { settings } = useSettingsStore();
@@ -92,8 +92,11 @@ export function useLogIngestion(workspaceId: string | null, fetchLogs: () => voi
 
         // Fire polling NOW — the ingest job has just been enqueued.
         startPolling(workspaceId);
-
-        fetchLogs();
+        // NOTE: Do NOT call fetchLogs() here. The callback captured in this closure
+        // still references the OLD activeSourceId (stale closure). React's useEffect
+        // in InvestigationPage will re-fire fetchLogs() automatically once the
+        // queryParams update with the new sourceId. Calling it here fetches the
+        // previous file's logs and flashes them before the Queue overlay appears.
 
         if (tail) {
           await callSidecar({
@@ -124,7 +127,6 @@ export function useLogIngestion(workspaceId: string | null, fetchLogs: () => voi
       createSource,
       setActiveSource,
       setLogs,
-      fetchLogs,
       setTailing,
       startPolling,
       addLiveSource,
@@ -216,8 +218,7 @@ export function useLogIngestion(workspaceId: string | null, fetchLogs: () => voi
         // SSH tail is a persistent live source.
         addLiveSource();
         startPolling(workspaceId);
-
-        fetchLogs();
+        // NOTE: Do NOT call fetchLogs() here — stale closure captures old sourceId.
         setTailingSourceIds((prev) => new Set(prev).add(newSource.id));
         setTailing(true);
         toast.success(`SSH tailing started for ${connectionPath}`);
@@ -234,7 +235,6 @@ export function useLogIngestion(workspaceId: string | null, fetchLogs: () => voi
       createSource,
       setActiveSource,
       setLogs,
-      fetchLogs,
       setTailing,
       addLiveSource,
       startPolling,
@@ -283,7 +283,7 @@ export function useLogIngestion(workspaceId: string | null, fetchLogs: () => voi
 
         // One-shot ingest — starts polling which will self-terminate on completion.
         startPolling(workspaceId);
-        fetchLogs();
+        // NOTE: Do NOT call fetchLogs() here — stale closure captures old sourceId.
       } catch (error) {
         if (newSourceId) {
           removeTransitioningSource(newSourceId);
@@ -299,7 +299,6 @@ export function useLogIngestion(workspaceId: string | null, fetchLogs: () => voi
       createSource,
       setActiveSource,
       setLogs,
-      fetchLogs,
       startPolling,
       addTransitioningSource,
       removeTransitioningSource,

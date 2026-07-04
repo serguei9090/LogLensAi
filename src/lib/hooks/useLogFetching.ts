@@ -295,21 +295,11 @@ export function useLogFetching(workspaceId: string | null, activeSourceId: strin
           await fetchPartialLogs(workspaceId, currentSourceRef, queryParams);
         }
 
-        const state = useIngestionStore.getState();
-        const hasActiveJob = state.jobs.some(
-          (j) =>
-            j.source_id === currentSourceRef &&
-            (j.status === "processing" || j.status === "pending"),
-        );
-        const hasFinishedJob = state.jobs.some(
-          (j) =>
-            j.source_id === currentSourceRef && (j.status === "completed" || j.status === "failed"),
-        );
-        const hasData = useInvestigationStore.getState().total > 0;
-
-        if ((hasFinishedJob || hasData) && !hasActiveJob) {
-          state.stopIngestion(currentSourceRef);
-        }
+        // NOTE: Do NOT call stopIngestion() here.
+        // InvestigationPage.tsx owns the ingestion state machine and calls stopIngestion()
+        // only AFTER fetchHierarchy() has confirmed is_uploaded=true AND logs have arrived.
+        // Calling it here races with that sequence and drops the loading overlay prematurely,
+        // causing the "ghost empty" / "No logs detected" flash.
       } catch (e) {
         console.error("[useLogFetching] Data retrieval failed:", e);
         setIsConnected(false);
