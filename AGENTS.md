@@ -105,7 +105,6 @@ sidecar/
 
 ## ⚡ Boot Sequence (for AI agents)
 
-1. Read `docs/track/TODO.md` — understand sprint status (the absolute single source of truth for planning and progress).
 2. Check `.agents/rules/` for constraints
 
 ## 🔌 JSON-RPC API Contract

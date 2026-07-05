@@ -38,6 +38,15 @@ interface IngestionState {
   transitioningSourceIds: Set<string>;
   /** Tracks job IDs that have already triggered a completed/failed notification. */
   notifiedJobIds: Set<number>;
+  /**
+   * Tracks job IDs whose completion has already been fully handled by
+   * InvestigationPage (hierarchy refresh + log fetch + overlay drop).
+   * Stored in global Zustand so the Set survives InvestigationPage unmounting
+   * (e.g. when the user navigates to Dashboard and returns).
+   * Without this, the component-local ref was destroyed on unmount and the
+   * completion handler re-fired on every remount, instantly clearing the overlay.
+   */
+  handledJobIds: Set<number>;
 
   // Import Feed Modal Global States
   isImportOpen: boolean;
@@ -102,6 +111,15 @@ interface IngestionState {
   clearCompletedState: (workspaceId: string, sourceId: string) => void;
   clearState: () => void;
   removeJobsForSource: (sourceId: string) => void;
+  /** Mark a job as fully handled so remounts don't re-process it. */
+  markJobHandled: (jobId: number) => void;
+  /** Return true if this job has already been fully processed. */
+  isJobHandled: (jobId: number) => boolean;
+  /**
+   * Clear the handled-job tracking for a specific source so that re-importing
+   * the same file (which creates a new job ID) triggers the overlay correctly.
+   */
+  clearHandledJobsForSource: (sourceId: string) => void;
 }
 
 /** Interval (ms) when an ingestion job is actively processing. */
@@ -132,6 +150,7 @@ export const useIngestionStore = create<IngestionState>((set, get) => ({
   ingestingSourceIds: [],
   transitioningSourceIds: new Set<string>(),
   notifiedJobIds: new Set<number>(),
+  handledJobIds: new Set<number>(),
 
   // Import Modal Initial States
   isImportOpen: false,
@@ -195,9 +214,8 @@ export const useIngestionStore = create<IngestionState>((set, get) => ({
 
       // (no longer needed: activeJob is derived from combinedJobs below)
 
-      const { notifiedJobIds: prevNotified, jobs: prevJobs, ingestingSourceIds } = get();
+      const { notifiedJobIds: prevNotified, jobs: prevJobs } = get();
       const nextNotified = new Set(prevNotified);
-      const finishedSourceIds: string[] = [];
 
       for (const job of fetchedJobs) {
         if (job.status === "completed" || job.status === "failed") {
@@ -228,12 +246,30 @@ export const useIngestionStore = create<IngestionState>((set, get) => ({
             // Silently mark existing completed jobs as notified
             nextNotified.add(job.id);
           }
-          finishedSourceIds.push(job.source_id);
         }
       }
 
+      // Merge fetched jobs with existing jobs for this workspace to prevent race conditions
+      // (e.g. an in-flight poll resolving after a new job was added locally but before the
+      // sidecar's get_ingestion_jobs returns it).
+      // We keep any local jobs that are still active (queued, pending, processing) and not in the fetched list.
+      const currentWorkspaceJobs = prevJobs.filter((j) => j.workspace_id === workspaceId);
       const otherWorkspacesJobs = prevJobs.filter((j) => j.workspace_id !== workspaceId);
-      const combinedJobs = [...otherWorkspacesJobs, ...fetchedJobs];
+
+      const mergedCurrentJobs = [...fetchedJobs];
+      for (const localJob of currentWorkspaceJobs) {
+        const isFetched = fetchedJobs.some((fj) => fj.id === localJob.id);
+        const isActive =
+          localJob.status === "queued" ||
+          localJob.status === "pending" ||
+          localJob.status === "processing";
+
+        if (!isFetched && isActive) {
+          mergedCurrentJobs.push(localJob);
+        }
+      }
+
+      const combinedJobs = [...otherWorkspacesJobs, ...mergedCurrentJobs];
 
       // activeJob must reflect ANY active job across ALL workspaces so the poll
       // termination check in startPolling does not prematurely kill a session
@@ -243,12 +279,17 @@ export const useIngestionStore = create<IngestionState>((set, get) => ({
           (j) => j.status === "processing" || j.status === "pending" || j.status === "queued",
         ) ?? null;
 
+      // IMPORTANT: Do NOT include ingestingSourceIds in this set() call.
+      // fetchJobs is async — reading ingestingSourceIds at the top of the function
+      // and writing it back here would OVERWRITE any startIngestion() calls that
+      // fired concurrently during the await (e.g. a second file upload starting
+      // while the poll was in-flight). Omitting the key means Zustand preserves
+      // the current value via shallow merge.
       set({
         jobs: combinedJobs,
         activeJob: globalActiveJob,
         lastJob: fetchedJobs[0] ?? null,
         error: null,
-        ingestingSourceIds, // Keep ingestingSourceIds as is; let the page handle stopIngestion
         notifiedJobIds: nextNotified,
       });
     } catch (err) {
@@ -472,6 +513,37 @@ export const useIngestionStore = create<IngestionState>((set, get) => ({
         activeJob: active ?? null,
         lastJob: nextJobs[0] ?? null,
       };
+    });
+  },
+
+  markJobHandled: (jobId: number) => {
+    set((state) => {
+      const next = new Set(state.handledJobIds);
+      next.add(jobId);
+      return { handledJobIds: next };
+    });
+  },
+
+  isJobHandled: (jobId: number) => {
+    return get().handledJobIds.has(jobId);
+  },
+
+  clearHandledJobsForSource: (sourceId: string) => {
+    // We need the job list to find which job IDs belong to this source,
+    // then remove them from handledJobIds so a re-import of the same file
+    // (new job ID) triggers the full completion sequence again.
+    // NOTE: since job IDs are globally unique integers this is safe to do
+    // even for completed jobs that are no longer in the jobs list — we only
+    // clear IDs that ARE still in the store for this source.
+    set((state) => {
+      const sourceJobIds = new Set(
+        state.jobs.filter((j) => j.source_id === sourceId).map((j) => j.id),
+      );
+      const next = new Set(state.handledJobIds);
+      for (const id of sourceJobIds) {
+        next.delete(id);
+      }
+      return { handledJobIds: next };
     });
   },
 }));

@@ -304,17 +304,10 @@ function InvestigationPageImpl() {
   //   4. Only call stopIngestion AFTER logs have confirmed arrival
   //   5. Remove retrieving marker last
   // Tracks job completions across ALL sources in the workspace, not just the active one.
-  // The ref is keyed by sourceId so re-importing the same file (new job) is not suppressed.
-  const completedJobIds = useRef<Map<string, Set<number>>>(new Map());
-
-  // Reset a source's completed-job tracker when activeSourceId changes so a re-import
-  // of the same file (new job ID) always triggers the overlay → data sequence.
-  useEffect(() => {
-    if (activeSourceId) {
-      // Clear the tracking set for this source only — not all sources.
-      completedJobIds.current.delete(activeSourceId);
-    }
-  }, [activeSourceId]);
+  //
+  // NAVIGATION-SAFETY: Uses the global ingestionStore.handledJobIds instead of a
+  // component-local useRef. This prevents InvestigationPage from re-processing the
+  // same completion event after unmounting (e.g. Dashboard navigation) and remounting.
 
   useEffect(() => {
     for (const sourceJob of jobs) {
@@ -322,15 +315,15 @@ function InvestigationPageImpl() {
         continue;
       }
 
-      const sourceSet = completedJobIds.current.get(sourceJob.source_id) ?? new Set<number>();
-      if (sourceSet.has(sourceJob.id)) {
-        // Already handled for this source
+      // Use the global, navigation-persistent handledJobIds instead of a local ref.
+      // This prevents re-processing when InvestigationPage remounts after navigation.
+      if (useIngestionStore.getState().isJobHandled(sourceJob.id)) {
         continue;
       }
 
-      // Mark handled immediately so a re-render doesn't double-fire
-      sourceSet.add(sourceJob.id);
-      completedJobIds.current.set(sourceJob.source_id, sourceSet);
+      // Mark handled IMMEDIATELY before any async work so concurrent re-renders
+      // and remounts both see this job as already processed.
+      useIngestionStore.getState().markJobHandled(sourceJob.id);
 
       // Snapshot IDs — closures below always use these, never stale reactive values
       const completedSourceId = sourceJob.source_id;
