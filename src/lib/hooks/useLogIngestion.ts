@@ -1,6 +1,6 @@
 import { useCallback, useState } from "react";
 import { toast } from "sonner";
-import { type IngestionJob, useIngestionStore } from "@/store/ingestionStore";
+import { type IngestionJob, traceIngestion, useIngestionStore } from "@/store/ingestionStore";
 import { useInvestigationStore } from "@/store/investigationStore";
 import { useSettingsStore } from "@/store/settingsStore";
 import { useWorkspaceStore } from "@/store/workspaceStore";
@@ -40,6 +40,7 @@ export function useLogIngestion(workspaceId: string | null) {
         return;
       }
 
+      traceIngestion(`[Hook] handleImportLocal: Started for path=${path}, tail=${tail}`);
       const { setImportProcessing, setImportOpen } = useIngestionStore.getState();
       setImportProcessing(true);
 
@@ -56,6 +57,9 @@ export function useLogIngestion(workspaceId: string | null) {
           folderId,
         );
         newSourceId = newSource.id;
+        traceIngestion(
+          `[Hook] handleImportLocal: Created workspace source id=${newSourceId}, name=${newSource.name}`,
+        );
 
         setActiveSource(workspaceId, newSource.id);
 
@@ -65,6 +69,7 @@ export function useLogIngestion(workspaceId: string | null) {
         useIngestionStore.getState().startIngestion(newSource.id);
         setLogs([], 0);
 
+        traceIngestion(`[Hook] handleImportLocal: Dispatched ingest_local_file sidecar request...`);
         const result = await callSidecar<{
           status: string;
           job_id: number;
@@ -79,9 +84,15 @@ export function useLogIngestion(workspaceId: string | null) {
           },
         });
 
+        traceIngestion(
+          `[Hook] handleImportLocal: sidecar returned job_id=${result.job_id}, status=${result.status}`,
+        );
 
         // P4 FIX: Handle instant 'completed' status from sidecar's is_uploaded shortcut
         if (result.status === "completed" && result.job_id === 0) {
+          traceIngestion(
+            `[Hook] handleImportLocal: Instant completion hit. Setting mock completed job.`,
+          );
           const mockCompletedJob: IngestionJob = {
             id: Date.now(),
             workspace_id: workspaceId,
@@ -114,6 +125,9 @@ export function useLogIngestion(workspaceId: string | null) {
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         };
+        traceIngestion(
+          `[Hook] handleImportLocal: Adding job ${result.job_id} to store, calling startPolling.`,
+        );
         useIngestionStore.getState().addOrUpdateJob(newJob);
 
         // Fire polling NOW — the ingest job has just been enqueued.
@@ -125,6 +139,7 @@ export function useLogIngestion(workspaceId: string | null) {
         // previous file's logs and flashes them before the Queue overlay appears.
 
         if (tail) {
+          traceIngestion(`[Hook] handleImportLocal: Initializing live monitoring (tail)...`);
           await callSidecar({
             method: "start_tail",
             params: {
@@ -145,6 +160,9 @@ export function useLogIngestion(workspaceId: string | null) {
           setImportProcessing(false);
         }, 300);
       } catch (e: unknown) {
+        traceIngestion(
+          `[Hook] handleImportLocal: Error: ${e instanceof Error ? e.message : String(e)}`,
+        );
         setImportProcessing(false);
         // Remove transitioning guard on error
         if (newSourceId) {

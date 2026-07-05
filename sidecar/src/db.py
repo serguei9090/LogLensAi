@@ -57,16 +57,41 @@ class LogDatabase:
         raise e
 
     def _get_conn(self):
-        # Share a single connection object across all threads to avoid DuckDB lock contention/deadlocks.
-        # Cursors are thread-safe and isolated.
-        if not hasattr(self, "_shared_conn") or self._shared_conn is None:
+        # To avoid Windows database file-lock deadlocks, we open exactly one main
+        # process-level connection (self._main_conn). To prevent transaction deadlocks
+        # across concurrent threads/requests, each thread receives its own cursor
+        # connection (self._local.conn) created from the main connection.
+        need_connect = False
+        if not hasattr(self, "_main_conn") or self._main_conn is None:
+            need_connect = True
+        else:
             try:
-                self._shared_conn = duckdb.connect(self.db_path)
+                # Test main connection by creating a temporary cursor; if closed, it throws
+                self._main_conn.cursor()
+            except Exception:
+                need_connect = True
+
+        if need_connect:
+            try:
+                self._main_conn = duckdb.connect(self.db_path)
             except Exception as e:
-                self._shared_conn = self._recover_wal(e)
+                self._main_conn = self._recover_wal(e)
+
+        # Get or create thread-local cursor connection
+        if not hasattr(self._local, "conn") or self._local.conn is None:
+            self._local.conn = self._main_conn.cursor()
             with self._connections_lock:
-                self._connections.add(self._shared_conn)
-        return self._shared_conn
+                self._connections.add(self._local.conn)
+        else:
+            try:
+                # Test if the thread-local connection is still open/valid
+                self._local.conn.cursor()
+            except Exception:
+                self._local.conn = self._main_conn.cursor()
+                with self._connections_lock:
+                    self._connections.add(self._local.conn)
+
+        return self._local.conn
 
     def get_cursor(self):
         return self._get_conn().cursor()
@@ -691,8 +716,10 @@ class LogDatabase:
                         with contextlib.suppress(Exception):
                             conn.close()
                     cls._connections.clear()
-                if hasattr(cls._instance, "_shared_conn"):
-                    cls._instance._shared_conn = None
+                if hasattr(cls._instance, "_main_conn") and cls._instance._main_conn is not None:
+                    with contextlib.suppress(Exception):
+                        cls._instance._main_conn.close()
+                    cls._instance._main_conn = None
                 if hasattr(cls._instance, "_local") and hasattr(cls._instance._local, "conn"):
                     cls._instance._local.conn = None
                 cls._instance = None

@@ -11,7 +11,6 @@ import {
 import { restrictToWindowEdges } from "@dnd-kit/modifiers";
 import { type ReactNode, useEffect } from "react";
 import type { NavTab } from "@/App";
-import { ProcessingNotification } from "@/components/molecules/ProcessingNotification";
 import { type DiagnosticData, DiagnosticSidebar } from "@/components/organisms/DiagnosticSidebar";
 import { Sidebar } from "@/components/organisms/Sidebar";
 import { callSidecar } from "@/lib/hooks/useSidecarBridge";
@@ -179,7 +178,6 @@ export function AppLayout({
           }}
         >
           {children}
-          <ProcessingNotification />
         </main>
 
         <DiagnosticSidebar

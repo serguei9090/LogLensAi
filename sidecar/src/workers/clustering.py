@@ -246,7 +246,9 @@ class ClusteringWorker:
 
                 if processed_count == 0:
                     self._force_cycle.clear()
-                    self._sync_job_statuses()
+                    # Disable premature status syncing. Ingestion jobs are fully managed
+                    # (marked completed/failed) by the queue worker in api.py.
+                    # self._sync_job_statuses()
                     self._stop_event.wait(current_interval)
                 elif self.mode == "burst":
                     self._stop_event.wait(current_interval)

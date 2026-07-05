@@ -85,7 +85,7 @@ from models import (
     UpdateTemporalOffsetsRequest,
 )
 from parser import DrainParser
-from pydantic import ValidationError
+from pydantic import BaseModel, ValidationError
 from query_parser import parse_llql
 from services.fast_path import FastPathService
 from services.log_file_store import DiskLogStore
@@ -94,6 +94,26 @@ from services.shared_core import SharedSourceManager
 from ssh_loader import SSHLoader
 from tailer import FileTailer
 from workers.clustering import ClusteringWorker
+
+_trace_file_lock = threading.Lock()
+
+
+def trace_ingestion_event(message: str):
+    if os.getenv("INGESTION_TRACE") != "true":
+        return
+    # Use exact millisecond timestamp
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
+    log_dir = os.path.join(PROJECT_ROOT, "logs")
+    os.makedirs(log_dir, exist_ok=True)
+    log_path = os.path.join(log_dir, "ingestion_trace.log")
+    formatted_msg = f"[{timestamp}] [Backend] {message}\n"
+    with _trace_file_lock, open(log_path, "a", encoding="utf-8") as f:
+        f.write(formatted_msg)
+
+
+class LogTraceRequest(BaseModel):
+    message: str
+
 
 A2UI_START = "[[A2UI]]"
 A2UI_END = "[[/A2UI]]"
@@ -263,6 +283,7 @@ class App:
         "update_settings": UpdateSettingsRequest,
         "get_dashboard_stats": GetDashboardStatsRequest,
         "purge_inactive_workspaces": PurgeInactiveWorkspacesRequest,
+        "log_trace": LogTraceRequest,
         "list_ai_models": None,
         "send_ai_message": SendAiMessageRequest,
         "get_ai_sessions": GetAiSessionsRequest,
@@ -454,7 +475,11 @@ class App:
     def method_get_ingestion_jobs(self, workspace_id: str | None = None) -> list[dict]:
         """Fetch all ingestion jobs for a workspace."""
         logger.info("RPC Dispatch: get_ingestion_jobs (workspace=%s)", workspace_id)
-        return self.db.get_ingestion_jobs(workspace_id)
+        jobs = self.db.get_ingestion_jobs(workspace_id)
+        trace_ingestion_event(
+            f"method_get_ingestion_jobs: Polled for workspace={workspace_id}. Returning {len(jobs)} jobs: {[(j['id'], j['status'], j['processed_lines'], j['total_lines']) for j in jobs]}"
+        )
+        return jobs
 
     def method_get_clustering_status(self, workspace_id: str | None = None) -> dict:
         """Fetch current clustering worker status and backlog."""
@@ -1644,7 +1669,11 @@ class App:
 
         Now runs in a background thread to prevent blocking the UI.
         """
+        trace_ingestion_event(
+            f"method_ingest_local_file: Called for workspace={workspace_id}, source={source_id}, file={filepath}"
+        )
         if not os.path.exists(filepath):
+            trace_ingestion_event(f"method_ingest_local_file: File not found error: {filepath}")
             raise FileNotFoundError(f"File not found: {filepath}")
 
         # Check if already uploaded to support app restarts/skips
@@ -1655,6 +1684,9 @@ class App:
             logger.info(
                 "[Ingestion] Source %s already marked as uploaded. Skipping ingestion.", source_id
             )
+            trace_ingestion_event(
+                f"method_ingest_local_file: Source {source_id} is already uploaded. Skipping ingestion, returning completed job_id=0."
+            )
             return {
                 "status": "completed",
                 "job_id": 0,
@@ -1663,6 +1695,9 @@ class App:
             }
 
         # Clear any existing logs/jobs for this source to ensure a clean overwrite if retrying
+        trace_ingestion_event(
+            f"method_ingest_local_file: Deleting existing logs/jobs for source={source_id}"
+        )
         self.db.delete_logs(workspace_id, source_id)
 
         # 1. Count total lines/entries for progress tracking (quick scan)
@@ -1679,11 +1714,19 @@ class App:
         if has_content and total_lines == 0:
             total_lines = 1
 
+        trace_ingestion_event(
+            f"method_ingest_local_file: Scanned lines. total_lines={total_lines}, has_content={has_content}"
+        )
+
         if not has_content:
+            trace_ingestion_event(
+                "method_ingest_local_file: File has no content. Returning status=ok, count=0."
+            )
             return {"status": "ok", "count": 0, "job_id": None}
 
         # 2. Create ingestion job record
         job_id = self.db.create_ingestion_job(workspace_id, source_id, total_lines)
+        trace_ingestion_event(f"method_ingest_local_file: Created job {job_id} in DB.")
 
         # Ensure the queue worker thread is alive (resurrect if it was stopped/dead)
         if (
@@ -1710,6 +1753,9 @@ class App:
             job_id,
             source_id,
             queue_position,
+        )
+        trace_ingestion_event(
+            f"method_ingest_local_file: Enqueued job {job_id} to queue. Current depth={queue_position}"
         )
         return {
             "status": "queued",
@@ -1739,6 +1785,9 @@ class App:
                 source_id,
                 filepath,
             )
+            trace_ingestion_event(
+                f"_ingestion_queue_worker: Dequeued job {job_id} for source {source_id} (file: {filepath})"
+            )
             try:
                 # Mark as processing now that the job is at the front of the queue
                 cursor = self.db.get_cursor()
@@ -1747,10 +1796,19 @@ class App:
                     (job_id,),
                 )
                 self.db.commit()
+                trace_ingestion_event(
+                    f"_ingestion_queue_worker: Marked job {job_id} as 'processing' in DB. Starting _bg_ingest_local_file."
+                )
                 self._bg_ingest_local_file(workspace_id, source_id, filepath, job_id)
             except Exception as exc:
                 logger.exception("[IngestionQueue] Unexpected error for job %d: %s", job_id, exc)
+                trace_ingestion_event(
+                    f"_ingestion_queue_worker: Unexpected error for job {job_id}: {exc}"
+                )
             finally:
+                trace_ingestion_event(
+                    f"_ingestion_queue_worker: Finished task_done for job {job_id}"
+                )
                 self._ingestion_queue.task_done()
 
     def _ingest_chunk(
@@ -1820,6 +1878,9 @@ class App:
         3. Train & Tag Drain3 in RAM (Single Thread)
         4. Bulk Insert processed rows via PyArrow
         """
+        trace_ingestion_event(
+            f"_bg_ingest_local_file: Started background worker for job_id={job_id}, source={source_id}, file={filepath}"
+        )
         initial_chunk_size = 5000
         max_chunk_size = 10000
         commit_interval = 10000
@@ -1858,6 +1919,9 @@ class App:
                         source_id,
                         job_id,
                     )
+                    trace_ingestion_event(
+                        f"_bg_ingest_local_file: Source {source_id} deleted. Aborting job {job_id}."
+                    )
                     cursor.execute("DELETE FROM ingestion_jobs WHERE id = ?", (job_id,))
                     db_instance.commit()
                     return
@@ -1875,6 +1939,9 @@ class App:
                 )
                 processed_count += n
                 uncommitted_count += n
+                trace_ingestion_event(
+                    f"_bg_ingest_local_file: Ingested chunk of {n} lines. Cumulative processed={processed_count} lines for job {job_id}"
+                )
 
                 if uncommitted_count >= commit_interval:
                     cursor.execute(
@@ -1882,6 +1949,9 @@ class App:
                         (processed_count, job_id),
                     )
                     db_instance.commit()
+                    trace_ingestion_event(
+                        f"_bg_ingest_local_file: Intermediate commit for job {job_id}. processed_lines={processed_count}"
+                    )
                     uncommitted_count = 0
 
             # Mark job completed
@@ -1891,6 +1961,9 @@ class App:
             )
             self.db.mark_source_uploaded(source_id, True)
             db_instance.commit()
+            trace_ingestion_event(
+                f"_bg_ingest_local_file: Job {job_id} marked as 'completed' in DB. Lines processed={processed_count}. mark_source_uploaded=True."
+            )
 
             # Trigger event-driven anomaly detection on ingestion complete
             try:
@@ -1907,6 +1980,9 @@ class App:
 
         except Exception as exc:
             logger.exception("[Ingestion] Failed background job %d: %s", job_id, exc)
+            trace_ingestion_event(
+                f"_bg_ingest_local_file: Job {job_id} failed with exception: {exc}"
+            )
             try:
                 cursor = self.db.get_cursor()
                 cursor.execute(
@@ -1914,6 +1990,9 @@ class App:
                     (job_id,),
                 )
                 self.db.commit()
+                trace_ingestion_event(
+                    f"_bg_ingest_local_file: Marked job {job_id} as 'failed' in DB."
+                )
             except Exception:
                 pass
 
@@ -2186,6 +2265,11 @@ class App:
         self.db.commit()
         logger.info("[Cleanup] Purged %d stalled ingestion jobs for %s", count, workspace_id)
         return {"status": "success", "purged_count": count}
+
+    def method_log_trace(self, message: str) -> dict:
+        """Expose a way for the frontend to write to the ingestion trace log file."""
+        trace_ingestion_event(f"[Frontend] {message}")
+        return {"status": "success"}
 
     def method_get_metadata_facets(self, **kwargs) -> dict:
         """Return the top unique metadata facets across all logs in a workspace."""

@@ -129,6 +129,14 @@ const POLL_ACTIVE_MS = 1_000;
 /** Interval (ms) when a live source is open but no job is queued yet. */
 const POLL_LIVE_MS = 3_000;
 
+export const traceIngestion = async (message: string) => {
+  try {
+    await callSidecar("log_trace", { message });
+  } catch (e) {
+    console.warn("Failed to write to ingestion trace log:", e);
+  }
+};
+
 /**
  * Per-workspace poll sessions. Keyed by workspaceId.
  * Module-level map (not in Zustand state) to avoid re-render cycles from timers.
@@ -208,6 +216,9 @@ export const useIngestionStore = create<IngestionState>((set, get) => ({
     if (!workspaceId) {
       return;
     }
+    traceIngestion(
+      `[Store] fetchJobs: Called for workspaceId=${workspaceId}. Current ingestingSourceIds=${JSON.stringify(get().ingestingSourceIds)}, transitioningSourceIds=${JSON.stringify(Array.from(get().transitioningSourceIds))}, retrievingSourceIds=${JSON.stringify(Array.from(get().retrievingSourceIds))}`,
+    );
     try {
       const fetchedJobs = await callSidecar<IngestionJob[]>({
         method: "get_ingestion_jobs",
@@ -236,6 +247,9 @@ export const useIngestionStore = create<IngestionState>((set, get) => ({
               console.log(
                 `[useIngestionStore] Ingestion COMPLETE for job ${job.id} (source: ${job.source_id})`,
               );
+              traceIngestion(
+                `[Store] fetchJobs: Detected job ${job.id} (source: ${job.source_id}) complete! Starting completion handler sequence.`,
+              );
 
               // Run global job completion handler logic
               const completedSourceId = job.source_id;
@@ -247,23 +261,36 @@ export const useIngestionStore = create<IngestionState>((set, get) => ({
                 next.add(completedSourceId);
                 return { retrievingSourceIds: next };
               });
+              traceIngestion(
+                `[Store] Completion Step 1: Marked retrievingSourceIds globally for source=${completedSourceId}.`,
+              );
 
               (async () => {
                 try {
                   // Step 2: Refresh hierarchy
+                  traceIngestion(`[Store] Completion Step 2: Fetching workspace hierarchy...`);
                   const { useWorkspaceStore } = await import("@/store/workspaceStore");
                   await useWorkspaceStore.getState().fetchHierarchy(completedWorkspaceId);
+                  traceIngestion(`[Store] Completion Step 2: Workspace hierarchy fetched.`);
 
                   // Step 3: Clear completed job state from store
+                  traceIngestion(`[Store] Completion Step 3: Clearing completed state...`);
                   get().clearCompletedState(completedWorkspaceId, completedSourceId);
 
                   // Step 4: Stop ingestion tracking
+                  traceIngestion(`[Store] Completion Step 4: Stopping ingestion...`);
                   get().stopIngestion(completedSourceId);
 
                   // Dispatch refresh logs event
+                  traceIngestion(
+                    `[Store] Completion Step 5: Dispatching loglens:refresh-logs event.`,
+                  );
                   globalThis.dispatchEvent(new CustomEvent("loglens:refresh-logs"));
                 } catch (e) {
                   console.error("[useIngestionStore] Error in global completion handler:", e);
+                  traceIngestion(
+                    `[Store] Completion Handler Error: ${e instanceof Error ? e.message : String(e)}`,
+                  );
                 } finally {
                   // Step 5: Remove retrieving after a brief grace period
                   setTimeout(() => {
@@ -325,6 +352,10 @@ export const useIngestionStore = create<IngestionState>((set, get) => ({
           (j) => j.status === "processing" || j.status === "pending" || j.status === "queued",
         ) ?? null;
 
+      traceIngestion(
+        `[Store] fetchJobs: Merged jobs result: count=${combinedJobs.length}, activeJob=${globalActiveJob?.id ?? "none"} (status: ${globalActiveJob?.status ?? "none"}).`,
+      );
+
       // IMPORTANT: Do NOT include ingestingSourceIds in this set() call.
       // fetchJobs is async — reading ingestingSourceIds at the top of the function
       // and writing it back here would OVERWRITE any startIngestion() calls that
@@ -340,6 +371,9 @@ export const useIngestionStore = create<IngestionState>((set, get) => ({
       });
     } catch (err) {
       console.error("Failed to fetch ingestion jobs:", err);
+      traceIngestion(
+        `[Store] fetchJobs: Error: ${err instanceof Error ? err.message : String(err)}`,
+      );
       set({ error: err instanceof Error ? err.message : String(err) });
     }
   },
@@ -350,6 +384,10 @@ export const useIngestionStore = create<IngestionState>((set, get) => ({
     // Increment session ID to invalidate any in-flight tick from the old session.
     session.sessionId += 1;
     const currentSessionId = session.sessionId;
+
+    traceIngestion(
+      `[Store] startPolling: Initializing session for workspaceId=${workspaceId}, sessionId=${currentSessionId}`,
+    );
 
     // Cancel any pending timer for this workspace.
     if (session.timer) {
@@ -417,18 +455,23 @@ export const useIngestionStore = create<IngestionState>((set, get) => ({
   },
 
   startIngestion: (sourceId: string) => {
+    traceIngestion(`[Store] startIngestion: Adding sourceId=${sourceId} to ingestingSourceIds`);
     set((state) => ({
       ingestingSourceIds: [...state.ingestingSourceIds.filter((id) => id !== sourceId), sourceId],
     }));
   },
 
   stopIngestion: (sourceId: string) => {
+    traceIngestion(`[Store] stopIngestion: Removing sourceId=${sourceId} from ingestingSourceIds`);
     set((state) => ({
       ingestingSourceIds: state.ingestingSourceIds.filter((id) => id !== sourceId),
     }));
   },
 
   addTransitioningSource: (sourceId: string) => {
+    traceIngestion(
+      `[Store] addTransitioningSource: Adding sourceId=${sourceId} to transitioningSourceIds`,
+    );
     set((state) => {
       const next = new Set(state.transitioningSourceIds);
       next.add(sourceId);
@@ -437,6 +480,9 @@ export const useIngestionStore = create<IngestionState>((set, get) => ({
   },
 
   removeTransitioningSource: (sourceId: string) => {
+    traceIngestion(
+      `[Store] removeTransitioningSource: Removing sourceId=${sourceId} from transitioningSourceIds`,
+    );
     set((state) => {
       const next = new Set(state.transitioningSourceIds);
       next.delete(sourceId);
@@ -445,6 +491,9 @@ export const useIngestionStore = create<IngestionState>((set, get) => ({
   },
 
   addOrUpdateJob: (job: IngestionJob) => {
+    traceIngestion(
+      `[Store] addOrUpdateJob: Called for job.id=${job.id}, status=${job.status}, source=${job.source_id}`,
+    );
     set((state) => {
       const exists = state.jobs.some((j) => j.id === job.id);
       const nextJobs = exists
@@ -501,6 +550,9 @@ export const useIngestionStore = create<IngestionState>((set, get) => ({
   },
 
   clearCompletedState: (workspaceId: string, sourceId: string) => {
+    traceIngestion(
+      `[Store] clearCompletedState: Clearing completed/failed jobs for workspaceId=${workspaceId}, sourceId=${sourceId}`,
+    );
     set((state) => {
       const nextJobs = state.jobs.filter(
         (j) =>
