@@ -3017,6 +3017,11 @@ class App:
             where_clauses.append(f"l.workspace_id IN ({placeholders})")
             params.extend(active_workspace_ids)
 
+        # Exclude log sources of type 'local' that are not fully uploaded yet
+        where_clauses.append(
+            "l.source_id NOT IN (SELECT id FROM log_sources WHERE type = 'local' AND is_uploaded = false)"
+        )
+
         where_sql = " WHERE " + SQL_AND_JOIN.join(where_clauses) if where_clauses else ""
         return where_sql, params, norm_start
 
@@ -3251,12 +3256,14 @@ class App:
 
     def _fetch_workspace_count(self, active_workspace_ids: list[str] | None) -> int:
         cur = self.db.get_cursor()
+        exclude_sql = "source_id NOT IN (SELECT id FROM log_sources WHERE type = 'local' AND is_uploaded = false)"
         if active_workspace_ids:
             placeholders = ", ".join(["?"] * len(active_workspace_ids))
-            q = f"SELECT COUNT(DISTINCT workspace_id) FROM logs WHERE workspace_id IN ({placeholders})"
+            q = f"SELECT COUNT(DISTINCT workspace_id) FROM logs WHERE workspace_id IN ({placeholders}) AND {exclude_sql}"
             cur.execute(q, active_workspace_ids)
         else:
-            cur.execute("SELECT COUNT(DISTINCT workspace_id) FROM logs")
+            q = f"SELECT COUNT(DISTINCT workspace_id) FROM logs WHERE {exclude_sql}"
+            cur.execute(q)
         row = cur.fetchone()
         return row[0] if row else 0
 

@@ -9,10 +9,13 @@ import {
   useSensors,
 } from "@dnd-kit/core";
 import { restrictToWindowEdges } from "@dnd-kit/modifiers";
-import type { ReactNode } from "react";
+import { type ReactNode, useEffect } from "react";
 import type { NavTab } from "@/App";
+import { ProcessingNotification } from "@/components/molecules/ProcessingNotification";
 import { type DiagnosticData, DiagnosticSidebar } from "@/components/organisms/DiagnosticSidebar";
 import { Sidebar } from "@/components/organisms/Sidebar";
+import { callSidecar } from "@/lib/hooks/useSidecarBridge";
+import { type IngestionJob, useIngestionStore } from "@/store/ingestionStore";
 import type { Workspace } from "@/store/workspaceStore";
 import { useWorkspaceStore } from "@/store/workspaceStore";
 
@@ -79,6 +82,56 @@ export function AppLayout({
   const keyboardSensor = useSensor(KeyboardSensor);
   const sensors = useSensors(pointerSensor, keyboardSensor);
 
+  // Restore ingestion state from sidecar on mount and workspace switch
+  useEffect(() => {
+    if (!activeWorkspaceId) {
+      return;
+    }
+
+    const restoreIngestionState = async () => {
+      try {
+        const fetchedJobs = await callSidecar<IngestionJob[]>({
+          method: "get_ingestion_jobs",
+          params: { workspace_id: activeWorkspaceId },
+          silent: true,
+        });
+
+        if (!fetchedJobs || fetchedJobs.length === 0) {
+          return;
+        }
+
+        const store = useIngestionStore.getState();
+
+        for (const job of fetchedJobs) {
+          if (job.status === "queued" || job.status === "pending" || job.status === "processing") {
+            store.addOrUpdateJob(job);
+            store.startIngestion(job.source_id);
+
+            if (job.status === "queued" || job.status === "pending") {
+              store.addTransitioningSource(job.source_id);
+            }
+            if (job.status === "processing") {
+              store.removeTransitioningSource(job.source_id);
+            }
+          }
+        }
+
+        const hasActiveJobs = fetchedJobs.some(
+          (j) => j.status === "queued" || j.status === "pending" || j.status === "processing",
+        );
+        if (hasActiveJobs) {
+          store.startPolling(activeWorkspaceId);
+        }
+
+        console.log(`[AppLayout] Restored ${fetchedJobs.length} ingestion jobs from sidecar`);
+      } catch (err) {
+        console.error("[AppLayout] Failed to restore ingestion state:", err);
+      }
+    };
+
+    restoreIngestionState();
+  }, [activeWorkspaceId]);
+
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
     if (over) {
@@ -96,12 +149,12 @@ export function AppLayout({
   return (
     <DndContext sensors={sensors} modifiers={[restrictToWindowEdges]} onDragEnd={handleDragEnd}>
       {/* OPTIMIZATION 1: Force Hardware acceleration context across the application frame */}
-      <div 
+      <div
         className="flex h-screen w-full bg-bg-app overflow-hidden relative font-sans"
         style={{
           transform: "translate3d(0,0,0)",
           backfaceVisibility: "hidden",
-          willChange: "transform"
+          willChange: "transform",
         }}
       >
         <Sidebar
@@ -115,17 +168,18 @@ export function AppLayout({
           onNavSelect={onNavSelect}
           activeFolderId={activeFolderId}
         />
-        
+
         {/* OPTIMIZATION 2: Apply layout boundaries specifically targeting sub-renders (Charts & Logs) */}
-        <main 
+        <main
           className="flex-1 flex flex-col min-w-0 relative h-full bg-bg-base"
           style={{
             transform: "translate3d(0,0,0)",
             backfaceVisibility: "hidden",
-            contain: "strict" // Prevents child chart calculations from forcing tree-wide paint updates
+            contain: "strict", // Prevents child chart calculations from forcing tree-wide paint updates
           }}
         >
           {children}
+          <ProcessingNotification />
         </main>
 
         <DiagnosticSidebar

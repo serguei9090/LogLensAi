@@ -57,24 +57,16 @@ class LogDatabase:
         raise e
 
     def _get_conn(self):
-        # Memory DBs MUST share the same connection object to see the same data.
-        # File-based DBs should use thread-local connections to avoid transaction interference.
-        if self.db_path == MEMORY_DB:
-            if not hasattr(self, "_shared_conn") or self._shared_conn is None:
-                self._shared_conn = duckdb.connect(self.db_path)
-                with self._connections_lock:
-                    self._connections.add(self._shared_conn)
-            return self._shared_conn
-
-        if not hasattr(self._local, "conn"):
+        # Share a single connection object across all threads to avoid DuckDB lock contention/deadlocks.
+        # Cursors are thread-safe and isolated.
+        if not hasattr(self, "_shared_conn") or self._shared_conn is None:
             try:
-                # Use the same db_path for all connections
-                self._local.conn = duckdb.connect(self.db_path)
+                self._shared_conn = duckdb.connect(self.db_path)
             except Exception as e:
-                self._local.conn = self._recover_wal(e)
+                self._shared_conn = self._recover_wal(e)
             with self._connections_lock:
-                self._connections.add(self._local.conn)
-        return self._local.conn
+                self._connections.add(self._shared_conn)
+        return self._shared_conn
 
     def get_cursor(self):
         return self._get_conn().cursor()
@@ -699,6 +691,8 @@ class LogDatabase:
                         with contextlib.suppress(Exception):
                             conn.close()
                     cls._connections.clear()
+                if hasattr(cls._instance, "_shared_conn"):
+                    cls._instance._shared_conn = None
                 if hasattr(cls._instance, "_local") and hasattr(cls._instance._local, "conn"):
                     cls._instance._local.conn = None
                 cls._instance = None
@@ -1123,8 +1117,7 @@ class LogDatabase:
     def mark_source_uploaded(self, source_id: str, is_uploaded: bool):
         cursor = self.get_cursor()
         cursor.execute(
-            "UPDATE log_sources SET is_uploaded = ? WHERE id = ?",
-            (is_uploaded, source_id)
+            "UPDATE log_sources SET is_uploaded = ? WHERE id = ?", (is_uploaded, source_id)
         )
         self.commit()
 
@@ -1208,7 +1201,14 @@ class LogDatabase:
             (workspace_id,),
         )
         sources = [
-            {"id": r[0], "name": r[1], "type": r[2], "path": r[3], "folder_id": r[4], "is_uploaded": bool(r[5])}
+            {
+                "id": r[0],
+                "name": r[1],
+                "type": r[2],
+                "path": r[3],
+                "folder_id": r[4],
+                "is_uploaded": bool(r[5]),
+            }
             for r in cursor.fetchall()
         ]
 

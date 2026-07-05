@@ -47,6 +47,8 @@ interface IngestionState {
    * completion handler re-fired on every remount, instantly clearing the overlay.
    */
   handledJobIds: Set<number>;
+  /** Tracks sources whose job just completed but fetchLogs hasn't returned data yet. */
+  retrievingSourceIds: Set<string>;
 
   // Import Feed Modal Global States
   isImportOpen: boolean;
@@ -151,6 +153,7 @@ export const useIngestionStore = create<IngestionState>((set, get) => ({
   transitioningSourceIds: new Set<string>(),
   notifiedJobIds: new Set<number>(),
   handledJobIds: new Set<number>(),
+  retrievingSourceIds: new Set<string>(),
 
   // Import Modal Initial States
   isImportOpen: false,
@@ -233,6 +236,46 @@ export const useIngestionStore = create<IngestionState>((set, get) => ({
               console.log(
                 `[useIngestionStore] Ingestion COMPLETE for job ${job.id} (source: ${job.source_id})`,
               );
+
+              // Run global job completion handler logic
+              const completedSourceId = job.source_id;
+              const completedWorkspaceId = job.workspace_id;
+
+              // Step 1: Mark as retrieving globally
+              set((state) => {
+                const next = new Set(state.retrievingSourceIds);
+                next.add(completedSourceId);
+                return { retrievingSourceIds: next };
+              });
+
+              (async () => {
+                try {
+                  // Step 2: Refresh hierarchy
+                  const { useWorkspaceStore } = await import("@/store/workspaceStore");
+                  await useWorkspaceStore.getState().fetchHierarchy(completedWorkspaceId);
+
+                  // Step 3: Clear completed job state from store
+                  get().clearCompletedState(completedWorkspaceId, completedSourceId);
+
+                  // Step 4: Stop ingestion tracking
+                  get().stopIngestion(completedSourceId);
+
+                  // Dispatch refresh logs event
+                  globalThis.dispatchEvent(new CustomEvent("loglens:refresh-logs"));
+                } catch (e) {
+                  console.error("[useIngestionStore] Error in global completion handler:", e);
+                } finally {
+                  // Step 5: Remove retrieving after a brief grace period
+                  setTimeout(() => {
+                    set((state) => {
+                      const next = new Set(state.retrievingSourceIds);
+                      next.delete(completedSourceId);
+                      return { retrievingSourceIds: next };
+                    });
+                    get().stopIngestion(completedSourceId);
+                  }, 300);
+                }
+              })();
             } else {
               console.log(
                 `[useIngestionStore] Ingestion FAILED for job ${job.id} (source: ${job.source_id})`,
@@ -241,6 +284,9 @@ export const useIngestionStore = create<IngestionState>((set, get) => ({
                 id: "ingest",
                 description: "Check sidecar logs for details.",
               });
+
+              // Cleanup even on failure
+              get().stopIngestion(job.source_id);
             }
           } else {
             // Silently mark existing completed jobs as notified

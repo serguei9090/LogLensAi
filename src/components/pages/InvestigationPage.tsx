@@ -1,4 +1,4 @@
-﻿// Assume Role: Frontend Engineer (@frontend)
+// Assume Role: Frontend Engineer (@frontend)
 
 import { lazy, memo, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
@@ -32,7 +32,7 @@ import { useLogFetching } from "@/lib/hooks/useLogFetching";
 import { useLogIngestion } from "@/lib/hooks/useLogIngestion";
 import { callSidecar } from "@/lib/hooks/useSidecarBridge";
 import { useAiStore } from "@/store/aiStore";
-import { useIngestionStore, type IngestionJob } from "@/store/ingestionStore";
+import { useIngestionStore } from "@/store/ingestionStore";
 import { useInvestigationStore } from "@/store/investigationStore";
 import { useSettingsStore } from "@/store/settingsStore";
 import { type LogSource, selectActiveWorkspace, useWorkspaceStore } from "@/store/workspaceStore";
@@ -126,7 +126,7 @@ function InvestigationPageImpl() {
   // Tracks sources whose job just completed but fetchLogs hasn't returned data yet.
   // Prevents the overlay from dropping the instant the job flips to "completed"
   // before the log rows actually arrive in the table.
-  const [retrievingSourceIds, setRetrievingSourceIds] = useState<Set<string>>(new Set());
+  const retrievingSourceIds = useIngestionStore((state) => state.retrievingSourceIds);
 
   // These subscriptions must be declared BEFORE the source-switch useEffect below,
   // which references transitioningSourceIds reactively.
@@ -247,69 +247,6 @@ function InvestigationPageImpl() {
     }
   }, [jobs, transitioningSourceIds]);
 
-  // ── P2 FIX: Restore ingestion state from sidecar on mount ──────────────────
-  // When the page loads (or after a refresh), query the sidecar for any active
-  // ingestion jobs and restore them to the Zustand store. This ensures that:
-  // 1. The loading overlay shows correctly if ingestion is still in progress
-  // 2. Polling resumes automatically for any interrupted jobs
-  // 3. The user sees "Preparing..." or "Indexing..." even after a page reload
-  useEffect(() => {
-    if (!activeWorkspaceId) {
-      return;
-    }
-
-    const restoreIngestionState = async () => {
-      try {
-        const fetchedJobs = await callSidecar<IngestionJob[]>({
-          method: "get_ingestion_jobs",
-          params: { workspace_id: activeWorkspaceId },
-          silent: true,
-        });
-
-        if (!fetchedJobs || fetchedJobs.length === 0) {
-          return;
-        }
-
-        const store = useIngestionStore.getState();
-
-        for (const job of fetchedJobs) {
-          // Only restore active jobs (not completed/failed)
-          if (job.status === "queued" || job.status === "pending" || job.status === "processing") {
-            // Add the job to the store
-            store.addOrUpdateJob(job);
-
-            // Restore ingestion tracking for the source
-            store.startIngestion(job.source_id);
-
-            // Mark as transitioning if we haven't detected the job yet
-            if (job.status === "queued" || job.status === "pending") {
-              store.addTransitioningSource(job.source_id);
-            }
-
-            // If job is already processing, remove transitioning state
-            if (job.status === "processing") {
-              store.removeTransitioningSource(job.source_id);
-            }
-          }
-        }
-
-        // Resume polling for active jobs
-        const hasActiveJobs = fetchedJobs.some(
-          (j) => j.status === "queued" || j.status === "pending" || j.status === "processing",
-        );
-        if (hasActiveJobs) {
-          store.startPolling(activeWorkspaceId);
-        }
-
-        console.log(`[InvestigationPage] Restored ${fetchedJobs.length} ingestion jobs from sidecar`);
-      } catch (err) {
-        console.error("[InvestigationPage] Failed to restore ingestion state:", err);
-      }
-    };
-
-    restoreIngestionState();
-  }, [activeWorkspaceId]);
-
   // ── Polling logic ──────────────────────────────────────────────────────────
   // NOTE: Log polling during ingestion is handled exclusively by ingestionStore.startPolling().
   // A separate setInterval here was removed because it caused duplicate state transitions
@@ -336,86 +273,6 @@ function InvestigationPageImpl() {
 
   // Search Bar Ref
   const searchRef = useRef<HTMLInputElement>(null);
-
-  // ── P1 FIX: Job completion handler ──────────────────────────────────────────
-  // P1 FIX: Removed redundant fetchLogs() call here. The useEffect([fetchLogs])
-  // at line ~305 handles fetching logs after job completion. Calling fetchLogs here
-  // AND in the useEffect created a race condition where both could fire concurrently.
-  //
-  // CRITICAL ORDER OF OPERATIONS:
-  //   1. Mark source as "retrieving" so the overlay stays up (no flash to "empty")
-  //   2. Fetch hierarchy FIRST so is_uploaded becomes true before overlay drops
-  //   3. Clear completed job from store
-  //   4. Stop ingestion tracking
-  //   5. Remove retrieving marker (after brief grace period)
-  //
-  // NOTE: fetchLogs() is NOT called here anymore. The useEffect([fetchLogs]) above
-  // will automatically trigger when the store state changes (jobs updated, activeSourceId
-  // stays the same, fetchLogs reference is stable via useCallback).
-  //
-  // NAVIGATION-SAFETY: Uses the global ingestionStore.handledJobIds instead of a
-  // component-local useRef. This prevents InvestigationPage from re-processing the
-  // same completion event after unmounting (e.g. Dashboard navigation) and remounting.
-
-  useEffect(() => {
-    for (const sourceJob of jobs) {
-      if (sourceJob.status !== "completed") {
-        continue;
-      }
-
-      // Use the global, navigation-persistent handledJobIds instead of a local ref.
-      // This prevents re-processing when InvestigationPage remounts after navigation.
-      if (useIngestionStore.getState().isJobHandled(sourceJob.id)) {
-        continue;
-      }
-
-      // Mark handled IMMEDIATELY before any async work so concurrent re-renders
-      // and remounts both see this job as already processed.
-      useIngestionStore.getState().markJobHandled(sourceJob.id);
-
-      // Snapshot IDs — closures below always use these, never stale reactive values
-      const completedSourceId = sourceJob.source_id;
-      const completedWorkspaceId = sourceJob.workspace_id;
-
-      // Step 1: Mark as retrieving BEFORE any async work so overlay never drops prematurely
-      setRetrievingSourceIds((prev) => {
-        const next = new Set(prev);
-        next.add(completedSourceId);
-        return next;
-      });
-
-      (async () => {
-        // Step 2: Refresh hierarchy FIRST — this sets is_uploaded=true on the source node.
-        if (completedWorkspaceId) {
-          await useWorkspaceStore.getState().fetchHierarchy(completedWorkspaceId);
-        }
-
-        // P1 FIX: Removed await fetchLogs({ forceFull: true }) here.
-        // The useEffect([fetchLogs]) at the top of this component will automatically
-        // detect the state change and trigger a fresh log fetch. This eliminates the
-        // race condition between the completion handler and the useEffect.
-
-        // Step 3: Clear the completed job from the store (happens AFTER hierarchy refresh)
-        if (completedWorkspaceId) {
-          useIngestionStore.getState().clearCompletedState(completedWorkspaceId, completedSourceId);
-        }
-
-        // Step 4: Stop ingestion tracking unconditionally for the source
-        useIngestionStore.getState().stopIngestion(completedSourceId);
-
-        // Brief grace period before removing the retrieving marker
-        setTimeout(() => {
-          setRetrievingSourceIds((prev) => {
-            const next = new Set(prev);
-            next.delete(completedSourceId);
-            return next;
-          });
-          // Ensure ingestion is always cleared
-          useIngestionStore.getState().stopIngestion(completedSourceId);
-        }, 300);
-      })();
-    }
-  }, [jobs, activeSourceId, fetchLogs]);
 
   // Memoized non-fusion sources
   const nonFusionSources = useMemo(() => sources.filter((s) => s.type !== "fusion"), [sources]);

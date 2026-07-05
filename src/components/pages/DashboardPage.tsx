@@ -48,7 +48,6 @@ import { callSidecar } from "@/lib/hooks/useSidecarBridge";
 import { cn } from "@/lib/utils";
 // AI Mode Imports
 import { useAiStore } from "@/store/aiStore";
-import { useIngestionStore } from "@/store/ingestionStore";
 import { selectActiveWorkspace, useWorkspaceStore } from "@/store/workspaceStore";
 
 interface DashboardStats {
@@ -204,52 +203,6 @@ function DashboardFilters({
           className="h-8 scale-90 origin-left"
         />
       </div>
-    </div>
-  );
-}
-
-function ProcessingHUD({ jobs }: Readonly<{ jobs: any[] }>) {
-  const activeJobs = jobs.filter((j) => j.status === "processing" || j.status === "pending");
-  if (activeJobs.length === 0) {
-    return null;
-  }
-
-  return (
-    <div className="space-y-3">
-      <div className="flex items-center gap-2 mb-2">
-        <RefreshCcw className="size-3 text-primary animate-spin" />
-        <span className="text-[10px] font-bold uppercase tracking-widest text-text-muted">
-          Background Processing
-        </span>
-      </div>
-      {activeJobs.map((job) => (
-        <div
-          key={job.id}
-          className="bg-bg-surface/40 border border-border/50 rounded-xl p-4 backdrop-blur-sm animate-fade-in-up"
-        >
-          <div className="flex justify-between items-center mb-2">
-            <div className="flex items-center gap-3">
-              <span className="text-[10px] font-mono text-primary bg-primary/10 px-1.5 py-0.5 rounded uppercase font-bold">
-                Job #{job.id}
-              </span>
-              <span className="text-[11px] font-medium text-text-primary uppercase tracking-tight">
-                Clustering Patterns...
-              </span>
-            </div>
-            <span className="text-[10px] font-mono text-text-muted">
-              {job.processed_lines.toLocaleString()} / {job.total_lines.toLocaleString()} lines
-            </span>
-          </div>
-          <div className="h-1.5 bg-bg-base/50 rounded-full overflow-hidden border border-white/5">
-            <div
-              className="h-full bg-primary shadow-[0_0_10px_var(--primary-glow)] transition-[width] duration-500 ease-out"
-              style={{
-                width: `${(job.processed_lines / job.total_lines) * 100}%`,
-              }}
-            />
-          </div>
-        </div>
-      ))}
     </div>
   );
 }
@@ -692,8 +645,6 @@ export default function DashboardPage() {
   const workspaces = useWorkspaceStore((state) => state.workspaces);
   const activeWorkspace = useWorkspaceStore(selectActiveWorkspace);
   const { dashboardWidgets, isSidebarOpen, setSidebarOpen } = useAiStore();
-  // Consume shared ingestion store — no independent polling
-  const ingestionJobs = useIngestionStore((state) => state.jobs);
   const [mode, setMode] = useState<DashboardMode>("static");
 
   const {
@@ -765,9 +716,6 @@ export default function DashboardPage() {
 
           {mode === "static" ? (
             <div key="static" className="space-y-10 animate-fade-in-up">
-              {/* Processing HUD */}
-              <ProcessingHUD jobs={ingestionJobs} />
-
               {/* AI Insight Snippet */}
               {stats && <AIObservationCard stats={stats} setMode={setMode} />}
 
