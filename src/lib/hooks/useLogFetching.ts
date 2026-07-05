@@ -206,7 +206,10 @@ export function useLogFetching(workspaceId: string | null, activeSourceId: strin
       setIsConnected(true);
       lastSourceKeyRef.current = sourceKey;
 
-      if (!lastFetchedParamsRef.current || lastFetchedParamsRef.current.startTime !== timeRange.start) {
+      if (
+        !lastFetchedParamsRef.current ||
+        lastFetchedParamsRef.current.startTime !== timeRange.start
+      ) {
         lastFetchedParamsRef.current = {
           searchQuery,
           filters: JSON.stringify(queryParams.combinedFilters),
@@ -254,8 +257,7 @@ export function useLogFetching(workspaceId: string | null, activeSourceId: strin
       const state = useIngestionStore.getState();
       const hasActiveJob = state.jobs.some(
         (j) =>
-          j.source_id === currentSourceRef &&
-          (j.status === "processing" || j.status === "pending"),
+          j.source_id === currentSourceRef && (j.status === "processing" || j.status === "pending"),
       );
 
       const filtersStr = JSON.stringify(queryParams.combinedFilters);
@@ -284,6 +286,12 @@ export function useLogFetching(workspaceId: string | null, activeSourceId: strin
 
       if (shouldSkipFetch) {
         return;
+      }
+
+      if (shouldFetchAll) {
+        // Clear logs and facets immediately to prevent "ghost data" flash from the old source
+        setLogs([], 0);
+        setAvailableFacets({});
       }
 
       setIsFetching(true);
