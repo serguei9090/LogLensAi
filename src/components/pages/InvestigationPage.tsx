@@ -1,4 +1,4 @@
-// Assume Role: Frontend Engineer (@frontend)
+﻿// Assume Role: Frontend Engineer (@frontend)
 
 import { lazy, memo, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
@@ -32,7 +32,7 @@ import { useLogFetching } from "@/lib/hooks/useLogFetching";
 import { useLogIngestion } from "@/lib/hooks/useLogIngestion";
 import { callSidecar } from "@/lib/hooks/useSidecarBridge";
 import { useAiStore } from "@/store/aiStore";
-import { useIngestionStore } from "@/store/ingestionStore";
+import { useIngestionStore, type IngestionJob } from "@/store/ingestionStore";
 import { useInvestigationStore } from "@/store/investigationStore";
 import { useSettingsStore } from "@/store/settingsStore";
 import { type LogSource, selectActiveWorkspace, useWorkspaceStore } from "@/store/workspaceStore";
@@ -247,24 +247,68 @@ function InvestigationPageImpl() {
     }
   }, [jobs, transitioningSourceIds]);
 
-  // Resume status polling on mount/workspace change if active ingestion jobs exist in the store
+  // ── P2 FIX: Restore ingestion state from sidecar on mount ──────────────────
+  // When the page loads (or after a refresh), query the sidecar for any active
+  // ingestion jobs and restore them to the Zustand store. This ensures that:
+  // 1. The loading overlay shows correctly if ingestion is still in progress
+  // 2. Polling resumes automatically for any interrupted jobs
+  // 3. The user sees "Preparing..." or "Indexing..." even after a page reload
   useEffect(() => {
     if (!activeWorkspaceId) {
       return;
     }
-    const hasActiveJobs = useIngestionStore
-      .getState()
-      .jobs.some(
-        (j) =>
-          j.workspace_id === activeWorkspaceId &&
-          (j.status === "queued" || j.status === "pending" || j.status === "processing"),
-      );
-    if (hasActiveJobs) {
-      useIngestionStore.getState().startPolling(activeWorkspaceId);
-    }
-  }, [activeWorkspaceId]);
 
-  // Orchestrator Hub state
+    const restoreIngestionState = async () => {
+      try {
+        const fetchedJobs = await callSidecar<IngestionJob[]>({
+          method: "get_ingestion_jobs",
+          params: { workspace_id: activeWorkspaceId },
+          silent: true,
+        });
+
+        if (!fetchedJobs || fetchedJobs.length === 0) {
+          return;
+        }
+
+        const store = useIngestionStore.getState();
+
+        for (const job of fetchedJobs) {
+          // Only restore active jobs (not completed/failed)
+          if (job.status === "queued" || job.status === "pending" || job.status === "processing") {
+            // Add the job to the store
+            store.addOrUpdateJob(job);
+
+            // Restore ingestion tracking for the source
+            store.startIngestion(job.source_id);
+
+            // Mark as transitioning if we haven't detected the job yet
+            if (job.status === "queued" || job.status === "pending") {
+              store.addTransitioningSource(job.source_id);
+            }
+
+            // If job is already processing, remove transitioning state
+            if (job.status === "processing") {
+              store.removeTransitioningSource(job.source_id);
+            }
+          }
+        }
+
+        // Resume polling for active jobs
+        const hasActiveJobs = fetchedJobs.some(
+          (j) => j.status === "queued" || j.status === "pending" || j.status === "processing",
+        );
+        if (hasActiveJobs) {
+          store.startPolling(activeWorkspaceId);
+        }
+
+        console.log(`[InvestigationPage] Restored ${fetchedJobs.length} ingestion jobs from sidecar`);
+      } catch (err) {
+        console.error("[InvestigationPage] Failed to restore ingestion state:", err);
+      }
+    };
+
+    restoreIngestionState();
+  }, [activeWorkspaceId]);
 
   // ── Polling logic ──────────────────────────────────────────────────────────
   // NOTE: Log polling during ingestion is handled exclusively by ingestionStore.startPolling().
@@ -293,17 +337,21 @@ function InvestigationPageImpl() {
   // Search Bar Ref
   const searchRef = useRef<HTMLInputElement>(null);
 
-  // Reset job tracking refs when activeWorkspaceId changes to prevent phantom notifications
-  // (Redundant refs removed, tracking centralized in Zustand store)
-
-  // Specific effect to trigger fetchLogs when the job for the ACTIVE source completes.
+  // ── P1 FIX: Job completion handler ──────────────────────────────────────────
+  // P1 FIX: Removed redundant fetchLogs() call here. The useEffect([fetchLogs])
+  // at line ~305 handles fetching logs after job completion. Calling fetchLogs here
+  // AND in the useEffect created a race condition where both could fire concurrently.
+  //
   // CRITICAL ORDER OF OPERATIONS:
   //   1. Mark source as "retrieving" so the overlay stays up (no flash to "empty")
   //   2. Fetch hierarchy FIRST so is_uploaded becomes true before overlay drops
-  //   3. Fetch logs (forceFull) to actually load the data
-  //   4. Only call stopIngestion AFTER logs have confirmed arrival
-  //   5. Remove retrieving marker last
-  // Tracks job completions across ALL sources in the workspace, not just the active one.
+  //   3. Clear completed job from store
+  //   4. Stop ingestion tracking
+  //   5. Remove retrieving marker (after brief grace period)
+  //
+  // NOTE: fetchLogs() is NOT called here anymore. The useEffect([fetchLogs]) above
+  // will automatically trigger when the store state changes (jobs updated, activeSourceId
+  // stays the same, fetchLogs reference is stable via useCallback).
   //
   // NAVIGATION-SAFETY: Uses the global ingestionStore.handledJobIds instead of a
   // component-local useRef. This prevents InvestigationPage from re-processing the
@@ -342,18 +390,17 @@ function InvestigationPageImpl() {
           await useWorkspaceStore.getState().fetchHierarchy(completedWorkspaceId);
         }
 
-        // Step 3: Fetch logs ONLY if the completed source is currently active on screen
-        const isActive = completedSourceId === activeSourceId;
-        if (isActive) {
-          await fetchLogs({ forceFull: true });
-        }
+        // P1 FIX: Removed await fetchLogs({ forceFull: true }) here.
+        // The useEffect([fetchLogs]) at the top of this component will automatically
+        // detect the state change and trigger a fresh log fetch. This eliminates the
+        // race condition between the completion handler and the useEffect.
 
-        // Step 4: Now clear the completed job from the store
+        // Step 3: Clear the completed job from the store (happens AFTER hierarchy refresh)
         if (completedWorkspaceId) {
           useIngestionStore.getState().clearCompletedState(completedWorkspaceId, completedSourceId);
         }
 
-        // Step 5: Stop ingestion tracking unconditionally for the source
+        // Step 4: Stop ingestion tracking unconditionally for the source
         useIngestionStore.getState().stopIngestion(completedSourceId);
 
         // Brief grace period before removing the retrieving marker
@@ -754,7 +801,7 @@ function InvestigationPageImpl() {
               try {
                 // Update the source-specific parser in the DB
                 // This is typically stored in fusion_configs or a dedicated table
-                // For now, we'll assume we update the fusion config for the active source
+                // For now, we assume we update the fusion config for the active source
                 await callSidecar({
                   method: "update_source_parser",
                   params: {

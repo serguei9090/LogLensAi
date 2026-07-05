@@ -94,9 +94,7 @@ export function VirtualLogTable({
   const ingestingSourceIds = useIngestionStore((state) => state.ingestingSourceIds);
   // Reactive subscription — NOT a getState() snapshot — so isQueued derives correctly on every tick
   const isAnyIngestionProcessing = useIngestionStore((state) =>
-    state.jobs.some(
-      (j) => j.workspace_id === activeWorkspace?.id && j.status === "processing"
-    )
+    state.jobs.some((j) => j.workspace_id === activeWorkspace?.id && j.status === "processing"),
   );
   // Reactive transitioning set so showPreparing updates without getState snapshots
   const transitioningSourceIds = useIngestionStore((state) => state.transitioningSourceIds);
@@ -108,7 +106,6 @@ export function VirtualLogTable({
     );
   }, [activeWorkspace, ingestingSourceIds]);
   const { visibleColumns, customColumns, columnOrder, columnWidths, setColumnWidth } = useUIStore();
-
 
   // Active visible columns ordered by store order
   const activeVisibleColumns = useMemo(() => {
@@ -421,10 +418,11 @@ export function VirtualLogTable({
       >
         {/* ─── State Management Overlays ────────────────────────────────────── */}
         {(() => {
-          const source = activeWorkspace?.sources?.find((s) => s.id === activeWorkspace?.activeSourceId);
+          const source = activeWorkspace?.sources?.find(
+            (s) => s.id === activeWorkspace?.activeSourceId,
+          );
           // Check if any job in the workspace is currently processing.
           // If a job is processing, other newly queued/pending jobs will show a Queue Screen.
-
           const isIngesting =
             isCurrentlyIngesting || !!(activeJob && activeJob.status !== "queued");
           const isQueued = !!(
@@ -432,32 +430,46 @@ export function VirtualLogTable({
             (activeJob.status === "queued" ||
               (activeJob.status === "pending" && isAnyIngestionProcessing))
           );
-          const showOverlay = (isIngesting || isQueued || (isTransitioning && !isTailing)) && logs.length === 0;
 
-          const showPreparing = !activeJob && !!(
-            activeWorkspace?.activeSourceId &&
-            transitioningSourceIds.has(activeWorkspace.activeSourceId)
-          ) && logs.length === 0;
-          
+          const showPreparing =
+            !activeJob &&
+            !!(
+              activeWorkspace?.activeSourceId &&
+              transitioningSourceIds.has(activeWorkspace.activeSourceId)
+            ) &&
+            logs.length === 0;
+
+          // P3 FIX: Separate indexing from retrieving
+          const isIndexing = !!(
+            activeJob &&
+            (activeJob.status === "processing" || activeJob.status === "pending")
+          );
+
+          const showOverlay =
+            !showPreparing &&
+            (isQueued || isIndexing || ((isTransitioning || logs.length === 0) && !isTailing));
+
           // Rehydrating screen: source is created, but no logs loaded yet and is_uploaded is true
           const isRehydrating =
-            !isIngesting &&
+            !showPreparing &&
             !isQueued &&
+            !isIndexing &&
             logs.length === 0 &&
             isFetching &&
             (source as any)?.is_uploaded;
-            
-          const showHydrating = !showPreparing && (isRehydrating || (!isIngesting && !isQueued && logs.length === 0 && isFetching));
+
+          const showHydrating =
+            !showPreparing &&
+            (isRehydrating || (!isIngesting && !isQueued && logs.length === 0 && isFetching));
 
           const isEmpty =
             logs.length === 0 &&
-            !isIngesting &&
-            !isQueued &&
             !showPreparing &&
+            !isQueued &&
+            !isIndexing &&
             !showHydrating &&
             !isTransitioning &&
             !isFetching;
-
           if (showPreparing) {
             return (
               <div className="absolute inset-0 flex flex-col items-center justify-center p-8 text-center animate-in fade-in zoom-in-95 duration-500 bg-bg-base/50 backdrop-blur-sm z-50">
@@ -469,7 +481,9 @@ export function VirtualLogTable({
                     </div>
                   </div>
                   <div className="space-y-2">
-                    <h3 className="text-xl font-bold text-text-primary animate-pulse">Preparing Ingestion...</h3>
+                    <h3 className="text-xl font-bold text-text-primary animate-pulse">
+                      Preparing Ingestion...
+                    </h3>
                     <p className="text-sm text-text-muted leading-relaxed">
                       Initializing storage buffers and checking queue status.
                     </p>
@@ -490,7 +504,9 @@ export function VirtualLogTable({
                     </div>
                   </div>
                   <div className="space-y-2">
-                    <h3 className="text-xl font-bold text-text-primary animate-pulse">Retrieving logs...</h3>
+                    <h3 className="text-xl font-bold text-text-primary animate-pulse">
+                      Retrieving logs...
+                    </h3>
                     <p className="text-sm text-text-muted leading-relaxed">
                       Hydrating log records from storage.
                     </p>
@@ -542,15 +558,15 @@ export function VirtualLogTable({
                       </div>
                       <div className="space-y-2">
                         <h3 className="text-xl font-bold text-text-primary">
-                          {isIngesting ? "Indexing Dataset..." : "Retrieving Logs..."}
+                          {isIndexing ? "Indexing Dataset..." : "Retrieving Logs..."}
                         </h3>
                         <p className="text-sm text-text-muted leading-relaxed">
-                          {isIngesting
+                          {isIndexing
                             ? "Building database indices and mapping patterns for the complete file. Almost ready."
                             : "Hydrating log records from storage and applying active filters."}
                         </p>
                       </div>
-                      {isIngesting && (
+                      {isIndexing && (
                         <div className="w-full space-y-3">
                           {activeJob ? (
                             <>
@@ -570,7 +586,7 @@ export function VirtualLogTable({
                                 <div
                                   className="h-full bg-primary transition-all duration-500 ease-out shadow-[0_0_10px_rgba(34,197,94,0.5)]"
                                   style={{
-                                    width: `${(activeJob.processed_lines / activeJob.total_lines) * 100}%`,
+                                    width: `${activeJob.total_lines > 0 ? (activeJob.processed_lines / activeJob.total_lines) * 100 : 0}%`,
                                   }}
                                 />
                               </div>
@@ -648,8 +664,6 @@ export function VirtualLogTable({
           return (
             logs.length > 0 && (
               <>
-
-
                 <div
                   style={{
                     height: `${rowVirtualizer.getTotalSize()}px`,

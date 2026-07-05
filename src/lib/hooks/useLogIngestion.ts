@@ -79,6 +79,29 @@ export function useLogIngestion(workspaceId: string | null) {
           },
         });
 
+
+        // P4 FIX: Handle instant 'completed' status from sidecar's is_uploaded shortcut
+        if (result.status === "completed" && result.job_id === 0) {
+          const mockCompletedJob: IngestionJob = {
+            id: Date.now(),
+            workspace_id: workspaceId,
+            source_id: newSource.id,
+            status: "completed",
+            total_lines: 0,
+            processed_lines: 0,
+            queue_position: 0,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          };
+          useIngestionStore.getState().addOrUpdateJob(mockCompletedJob);
+          useIngestionStore.getState().markJobHandled(mockCompletedJob.id);
+          await useWorkspaceStore.getState().fetchHierarchy(workspaceId);
+          setImportOpen(false);
+          setImportProcessing(false);
+          toast.success(`File ${newSource.name} was already processed.`);
+          return;
+        }
+
         // Add the job directly to the store to prevent polling lag visual flutters
         const newJob: IngestionJob = {
           id: result.job_id,
