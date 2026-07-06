@@ -44,7 +44,7 @@ export function TailSwitch({
           )}
         />
       </span>
-      <span className="hidden 2xl:inline">{label}</span>
+      <span>{label}</span>
     </button>
   );
 }
