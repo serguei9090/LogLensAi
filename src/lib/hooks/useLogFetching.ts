@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useIngestionStore } from "@/store/ingestionStore";
 import { useInvestigationStore } from "@/store/investigationStore";
 import { type LogSource, selectActiveWorkspace, useWorkspaceStore } from "@/store/workspaceStore";
@@ -25,6 +25,15 @@ export function useLogFetching(workspaceId: string | null, activeSourceId: strin
 
   const activeWorkspace = useWorkspaceStore(selectActiveWorkspace);
   const sources: LogSource[] = activeWorkspace?.sources ?? [];
+
+  const [debouncedQuery, setDebouncedQuery] = useState(searchQuery);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedQuery(searchQuery);
+    }, 250); // 250ms debounce delay
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
 
   const [isFetching, setIsFetching] = useState(false);
   const [isConnected, setIsConnected] = useState(true);
@@ -80,7 +89,7 @@ export function useLogFetching(workspaceId: string | null, activeSourceId: strin
           ...(queryParams.fusionId ? { fusion_id: queryParams.fusionId } : {}),
           offset: 0,
           limit: 1000,
-          query: searchQuery || undefined,
+          query: debouncedQuery || undefined,
           filters: queryParams.combinedFilters,
           sort_by: sortBy,
           sort_order: sortOrder,
@@ -94,7 +103,7 @@ export function useLogFetching(workspaceId: string | null, activeSourceId: strin
         setLogs(logResult.logs ?? [], logResult.total ?? 0);
         setIsConnected(true);
         lastFetchedParamsRef.current = {
-          searchQuery,
+          searchQuery: debouncedQuery,
           filters: JSON.stringify(queryParams.combinedFilters),
           sortBy,
           sortOrder,
@@ -104,7 +113,7 @@ export function useLogFetching(workspaceId: string | null, activeSourceId: strin
         };
       }
     },
-    [searchQuery, sortBy, sortOrder, timeRange, activeSourceId, setLogs, showAnomalies],
+    [debouncedQuery, sortBy, sortOrder, timeRange, activeSourceId, setLogs, showAnomalies],
   );
 
   const fetchAllLogsAndMetadata = useCallback(
@@ -137,7 +146,7 @@ export function useLogFetching(workspaceId: string | null, activeSourceId: strin
           ...(queryParams.fusionId ? { fusion_id: queryParams.fusionId } : {}),
           offset: 0,
           limit: 1000,
-          query: searchQuery || undefined,
+          query: debouncedQuery || undefined,
           filters: queryParams.combinedFilters,
           sort_by: sortBy,
           sort_order: sortOrder,
@@ -179,7 +188,7 @@ export function useLogFetching(workspaceId: string | null, activeSourceId: strin
           // Pre-cache parameters with updated bounds start/end so that setting the store timeRange
           // does not trigger a duplicate log fetch on the next render pass.
           lastFetchedParamsRef.current = {
-            searchQuery,
+            searchQuery: debouncedQuery,
             filters: JSON.stringify(queryParams.combinedFilters),
             sortBy,
             sortOrder,
@@ -211,7 +220,7 @@ export function useLogFetching(workspaceId: string | null, activeSourceId: strin
         lastFetchedParamsRef.current.startTime !== timeRange.start
       ) {
         lastFetchedParamsRef.current = {
-          searchQuery,
+          searchQuery: debouncedQuery,
           filters: JSON.stringify(queryParams.combinedFilters),
           sortBy,
           sortOrder,
@@ -222,7 +231,7 @@ export function useLogFetching(workspaceId: string | null, activeSourceId: strin
       }
     },
     [
-      searchQuery,
+      debouncedQuery,
       sortBy,
       sortOrder,
       timeRange,
@@ -262,7 +271,7 @@ export function useLogFetching(workspaceId: string | null, activeSourceId: strin
 
       const filtersStr = JSON.stringify(queryParams.combinedFilters);
       const currentParams = {
-        searchQuery,
+        searchQuery: debouncedQuery,
         filters: filtersStr,
         sortBy,
         sortOrder,
@@ -324,7 +333,7 @@ export function useLogFetching(workspaceId: string | null, activeSourceId: strin
       setLogs,
       setAvailableFacets,
       isTailing,
-      searchQuery,
+      debouncedQuery,
       sortBy,
       sortOrder,
       timeRange,
@@ -358,7 +367,7 @@ export function useLogFetching(workspaceId: string | null, activeSourceId: strin
           ...(queryParams.fusionId ? { fusion_id: queryParams.fusionId } : {}),
           offset: currentLogs.length, // Load next batch
           limit: 1000,
-          query: searchQuery || undefined,
+          query: debouncedQuery || undefined,
           filters: queryParams.combinedFilters,
           sort_by: sortBy,
           sort_order: sortOrder,
@@ -382,7 +391,7 @@ export function useLogFetching(workspaceId: string | null, activeSourceId: strin
     workspaceId,
     activeSourceId,
     queryParams,
-    searchQuery,
+    debouncedQuery,
     sortBy,
     sortOrder,
     setLogs,
