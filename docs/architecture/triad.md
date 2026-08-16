@@ -1,5 +1,7 @@
 # AI Agentic Workflow Visualization
 
+> **Note**: this document describes the pre-migration Python/React implementation. See `docs/migration/STATUS.md` for the current Go/Flutter architecture.
+
 This diagram illustrates the interaction between the **Antigravity Command Center**, the **Gemini Subagents**, and the **Jules Remote Agent**.
 
 ```mermaid

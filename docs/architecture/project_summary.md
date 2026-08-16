@@ -1,5 +1,7 @@
 # 📋 Project Summary
 
+> **Note**: this document describes the pre-migration Python/React implementation. See `docs/migration/STATUS.md` for the current Go/Flutter architecture.
+
 > **Init Selector** — Fill this file at project start. The AI uses it as the primary context anchor for all decisions: naming, architecture, tone, and constraints.
 
 <!-- AI_PROMPT: If this file is empty or has placeholder values, run the /init workflow 

@@ -8,16 +8,18 @@ LogLensAi is a state-of-the-art diagnostic tool designed for high-velocity log i
 * **Purpose:** Academic research and technical skill development.
 
 ## 🏗️ Technical Architecture
-- **Frontend**: Tauri v2, React 19, Vite, Zustand, TanStack Table (Virtualization).
-- **Backend (Sidecar)**: Python 3.12+, DuckDB, Drain3.
-- **Protocol**: JSON-RPC 2.0 over stdin/stdout.
+- **Frontend**: Flutter (Dart), desktop targets (Windows/macOS/Linux), Riverpod, `fl_chart`.
+- **Backend (Sidecar)**: Go 1.26+, DuckDB (`marcboeker/go-duckdb`), hand-ported Drain3.
+- **Protocol**: JSON-RPC 2.0 — HTTP on port 5000 in dev, stdin/stdout in prod.
+
+> Originally built on Tauri v2 + React 19 + a Python sidecar; fully migrated to Go + Flutter on the `flutter` branch. See `docs/migration/STATUS.md` for the migration record.
 
 ## 🛠️ Tooling & Standards
-- **JS Runtime**: [Bun](https://bun.sh)
-- **Python Runtime**: [uv](https://github.com/astral-sh/uv)
+- **Go Toolchain**: [Go](https://go.dev) `1.26.4`
+- **Flutter SDK**: [Flutter](https://flutter.dev) `3.44.4` stable
 - **Linting & Formatting**: 
-  - [Biome](https://biomejs.dev) (Frontend)
-  - [Ruff](https://astral.sh/ruff) (Backend)
+  - `flutter analyze` / `dart format` (Frontend)
+  - `go vet` / `gofmt` (Backend)
 - **Autonomy**: Triggered subagents via `lefthook` for linting (`@lint-agent`) and documentation (`@doc-agent`).
 
 ## 🌪️ Autonomy & Vibecoding
@@ -42,25 +44,28 @@ LogLensAi is developed using the **Jules-Cycle**:
 - `.agents/`: AI-Native rules, skills, and workflows.
 - `.gemini/`: Subagent personas and configurations.
 - `docs/architecture/`: Permanent architectural records (ADRs).
-- `src/`: React Frontend (Atomic Design: Atoms, Molecules, Organisms).
-- `sidecar/src/`: Python Logic, RPC Dispatcher, and DuckDB Engine.
-- `src-tauri/`: Rust shell for desktop integration and window mgmt.
+- `docs/migration/`: Record of the Tauri/React/Python → Go/Flutter migration.
+- `flutter_app/`: Flutter Frontend (Atomic Design: `lib/widgets/{atoms,molecules,organisms}`, `lib/pages/`).
+- `backend-go/`: Go sidecar — RPC dispatcher (`internal/rpc/`), DuckDB engine (`internal/db/`), Drain3 clustering (`internal/drain3/`), AI orchestration (`internal/ai/`).
 
 ## 🚀 Getting Started
 
 ### 1. Prerequisites
-- **Node.js**: [Bun](https://bun.sh) recommended.
-- **Python**: [uv](https://github.com/astral-sh/uv) required.
-- **Rust**: Latest stable (for Tauri).
+- **Go**: [Go](https://go.dev) `1.26.4`+ required (backend).
+- **Flutter**: [Flutter](https://flutter.dev) `3.44.4`+ stable, with desktop support enabled (`flutter config --enable-windows-desktop` / `--enable-macos-desktop` / `--enable-linux-desktop`).
 
 ### 2. Setup
 ```bash
-# Install frontend dependencies
-bun install
+# Build/run the Go sidecar (dev mode, HTTP on :5000)
+cd backend-go
+go build ./cmd/sidecar
+./sidecar   # or: go run ./cmd/sidecar
 
-# Setup backend sidecar (automatic via uv)
-cd sidecar && uv sync && cd ..
+# In a separate terminal, fetch Flutter deps and run the desktop app
+cd flutter_app
+flutter pub get
+flutter run -d windows   # or -d macos / -d linux
 
-# Start development (Starts Vite + Sidecar)
-bun run tauri dev
+# Production build (bundles the app; Flutter spawns the Go binary as a subprocess over stdio)
+flutter build windows    # or: flutter build macos / flutter build linux
 ```

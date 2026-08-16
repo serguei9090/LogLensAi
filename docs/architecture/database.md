@@ -1,5 +1,7 @@
 # 🗄️ Database & Persistence Layer
 
+> **Migration note (2026-08)**: the database engine and schema are unchanged by the Go/Flutter migration — the Go sidecar uses the same DuckDB file format and (per `docs/migration/STATUS.md`) the same 16-table schema, migrated by `backend-go/internal/db/schema.go` + `internal/db/migrations.go`. Only the driver changed, from Python's `duckdb` package to `github.com/marcboeker/go-duckdb` (v1.8.5). One platform gap introduced by the driver swap: DuckDB's `vss` extension (used for AI/RAG memory search) has no Windows-mingw build upstream, so vector search runs as brute-force scan (not HNSW-indexed) on Windows — correctness unaffected, only ANN-index performance at scale; expected to work natively on Linux/macOS. See `backend-go/internal/db/vss.go`.
+
 > **Init Selector** — Check the database engine and access pattern for this project. The AI will never introduce a DB pattern that is not listed here.
 
 <!-- AI_PROMPT: If no option is checked, check `stack.md` and `project_summary.md` for 
@@ -13,8 +15,8 @@
 
 ## ⚙️ Database Engine Selection
 
-- [ ] **DuckDB** *(Recommended for Sidecar / analytics / offline desktop apps)*
-  — Embedded, columnar, thread-safe via `get_cursor()`. No server required.
+- [x] **DuckDB** *(Recommended for Sidecar / analytics / offline desktop apps — this project)*
+  — Embedded, columnar, thread-safe via connection/cursor helpers in `backend-go/internal/db`. No server required. Driver: `github.com/marcboeker/go-duckdb` v1.8.5.
 - [ ] **SQLite + Drizzle ORM** *(Recommended for Tauri apps requiring type-safe ORM)*
   — File-based, zero-config, Drizzle provides TypeScript type inference.
 - [ ] **PostgreSQL + Prisma** *(Recommended for web apps with complex relational data)*
@@ -56,8 +58,8 @@ CREATE TABLE example_table (
 
 > Enforced by `Architecture.md` — Persistence & Data Safety section.
 
-1. **DuckDB Concurrency**: Always use `self.db.get_cursor()` within each sidecar method. Never share cursors across async boundaries.
-2. **Schema Authority**: Backend Pydantic/Drizzle models are the authoritative schema. Frontend types MUST be generated from them, never written by hand.
+1. **DuckDB Concurrency**: Always go through `backend-go/internal/db`'s connection/cursor helpers within each RPC handler (`internal/app/handlers_*.go`). Never share a `*sql.DB`/connection across goroutines without the package's locking discipline.
+2. **Schema Authority**: `backend-go/internal/db/schema.go` is the authoritative schema. Frontend Dart model classes (`flutter_app/lib/models/`) are hand-written mirrors, not generated — keep them in sync manually when the schema changes.
 3. **Migrations**: All schema changes go through migration files, never manual `ALTER TABLE` in prod.
 4. **Timestamps**: Always store as UTC. Serialize to ISO 8601 strings in API responses.
 5. **Soft Deletes**: Prefer `deleted_at TIMESTAMPTZ` over hard `DELETE` for audit trails.

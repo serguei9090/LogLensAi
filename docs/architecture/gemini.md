@@ -1,5 +1,7 @@
 # LogLensAi Architecture Roadmap (gemini.md)
 
+> **Note**: this document describes the pre-migration Python/React implementation. See `docs/migration/STATUS.md` for the current Go/Flutter architecture.
+
 This file is the main point of entry for the application's architecture. It contains the high-level system context, the primary personas for architecture files, and the index of detailed documentation.
 
 ## 👥 Architecture Personas

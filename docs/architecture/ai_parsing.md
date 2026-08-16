@@ -1,5 +1,7 @@
 # AI Reasoning Parsing (Universal Hybrid Orchestration)
 
+> **Note**: this document describes the pre-migration Python/React implementation. See `docs/migration/STATUS.md` for the current Go/Flutter architecture.
+
 This document describes how LogLensAi handles the complex reasoning-to-response transition for models like Gemma 4 when served via Ollama.
 
 ## The Challenge

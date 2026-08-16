@@ -1,3 +1,5 @@
+> **Note**: this document describes the pre-migration Python/React implementation. See `docs/migration/STATUS.md` for the current Go/Flutter architecture.
+
 ## Log Ingestion Workflow
 
 ```mermaid

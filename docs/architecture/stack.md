@@ -9,26 +9,28 @@
 
 ---
 
+> **Migration note (2026-08)**: this app moved from Tauri v2 + React 19 + a Python sidecar to Flutter (desktop) + a Go sidecar. The checkboxes below reflect the **current** (post-migration) stack. See `docs/migration/STATUS.md` for the full record, including what changed and why.
+
 ## 🖥️ Application Shell
 
 Select the primary application shell / delivery mechanism:
 
-- [x] **Tauri v2** *(Recommended: Desktop app, uses Rust shell + web frontend)*
+- [ ] **Tauri v2** *(superseded — Desktop app, uses Rust shell + web frontend)*
 - [ ] **Electron** *(Desktop app, Node.js shell — heavier but more ecosystem)*
 - [ ] **Next.js (Vercel)** *(Web app, SSR + API routes)*
 - [ ] **Vite + React (SPA)** *(Web app, client-side only)*
 - [ ] **FastAPI (Python API only)** *(Backend service / microservice, no frontend)*
 - [ ] **Bun + Hono** *(Ultra-fast API service)*
 - [ ] **CLI (Python / Click / Typer)** *(Command-line tool)*
-- [ ] **Flutter (cross-platform)** *(Mobile + Desktop + Web)*
+- [x] **Flutter (cross-platform)** *(Desktop targets: Windows/macOS/Linux — uses Flutter's own native runner, no separate shell process)*
 
 ---
 
 ## 🎨 Frontend Framework
 
-- [x] **React 19** *(default for Tauri/Vite/Next.js projects)*
+- [ ] **React 19** *(superseded — default for Tauri/Vite/Next.js projects)*
 - [ ] **Next.js 15** *(SSR, file-based routing, Server Components)*
-- [ ] **Flutter / Dart** *(for Flutter shell projects)*
+- [x] **Flutter / Dart** *(for Flutter shell projects — this project)*
 - [ ] **Vue 3 + Vite** *(alternative web framework)*
 - [ ] **Svelte 5** *(minimal, compiler-based alternative)*
 - [ ] **No frontend** *(API/CLI projects)*
@@ -37,47 +39,47 @@ Select the primary application shell / delivery mechanism:
 
 ## 💅 UI Component Library
 
-- [x] **shadcn/ui** *(Recommended: copy-own components, Radix + Tailwind)*
-- [x] **Radix UI (headless)** *(unstyled primitives, full control)*
+- [ ] **shadcn/ui** *(superseded — copy-own components, Radix + Tailwind)*
+- [ ] **Radix UI (headless)** *(unstyled primitives, full control)*
 - [ ] **Mantine** *(batteries-included, good DX)*
 - [ ] **Ant Design** *(enterprise-grade, feature-rich)*
 - [ ] **Lobe UI** *(AI-optimized components from LobeHub)*
 - [ ] **Custom / No library** *(vanilla CSS or project-specific)*
-- [ ] **Flutter native widgets** *(for Flutter projects)*
+- [x] **Flutter native widgets** *(Material-based, hand-built atoms/molecules/organisms in `flutter_app/lib/widgets/`, no third-party component kit)*
 
 ---
 
 ## 🎨 Styling System
 
-- [x] **Tailwind CSS v4** *(Recommended for most React projects)*
+- [ ] **Tailwind CSS v4** *(superseded — Recommended for most React projects)*
 - [ ] **Vanilla CSS + CSS Variables** *(recommended for maximum control)*
 - [ ] **CSS Modules** *(scoped styles, good for large teams)*
 - [ ] **Styled Components / Emotion** *(CSS-in-JS)*
-- [ ] **Flutter Material / Cupertino** *(for Flutter projects)*
+- [x] **Flutter Material / Cupertino** *(dark-only `ThemeData` + custom `ThemeExtension` for glow/glass tokens, built from `DESIGN.md` in `flutter_app/lib/theme/`)*
 
 ---
 
 ## 🗃️ State Management
 
-> See also: `docs/architecture/state_management.md` for detailed patterns.
+> See also: `docs/architecture/state_management.md` for detailed patterns (note: that file still describes the old Zustand-based approach — see its deprecation note).
 
-- [x] **Zustand** *(Recommended: React — minimal, hook-based)*
+- [ ] **Zustand** *(superseded — React — minimal, hook-based)*
 - [ ] **Jotai** *(atomic state — good for fine-grained reactivity)*
 - [ ] **Redux Toolkit** *(large apps, strict data flow)*
 - [ ] **React Context + useReducer** *(simple apps, no extra deps)*
 - [ ] **TanStack Query** *(server-state management — works alongside Zustand)*
 - [ ] **Bloc** *(Flutter projects)*
-- [ ] **Riverpod** *(Flutter projects — alternative to Bloc)*
+- [x] **Riverpod** *(this project — `flutter_riverpod` `StateNotifier`s in `flutter_app/lib/providers/`, one per domain, mirroring the old Zustand store shapes)*
 
 ---
 
 ## ⚙️ Backend / Sidecar
 
-- [x] **Python (uv) + JSON-RPC Sidecar** *(Recommended for Tauri + AI apps)*
+- [ ] **Python (uv) + JSON-RPC Sidecar** *(superseded — Recommended for Tauri + AI apps)*
 - [ ] **Python (uv) + FastAPI** *(Recommended for standalone web APIs)*
 - [ ] **Bun + Hono** *(TypeScript-native, ultra-fast API)*
 - [ ] **Node.js + Express** *(standard JS backend)*
-- [ ] **Go + Chi/Gin** *(high-performance stateless services)*
+- [x] **Go + JSON-RPC Sidecar** *(this project — `backend-go/`, `net/http` for the dev HTTP transport + stdio for prod, same JSON-RPC 2.0 contract as the old Python sidecar)*
 - [ ] **No backend** *(frontend-only, static)*
 
 ---
@@ -86,7 +88,7 @@ Select the primary application shell / delivery mechanism:
 
 > See also: `docs/architecture/database.md` for schema and migration patterns.
 
-- [x] **DuckDB** *(Recommended for Sidecar apps — analytical, embedded, thread-safe)*
+- [x] **DuckDB** *(Recommended for Sidecar apps — analytical, embedded, thread-safe. Driver: `github.com/marcboeker/go-duckdb` v1.8.5)*
 - [ ] **SQLite + Drizzle ORM** *(Recommended for Tauri — file-based, type-safe)*
 - [ ] **PostgreSQL + Prisma** *(Recommended for web apps with complex relations)*
 - [ ] **MongoDB** *(document store — good for flexible schemas)*
@@ -98,14 +100,14 @@ Select the primary application shell / delivery mechanism:
 
 ## 🤖 AI / LLM Integration
 
-- [x] **Ollama (local)** *(Recommended: Gemma 4 / offline-first)*
-- [x] **Google Gemini API** *(cloud, multimodal)*
-- [x] **OpenAI API** *(GPT-4o / cloud)*
+- [x] **Ollama (local)** *(offline-first, via `backend-go/internal/ai/providers`)*
+- [x] **Google Gemini API** *(cloud, multimodal, via `backend-go/internal/ai/providers`)*
+- [x] **OpenAI-compatible API** *(cloud, via `backend-go/internal/ai/providers`)*
 - [ ] **Anthropic Claude API** *(cloud, long context)*
-- [x] **Google ADK 2.0** *(agentic workflows + tool use)*
-- [x] **Pydantic AI** *(type-safe agent framework)*
-- [x] **LangGraph** *(stateful multi-actor workflows)*
-- [ ] **No AI integration**
+- [ ] **Google ADK 2.0** *(superseded — agentic workflows + tool use)*
+- [ ] **Pydantic AI** *(superseded — type-safe agent framework)*
+- [ ] **LangGraph** *(superseded — stateful multi-actor workflows)*
+- [x] **Hand-written Go state machine** *(`backend-go/internal/ai/graph` — reasoning/tool_execution/final_answer states + a 7-tool registry, replaces LangGraph + PydanticAI)*
 
 ---
 
@@ -113,8 +115,8 @@ Select the primary application shell / delivery mechanism:
 
 | Layer | Tool | Version |
 |-------|------|---------|
-| **Python** | `uv` | `>=0.5.0` |
-| **JavaScript / TypeScript** | `bun` | `>=1.0.0` |
+| **Go** | `go mod` | Go `1.26.4` |
+| **Dart / Flutter** | `flutter pub` | Flutter `3.44.4` stable, Dart SDK `^3.12.2` |
 
 ---
 
@@ -122,8 +124,8 @@ Select the primary application shell / delivery mechanism:
 
 | Tool | Purpose | Config File |
 |------|---------|-------------|
-| `ruff` | Python lint + format | `pyproject.toml` |
-| `biome` | JS/TS lint + format | `biome.json` |
+| `go vet` / `gofmt` | Go lint + format | — (stdlib toolchain) |
+| `flutter analyze` / `dart format` | Dart/Flutter lint + format | `flutter_app/analysis_options.yaml` |
 | `lefthook` | Git hooks orchestration | `lefthook.yml` |
 
 ---

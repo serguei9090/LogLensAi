@@ -1,5 +1,7 @@
 # System Interaction Map
 
+> **Note**: this document describes the pre-migration Python/React implementation. See `docs/migration/STATUS.md` for the current Go/Flutter architecture.
+
 This document serves as the high-level bridge between the React frontend stores and the Python Sidecar API.
 
 ## 📡 The JSON-RPC Bridge

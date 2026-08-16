@@ -1,5 +1,7 @@
 # 📦 Deployment & Packaging Strategy
 
+> **Migration note (2026-08)**: packaging moved from Tauri's Rust-based bundler to Flutter's own native desktop runner/bundler. The Go sidecar binary is spawned as a subprocess over stdio by the Flutter app at runtime — same subprocess pattern the old Rust shell used for the Python sidecar, just with a different binary. ONNX Runtime (`onnxruntime.dll` / `.so`, used by `backend-go/internal/ai/rag` for embeddings) is a native-library dependency that needs to ship alongside the Go binary. See `docs/migration/STATUS.md` (Phase 6 / cutover section) for open packaging follow-ups.
+
 > **Init Selector** — Check the deployment target(s) for this project. The AI uses this to generate the correct CI/CD pipelines, Docker configs, and build scripts.
 
 <!-- AI_PROMPT: If no option is checked, ask the user: 
@@ -13,10 +15,13 @@
 
 ### Desktop
 
-- [ ] **Tauri v2 — Windows** *(NSIS installer / MSI)*
-- [ ] **Tauri v2 — macOS** *(DMG / PKG)*
-- [ ] **Tauri v2 — Linux** *(AppImage / deb / rpm)*
-- [ ] **Tauri v2 — Cross-platform (all three above)**
+- [ ] **Tauri v2 — Windows** *(superseded — NSIS installer / MSI)*
+- [ ] **Tauri v2 — macOS** *(superseded — DMG / PKG)*
+- [ ] **Tauri v2 — Linux** *(superseded — AppImage / deb / rpm)*
+- [ ] **Tauri v2 — Cross-platform (all three above)** *(superseded)*
+- [x] **Flutter — Windows** *(`flutter build windows`, produces `build\windows\x64\runner\Release\loglensai.exe` + the Go sidecar binary alongside it)*
+- [x] **Flutter — macOS** *(`flutter build macos`, expected to work per `docs/migration/STATUS.md`, not yet manually verified on this branch)*
+- [x] **Flutter — Linux** *(`flutter build linux`, expected to work per `docs/migration/STATUS.md`, not yet manually verified on this branch)*
 
 ### Web
 
@@ -33,7 +38,8 @@
 - [ ] **AWS ECS / EKS** *(enterprise container orchestration)*
 - [ ] **Google Cloud Run** *(serverless containers)*
 - [ ] **Render** *(managed PaaS)*
-- [ ] **Python Sidecar (embedded)** *(bundled with Tauri — no separate deployment)*
+- [ ] **Python Sidecar (embedded)** *(superseded — was bundled with Tauri, no separate deployment)*
+- [x] **Go Sidecar (embedded)** *(compiled with `go build ./cmd/sidecar`, bundled alongside the Flutter app and spawned as a subprocess over stdio — no separate deployment)*
 
 ### Mobile
 
@@ -48,20 +54,24 @@
 ### Build Commands
 
 ```bash
-# Fill after checking your targets above
+# Go sidecar — compile the binary that gets bundled with the Flutter app
+cd backend-go
+go build -o sidecar.exe ./cmd/sidecar    # Windows
+go build -o sidecar ./cmd/sidecar        # macOS / Linux
 
-# Tauri Desktop
-bun run tauri build
+# Flutter Desktop — Windows
+cd flutter_app
+flutter build windows
+# -> build\windows\x64\runner\Release\loglensai.exe
 
-# Web (Next.js)
-bun run build
+# Flutter Desktop — macOS
+flutter build macos
 
-# Docker
-docker build -t {PROJECT_SLUG}:{VERSION} .
-docker compose up -d
+# Flutter Desktop — Linux
+flutter build linux
 
-# Python Sidecar (bundle with PyInstaller for Tauri)
-uv run pyinstaller --onefile sidecar/src/main.py
+# (Superseded) old Tauri build command, kept for historical reference:
+# bun run tauri build
 ```
 
 ---

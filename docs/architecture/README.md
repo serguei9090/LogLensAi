@@ -2,6 +2,8 @@
 
 This folder is the **single source of truth for project-level architectural decisions** in the Morphic Framework. It contains both **framework-level specs** (constant across all projects) and **project-level init selectors** (filled at project start via the `/init` workflow).
 
+> **Migration note (2026-08)**: LogLensAi moved from Tauri v2 + React 19 + a Python sidecar to Flutter (desktop) + a Go sidecar. `stack.md`, `communication.md`, `database.md`, `deployment.md`, and `layers/{backend,frontend}.md` have been updated for the new stack. The narrower files below them (testing, state management, diagrams, and similar deep-dive docs) still describe the pre-migration implementation and each carries its own deprecation note pointing at `docs/migration/STATUS.md`, the authoritative record of the migration.
+
 ---
 
 ## 📂 File Index

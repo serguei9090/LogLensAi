@@ -1,6 +1,8 @@
 # Master AI Context: LogLensAi
 
-LogLensAi is a **Tauri v2 desktop application** for professional log analysis. It uses a Python sidecar for heavy lifting (DuckDB storage, Drain3 log clustering) and a React 19 frontend for the UI.
+LogLensAi is a **Flutter desktop application** (Windows/macOS/Linux) for professional log analysis. It uses a Go sidecar for heavy lifting (DuckDB storage, Drain3 log clustering, AI orchestration) and a Flutter/Dart frontend for the UI.
+
+> **Migration note**: this app was originally built on Tauri v2 + React 19 + a Python sidecar. That stack was fully replaced by a Go backend + Flutter frontend on the `flutter` branch (old `sidecar/`, `src/`, `src-tauri/` directories removed). The JSON-RPC 2.0 contract between frontend and backend did not change — only its implementation language did. Full migration history: `docs/migration/STATUS.md`.
 
 ## 🗺️ Rule-Map (Laws of Physics)
 
@@ -16,92 +18,96 @@ LogLensAi is a **Tauri v2 desktop application** for professional log analysis. I
 
 The **only active modules** are:
 
-1. **Investigation Page** — the core log analysis view
-2. **Settings Page** — AI provider + Drain3 config + general preferences
+1. **Dashboard Page** — stat tiles, charts, AI-insights mode (`flutter_app/lib/pages/dashboard_page.dart`) — was a grayed-out placeholder in the pre-migration React app, now fully implemented as part of the Flutter rebuild
+2. **Investigation Page** — the core log analysis view
+3. **Settings Page** — AI provider + Drain3 config + general preferences
 
 **Explicitly OUT of scope** (backlog only, no implementation):
 
-- Dashboard (placeholder nav item, grayed out)
-- Metrics views
+- Metrics views beyond the existing Dashboard stat tiles / charts
 - Multi-file merge
 
 ## 🏗️ Tech Stack
 
-- **Frontend**: React 19, TypeScript, Vite, Zustand, TanStack Virtual, shadcn/ui
-- **Communication**: JSON-RPC 2.0 — HTTP on port 5000 in dev, stdin/stdout in prod
-- **Backend Sidecar**: Python 3.12, DuckDB, Drain3, aiohttp, LangGraph, PydanticAI
-- **Desktop Shell**: Tauri v2 (Rust)
-- **Package Manager**: Bun
-- **Linter/Formatter**: Biome (TS/JS), Ruff (Python)
+- **Frontend**: Flutter (Dart), desktop targets (Windows/macOS/Linux), Riverpod for state, `fl_chart` for charting
+- **Communication**: JSON-RPC 2.0 — HTTP on port 5000 in dev, stdin/stdout in prod (unchanged from the old stack)
+- **Backend Sidecar**: Go, DuckDB (`marcboeker/go-duckdb`), hand-ported Drain3 clustering, hand-written AI state machine + tool registry
+- **Desktop Shell**: Flutter's own native desktop runner (no separate Rust shell)
+- **Package Manager**: Go modules (`go.mod`) for the backend, `pub`/`flutter pub` for the frontend
+- **Linter/Formatter**: `go vet` / `gofmt` (backend), `flutter analyze` / `dart format` (frontend)
 
-### Pinned Versions (Reproduce with `bun install` + `uv sync`)
+### Pinned Versions (Reproduce with `go build ./...` in `backend-go/` + `flutter pub get` in `flutter_app/`)
 
 | Layer | Package | Version |
 |---|---|---|
-| Runtime | Node.js (via Bun) | `>=22` |
-| Runtime | Python | `>=3.12` |
-| Frontend | react + react-dom | `^19.0.0` |
-| Frontend | vite | `^6.0.11` |
-| Frontend | typescript | `^5.7.3` |
-| Frontend | @tauri-apps/api | `^2.10.1` |
-| Frontend | @tauri-apps/cli | `^2.3.0` |
-| Frontend | zustand | `^5.0.3` |
-| Frontend | @tanstack/react-virtual | `^3.11.2` |
-| Frontend | lucide-react | `^1.7.0` |
-| Frontend | tailwindcss | `^4.0.0` |
-| Frontend | @biomejs/biome | `^1.9.4` |
-| Sidecar | duckdb | `>=1.2.0` |
-| Sidecar | drain3 | `>=0.9.11` |
-| Sidecar | aiohttp | `>=3.11.0` |
-| Sidecar | aiohttp-cors | `>=0.7.0` |
-| Sidecar | paramiko | `>=3.5.0` |
-| Sidecar | pydantic | `>=2.10.0` |
-| Sidecar | pydantic-ai | `>=1.31.0` |
-| Sidecar | langgraph | `>=1.1.9` |
-| Sidecar | aiosqlite | `>=0.22.1` |
-| Sidecar | ruff | `>=0.9.0` |
+| Runtime | Go | `1.26.4` |
+| Runtime | Flutter SDK | `3.44.4` stable (Dart SDK `^3.12.2`) |
+| Backend | `github.com/marcboeker/go-duckdb` | `v1.8.5` |
+| Backend | `github.com/yalue/onnxruntime_go` | `v1.31.0` |
+| Backend | `github.com/fsnotify/fsnotify` | `v1.10.1` |
+| Backend | `github.com/google/uuid` | `v1.6.0` |
+| Backend | `golang.org/x/crypto` | `v0.55.0` |
+| Backend | `golang.org/x/text` | `v0.41.0` |
+| Frontend | `flutter_riverpod` | `^2.6.1` |
+| Frontend | `fl_chart` | `^0.69.2` |
+| Frontend | `file_picker` | `^8.1.6` |
+| Frontend | `window_manager` | `^0.4.3` |
+| Frontend | `http` | `^1.2.2` |
+| Frontend | `cupertino_icons` | `^1.0.8` |
+
+Check `backend-go/go.mod` and `flutter_app/pubspec.yaml` for the authoritative, current version list — this table is a snapshot.
 
 ## 📁 Mandatory Folder Structure
 
 ```text
-src/
-  components/
-    atoms/          ← smallest units (Badge, Switch, Dot, Tooltip)
-    molecules/      ← composed atoms (SearchBar, FilterBuilder, FilterTag)
-    organisms/      ← full UI sections (LogToolbar, VirtualLogTable, Sidebar)
-    templates/      ← layout wrappers (AppLayout, InvestigationLayout)
-    pages/          ← assembled views (InvestigationPage, SettingsPage)
-    ui/             ← raw shadcn primitives (do not modify logic here)
-  store/            ← Zustand stores (workspaceStore, investigationStore)
+flutter_app/
   lib/
-    hooks/          ← custom React hooks (useSidecarBridge, useLogStream)
-    utils.ts        ← cn(), formatters
-  styles/
-    globals.css     ← CSS custom properties — ALL design tokens live here
+    theme/            ← DESIGN.md tokens ported verbatim (app_colors.dart, app_spacing.dart,
+                         app_typography.dart, app_theme.dart) — ALL design tokens live here
+    models/            ← Dart mirrors of the JSON-RPC contract (hand-written fromJson/toJson)
+    services/
+      sidecar_bridge.dart  ← dual-mode IPC (stdio subprocess default, HTTP :5000 fallback)
+    providers/          ← Riverpod StateNotifiers, one per domain (workspace, investigation,
+                         clustering, health, debug, ingestion, ai, fusion, settings, template,
+                         distribution, dashboard, ui)
+    widgets/
+      atoms/            ← smallest units (StatusDot, LogLevelBadge, IconButton, TailSwitch)
+      molecules/        ← composed atoms (SearchBar, FilterBuilder, ClusterRow, SourceItem)
+      organisms/        ← full UI sections (LogToolbar, VirtualLogTable, Sidebar,
+                         AIInvestigationSidebar, DashboardCharts)
+    pages/               ← assembled views (DashboardPage, InvestigationPage, SettingsPage)
+    app.dart             ← real 3-column app shell (Sidebar / main / DiagnosticSidebar)
+    main.dart            ← entrypoint
 
-sidecar/
-  src/
-    api.py          ← JSON-RPC dispatch & all method_ implementations
-    db.py           ← DuckDB singleton (USE get_cursor() NOT get_connection())
-    parser.py       ← Drain3 log parsing
-    tailer.py       ← FileTailer background thread
-    ssh_loader.py   ← SSH remote tailing
-    workers/        ← Async worker processes (ClusteringWorker)
-    services/       ← Business logic services (FastPathService, RagService)
+backend-go/
+  cmd/
+    sidecar/           ← entrypoint (stdio + HTTP, mirrors the old sidecar/main.py)
+    goldentest/         ← Python-vs-Go parity harness used during the migration
+  internal/
+    db/                 ← DuckDB schema, migrations, singleton/cursor mgmt (USE get_cursor()
+                         patterns mirrored from the Python original)
+    rpc/                 ← JSON-RPC 2.0 dispatch (HTTP :5000 + stdio), all 67 methods
+    models/              ← request/response structs (from the original api_schema.json)
+    drain3/              ← hand-ported Drain3 clustering algorithm
+    query/                ← LLQL parser
+    metadata/             ← timestamp/level/facet extraction
+    ingestion/            ← file tailer, SSH tailer, syslog/HTTP listeners, shared-source dedup
     ai/
-      __init__.py   ← AI Provider Factory
-      base.py       ← AI Base Classes
-      graph.py      ← LangGraph State Machine
-      runner.py     ← Hybrid ADK Runner
-      tools.py      ← PydanticAI Tool Registry
-      reasoning.py  ← Universal Reasoning Parser
+      providers/          ← Ollama / OpenAI-compatible / Gemini HTTP clients
+      graph/               ← hand-written state machine (reasoning/tool_execution/final_answer)
+      rag/                  ← DuckDB-VSS memory search, ONNX embeddings, Go WordPiece tokenizer
+      wiring.go             ← reconciliation/adapter layer between the above packages
+    services/
+      clustering/          ← goroutine-based train-then-tag batch worker
+      logstore/             ← disk-first append-only storage + mmap fast-path reads
+    app/                   ← composition root (App struct) + handlers_*.go RPC wiring
 ```
 
 ## 🎨 Design System
 
-- **Source of Truth**: `DESIGN.md` (Unified tokens for colors, typography, and spacing)
+- **Source of Truth**: `DESIGN.md` (Unified tokens for colors, typography, and spacing) — unchanged by the migration
 - Dark theme: `#0D0F0E` base, `#22C55E` primary green accent
-- **Hard rule**: No hardcoded hex in component files. Use CSS custom properties only.
+- **Hard rule**: No hardcoded hex in widget files. Use the `flutter_app/lib/theme/` tokens (`AppColors`, `AppSpacing`, `AppTypography`) only.
 
 ## ⚡ Boot Sequence (for AI agents)
 
@@ -109,7 +115,7 @@ sidecar/
 
 ## 🔌 JSON-RPC API Contract
 
-All methods are called via `useSidecarBridge.ts`. Never change the transport.
+All methods are called via `flutter_app/lib/services/sidecar_bridge.dart`. Never change the transport. The contract itself (method names, params, returns) is unchanged from the Python-era sidecar.
 
 | Method | Params | Returns |
 |---|---|---|
@@ -127,6 +133,8 @@ All methods are called via `useSidecarBridge.ts`. Never change the transport.
 | `factory_reset` | `{}` | `{ status, message }` |
 | `get_health` | `{}` | `{ status, uptime, version }` |
 
+All 67 methods are registered in `backend-go/internal/rpc/` (`RegisterStubs` + `RegisterApp`, called from `cmd/sidecar/main.go`); real implementations live under `backend-go/internal/app/handlers_*.go`.
+
 ## Golden Standards
 
 - **Team Perspective (NEW)**: We are the new autonomous development team. We value precision, automation, and strict adherence to the defined architecture. We verify before we implement.
@@ -134,13 +142,13 @@ All methods are called via `useSidecarBridge.ts`. Never change the transport.
     - **Precedence**: This rule takes absolute precedence over any contradictory instructions in `.agents/rules/` (e.g., legacy `bd` or `beads` systems).
     - **No DB Tasks**: Do not use, initialize, or depend on any database-backed task managers.
 - **Contract → Interface → Mock → Impl**: define boundaries before writing logic
-- **shadcn/ui Standards**: Always use the `shadcn` skill for UI tasks. Use `bunx --bun shadcn@latest` for all component management. Follow the critical rules in the skill (e.g. `cn()` for classes, `gap` over `space-x/y`, `data-icon` for button icons).
-- **Pydantic API Validation**: All JSON-RPC methods MUST receive inputs and return outputs validated by strict `Pydantic` models. 
-- **Thread-safe Database**: every DuckDB query uses `self.db.get_cursor()` for thread isolation.
+- **Flutter/Dart Standards**: Follow the widget-tier discipline in `.agents/rules/UI/AtomicDesignStandard.md` — Atoms stay stateless/store-free, Organisms own Riverpod provider access. Run `flutter analyze` before considering UI work done.
+- **JSON Validation**: All JSON-RPC methods MUST validate inputs and produce outputs via typed Go structs in `internal/models/` (the Go analogue of the old Pydantic models).
+- **Thread-safe Database**: every DuckDB query goes through `internal/db`'s cursor/connection helpers (the Go analogue of Python's `get_cursor()` discipline) for thread isolation.
 - **Graceful Shutdown (Prod vs Dev)**:
-  - **Dev**: The `aiohttp` runner must use `async def on_cleanup(_): Database.reset()` to prevent Zombie processes and WAL locks.
-  - **Prod**: The `stdin/stdout` loop must gracefully catch `EOF` and `KeyboardInterrupt` and properly close the DuckDB connection before exiting.
-- **Testing (ADK Standard)**: Real code over mocks. Test public interface behavior. Fast and isolated tests. High coverage for edge cases.
+  - **Dev**: The HTTP (`:5000`) listener must clean up the DuckDB connection on shutdown to prevent zombie processes and WAL locks.
+  - **Prod**: The `stdin/stdout` loop must gracefully catch `EOF`/interrupt signals and properly close the DuckDB connection before exiting.
+- **Testing (ADK Standard)**: Real code over mocks. Test public interface behavior. Fast and isolated tests. High coverage for edge cases. Backend: `go test ./...` from `backend-go/`. Frontend: `flutter test` from `flutter_app/`.
 - **Conventional Commits**: ALL commits must follow the `feat|fix|refactor|docs|test|chore` format.
 - **No silent gaps**: missing logic gets a `TODO(ID)` with a detail file in `docs/track/specs/`
 
@@ -154,10 +162,10 @@ When running `/smith_orchestra_auto`, Jules orchestrates work based on `docs/tra
 |---|---|---|
 | **@pm** | Roadmap & Logic Specs. Owns `TODO.md` and `specs/*.md`. | `docs/track/` |
 | **@critique** | Investigative Root Cause & Solution Review. Audits all plans. | `docs/track/LessonsLearned.md` |
-| **@backend** | Sidecar, DB, & Logic. Ensures DuckDB cursor safety. | `sidecar/src/` |
-| **@frontend** | UI, Layout, & State. Strictly follows `DESIGN.md`. | `src/components/`, `src/store/` |
-| **@qa** | Auditing & Bug Fixes. Manages `vitest` and `pytest`. | All codebase |
-| **@devops** | Deployment, Packaging, & Automation Scripts. | `src-tauri/`, `scripts/` |
+| **@backend** | Go sidecar, DB, & RPC logic. Ensures DuckDB connection/cursor safety. | `backend-go/internal/` |
+| **@frontend** | Flutter UI, layout, & Riverpod state. Strictly follows `DESIGN.md`. | `flutter_app/lib/widgets/`, `flutter_app/lib/providers/` |
+| **@qa** | Auditing & Bug Fixes. Manages `flutter test` and `go test`. | All codebase |
+| **@devops** | Deployment, Packaging, & Automation Scripts. | `flutter_app/windows/`, `flutter_app/macos/`, `flutter_app/linux/`, `scripts/` |
 
 ### Working Protocol
 

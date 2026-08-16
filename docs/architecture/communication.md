@@ -1,22 +1,24 @@
 # Communication & Protocol (communication.md)
 
-This document describes the bridging mechanism between the Tauri Rust layer and the Python sidecar engine, as well as the JSON-RPC 2.0 contract.
+This document describes the bridging mechanism between the Flutter frontend and the Go sidecar engine, as well as the JSON-RPC 2.0 contract.
+
+> **Migration note (2026-08)**: the transport and the JSON-RPC 2.0 contract itself are **unchanged** from the pre-migration Tauri/Python stack — only the implementations moved: the Rust IPC layer became Flutter's own subprocess/stdio bridge, and the Python `api.py` dispatcher became `backend-go/internal/rpc/`. See `docs/migration/STATUS.md` for the full record.
 
 ## 👤 Persona: `@bridge-arch`
-Expert in distributed communication, JSON-RPC 2.0 specs, and low-latency bridging. Focuses on the "Tauri ↔ Sidecar" interface.
+Expert in distributed communication, JSON-RPC 2.0 specs, and low-latency bridging. Focuses on the "Flutter ↔ Go Sidecar" interface.
 
-## 🌉 The Bridge (useSidecarBridge.ts)
-LogLensAi uses a unified `callSidecar<T>` function to handle all communication with the sidecar.
+## 🌉 The Bridge (sidecar_bridge.dart)
+LogLensAi uses a unified `callSidecar<T>` function (`flutter_app/lib/services/sidecar_bridge.dart`) to handle all communication with the sidecar. It is dual-mode:
 
 | Path | Protocol | Purpose |
 |---|---|---|
-| **Development** | HTTP (Port 5000) | Local dev server for faster hot-reloading. |
-| **Production** | STDIN / STDOUT | Direct pipe between the Tauri process and the Sidecar binary. |
+| **Development** | HTTP (Port 5000) | Local dev server for faster hot-reloading (`internal/rpc/http.go`). |
+| **Production** | STDIN / STDOUT | Direct pipe between the Flutter process and the Go sidecar binary, spawned as a subprocess — respawn-then-retry-once on failure (`internal/rpc/stdio.go`). |
 
 ### Error Propagation Flow
-1. **Python Exception**: Caught in `api.py`. Returns a JSON-RPC error object with status `-32603` (Internal Error).
-2. **Rust Wrapper**: Receives the response over the pipe.
-3. **JS/TS Frontend**: `callSidecar` parses the error object and throws a detailed `Error` that includes Python tracebacks in dev mode.
+1. **Go Error**: Caught in `internal/rpc/dispatch.go`. Returns a JSON-RPC error object with status `-32603` (Internal Error).
+2. **Flutter Bridge**: `sidecar_bridge.dart` receives the response over HTTP or the stdio pipe.
+3. **Dart Frontend**: `callSidecar` parses the error object and throws a detailed exception including the Go error message/stack in dev mode.
 
 ## 📡 JSON-RPC 2.0 Specification
 
@@ -51,33 +53,30 @@ All requests must conform to the following schema:
   "error": {
     "code": -32603,
     "message": "Internal error",
-    "data": "Python Exception Traceback..."
+    "data": "Go error detail..."
   }
 }
 ```
 
 ## 🔐 Type-Safety Guardrails
 
-### Pydantic Validation (Backend)
-Every incoming request in `api.py` is validated against a Pydantic `BaseModel`. This ensures that required fields (like `workspace_id`) are present before any logic begins.
+### Struct Validation (Backend)
+Every incoming request in `backend-go/internal/rpc/` is decoded into a typed Go struct defined in `internal/models/requests.go` (the Go analogue of the old Pydantic `BaseModel`s). This ensures required fields (like `workspace_id`) are present before any logic in `internal/app/handlers_*.go` runs.
 
-### TypeScript Interfaces (Frontend)
-Response data from `callSidecar<T>` should be cast to a global interface defined in the corresponding layer (e.g., `LogEntry[]` for `get_logs`).
+### Dart Model Classes (Frontend)
+Response data from `callSidecar<T>` is decoded into hand-written Dart model classes under `flutter_app/lib/models/` (`fromJson`/`toJson`, no codegen), e.g. `LogEntry` for `get_logs`.
 
 ## 🔄 Interaction Diagram (Request ↔ Response)
 
 ```mermaid
 sequenceDiagram
-  participant UI as Frontend (React)
-  participant Bridge as useSidecarBridge.ts
-  participant Rust as Rust Command (IPC)
-  participant Python as Sidecar Engine (Python)
-  
+  participant UI as Frontend (Flutter Widgets)
+  participant Bridge as sidecar_bridge.dart
+  participant Sidecar as Go Sidecar (backend-go)
+
   UI->>Bridge: callSidecar("get_logs", params)
-  Bridge->>Rust: invoke("dispatch_sidecar", { request })
-  Rust->>Python: write to STDIN
-  Python->>Python: _get_logs_internal()
-  Python-->>Rust: write to STDOUT
-  Rust-->>Bridge: return stringified JSON
-  Bridge-->>UI: return Typed Result
+  Bridge->>Sidecar: HTTP POST :5000/rpc  (dev)  or  write to STDIN  (prod)
+  Sidecar->>Sidecar: internal/rpc dispatch -> internal/app handler
+  Sidecar-->>Bridge: HTTP response  (dev)  or  write to STDOUT  (prod)
+  Bridge-->>UI: return typed Dart model
 ```

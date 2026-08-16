@@ -1,5 +1,7 @@
 # Technical Specification: Antigravity AI Agentic Workflow Engine
 
+> **Note**: this document describes the pre-migration Python/React implementation. See `docs/migration/STATUS.md` for the current Go/Flutter architecture.
+
 ## Executive Summary
 **Antigravity** is a meta-orchestration framework designed to transform a standard codebase into an autonomous "Software Factory." It utilizes a multi-persona architecture (The Triad: Antigravity, Gemini CLI, Jules CLI) to execute hierarchical development tasks with built-in validation gates, 3-strike self-healing logic, and environment-aware hardware abstraction.
 

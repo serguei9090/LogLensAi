@@ -1,5 +1,7 @@
 # LogLensAi - Function & Component Index
 
+> **Note**: this document describes the pre-migration Python/React implementation. See `docs/migration/STATUS.md` for the current Go/Flutter architecture.
+
 This file provides a comprehensive list of all core logic functions in the backend sidecar and functional components in the React frontend. It serves as a quick reference for logic discovery and architectural navigation.
 
 ## 🐍 Backend (Python Sidecar)

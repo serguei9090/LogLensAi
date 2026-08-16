@@ -1,5 +1,7 @@
 # 🧪 Testing Strategy
 
+> **Note**: this document describes the pre-migration Python/React implementation. See `docs/migration/STATUS.md` for the current Go/Flutter architecture.
+
 > **Init Selector** — Check the testing types and frameworks for this project. The AI will generate tests that match the checked strategy and will never suggest unchecked test types without asking.
 
 <!-- AI_PROMPT: If no option is checked, review `stack.md` for the frontend framework and backend.

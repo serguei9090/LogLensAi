@@ -1,5 +1,7 @@
 # Global Architecture Diagrams (diagrams.md)
 
+> **Note**: this document describes the pre-migration Python/React implementation. See `docs/migration/STATUS.md` for the current Go/Flutter architecture.
+
 This document is the repository for complex Mermaid.js diagrams that span multiple layers of the LogLensAi system.
 
 ## 👤 Persona: `@diagram-arch`

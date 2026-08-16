@@ -1,5 +1,7 @@
 # Gemini CLI: Headless & JSON Reference
 
+> **Note**: this document describes the pre-migration Python/React implementation. See `docs/migration/STATUS.md` for the current Go/Flutter architecture.
+
 This document captures the official technical specification for interacting with the `gemini` CLI in non-interactive (headless) environments.
 
 ## 🚀 Headless Execution
