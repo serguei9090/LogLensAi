@@ -83,6 +83,8 @@ func Run(ctx context.Context, provider Provider, tools *ToolRegistry, initialSta
 				if lastUserMsg != "" {
 					if routed, err := RouteWithLaya(ctx, tools, lastUserMsg); err == nil && routed != nil && routed.Confidence >= 0.85 {
 						state.Status = fmt.Sprintf("laya_routed:%s:%.2f", routed.SelectedLabel, routed.Confidence)
+						hint := fmt.Sprintf("[Laya System 1 Router: User intent classified as %q (confidence: %.2f). Prioritize selecting this tool if applicable.]", routed.SelectedLabel, routed.Confidence)
+						state.Messages = append([]ChatMessage{{Role: "system", Content: hint}}, state.Messages...)
 					}
 				}
 			}
