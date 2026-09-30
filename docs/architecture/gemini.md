@@ -1,79 +1,101 @@
 # LogLensAi Architecture Roadmap (gemini.md)
 
-> **Note**: this document describes the pre-migration Python/React implementation. See `docs/migration/STATUS.md` for the current Go/Flutter architecture.
+This file is the main architectural entry point for the LogLensAi application. It outlines the high-level system context, primary architectural roles, and index of detailed specifications for the **React 19 + Tauri v2 + Go 1.26 + Laya AI** stack.
 
-This file is the main point of entry for the application's architecture. It contains the high-level system context, the primary personas for architecture files, and the index of detailed documentation.
+---
 
 ## 👥 Architecture Personas
 
 | File Path | Persona | Focus |
 |---|---|---|
 | `docs/architecture/gemini.md` | `@system-arch` | Overall system context, C4 diagrams, and entry-point indexing. |
-| `docs/architecture/layers/frontend.md` | `@frontend-arch` | Component hierarchy (Atomic Design), Zustand stores, and TanStack-virtual virtualization. |
-| `docs/architecture/layers/backend.md` | `@backend-arch` | Python sidecar, DuckDB storage engines, Drain3 log clustering, and ingestion pipeline. |
-| `docs/architecture/communication.md` | `@bridge-arch` | JSON-RPC 2.0 implementation, Tauri ↔ Sidecar bridging, and API contract validation. |
-| `docs/architecture/testing.md` | `@qa-arch` | Unit, Integration, and E2E testing strategies and coverage tracking. |
-| `docs/architecture/diagrams.md` | `@diagram-arch` | Global Mermaid.js diagrams (ERD, Sequence, and Flowcharts). |
+| `docs/architecture/interaction_map.md` | `@bridge-arch` | Bridges React 19 stores with Go JSON-RPC handlers and DuckDB. |
+| `docs/architecture/diagrams.md` | `@diagram-arch` | Global Mermaid diagrams (triage pipelines, dual-engine sequence, ERD). |
+| `docs/architecture/communication.md` | `@rpc-arch` | JSON-RPC 2.0 schema, IPC transports, and error models. |
+| `docs/architecture/database.md` | `@db-arch` | DuckDB schema, cursor pool safety, and `cluster_triage` table design. |
+| `docs/track/specs/` | `@spec-arch` | Detailed feature implementation specifications (e.g. `FEAT_LAYA_SYSTEM1_ENGINE.md`). |
 
-## 🏗️ High-Level System Context (C4-style)
+---
+
+## 🏗️ High-Level System Context (C4-Style)
 
 ```mermaid
 graph TD
-  subgraph User_Environment [Desktop Shell (Tauri v2)]
-    UI["Frontend (React 19)"]
-    Store["Zustand State (workspaceStore/investigationStore)"]
+  subgraph User_Environment [Desktop Shell: Tauri v2 (Rust)]
+    UI["Frontend (React 19 + Vite 6 + Tailwind v4)"]
+    Store["Zustand State (investigationStore / layaStore / dashboardStore)"]
     Bridge["Sidecar Bridge (useSidecarBridge.ts)"]
   end
 
-  subgraph Engine_Environment [Sidecar Engine (Python 3.12)]
-    API["JSON-RPC API (api.py)"]
-    Runner["Hybrid Runner (ADK / runner.py)"]
-    Graph["LangGraph Machine (graph.py)"]
-    Tools["Tool Registry (tools.py)"]
-    Parser["Log Parser (Drain3 / parser.py)"]
-    DB["DuckDB Persistence (db.py)"]
-    SSH["SSH Remote Loader (ssh_loader.py)"]
-    Tailer["File Tailer (tailer.py)"]
-    AI["AI Interface (src/ai/)"]
+  subgraph Engine_Environment [Sidecar Engine: Go 1.26]
+    RPC["JSON-RPC 2.0 Dispatcher (HTTP :5000 / Stdio)"]
+    Ingest["Ingestion Pipeline (File / Tailer / Syslog / HTTP)"]
+    Drain["Drain3 Log Clustering (>81k lines/sec)"]
+    DB[("DuckDB Columnar Storage (loglens.duckdb)")]
+    
+    subgraph Laya_System1 ["System 1: Laya Fast Decision Engine (<30ms)"]
+      ONNX["ONNX ModernBERT Q8 (Zero-VRAM CPU / DirectML)"]
+      Triage["LayaClusterTriager (Bounded Concurrency x4)"]
+      Rules["RuleManager & Checkpoint Store (laya_rules.json)"]
+      HFDownloader["Hugging Face Model Manager & Downloader"]
+    end
+
+    subgraph LLM_System2 ["System 2: Deep Reasoning Engine"]
+      LangGraph["LangGraph State Machine (Reasoning -> Tool -> Final)"]
+      Tools["Tool Registry (get_logs, analyze_cluster, update_laya_rules)"]
+      VSS[("DuckDB-VSS Vector Memory")]
+    end
   end
 
-  subgraph AI_Cloud_Provider [External AI Engines]
-    A2A["Gemini CLI (A2A Server)"]
-    Studio["Google AI Studio"]
-    Ollama["Ollama (Local)"]
+  subgraph External_AI [External AI Engines]
+    Ollama["Ollama (Local LLM)"]
+    Studio["Google Gemini API"]
+    OpenAI["OpenAI Compatible API"]
   end
 
+  %% Client IPC
   UI <--> Store
   UI <--> Bridge
-  Bridge <-- "JSON-RPC (stdin/stdout)" --> API
-  API <--> Parser
-  API <--> DB
-  API <--> Tailer
-  API <--> Runner
-  Runner <--> Graph
-  Graph <--> AI
-  Graph <--> Tools
-  Tools <--> Parser
-  Tools <--> DB
-  AI <--> A2A
-  AI <--> Studio
-  AI <--> Ollama
-  Tailer <--> DB
-  SSH <--> Parser
-  Parser <--> DB
+  Bridge <-- "JSON-RPC 2.0 (stdin/stdout or :5000)" --> RPC
 
-  User_File[(".log files (local)")] --> Tailer
-  Remote_Srv[("Remote Server (SSH)")] --> SSH
+  %% Ingestion & Clustering
+  RPC <--> Ingest
+  Ingest --> DB
+  Ingest --> Drain
+  Drain --> Triage
+  Triage --> ONNX
+  Triage --> DB
+
+  %% AI Investigation
+  RPC <--> LangGraph
+  LangGraph <--> External_AI
+  LangGraph --> Tools
+  Tools --> DB
+  Tools --> Drain
+  Tools --> VSS
+  Tools --> Rules
+
+  %% Configuration & Models
+  RPC <--> Rules
+  RPC <--> HFDownloader
+  HFDownloader --> ONNX
 ```
+
+---
 
 ## 📂 File Index & Documentation Map
 
-- **[Frontend Architecture](layers/frontend.md)**: Detailed mapping of every React component, hook, and store value.
-- **[Backend Architecture](layers/backend.md)**: Every Python class, method, and DuckDB table definition.
-- **[Communication & Contract](communication.md)**: Full JSON-RPC 2.0 method specification and bridge patterns.
-- **[Testing & Quality](testing.md)**: Unit, integration, and E2E coverage tracking for the LogLens ecosystem.
-- **[Visual Diagrams Repository](diagrams.md)**: Detailed flowcharts and sequence diagrams for complex interactions.
-- **[Function & Component Index](function_index.md)**: Searchable list of all core backend functions and frontend components with one-line summaries.
+- **[System Interaction Map](interaction_map.md)**: Direct mapping between React stores, Go JSON-RPC handlers, and DuckDB tables.
+- **[Visual Diagrams Repository](diagrams.md)**: In-depth sequence diagrams, C4 topologies, and DuckDB ERD with cluster triage schemas.
+- **[Database Architecture](database.md)**: Columnar DuckDB table schemas, migration records, and thread-safe cursor patterns.
+- **[Communication & Contract](communication.md)**: JSON-RPC 2.0 method catalog, payload definitions, and response envelopes.
+- **[Laya System 1 Specification](../track/specs/FEAT_LAYA_SYSTEM1_ENGINE.md)**: Full engineering spec for the ModernBERT ONNX decision engine, rule manager, downloader, and triage hooks.
 
-## 🛡️ Mandate
-Every new feature, function, or structural file MUST update its corresponding documentation in this directory. Failing to do so is a direct violation of the `ArchitectureDocs.md` rule.
+---
+
+## 🛡️ Architectural Mandates
+
+1. **Dual-Engine Balance**: System 1 (Laya) handles sub-30ms reactive triage and intent routing; System 2 handles generative reasoning and diagnostic explanations.
+2. **Zero Ingestion Blocking**: Log clustering and Laya triage must run asynchronously via non-blocking goroutines with bounded concurrency (semaphore max 4).
+3. **Cursor Isolation**: All DuckDB queries must acquire thread-safe connections through the cursor manager to prevent WAL locks.
+4. **Desktop Autonomy**: Zero-VRAM CPU execution must always be supported to ensure portability on systems without dedicated GPUs.
