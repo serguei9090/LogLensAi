@@ -100,8 +100,10 @@ type App struct {
 	tailersMu sync.Mutex
 	tailers   map[string]*ingestion.FileTailer
 
+	engineMu    sync.Mutex
 	LayaManager *laya.RuleManager
 	LayaEngine  laya.Engine
+	LayaModels  *laya.ModelManager
 }
 
 // NewApp opens/creates the DuckDB database at dbPath, constructs the
@@ -136,8 +138,18 @@ func NewApp(dbPath string) (*App, error) {
 		return nil, fmt.Errorf("app: initializing laya rule manager: %w", err)
 	}
 
+	layaModelDir := filepath.Join(dataDir, "models", "laya")
+	layaModels := laya.NewModelManager(layaModelDir)
+
 	var layaEngine laya.Engine = laya.NewMockEngine()
-	if onnxEng, err := laya.NewONNXEngine(laya.ONNXEngineConfig{FallbackToMock: true}); err == nil {
+	encPath, headPath, tokPath := layaModels.GetPaths()
+	onnxCfg := laya.ONNXEngineConfig{
+		EncoderPath:    encPath,
+		HeadPath:       headPath,
+		TokenizerPath:  tokPath,
+		FallbackToMock: true,
+	}
+	if onnxEng, err := laya.NewONNXEngine(onnxCfg); err == nil {
 		layaEngine = onnxEng
 	}
 	if layaManager != nil {
@@ -146,6 +158,8 @@ func NewApp(dbPath string) (*App, error) {
 			_ = layaEngine.SetDevice(settings.Device)
 		}
 	}
+
+	_ = database.InitClusterTriageTable()
 
 	a := &App{
 		DB:          database,
@@ -159,6 +173,7 @@ func NewApp(dbPath string) (*App, error) {
 		tailers:     make(map[string]*ingestion.FileTailer),
 		LayaManager: layaManager,
 		LayaEngine:  layaEngine,
+		LayaModels:  layaModels,
 	}
 	a.metaResolver = &metadataConfigResolver{app: a}
 
@@ -176,10 +191,41 @@ func NewApp(dbPath string) (*App, error) {
 	// ingest.
 	extractor := clustering.NewMetadataAdapter(a.metaResolver)
 	worker := clustering.NewWorker(database, fastPath, extractor, a.GetDrainParser, clusterWorkerBatchSize, 0, 0)
+	worker.SetTriageHandler(NewLayaClusterTriager(a))
 	a.Cluster = worker
 	worker.Start()
 
 	return a, nil
+}
+
+// ReloadLayaEngine reinitializes the Laya engine with newly available ONNX weights.
+func (a *App) ReloadLayaEngine() error {
+	a.engineMu.Lock()
+	defer a.engineMu.Unlock()
+
+	if a.LayaModels == nil || a.LayaManager == nil {
+		return nil
+	}
+
+	encPath, headPath, tokPath := a.LayaModels.GetPaths()
+	cfg := laya.ONNXEngineConfig{
+		EncoderPath:    encPath,
+		HeadPath:       headPath,
+		TokenizerPath:  tokPath,
+		FallbackToMock: true,
+		Device:         a.LayaManager.GetSettings().Device,
+	}
+
+	eng, err := laya.NewONNXEngine(cfg)
+	if err != nil {
+		return fmt.Errorf("app: reloading laya engine: %w", err)
+	}
+
+	if a.LayaEngine != nil {
+		_ = a.LayaEngine.Close()
+	}
+	a.LayaEngine = eng
+	return nil
 }
 
 // resolveDataDir picks the directory NewApp uses for disk-first log storage

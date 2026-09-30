@@ -504,6 +504,10 @@ function ErrorClustersSection({ stats, selectedWorkspaceId }: ClustersSectionPro
         type="error"
         clusterId={(c as any).cluster_id}
         workspaceId={selectedWorkspaceId}
+        category={(c as any).category}
+        severity={(c as any).severity}
+        isOutage={(c as any).is_outage}
+        confidence={(c as any).confidence}
       />
     ));
   } else {
@@ -555,6 +559,10 @@ function NoiseClustersSection({ stats, selectedWorkspaceId }: ClustersSectionPro
         type="noise"
         clusterId={(c as any).cluster_id}
         workspaceId={selectedWorkspaceId}
+        category={(c as any).category}
+        severity={(c as any).severity}
+        isOutage={(c as any).is_outage}
+        confidence={(c as any).confidence}
       />
     ));
   } else {

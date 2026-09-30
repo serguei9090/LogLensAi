@@ -78,7 +78,23 @@ type Worker struct {
 
 	stopCh chan struct{}
 	doneCh chan struct{}
+
+	triageHandler ClusterTriageHandler
 }
+
+// ClusterTriageHandler allows external services (such as Laya System 1) to asynchronously
+// evaluate newly created or updated cluster templates without blocking the clustering pipeline.
+type ClusterTriageHandler interface {
+	TriageClustersAsync(workspaceID string, templates map[string]string)
+}
+
+// SetTriageHandler registers a triage handler for async template classification.
+func (w *Worker) SetTriageHandler(h ClusterTriageHandler) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	w.triageHandler = h
+}
+
 
 // NewWorker constructs a Worker.
 //

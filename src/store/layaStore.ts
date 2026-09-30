@@ -17,9 +17,12 @@ interface LayaStore {
   testResult: LayaDecisionResult | null;
   error: string | null;
 
+  modelStatus: import("@/types/laya").LayaModelStatus | null;
   fetchSettings: (workspaceId?: string) => Promise<void>;
   updateSettings: (params: { enabled?: boolean; device?: "cpu" | "gpu"; workspaceId?: string }) => Promise<void>;
   fetchCheckpoints: (workspaceId?: string) => Promise<void>;
+  fetchModelStatus: (workspaceId?: string) => Promise<void>;
+  downloadModel: (workspaceId?: string) => Promise<void>;
   rollbackCheckpoint: (checkpointId: string, workspaceId?: string) => Promise<void>;
   saveRules: (
     author: string,
@@ -72,10 +75,57 @@ const defaultLayaSettings: LayaSettings = {
 export const useLayaStore = create<LayaStore>((set, get) => ({
   settings: defaultLayaSettings,
   checkpoints: [],
+  modelStatus: null,
   isLoading: false,
   isTesting: false,
   testResult: null,
   error: null,
+
+  fetchModelStatus: async (workspaceId?: string) => {
+    try {
+      const res = await callSidecar<import("@/types/laya").LayaModelStatus>({
+        method: "get_laya_model_status",
+        params: { workspace_id: workspaceId },
+      });
+      if (res) {
+        set({ modelStatus: res });
+      }
+    } catch (err: unknown) {
+      console.warn("failed to fetch laya model status:", err);
+    }
+  },
+
+  downloadModel: async (workspaceId?: string) => {
+    try {
+      const res = await callSidecar<import("@/types/laya").LayaModelStatus>({
+        method: "download_laya_model",
+        params: { workspace_id: workspaceId },
+      });
+      if (res) {
+        set({ modelStatus: res });
+      }
+
+      // Poll status every 1.5 seconds while downloading
+      const pollInterval = setInterval(async () => {
+        try {
+          const status = await callSidecar<import("@/types/laya").LayaModelStatus>({
+            method: "get_laya_model_status",
+            params: { workspace_id: workspaceId },
+          });
+          if (status) {
+            set({ modelStatus: status });
+            if (status.state === "ready" || status.state === "error" || status.state === "idle") {
+              clearInterval(pollInterval);
+            }
+          }
+        } catch {
+          clearInterval(pollInterval);
+        }
+      }, 1500);
+    } catch (err: unknown) {
+      set({ error: err instanceof Error ? err.message : String(err) });
+    }
+  },
 
   fetchSettings: async (workspaceId?: string) => {
     set({ isLoading: true, error: null });
@@ -87,6 +137,7 @@ export const useLayaStore = create<LayaStore>((set, get) => ({
       if (res) {
         set({ settings: res });
       }
+      await get().fetchModelStatus(workspaceId);
     } catch (err: unknown) {
       set({ error: err instanceof Error ? err.message : String(err) });
     } finally {

@@ -13,6 +13,10 @@ interface ClusterRowProps {
   type: "error" | "noise";
   clusterId?: string;
   workspaceId?: string;
+  category?: string;
+  severity?: number;
+  isOutage?: boolean;
+  confidence?: number;
 }
 
 /**
@@ -27,6 +31,9 @@ export function ClusterRow({
   type,
   clusterId,
   workspaceId,
+  category,
+  severity,
+  isOutage,
 }: Readonly<ClusterRowProps>) {
   const [expanded, setExpanded] = useState(false);
   const [samples, setSamples] = useState<string[]>([]);
@@ -89,14 +96,31 @@ export function ClusterRow({
       >
         <span className="text-[10px] font-mono text-text-muted py-1 w-6">#{index + 1}</span>
         <div className="flex-1 overflow-hidden">
-          <p
-            className={cn(
-              "text-[11px] font-mono text-text-primary truncate mb-1.5 leading-relaxed group-hover:text-primary transition-colors",
-              type === "error" && "text-error opacity-90",
+          <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+            <p
+              className={cn(
+                "text-[11px] font-mono text-text-primary truncate leading-relaxed group-hover:text-primary transition-colors flex-1 min-w-[200px]",
+                type === "error" && "text-error opacity-90",
+              )}
+            >
+              {template}
+            </p>
+            {category && (
+              <span className="text-[9px] uppercase font-mono px-1.5 py-0.5 rounded bg-white/5 border border-white/10 text-text-muted">
+                {category}
+              </span>
             )}
-          >
-            {template}
-          </p>
+            {severity !== undefined && (
+              <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                Sev {severity.toFixed(1)}
+              </span>
+            )}
+            {isOutage && (
+              <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-rose-500/15 text-rose-400 border border-rose-500/30 animate-pulse">
+                OUTAGE
+              </span>
+            )}
+          </div>
           <div className="flex items-center gap-3">
             <div className="h-1 bg-bg-base/50 rounded-full flex-1 overflow-hidden border border-white/5">
               <div

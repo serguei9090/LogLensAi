@@ -362,3 +362,42 @@ func TestTestLayaRule(t *testing.T) {
 		t.Fatalf("expected errInternal for uninitialized engine, got %+v", errGuard)
 	}
 }
+
+func TestGetLayaModelStatus_And_Download(t *testing.T) {
+	a := newLayaTestApp(t)
+
+	// 1. Initial status
+	res, rpcErr := a.GetLayaModelStatus(models.GetLayaModelStatusRequest{})
+	if rpcErr != nil {
+		t.Fatalf("unexpected RPC error: %+v", rpcErr)
+	}
+	st, ok := res.(laya.ModelStatus)
+	if !ok {
+		t.Fatalf("expected laya.ModelStatus, got %T", res)
+	}
+	if st.State != laya.ModelStateIdle {
+		t.Errorf("expected state %s, got %s", laya.ModelStateIdle, st.State)
+	}
+
+	// 2. Download trigger
+	dlRes, dlErr := a.DownloadLayaModel(models.DownloadLayaModelRequest{})
+	if dlErr != nil {
+		t.Fatalf("unexpected RPC error on DownloadLayaModel: %+v", dlErr)
+	}
+	dlSt, ok := dlRes.(laya.ModelStatus)
+	if !ok {
+		t.Fatalf("expected laya.ModelStatus, got %T", dlRes)
+	}
+	if dlSt.State != laya.ModelStateDownloading && dlSt.State != laya.ModelStateReady {
+		t.Errorf("expected state downloading or ready, got %s", dlSt.State)
+	}
+	a.LayaModels.CancelDownload()
+
+	// 3. Error guard: uninitialized model manager
+	uninitApp := &App{}
+	_, errGuard := uninitApp.DownloadLayaModel(models.DownloadLayaModelRequest{})
+	if errGuard == nil || errGuard.Code != errInternal {
+		t.Fatalf("expected errInternal for uninitialized model manager, got %+v", errGuard)
+	}
+}
+

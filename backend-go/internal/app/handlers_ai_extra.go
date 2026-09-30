@@ -689,7 +689,26 @@ func (a *App) runClusterAggQuery(query string, params []any) []map[string]any {
 		var template, clusterID sql.NullString
 		var count int64
 		if rows.Scan(&template, &count, &clusterID) == nil {
-			out = append(out, map[string]any{"template": template.String, "count": count, "cluster_id": clusterID.String})
+			entry := map[string]any{"template": template.String, "count": count, "cluster_id": clusterID.String}
+			if a.DB != nil && clusterID.Valid && clusterID.String != "" {
+				// Check if triage metadata exists
+				row := a.DB.Conn.QueryRow(`
+					SELECT category, severity, is_outage, confidence
+					FROM cluster_triage
+					WHERE cluster_id = ?
+					LIMIT 1
+				`, clusterID.String)
+				var cat string
+				var sev, conf float64
+				var isOutage bool
+				if row.Scan(&cat, &sev, &isOutage, &conf) == nil {
+					entry["category"] = cat
+					entry["severity"] = sev
+					entry["is_outage"] = isOutage
+					entry["confidence"] = conf
+				}
+			}
+			out = append(out, entry)
 		}
 	}
 	return out

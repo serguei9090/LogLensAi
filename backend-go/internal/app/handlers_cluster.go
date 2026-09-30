@@ -1,22 +1,39 @@
 package app
 
 import (
+	"strconv"
+
+	"loglensai/backend-go/internal/db"
 	"loglensai/backend-go/internal/models"
 	"loglensai/backend-go/internal/services/clustering"
 )
 
 // GetClusters implements the get_clusters RPC method, mirroring api.py's
 // App.method_get_clusters: returns every cluster currently tracked by
-// workspaceID's Drain3 miner (see GetDrainParser for scope resolution).
+// workspaceID's Drain3 miner, enriched with Laya System 1 triage metadata when available.
 func (a *App) GetClusters(workspaceID string) (any, *models.RPCError) {
 	miner, err := a.GetDrainParser(workspaceID)
 	if err != nil {
 		return nil, &models.RPCError{Code: errInternal, Message: err.Error()}
 	}
 	clusters := miner.Clusters()
+
+	var triageMap map[string]db.ClusterTriage
+	if a.DB != nil {
+		triageMap, _ = a.DB.GetClusterTriageMap(workspaceID)
+	}
+
 	out := make([]map[string]any, len(clusters))
 	for i, c := range clusters {
-		out[i] = map[string]any{"id": c.ID, "template": c.Template(), "size": c.Size}
+		cIDStr := strconv.Itoa(c.ID)
+		entry := map[string]any{"id": c.ID, "template": c.Template(), "size": c.Size}
+		if t, ok := triageMap[cIDStr]; ok {
+			entry["category"] = t.Category
+			entry["severity"] = t.Severity
+			entry["is_outage"] = t.IsOutage
+			entry["confidence"] = t.Confidence
+		}
+		out[i] = entry
 	}
 	return out, nil
 }

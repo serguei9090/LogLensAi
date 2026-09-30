@@ -42,3 +42,15 @@ type TestLayaRuleRequest struct {
 	QuestionName *string        `json:"question_name,omitempty"`
 	WorkspaceID  *string        `json:"workspace_id,omitempty"`
 }
+
+// GetLayaModelStatusRequest defines parameters for querying local ONNX model weight readiness.
+type GetLayaModelStatusRequest struct {
+	WorkspaceID *string `json:"workspace_id,omitempty"`
+}
+
+// DownloadLayaModelRequest defines parameters for requesting background download of Laya weights.
+type DownloadLayaModelRequest struct {
+	Force       *bool   `json:"force,omitempty"`
+	WorkspaceID *string `json:"workspace_id,omitempty"`
+}
+

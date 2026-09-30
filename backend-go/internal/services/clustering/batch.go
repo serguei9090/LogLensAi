@@ -342,5 +342,27 @@ func (w *Worker) applyResults(updates []db.LogUpdate, clusterIncrements map[clus
 			return fmt.Errorf("clustering: updating ingestion job progress: %w", err)
 		}
 	}
+
+	w.mu.Lock()
+	th := w.triageHandler
+	w.mu.Unlock()
+
+	if th != nil && len(clusterIncrements) > 0 {
+		byWs := map[string]map[string]string{}
+		for k := range clusterIncrements {
+			if k.template != "" {
+				if byWs[k.workspace] == nil {
+					byWs[k.workspace] = map[string]string{}
+				}
+				byWs[k.workspace][k.cluster] = k.template
+			}
+		}
+		for ws, tmpls := range byWs {
+			if len(tmpls) > 0 {
+				th.TriageClustersAsync(ws, tmpls)
+			}
+		}
+	}
+
 	return nil
 }

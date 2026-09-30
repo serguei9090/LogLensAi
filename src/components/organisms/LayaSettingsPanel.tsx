@@ -17,11 +17,16 @@ import { useWorkspaceStore } from "@/store/workspaceStore";
 import type { LayaQuestion, QuestionType } from "@/types/laya";
 import {
   Activity,
+  AlertCircle,
   Check,
+  CheckCircle2,
   Code2,
   Cpu,
+  Download,
+  HardDrive,
   History,
   Layers,
+  Loader2,
   Play,
   Plus,
   RotateCcw,
@@ -37,12 +42,15 @@ export function LayaSettingsPanel() {
   const {
     settings,
     checkpoints,
+    modelStatus,
     isLoading,
     isTesting,
     testResult,
     fetchSettings,
     updateSettings,
     fetchCheckpoints,
+    fetchModelStatus,
+    downloadModel,
     rollbackCheckpoint,
     saveRules,
     testRule,
@@ -111,6 +119,16 @@ export function LayaSettingsPanel() {
       toast.error("Failed to switch hardware mode");
     }
   };
+
+  const handleDownloadModel = async () => {
+    try {
+      await downloadModel(currentWorkspace?.id);
+      toast.info("Started background download of Laya ONNX weights from Hugging Face");
+    } catch {
+      toast.error("Failed to start model download");
+    }
+  };
+
 
   const handleSaveJsonRules = async () => {
     try {
@@ -341,6 +359,81 @@ export function LayaSettingsPanel() {
             </div>
           </button>
         </div>
+      </div>
+
+      {/* Model Weights & Local Cache Status */}
+      <div className="p-4 rounded-xl border border-border bg-bg-surface space-y-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <HardDrive className="h-4 w-4 text-primary" />
+            <h4 className="text-xs font-semibold uppercase tracking-wider text-text-muted font-mono">
+              Model Weights & Local Cache
+            </h4>
+            <span className="text-[10px] font-mono text-text-muted hidden sm:inline">
+              nvkudva/laya-web-q8 (524 MB)
+            </span>
+          </div>
+          <div>
+            {modelStatus?.state === "ready" && (
+              <span className="flex items-center gap-1.5 text-xs font-medium text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-1 rounded-full">
+                <CheckCircle2 className="h-3.5 w-3.5" /> Local Weights Ready
+              </span>
+            )}
+            {modelStatus?.state === "downloading" && (
+              <span className="flex items-center gap-1.5 text-xs font-medium text-amber-400 bg-amber-500/10 border border-amber-500/20 px-2.5 py-1 rounded-full animate-pulse">
+                <Loader2 className="h-3.5 w-3.5 animate-spin" /> Downloading {modelStatus.progress.toFixed(1)}%
+              </span>
+            )}
+            {(!modelStatus || modelStatus.state === "idle") && (
+              <span className="flex items-center gap-1.5 text-xs font-medium text-amber-400/90 bg-amber-500/10 border border-amber-500/20 px-2.5 py-1 rounded-full">
+                <AlertCircle className="h-3.5 w-3.5" /> Simulated Fallback Mode
+              </span>
+            )}
+            {modelStatus?.state === "error" && (
+              <span className="flex items-center gap-1.5 text-xs font-medium text-rose-400 bg-rose-500/10 border border-rose-500/20 px-2.5 py-1 rounded-full">
+                <AlertCircle className="h-3.5 w-3.5" /> Download Error
+              </span>
+            )}
+          </div>
+        </div>
+
+        {modelStatus?.state === "downloading" ? (
+          <div className="space-y-2 pt-1">
+            <div className="w-full bg-border/60 rounded-full h-2 overflow-hidden">
+              <div
+                className="bg-primary h-full transition-all duration-300 rounded-full"
+                style={{ width: `${Math.max(2, modelStatus.progress)}%` }}
+              />
+            </div>
+            <div className="flex items-center justify-between text-[11px] font-mono text-text-muted">
+              <span>Downloading encoder_q8.onnx and head_q8.onnx...</span>
+              <span>
+                {(modelStatus.downloaded_bytes / (1024 * 1024)).toFixed(1)} MB /{" "}
+                {(modelStatus.total_bytes / (1024 * 1024)).toFixed(1)} MB
+              </span>
+            </div>
+          </div>
+        ) : (
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pt-1">
+            <p className="text-xs text-text-muted max-w-xl">
+              {modelStatus?.state === "ready"
+                ? "Quantized 8-bit ModernBERT ONNX weights are cached locally and accelerating log analysis."
+                : "LogLensAi operates with a built-in heuristic simulation when weights are not downloaded. Download the official 524 MB weights for full ModernBERT accuracy."}
+            </p>
+            {modelStatus?.state !== "ready" && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleDownloadModel}
+                disabled={modelStatus?.state === "downloading"}
+                className="shrink-0 gap-2 border-primary/40 text-primary hover:bg-primary/10"
+              >
+                <Download className="h-3.5 w-3.5" />
+                Download Weights (524 MB)
+              </Button>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Tabs Header */}

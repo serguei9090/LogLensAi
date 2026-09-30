@@ -32,3 +32,16 @@ export interface LayaDecisionResult {
   selected_score: number;
   confidence: number;
 }
+
+export interface LayaModelStatus {
+  state: "idle" | "downloading" | "ready" | "error";
+  progress: number;
+  downloaded_bytes: number;
+  total_bytes: number;
+  error_message?: string;
+  model_dir: string;
+  encoder_path: string;
+  head_path: string;
+  tokenizer_path: string;
+}
+

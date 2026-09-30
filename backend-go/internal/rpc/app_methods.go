@@ -109,6 +109,12 @@ func RegisterApp(r *Registry, a *app.App) {
 	r.RegisterWithModel("test_laya_rule", func() any { return &models.TestLayaRuleRequest{} }, appHandler(func(req models.TestLayaRuleRequest) (any, *models.RPCError) {
 		return a.TestLayaRule(req)
 	}))
+	r.RegisterWithModel("get_laya_model_status", func() any { return &models.GetLayaModelStatusRequest{} }, appHandler(func(req models.GetLayaModelStatusRequest) (any, *models.RPCError) {
+		return a.GetLayaModelStatus(req)
+	}))
+	r.RegisterWithModel("download_laya_model", func() any { return &models.DownloadLayaModelRequest{} }, appHandler(func(req models.DownloadLayaModelRequest) (any, *models.RPCError) {
+		return a.DownloadLayaModel(req)
+	}))
 }
 
 // appHandler decodes params into a T and calls fn, converting a decode

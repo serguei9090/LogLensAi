@@ -52,6 +52,12 @@ func (a *App) UpdateLayaSettings(req models.UpdateLayaSettingsRequest) (any, *mo
 		_ = a.LayaEngine.SetDevice(device)
 	}
 
+	if enabled && a.LayaModels != nil && !a.LayaModels.IsReady() {
+		_ = a.LayaModels.StartDownload(func() {
+			_ = a.ReloadLayaEngine()
+		})
+	}
+
 	return map[string]any{
 		"status":  "success",
 		"enabled": enabled,
@@ -148,3 +154,30 @@ func (a *App) TestLayaRule(req models.TestLayaRuleRequest) (any, *models.RPCErro
 
 	return result, nil
 }
+
+// GetLayaModelStatus implements the get_laya_model_status JSON-RPC 2.0 method,
+// reporting local availability and download progress for Laya weights.
+func (a *App) GetLayaModelStatus(_ models.GetLayaModelStatusRequest) (any, *models.RPCError) {
+	if a.LayaModels == nil {
+		return laya.ModelStatus{State: laya.ModelStateIdle}, nil
+	}
+	return a.LayaModels.GetStatus(), nil
+}
+
+// DownloadLayaModel implements the download_laya_model JSON-RPC 2.0 method,
+// initiating an asynchronous background download of model weights from Hugging Face.
+func (a *App) DownloadLayaModel(_ models.DownloadLayaModelRequest) (any, *models.RPCError) {
+	if a.LayaModels == nil {
+		return nil, &models.RPCError{Code: errInternal, Message: "laya model manager not initialized"}
+	}
+
+	err := a.LayaModels.StartDownload(func() {
+		_ = a.ReloadLayaEngine()
+	})
+	if err != nil {
+		return nil, &models.RPCError{Code: errInternal, Message: err.Error()}
+	}
+
+	return a.LayaModels.GetStatus(), nil
+}
+
