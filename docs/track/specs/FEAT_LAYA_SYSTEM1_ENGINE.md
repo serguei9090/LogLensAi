@@ -50,8 +50,17 @@ Integrate **Laya AI** (`nvkudva/laya-web-q8` 8-bit ONNX ModernBERT-large decisio
 - [x] **Task 2.2: Pre-LLM Routing Hook in AI State Machine** (`backend-go/internal/ai/graph/graph.go`)
   - Before calling `nodeReasoning`, evaluate query with `RouteWithLaya` against `tool_intent`.
   - Annotates high-confidence routing (`>= 0.85`) to accelerate tool execution.
-- [x] **Task 2.3: Post-Drain3 Cluster Enrichment Service**
-  - Integrated fast batch prediction interface for cluster template categorization and severity scoring.
+- [x] **Task 2.3: Post-Drain3 Cluster Enrichment Service** (`backend-go/internal/services/clustering/`, `internal/app/laya_triage.go`, `internal/db/clustering_triage.go`)
+  - Created `cluster_triage` DuckDB table and CRUD operations.
+  - Added `ClusterTriageHandler` to clustering worker; asynchronously triages newly discovered templates.
+  - Implemented `LayaClusterTriager` scoring category, severity, and outage indicators in background goroutines.
+  - Enriched `GetClusters` and Dashboard queries with triage metadata.
+  - Rendered category, severity, and outage badges on `ClusterRow` in Dashboard and Investigation views.
+- [x] **Task 2.4: Automated Hugging Face Model Downloader** (`backend-go/internal/ai/laya/downloader.go`)
+  - Implemented `ModelManager` with atomic file downloads (`encoder_q8.onnx` and `head_q8.onnx`, ~524MB total).
+  - Added JSON-RPC endpoints: `get_laya_model_status` and `download_laya_model`.
+  - Auto-triggers background download when user enables Laya and weights are missing.
+  - Added progress tracking bar, download button, and readiness badges in `LayaSettingsPanel.tsx`.
 
 ---
 
