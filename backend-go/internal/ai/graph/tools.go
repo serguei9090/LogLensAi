@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"strings"
 
+	"loglensai/backend-go/internal/ai/laya"
 	"loglensai/backend-go/internal/app"
 	"loglensai/backend-go/internal/models"
 )
@@ -115,12 +116,15 @@ func (r *ToolRegistry) registerBuiltins() {
 		Type: "function",
 		Function: ToolFunctionSchema{
 			Name:        "search_logs",
-			Description: "Search and filter logs in the workspace using LLQL.",
+			Description: "Search and filter logs in the workspace using LLQL, time ranges, and optional source filtering. If source_id is omitted, searches across ALL logs in the workspace.",
 			Parameters: rawSchema(`{
 				"type": "object",
 				"properties": {
 					"workspace_id": {"type": "string", "description": "The workspace ID to search in"},
-					"query": {"type": ["string", "null"], "description": "LLQL search query"},
+					"source_id": {"type": ["string", "null"], "description": "Optional source ID to restrict search to one specific log file. Omit to search across all 4+ logs in the workspace."},
+					"start_time": {"type": ["string", "null"], "description": "Optional start timestamp for the search window (e.g. '2026-09-16 10:00:00')"},
+					"end_time": {"type": ["string", "null"], "description": "Optional end timestamp for the search window (e.g. '2026-09-16 10:15:00')"},
+					"query": {"type": ["string", "null"], "description": "LLQL search query or keywords"},
 					"filters": {"type": ["array", "null"], "description": "List of filters to apply"},
 					"limit": {"type": "integer", "description": "Max logs to return", "default": 100},
 					"offset": {"type": "integer", "description": "Offset for pagination", "default": 0}
@@ -226,12 +230,35 @@ func (r *ToolRegistry) registerBuiltins() {
 			}`),
 		},
 	}, r.createFacet)
+
+	r.Register("update_laya_rules", ToolSchema{
+		Type: "function",
+		Function: ToolFunctionSchema{
+			Name:        "update_laya_rules",
+			Description: "Auto-improves or updates Laya System 1 decision rules to resolve misclassified log patterns, adjust severity rubrics, or add new infrastructure categories.",
+			Parameters: rawSchema(`{
+				"type": "object",
+				"properties": {
+					"rationale": {"type": "string", "description": "Clear reason for updating the rule (e.g. 'Added k8s OOM killed category to resolve ambiguity in pod evictions')"},
+					"question_name": {"type": "string", "description": "The key of the question to add or update (e.g. 'category', 'severity', 'is_outage', or a custom question)"},
+					"type": {"type": "string", "enum": ["choice", "score", "noul"], "description": "Decision primitive type"},
+					"instructions": {"type": "string", "description": "The precise prompt/instruction for the question"},
+					"options": {"type": "array", "items": {"type": "string"}, "description": "For choice: list of category options. For noul: optional true/false labels"},
+					"rubric": {"type": "array", "items": {"type": "integer"}, "description": "For score: ordinal rubric levels (e.g. [1, 2, 3, 4, 5])"}
+				},
+				"required": ["rationale", "question_name", "type", "instructions"]
+			}`),
+		},
+	}, r.updateLayaRules)
 }
 
 // --- search_logs ---
 
 type searchLogsParams struct {
 	WorkspaceID string             `json:"workspace_id"`
+	SourceID    *string            `json:"source_id,omitempty"`
+	StartTime   *string            `json:"start_time,omitempty"`
+	EndTime     *string            `json:"end_time,omitempty"`
 	Query       *string            `json:"query"`
 	Filters     []models.LogFilter `json:"filters"`
 	Limit       int                `json:"limit"`
@@ -245,12 +272,23 @@ func (r *ToolRegistry) searchLogs(_ context.Context, args json.RawMessage) (any,
 		return map[string]any{"error": err.Error()}, nil
 	}
 
+	filters := p.Filters
+	if p.SourceID != nil && *p.SourceID != "" {
+		filters = append(filters, models.LogFilter{
+			Field:    "source_id",
+			Operator: "equals",
+			Value:    *p.SourceID,
+		})
+	}
+
 	result, rpcErr := r.app.GetLogs(models.GetLogsRequest{
 		WorkspaceID: p.WorkspaceID,
 		Offset:      p.Offset,
 		Limit:       p.Limit,
-		Filters:     p.Filters,
+		Filters:     filters,
 		Query:       p.Query,
+		StartTime:   p.StartTime,
+		EndTime:     p.EndTime,
 	})
 	if rpcErr != nil {
 		return map[string]any{"error": rpcErr.Message}, nil
@@ -585,4 +623,66 @@ func (r *ToolRegistry) writeDrainMasksSetting(conn *sql.DB, workspaceID, value s
 		value,
 	)
 	return err
+}
+
+// --- update_laya_rules ---
+
+type updateLayaRulesParams struct {
+	Rationale    string   `json:"rationale"`
+	QuestionName string   `json:"question_name"`
+	Type         string   `json:"type"`
+	Instructions string   `json:"instructions"`
+	Options      []string `json:"options,omitempty"`
+	Rubric       []int    `json:"rubric,omitempty"`
+}
+
+func (r *ToolRegistry) updateLayaRules(_ context.Context, args json.RawMessage) (any, error) {
+	if r.app == nil || r.app.LayaManager == nil {
+		return map[string]any{"error": "Laya rule manager is not initialized on backend"}, nil
+	}
+
+	var p updateLayaRulesParams
+	if err := json.Unmarshal(args, &p); err != nil {
+		return map[string]any{"error": fmt.Sprintf("invalid arguments: %v", err)}, nil
+	}
+
+	rationale := strings.TrimSpace(p.Rationale)
+	if rationale == "" {
+		return map[string]any{"error": "rationale is required for auto-improving Laya rules"}, nil
+	}
+	qName := strings.TrimSpace(p.QuestionName)
+	if qName == "" {
+		return map[string]any{"error": "question_name is required"}, nil
+	}
+
+	qType := laya.QuestionType(strings.ToLower(strings.TrimSpace(p.Type)))
+	if qType != laya.QuestionTypeChoice && qType != laya.QuestionTypeScore && qType != laya.QuestionTypeNoul {
+		return map[string]any{"error": fmt.Sprintf("invalid question type %q; must be 'choice', 'score', or 'noul'", p.Type)}, nil
+	}
+
+	q := laya.Question{
+		Type:         qType,
+		Instructions: strings.TrimSpace(p.Instructions),
+		Options:      p.Options,
+		Rubric:       p.Rubric,
+	}
+
+	activeQuestions := r.app.LayaManager.GetActiveQuestions()
+	if activeQuestions == nil {
+		activeQuestions = make(map[string]laya.Question)
+	}
+	activeQuestions[qName] = q
+
+	chk, err := r.app.LayaManager.SaveCheckpoint("AI System 2 (Auto-Improvement)", rationale, activeQuestions)
+	if err != nil {
+		return map[string]any{"error": fmt.Sprintf("failed to save checkpoint: %v", err)}, nil
+	}
+
+	return map[string]any{
+		"status":        "checkpoint_created",
+		"checkpoint_id": chk.ID,
+		"question_name": qName,
+		"timestamp":     chk.Timestamp,
+		"message":       fmt.Sprintf("Successfully created checkpoint %s with updated rule '%s'", chk.ID, qName),
+	}, nil
 }

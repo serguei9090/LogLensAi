@@ -93,7 +93,7 @@ func (a *App) GetHierarchy(req models.GetHierarchyRequest) (any, *models.RPCErro
 	}
 
 	srows, err := a.DB.Conn.Query(
-		`SELECT id, name, type, path, folder_id FROM log_sources WHERE workspace_id = ?`, workspaceID,
+		`SELECT id, name, type, path, folder_id, is_uploaded FROM log_sources WHERE workspace_id = ?`, workspaceID,
 	)
 	if err != nil {
 		return nil, &models.RPCError{Code: errInternal, Message: err.Error()}
@@ -102,11 +102,18 @@ func (a *App) GetHierarchy(req models.GetHierarchyRequest) (any, *models.RPCErro
 	for srows.Next() {
 		var id, name, sType, path string
 		var folderID sql.NullString
-		if err := srows.Scan(&id, &name, &sType, &path, &folderID); err != nil {
+		var isUploaded sql.NullBool
+		if err := srows.Scan(&id, &name, &sType, &path, &folderID, &isUploaded); err != nil {
 			srows.Close()
 			return nil, &models.RPCError{Code: errInternal, Message: err.Error()}
 		}
-		src := models.HierarchySource{ID: id, Name: name, Type: sType, Path: path}
+		src := models.HierarchySource{
+			ID:         id,
+			Name:       name,
+			Type:       sType,
+			Path:       path,
+			IsUploaded: isUploaded.Valid && isUploaded.Bool,
+		}
 		if folderID.Valid && folderID.String != "" {
 			if parent, ok := folders[folderID.String]; ok {
 				parent.sources = append(parent.sources, src)

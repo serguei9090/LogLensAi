@@ -1,0 +1,418 @@
+import { useIngestionStore } from "@/store/ingestionStore";
+import { useInvestigationStore } from "@/store/investigationStore";
+import { type LogSource, selectActiveWorkspace, useWorkspaceStore } from "@/store/workspaceStore";
+import type { LogEntry } from "@/types/log";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { callSidecar } from "./useSidecarBridge";
+
+/**
+ * useLogFetching handles the retrieval of logs, metadata facets, and anomalies
+ * from the sidecar. It encapsulates the complex query parameter logic and
+ * manages loading/connection states.
+ */
+export function useLogFetching(workspaceId: string | null, activeSourceId: string | null) {
+  const {
+    searchQuery,
+    filters,
+    sortBy,
+    sortOrder,
+    timeRange,
+    showAnomalies,
+    setLogs,
+    setAvailableFacets,
+    isTailing,
+  } = useInvestigationStore();
+
+  const activeWorkspace = useWorkspaceStore(selectActiveWorkspace);
+  const sources: LogSource[] = activeWorkspace?.sources ?? [];
+
+  const [debouncedQuery, setDebouncedQuery] = useState(searchQuery);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedQuery(searchQuery);
+    }, 250); // 250ms debounce delay
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  const [isFetching, setIsFetching] = useState(false);
+  const [isConnected, setIsConnected] = useState(true);
+  const [anomalousClusters, setAnomalousClusters] = useState<Set<string>>(new Set());
+
+  // Keep track of the active source key to prevent fetching bounds, anomalies,
+  // and facets redundantly on every search/filter/sort action.
+  const lastSourceKeyRef = useRef<string | null>(null);
+
+  // Keep track of the last fetched parameters to prevent duplicate fetching
+  const lastFetchedParamsRef = useRef<{
+    searchQuery: string;
+    filters: string;
+    sortBy: string;
+    sortOrder: "asc" | "desc";
+    startTime: string;
+    endTime: string;
+    showAnomalies: boolean;
+  } | null>(null);
+
+  /**
+   * Memoized query parameters derived from the active source and active filters.
+   */
+  const queryParams = useMemo(() => {
+    const activeSrc = sources.find((s) => s.id === activeSourceId);
+    if (!activeSrc) {
+      return null;
+    }
+
+    const isFusion = activeSrc.type === "fusion";
+    const sourceFilter = isFusion
+      ? []
+      : [{ field: "source_id", operator: "equals", value: activeSrc.id }];
+
+    const combinedFilters =
+      filters.length > 0 || sourceFilter.length > 0 ? [...sourceFilter, ...filters] : undefined;
+    const fusionId = isFusion ? activeSrc.path : undefined;
+
+    return {
+      isFusion,
+      fusionId,
+      combinedFilters,
+      activeSrc,
+    };
+  }, [sources, activeSourceId, filters]);
+
+  const fetchPartialLogs = useCallback(
+    async (workspaceId: string, currentSourceRef: string, queryParams: any) => {
+      const logResult = await callSidecar<{ logs: LogEntry[]; total: number }>({
+        method: queryParams.isFusion ? "get_fused_logs" : "get_logs",
+        params: {
+          workspace_id: workspaceId,
+          ...(queryParams.fusionId ? { fusion_id: queryParams.fusionId } : {}),
+          offset: 0,
+          limit: 1000,
+          query: debouncedQuery || undefined,
+          filters: queryParams.combinedFilters,
+          sort_by: sortBy,
+          sort_order: sortOrder,
+          start_time: timeRange.start || undefined,
+          end_time: timeRange.end || undefined,
+        },
+        silent: true,
+      });
+
+      if (currentSourceRef === activeSourceId) {
+        setLogs(logResult.logs ?? [], logResult.total ?? 0);
+        setIsConnected(true);
+        lastFetchedParamsRef.current = {
+          searchQuery: debouncedQuery,
+          filters: JSON.stringify(queryParams.combinedFilters),
+          sortBy,
+          sortOrder,
+          startTime: timeRange.start || "",
+          endTime: timeRange.end || "",
+          showAnomalies,
+        };
+      }
+    },
+    [debouncedQuery, sortBy, sortOrder, timeRange, activeSourceId, setLogs, showAnomalies],
+  );
+
+  const fetchAllLogsAndMetadata = useCallback(
+    async (workspaceId: string, currentSourceRef: string, queryParams: any, sourceKey: string) => {
+      // Execute independent queries in parallel using Promise.all
+      const boundsPromise = callSidecar<{ min_time: string; max_time: string }>({
+        method: "get_time_boundaries",
+        params: {
+          workspace_id: workspaceId,
+          source_ids: queryParams.isFusion ? undefined : [queryParams.activeSrc.id],
+        },
+        silent: true,
+      }).catch((err) => {
+        console.warn("[useLogFetching] Failed to get time boundaries:", err);
+        return null;
+      });
+
+      const anomaliesPromise = showAnomalies
+        ? callSidecar<{ anomalies: { cluster_id: string }[] }>({
+            method: "get_anomalies",
+            params: { workspace_id: workspaceId },
+            silent: true,
+          })
+        : Promise.resolve({ anomalies: [] });
+
+      const logsPromise = callSidecar<{ logs: LogEntry[]; total: number }>({
+        method: queryParams.isFusion ? "get_fused_logs" : "get_logs",
+        params: {
+          workspace_id: workspaceId,
+          ...(queryParams.fusionId ? { fusion_id: queryParams.fusionId } : {}),
+          offset: 0,
+          limit: 1000,
+          query: debouncedQuery || undefined,
+          filters: queryParams.combinedFilters,
+          sort_by: sortBy,
+          sort_order: sortOrder,
+          start_time: timeRange.start || undefined,
+          end_time: timeRange.end || undefined,
+        },
+        silent: true,
+      });
+
+      const facetsPromise = callSidecar<Record<string, { value: string; count: number }[]>>({
+        method: "get_metadata_facets",
+        params: {
+          workspace_id: workspaceId,
+          source_ids: queryParams.isFusion ? undefined : [queryParams.activeSrc.id],
+        },
+        silent: true,
+      });
+
+      const [bounds, anomaliesRes, logResult, facetRes] = await Promise.all([
+        boundsPromise,
+        anomaliesPromise,
+        logsPromise,
+        facetsPromise,
+      ]);
+
+      if (currentSourceRef !== activeSourceId) {
+        return;
+      }
+
+      // Process Bounds
+      if (bounds?.min_time && bounds.max_time) {
+        const minIso = bounds.min_time.replace(" ", "T");
+        const maxIso = bounds.max_time.replace(" ", "T");
+        const store = useInvestigationStore.getState();
+        const boundsChanged =
+          store.timeRangeBounds.start !== minIso || store.timeRangeBounds.end !== maxIso;
+        store.setTimeRangeBounds({ start: minIso, end: maxIso });
+        if (boundsChanged || (!store.timeRange.start && !store.timeRange.end)) {
+          // Pre-cache parameters with updated bounds start/end so that setting the store timeRange
+          // does not trigger a duplicate log fetch on the next render pass.
+          lastFetchedParamsRef.current = {
+            searchQuery: debouncedQuery,
+            filters: JSON.stringify(queryParams.combinedFilters),
+            sortBy,
+            sortOrder,
+            startTime: minIso,
+            endTime: maxIso,
+            showAnomalies,
+          };
+          store.setTimeRange({ start: minIso, end: maxIso, label: "All Time" });
+        }
+      }
+
+      // Process Anomalies
+      if (anomaliesRes?.anomalies) {
+        setAnomalousClusters(new Set(anomaliesRes.anomalies.map((a) => a.cluster_id)));
+      } else {
+        setAnomalousClusters(new Set());
+      }
+
+      // Process Logs
+      setLogs(logResult.logs ?? [], logResult.total ?? 0);
+
+      // Process Facets
+      setAvailableFacets(facetRes);
+      setIsConnected(true);
+      lastSourceKeyRef.current = sourceKey;
+
+      if (
+        !lastFetchedParamsRef.current ||
+        lastFetchedParamsRef.current.startTime !== timeRange.start
+      ) {
+        lastFetchedParamsRef.current = {
+          searchQuery: debouncedQuery,
+          filters: JSON.stringify(queryParams.combinedFilters),
+          sortBy,
+          sortOrder,
+          startTime: timeRange.start || "",
+          endTime: timeRange.end || "",
+          showAnomalies,
+        };
+      }
+    },
+    [
+      debouncedQuery,
+      sortBy,
+      sortOrder,
+      timeRange,
+      activeSourceId,
+      showAnomalies,
+      setLogs,
+      setAvailableFacets,
+    ],
+  );
+
+  /**
+   * Primary data retrieval function. Fetches anomalies, logs, and facets concurrently.
+   */
+  const fetchLogs = useCallback(
+    async (options?: { forceFull?: boolean }) => {
+      if (!workspaceId || !activeSourceId || !queryParams) {
+        lastSourceKeyRef.current = null;
+        lastFetchedParamsRef.current = null;
+        if (!workspaceId) {
+          return;
+        }
+        setLogs([], 0);
+        setAvailableFacets({});
+        return;
+      }
+
+      const currentSourceRef = activeSourceId;
+      const sourceKey = `${workspaceId}_${activeSourceId}`;
+      const isSourceChanged = lastSourceKeyRef.current !== sourceKey;
+      const hasNoLogsLoaded = useInvestigationStore.getState().logs.length === 0;
+      const forceFull = options?.forceFull ?? false;
+      const shouldFetchAll = isSourceChanged || forceFull || hasNoLogsLoaded;
+
+      // Check for redundant parameter fetching if not tailing/ingesting
+      const state = useIngestionStore.getState();
+      const hasActiveJob = state.jobs.some(
+        (j) =>
+          j.source_id === currentSourceRef && (j.status === "processing" || j.status === "pending"),
+      );
+
+      const filtersStr = JSON.stringify(queryParams.combinedFilters);
+      const currentParams = {
+        searchQuery: debouncedQuery,
+        filters: filtersStr,
+        sortBy,
+        sortOrder,
+        startTime: timeRange.start || "",
+        endTime: timeRange.end || "",
+        showAnomalies,
+      };
+
+      const shouldSkipFetch =
+        !shouldFetchAll &&
+        !isTailing &&
+        !hasActiveJob &&
+        !hasNoLogsLoaded &&
+        lastFetchedParamsRef.current &&
+        lastFetchedParamsRef.current.searchQuery === currentParams.searchQuery &&
+        lastFetchedParamsRef.current.filters === currentParams.filters &&
+        lastFetchedParamsRef.current.sortBy === currentParams.sortBy &&
+        lastFetchedParamsRef.current.sortOrder === currentParams.sortOrder &&
+        lastFetchedParamsRef.current.startTime === currentParams.startTime &&
+        lastFetchedParamsRef.current.endTime === currentParams.endTime &&
+        lastFetchedParamsRef.current.showAnomalies === currentParams.showAnomalies;
+
+      if (forceFull) {
+        lastFetchedParamsRef.current = null;
+      }
+
+      if (shouldSkipFetch) {
+        return;
+      }
+
+      if (isSourceChanged) {
+        // Clear logs and facets immediately to prevent "ghost data" flash from the old source
+        setLogs([], 0);
+        setAvailableFacets({});
+      }
+
+      setIsFetching(true);
+
+      try {
+        if (shouldFetchAll) {
+          await fetchAllLogsAndMetadata(workspaceId, currentSourceRef, queryParams, sourceKey);
+        } else {
+          await fetchPartialLogs(workspaceId, currentSourceRef, queryParams);
+        }
+
+        // NOTE: Do NOT call stopIngestion() here.
+        // InvestigationPage.tsx owns the ingestion state machine and calls stopIngestion()
+        // only AFTER fetchHierarchy() has confirmed is_uploaded=true AND logs have arrived.
+        // Calling it here races with that sequence and drops the loading overlay prematurely,
+        // causing the "ghost empty" / "No logs detected" flash.
+      } catch (e) {
+        console.error("[useLogFetching] Data retrieval failed:", e);
+        setIsConnected(false);
+      } finally {
+        setIsFetching(false);
+      }
+    },
+    [
+      workspaceId,
+      activeSourceId,
+      queryParams,
+      fetchAllLogsAndMetadata,
+      fetchPartialLogs,
+      setLogs,
+      setAvailableFacets,
+      isTailing,
+      debouncedQuery,
+      sortBy,
+      sortOrder,
+      timeRange,
+      showAnomalies,
+    ],
+  );
+
+  /**
+   * Pagination support. Fetches the next batch of 1,000 logs and appends them.
+   */
+  const fetchMoreLogs = useCallback(async () => {
+    if (!workspaceId || !activeSourceId || !queryParams || isFetching) {
+      return;
+    }
+
+    const currentSourceRef = activeSourceId;
+    const currentLogs = useInvestigationStore.getState().logs;
+    const totalLogs = useInvestigationStore.getState().total;
+
+    if (currentLogs.length >= totalLogs) {
+      return; // All logs already loaded
+    }
+
+    setIsFetching(true);
+
+    try {
+      const logResult = await callSidecar<{ logs: LogEntry[]; total: number }>({
+        method: queryParams.isFusion ? "get_fused_logs" : "get_logs",
+        params: {
+          workspace_id: workspaceId,
+          ...(queryParams.fusionId ? { fusion_id: queryParams.fusionId } : {}),
+          offset: currentLogs.length, // Load next batch
+          limit: 1000,
+          query: debouncedQuery || undefined,
+          filters: queryParams.combinedFilters,
+          sort_by: sortBy,
+          sort_order: sortOrder,
+          start_time: timeRange.start || undefined,
+          end_time: timeRange.end || undefined,
+        },
+        silent: true,
+      });
+
+      if (currentSourceRef === activeSourceId) {
+        setLogs([...currentLogs, ...(logResult.logs ?? [])], logResult.total ?? 0);
+        setIsConnected(true);
+      }
+    } catch (e) {
+      console.error("[useLogFetching] Fetching more logs failed:", e);
+      setIsConnected(false);
+    } finally {
+      setIsFetching(false);
+    }
+  }, [
+    workspaceId,
+    activeSourceId,
+    queryParams,
+    debouncedQuery,
+    sortBy,
+    sortOrder,
+    setLogs,
+    isFetching,
+    timeRange,
+  ]);
+
+  return {
+    isFetching,
+    isConnected,
+    anomalousClusters,
+    fetchLogs,
+    fetchMoreLogs,
+    queryParams,
+  };
+}

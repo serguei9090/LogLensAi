@@ -64,3 +64,16 @@ final_debug*
 __pyrefly_virtual__/
 scratch/
 .antigravitycli/
+
+# Build binaries & symbols
+*.exe
+*.dll
+*.pdb
+*.obj
+
+# Local development storage & tools
+storage/
+**/storage/
+drain/
+.claude/
+.vscode/

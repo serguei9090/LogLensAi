@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+
+	"loglensai/backend-go/internal/ai/laya"
 )
 
 // StreamChunk is one unit of streamed output from Run, mirroring
@@ -68,6 +70,21 @@ func Run(ctx context.Context, provider Provider, tools *ToolRegistry, initialSta
 				out <- StreamChunk{Err: ctx.Err()}
 				return
 			default:
+			}
+
+			if i == 0 && len(state.Messages) > 0 {
+				var lastUserMsg string
+				for j := len(state.Messages) - 1; j >= 0; j-- {
+					if state.Messages[j].Role == "user" {
+						lastUserMsg = state.Messages[j].Content
+						break
+					}
+				}
+				if lastUserMsg != "" {
+					if routed, err := RouteWithLaya(ctx, tools, lastUserMsg); err == nil && routed != nil && routed.Confidence >= 0.85 {
+						state.Status = fmt.Sprintf("laya_routed:%s:%.2f", routed.SelectedLabel, routed.Confidence)
+					}
+				}
 			}
 
 			assistantMsg, err := nodeReasoning(ctx, provider, tools, &state)
@@ -203,4 +220,22 @@ func executeToolCall(ctx context.Context, tools *ToolRegistry, name, rawArgs str
 		return map[string]any{"error": fmt.Sprintf("Tool %s not found", name)}, nil
 	}
 	return tools.Execute(ctx, name, json.RawMessage(rawArgs))
+}
+
+// RouteWithLaya evaluates userText with Laya System 1 decision engine if enabled.
+// Returns nil if Laya is not configured, disabled, or if intent question is absent.
+func RouteWithLaya(ctx context.Context, tools *ToolRegistry, userText string) (*laya.DecisionResult, error) {
+	if tools == nil || tools.app == nil || tools.app.LayaManager == nil || tools.app.LayaEngine == nil {
+		return nil, nil
+	}
+	settings := tools.app.LayaManager.GetSettings()
+	if !settings.Enabled {
+		return nil, nil
+	}
+	questions := tools.app.LayaManager.GetActiveQuestions()
+	intentQuestion, ok := questions["tool_intent"]
+	if !ok {
+		return nil, nil
+	}
+	return tools.app.LayaEngine.Predict(ctx, intentQuestion, userText)
 }

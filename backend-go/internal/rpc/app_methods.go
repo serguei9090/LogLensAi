@@ -89,6 +89,26 @@ func RegisterApp(r *Registry, a *app.App) {
 	r.Register("get_health", func(params json.RawMessage) (any, *models.RPCError) {
 		return a.GetHealth()
 	})
+
+	// Laya AI System 1 decision engine methods
+	r.RegisterWithModel("get_laya_settings", func() any { return &models.GetLayaSettingsRequest{} }, appHandler(func(req models.GetLayaSettingsRequest) (any, *models.RPCError) {
+		return a.GetLayaSettings(req)
+	}))
+	r.RegisterWithModel("update_laya_settings", func() any { return &models.UpdateLayaSettingsRequest{} }, appHandler(func(req models.UpdateLayaSettingsRequest) (any, *models.RPCError) {
+		return a.UpdateLayaSettings(req)
+	}))
+	r.RegisterWithModel("get_laya_checkpoints", func() any { return &models.GetLayaCheckpointsRequest{} }, appHandler(func(req models.GetLayaCheckpointsRequest) (any, *models.RPCError) {
+		return a.GetLayaCheckpoints(req)
+	}))
+	r.RegisterWithModel("rollback_laya_checkpoint", func() any { return &models.RollbackLayaCheckpointRequest{} }, appHandler(func(req models.RollbackLayaCheckpointRequest) (any, *models.RPCError) {
+		return a.RollbackLayaCheckpoint(req)
+	}))
+	r.RegisterWithModel("save_laya_rules", func() any { return &models.SaveLayaRulesRequest{} }, appHandler(func(req models.SaveLayaRulesRequest) (any, *models.RPCError) {
+		return a.SaveLayaRules(req)
+	}))
+	r.RegisterWithModel("test_laya_rule", func() any { return &models.TestLayaRuleRequest{} }, appHandler(func(req models.TestLayaRuleRequest) (any, *models.RPCError) {
+		return a.TestLayaRule(req)
+	}))
 }
 
 // appHandler decodes params into a T and calls fn, converting a decode

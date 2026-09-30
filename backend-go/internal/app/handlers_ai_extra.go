@@ -551,6 +551,13 @@ func (a *App) prepareDashboardWhere(workspaceID, sourceID, startTime, endTime st
 	if workspaceID != "" {
 		clauses = append(clauses, "l.workspace_id = ?")
 		params = append(params, workspaceID)
+	} else if len(activeWorkspaceIDs) > 0 {
+		placeholders := make([]string, len(activeWorkspaceIDs))
+		for i, id := range activeWorkspaceIDs {
+			placeholders[i] = "?"
+			params = append(params, id)
+		}
+		clauses = append(clauses, "l.workspace_id IN ("+strings.Join(placeholders, ", ")+")")
 	}
 	if sourceID != "" {
 		clauses = append(clauses, "l.source_id = ?")
@@ -566,17 +573,6 @@ func (a *App) prepareDashboardWhere(workspaceID, sourceID, startTime, endTime st
 		clauses = append(clauses, "l.timestamp <= ?")
 		params = append(params, normEnd)
 	}
-	if len(activeWorkspaceIDs) > 0 {
-		placeholders := make([]string, len(activeWorkspaceIDs))
-		for i, id := range activeWorkspaceIDs {
-			placeholders[i] = "?"
-			params = append(params, id)
-		}
-		clauses = append(clauses, "l.workspace_id IN ("+strings.Join(placeholders, ", ")+")")
-	}
-
-	// Exclude 'local' sources that aren't fully uploaded yet.
-	clauses = append(clauses, "l.source_id NOT IN (SELECT id FROM log_sources WHERE type = 'local' AND is_uploaded = false)")
 
 	whereSQL := ""
 	if len(clauses) > 0 {
@@ -723,7 +719,6 @@ func (a *App) fetchTopErrorClusters(whereSQL string, params []any) []map[string]
 }
 
 func (a *App) fetchWorkspaceCount(activeWorkspaceIDs []string) int64 {
-	excludeSQL := "source_id NOT IN (SELECT id FROM log_sources WHERE type = 'local' AND is_uploaded = false)"
 	var n int64
 	if len(activeWorkspaceIDs) > 0 {
 		placeholders := make([]string, len(activeWorkspaceIDs))
@@ -732,10 +727,10 @@ func (a *App) fetchWorkspaceCount(activeWorkspaceIDs []string) int64 {
 			placeholders[i] = "?"
 			args[i] = id
 		}
-		q := `SELECT COUNT(DISTINCT workspace_id) FROM logs WHERE workspace_id IN (` + strings.Join(placeholders, ", ") + `) AND ` + excludeSQL
+		q := `SELECT COUNT(DISTINCT workspace_id) FROM logs WHERE workspace_id IN (` + strings.Join(placeholders, ", ") + `)`
 		_ = a.DB.Conn.QueryRow(q, args...).Scan(&n)
 	} else {
-		q := `SELECT COUNT(DISTINCT workspace_id) FROM logs WHERE ` + excludeSQL
+		q := `SELECT COUNT(DISTINCT workspace_id) FROM logs`
 		_ = a.DB.Conn.QueryRow(q).Scan(&n)
 	}
 	return n

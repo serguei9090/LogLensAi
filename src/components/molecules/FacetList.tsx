@@ -1,0 +1,147 @@
+import { cn } from "@/lib/utils";
+import { useInvestigationStore } from "@/store/investigationStore";
+import { AnimatePresence, motion } from "framer-motion";
+import { ChevronDown, ChevronRight, Database, Loader2 } from "lucide-react";
+import { useState } from "react";
+import type { FilterEntry } from "./FilterBuilder";
+
+interface FacetListProps {
+  onApplyFilter?: (key: string, value: string) => void;
+  className?: string;
+  isLoading?: boolean;
+}
+
+export function FacetList({
+  onApplyFilter,
+  className,
+  isLoading = false,
+}: Readonly<FacetListProps>) {
+  const { availableFacets, filters, setFilters } = useInvestigationStore();
+  const [expandedKeys, setExpandedKeys] = useState<Set<string>>(
+    new Set(["ip", "uuid", "level", "email", "user_id"]),
+  );
+
+  const toggleKey = (key: string) => {
+    const next = new Set(expandedKeys);
+    if (next.has(key)) {
+      next.delete(key);
+    } else {
+      next.add(key);
+    }
+    setExpandedKeys(next);
+  };
+
+  const handleApplyFilter = (key: string, value: string) => {
+    if (onApplyFilter) {
+      onApplyFilter(key, value);
+      return;
+    }
+
+    const field = key === "level" ? "level" : `facets.${key}`;
+    const existingIndex = filters.findIndex(
+      (f: FilterEntry) => f.field === field && f.value === value,
+    );
+
+    if (existingIndex !== -1) {
+      // Toggle off: remove the filter
+      setFilters(filters.filter((_, idx) => idx !== existingIndex));
+      return;
+    }
+
+    // Toggle on: add the filter
+    setFilters([...filters, { id: crypto.randomUUID(), field, value, operator: "equals" }]);
+  };
+
+  if (isLoading && Object.entries(availableFacets).length === 0) {
+    return (
+      <div className={cn("p-4 space-y-4 select-none", className)}>
+        <div className="flex items-center gap-2.5 px-3 py-2 rounded-lg bg-primary/10 border border-primary/20 animate-pulse">
+          <Loader2 className="h-4 w-4 text-primary animate-spin shrink-0" />
+          <span className="text-[11px] font-medium text-primary tracking-wide">
+            Analyzing metadata facets...
+          </span>
+        </div>
+        <div className="space-y-4 px-1 pt-1">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="space-y-2 animate-pulse">
+              <div className="h-3 bg-border-muted/50 rounded w-1/3" />
+              <div className="h-6 bg-border-subtle/30 rounded-md w-full" />
+              <div className="h-6 bg-border-subtle/20 rounded-md w-4/5" />
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  if (Object.entries(availableFacets).length === 0) {
+    return (
+      <div className={cn("px-6 py-10 text-center", className)}>
+        <Database className="h-8 w-8 text-text-muted/40 mx-auto mb-3" />
+        <p className="text-[11px] text-text-muted">No metadata facets detected in current view.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className={cn("py-2 space-y-1", className)}>
+      {Object.entries(availableFacets).map(([key, values]) => (
+        <div key={key} className="px-2">
+          <button
+            type="button"
+            onClick={() => toggleKey(key)}
+            className="w-full flex items-center gap-2 px-2 py-1.5 hover:bg-bg-hover rounded text-text-secondary transition-colors group"
+          >
+            {expandedKeys.has(key) ? (
+              <ChevronDown className="h-3.5 w-3.5 text-text-muted" />
+            ) : (
+              <ChevronRight className="h-3.5 w-3.5 text-text-muted" />
+            )}
+            <span className="text-xs font-medium capitalize flex-1 text-left">{key}</span>
+            <span className="text-[10px] text-text-muted group-hover:text-primary">
+              {values.length}
+            </span>
+          </button>
+
+          <AnimatePresence initial={false}>
+            {expandedKeys.has(key) && (
+              <motion.div
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: "auto", opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                className="overflow-hidden"
+              >
+                <div className="pl-6 pr-2 py-1 space-y-1">
+                  {values.map((v) => {
+                    const field = key === "level" ? "level" : `facets.${key}`;
+                    const isActive = filters.some(
+                      (f: FilterEntry) => f.field === field && f.value === v.value,
+                    );
+                    return (
+                      <button
+                        key={v.value}
+                        type="button"
+                        onClick={() => handleApplyFilter(key, v.value)}
+                        className={cn(
+                          "w-full flex items-center justify-between group py-1 px-2 rounded text-[11px] transition-all",
+                          isActive
+                            ? "bg-primary/10 text-primary"
+                            : "text-text-muted hover:bg-bg-hover hover:text-text-primary",
+                        )}
+                      >
+                        <span className="truncate max-w-[140px] font-mono">{v.value}</span>
+                        <span className="text-[9px] opacity-40 group-hover:opacity-100">
+                          {v.count}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+      ))}
+    </div>
+  );
+}

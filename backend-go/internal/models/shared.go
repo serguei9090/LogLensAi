@@ -54,10 +54,11 @@ type FacetExtractionRule struct {
 
 // HierarchySource mirrors models.py HierarchySource.
 type HierarchySource struct {
-	ID   string `json:"id"`
-	Name string `json:"name"`
-	Type string `json:"type"`
-	Path string `json:"path"`
+	ID         string `json:"id"`
+	Name       string `json:"name"`
+	Type       string `json:"type"`
+	Path       string `json:"path"`
+	IsUploaded bool   `json:"is_uploaded"`
 }
 
 // HierarchyNode mirrors models.py HierarchyNode.

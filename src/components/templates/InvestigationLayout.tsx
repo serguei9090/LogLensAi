@@ -1,0 +1,150 @@
+// Assume Role: Frontend Engineer (@frontend)
+
+import type { FilterEntry } from "@/components/molecules/FilterBuilder";
+import type { HighlightEntry } from "@/components/molecules/HighlightBuilder";
+import { WorkspaceTabs } from "@/components/molecules/WorkspaceTabs";
+import { LogToolbar } from "@/components/organisms/LogToolbar";
+import type { LogSource } from "@/store/workspaceStore";
+import { type ReactNode, Suspense, lazy } from "react";
+
+const LogDistributionWidget = lazy(() =>
+  import("@/components/organisms/LogDistributionWidget").then((m) => ({
+    default: m.LogDistributionWidget,
+  })),
+);
+
+interface InvestigationLayoutProps {
+  readonly searchQuery: string;
+  readonly onSearch: (q: string) => void;
+  readonly onExport: () => void;
+  readonly activeFilters: FilterEntry[];
+  readonly onFilterChange: (f: FilterEntry[]) => void;
+  readonly activeHighlights: HighlightEntry[];
+  readonly onHighlightChange: (h: HighlightEntry[]) => void;
+  readonly isTailing: boolean;
+  readonly onTailToggle: (v: boolean) => void;
+  readonly status: boolean;
+  readonly onImportOpen: () => void;
+  readonly onOrchestrateOpen: () => void;
+  readonly onEngineSettingsOpen?: () => void;
+  readonly children: ReactNode;
+  readonly sources?: LogSource[];
+  readonly activeSourceId?: string | null;
+  readonly tailingSourceIds?: Set<string>;
+  readonly onSelectSource?: (sourceId: string | null) => void;
+  readonly onRemoveSource?: (sourceId: string) => void;
+  readonly onDuplicateSource?: (source: LogSource) => void;
+  readonly onEditFusion?: (sourceId: string) => void;
+  readonly onRenameSource?: (workspaceId: string, sourceId: string, name: string) => void;
+  readonly showDistribution?: boolean;
+  readonly workspaceId?: string;
+  readonly onDistributionClose?: () => void;
+  readonly rightPanel?: ReactNode;
+  readonly leftPanel?: ReactNode;
+  readonly searchRef?: React.RefObject<HTMLInputElement | null>;
+}
+
+export function InvestigationLayout({
+  searchQuery,
+  onSearch,
+  onExport,
+  activeFilters,
+  onFilterChange,
+  activeHighlights,
+  onHighlightChange,
+  isTailing,
+  onTailToggle,
+  status,
+  onImportOpen,
+  onOrchestrateOpen,
+  onEngineSettingsOpen,
+  children,
+  sources,
+  activeSourceId,
+  tailingSourceIds,
+  onSelectSource,
+  onRemoveSource,
+  onDuplicateSource,
+  onEditFusion,
+  onRenameSource,
+  showDistribution,
+  workspaceId,
+  onDistributionClose,
+  rightPanel,
+  leftPanel,
+  searchRef,
+}: InvestigationLayoutProps) {
+  const activeSource = sources?.find((s) => s.id === activeSourceId);
+
+  return (
+    <div className="flex flex-col h-full w-full bg-bg-app overflow-hidden">
+      <LogToolbar
+        searchRef={searchRef}
+        searchQuery={searchQuery}
+        onSearch={onSearch}
+        onExport={onExport}
+        activeFilters={activeFilters}
+        onFilterChange={onFilterChange}
+        activeHighlights={activeHighlights}
+        onHighlightChange={onHighlightChange}
+        isTailing={isTailing}
+        onTailToggle={onTailToggle}
+        status={status}
+        onImportOpen={onImportOpen}
+        onOrchestrateOpen={onOrchestrateOpen}
+        onEngineSettingsOpen={onEngineSettingsOpen}
+        sources={sources}
+        activeSourceId={activeSourceId}
+        tailingSourceIds={tailingSourceIds}
+        onSelectSource={onSelectSource}
+        onRemoveSource={onRemoveSource}
+        onEditFusion={onEditFusion}
+        onRenameSource={onRenameSource}
+        activeWorkspaceId={workspaceId}
+      />
+      {sources && sources.length > 0 && onSelectSource && (
+        <div className="flex items-center px-4 py-1 bg-bg-surface/50 border-b border-border/40 overflow-x-auto scrollbar-none shrink-0">
+          <WorkspaceTabs
+            sources={sources}
+            activeSourceId={activeSourceId ?? null}
+            tailingSourceIds={tailingSourceIds}
+            onSelectSource={onSelectSource}
+            onRemoveSource={onRemoveSource}
+            onDuplicateSource={onDuplicateSource}
+            onEditFusion={onEditFusion}
+            onRenameSource={onRenameSource}
+            activeWorkspaceId={workspaceId ?? ""}
+          />
+        </div>
+      )}
+      {showDistribution && workspaceId && (
+        <Suspense
+          fallback={
+            <div className="min-h-[220px] h-[220px] w-full bg-bg-base border-b border-border/40 shrink-0 flex items-center justify-center text-xs text-text-muted animate-pulse">
+              Loading distribution charts...
+            </div>
+          }
+        >
+          <LogDistributionWidget
+            workspaceId={workspaceId}
+            sourceIds={
+              activeSource?.type && activeSource.type !== "fusion" ? [activeSource.id] : null
+            }
+            fusionId={activeSource?.type === "fusion" ? activeSource.path : undefined}
+            isTailing={activeSourceId ? tailingSourceIds?.has(activeSourceId) : false}
+            filters={activeFilters}
+            query={searchQuery}
+            onClose={onDistributionClose}
+          />
+        </Suspense>
+      )}
+      <div className="flex-1 flex min-h-0 min-w-0 overflow-hidden">
+        {leftPanel}
+        <div className="flex-1 flex flex-col min-w-0 min-h-0 overflow-hidden relative">
+          {children}
+        </div>
+        {rightPanel}
+      </div>
+    </div>
+  );
+}

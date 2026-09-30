@@ -23,6 +23,7 @@ import (
 	"sync"
 	"time"
 
+	"loglensai/backend-go/internal/ai/laya"
 	"loglensai/backend-go/internal/db"
 	"loglensai/backend-go/internal/drain3"
 	"loglensai/backend-go/internal/ingestion"
@@ -98,6 +99,9 @@ type App struct {
 
 	tailersMu sync.Mutex
 	tailers   map[string]*ingestion.FileTailer
+
+	LayaManager *laya.RuleManager
+	LayaEngine  laya.Engine
 }
 
 // NewApp opens/creates the DuckDB database at dbPath, constructs the
@@ -124,16 +128,37 @@ func NewApp(dbPath string) (*App, error) {
 	fastPath := logstore.NewFastPathService(storageDir)
 	shared := ingestion.NewSharedSourceManager(logStore)
 
+	layaRulesPath := filepath.Join(dataDir, "laya_rules.json")
+	layaManager, err := laya.NewRuleManager(layaRulesPath)
+	if err != nil {
+		_ = logStore.CloseAll()
+		_ = database.Close()
+		return nil, fmt.Errorf("app: initializing laya rule manager: %w", err)
+	}
+
+	var layaEngine laya.Engine = laya.NewMockEngine()
+	if onnxEng, err := laya.NewONNXEngine(laya.ONNXEngineConfig{FallbackToMock: true}); err == nil {
+		layaEngine = onnxEng
+	}
+	if layaManager != nil {
+		settings := layaManager.GetSettings()
+		if settings.Device != "" {
+			_ = layaEngine.SetDevice(settings.Device)
+		}
+	}
+
 	a := &App{
-		DB:        database,
-		LogStore:  logStore,
-		FastPath:  fastPath,
-		Shared:    shared,
-		startTime: time.Now(),
-		dataDir:   dataDir,
-		drainDir:  filepath.Join(dataDir, "drain"),
-		miners:    make(map[string]*drain3.Miner),
-		tailers:   make(map[string]*ingestion.FileTailer),
+		DB:          database,
+		LogStore:    logStore,
+		FastPath:    fastPath,
+		Shared:      shared,
+		startTime:   time.Now(),
+		dataDir:     dataDir,
+		drainDir:    filepath.Join(dataDir, "drain"),
+		miners:      make(map[string]*drain3.Miner),
+		tailers:     make(map[string]*ingestion.FileTailer),
+		LayaManager: layaManager,
+		LayaEngine:  layaEngine,
 	}
 	a.metaResolver = &metadataConfigResolver{app: a}
 
@@ -201,6 +226,12 @@ func (a *App) Close() error {
 	a.FastPath.CloseAll()
 	if err := a.LogStore.CloseAll(); err != nil {
 		log.Printf("[App] Error closing log store: %v", err)
+	}
+
+	if a.LayaEngine != nil {
+		if err := a.LayaEngine.Close(); err != nil {
+			log.Printf("[App] Error closing laya engine: %v", err)
+		}
 	}
 
 	return a.DB.Close()
