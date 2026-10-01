@@ -97,6 +97,12 @@ export const useLayaStore = create<LayaStore>((set, get) => ({
 
   downloadModel: async (workspaceId?: string) => {
     try {
+      set((state) => ({
+        error: null,
+        modelStatus: state.modelStatus
+          ? { ...state.modelStatus, state: "downloading", error_message: undefined }
+          : null,
+      }));
       const res = await callSidecar<import("@/types/laya").LayaModelStatus>({
         method: "download_laya_model",
         params: { workspace_id: workspaceId },
@@ -157,7 +163,14 @@ export const useLayaStore = create<LayaStore>((set, get) => ({
         },
       });
       if (res) {
-        set({ settings: res });
+        set((state) => ({
+          settings: {
+            ...state.settings,
+            ...res,
+            questions: res.questions || state.settings.questions,
+            active_checkpoint: res.active_checkpoint || state.settings.active_checkpoint,
+          },
+        }));
       }
     } catch (err: unknown) {
       set({ error: err instanceof Error ? err.message : String(err) });

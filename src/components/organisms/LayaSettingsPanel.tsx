@@ -14,7 +14,7 @@ import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 import { useLayaStore } from "@/store/layaStore";
 import { useWorkspaceStore } from "@/store/workspaceStore";
-import type { LayaQuestion, QuestionType } from "@/types/laya";
+import type { QuestionType } from "@/types/laya";
 import {
   Activity,
   AlertCircle,
@@ -34,22 +34,20 @@ import {
   Trash2,
   Zap,
 } from "lucide-react";
-import React, { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
 export function LayaSettingsPanel() {
-  const currentWorkspace = useWorkspaceStore((s) => s.currentWorkspace);
+  const activeWorkspaceId = useWorkspaceStore((s) => s.activeWorkspaceId);
   const {
     settings,
     checkpoints,
     modelStatus,
-    isLoading,
     isTesting,
     testResult,
     fetchSettings,
     updateSettings,
     fetchCheckpoints,
-    fetchModelStatus,
     downloadModel,
     rollbackCheckpoint,
     saveRules,
@@ -84,9 +82,9 @@ export function LayaSettingsPanel() {
   const [selectedQuestionName, setSelectedQuestionName] = useState("category");
 
   useEffect(() => {
-    fetchSettings(currentWorkspace?.id);
-    fetchCheckpoints(currentWorkspace?.id);
-  }, [currentWorkspace?.id, fetchSettings, fetchCheckpoints]);
+    fetchSettings(activeWorkspaceId);
+    fetchCheckpoints(activeWorkspaceId);
+  }, [activeWorkspaceId, fetchSettings, fetchCheckpoints]);
 
   useEffect(() => {
     if (settings.questions) {
@@ -104,7 +102,7 @@ export function LayaSettingsPanel() {
 
   const handleToggleEnabled = async (checked: boolean) => {
     try {
-      await updateSettings({ enabled: checked, workspaceId: currentWorkspace?.id });
+      await updateSettings({ enabled: checked, workspaceId: activeWorkspaceId });
       toast.success(checked ? "Laya System 1 Accelerator enabled" : "Laya System 1 Accelerator disabled");
     } catch {
       toast.error("Failed to update Laya setting");
@@ -113,7 +111,7 @@ export function LayaSettingsPanel() {
 
   const handleDeviceChange = async (device: "cpu" | "gpu") => {
     try {
-      await updateSettings({ device, workspaceId: currentWorkspace?.id });
+      await updateSettings({ device, workspaceId: activeWorkspaceId });
       toast.success(`Hardware acceleration set to ${device.toUpperCase()}`);
     } catch {
       toast.error("Failed to switch hardware mode");
@@ -122,7 +120,7 @@ export function LayaSettingsPanel() {
 
   const handleDownloadModel = async () => {
     try {
-      await downloadModel(currentWorkspace?.id);
+      await downloadModel(activeWorkspaceId);
       toast.info("Started background download of Laya ONNX weights from Hugging Face");
     } catch {
       toast.error("Failed to start model download");
@@ -140,7 +138,7 @@ export function LayaSettingsPanel() {
         "User (JSON Editor)",
         checkpointDesc.trim() || "Manual JSON rule update",
         parsed,
-        currentWorkspace?.id,
+        activeWorkspaceId,
       );
       setIsSaveCheckpointOpen(false);
       setCheckpointDesc("");
@@ -203,7 +201,7 @@ export function LayaSettingsPanel() {
         "User (Visual Builder)",
         `Updated rule: ${trimmedName}`,
         updatedQuestions,
-        currentWorkspace?.id,
+        activeWorkspaceId,
       );
       setIsAddRuleOpen(false);
       setRuleName("");
@@ -223,7 +221,7 @@ export function LayaSettingsPanel() {
         "User (Visual Builder)",
         `Deleted rule: ${nameToDelete}`,
         updated,
-        currentWorkspace?.id,
+        activeWorkspaceId,
       );
       toast.success(`Rule "${nameToDelete}" removed`);
     } catch {
@@ -234,7 +232,7 @@ export function LayaSettingsPanel() {
   const handleConfirmRollback = async () => {
     if (!rollbackTargetId) return;
     try {
-      await rollbackCheckpoint(rollbackTargetId, currentWorkspace?.id);
+      await rollbackCheckpoint(rollbackTargetId, activeWorkspaceId);
       toast.success(`Successfully rolled back to checkpoint ${rollbackTargetId}`);
       setRollbackTargetId(null);
     } catch {
@@ -248,7 +246,7 @@ export function LayaSettingsPanel() {
       return;
     }
     clearTestResult();
-    const res = await testRule(testText.trim(), selectedQuestionName, undefined, currentWorkspace?.id);
+    const res = await testRule(testText.trim(), selectedQuestionName, undefined, activeWorkspaceId);
     if (res) {
       toast.success(`Evaluation complete: ${res.selected_label}`);
     } else {
@@ -297,7 +295,7 @@ export function LayaSettingsPanel() {
           <h4 className="text-xs font-semibold uppercase tracking-wider text-text-muted font-mono">
             Hardware Acceleration & Memory Profile
           </h4>
-          <HelpTooltip text="CPU mode runs with 0 MB GPU VRAM footprint, leaving your entire GPU memory free for running 8B/14B models in Ollama." />
+          <HelpTooltip content="CPU mode runs with 0 MB GPU VRAM footprint, leaving your entire GPU memory free for running 8B/14B models in Ollama." />
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -414,23 +412,30 @@ export function LayaSettingsPanel() {
             </div>
           </div>
         ) : (
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pt-1">
-            <p className="text-xs text-text-muted max-w-xl">
-              {modelStatus?.state === "ready"
-                ? "Quantized 8-bit ModernBERT ONNX weights are cached locally and accelerating log analysis."
-                : "LogLensAi operates with a built-in heuristic simulation when weights are not downloaded. Download the official 524 MB weights for full ModernBERT accuracy."}
-            </p>
-            {modelStatus?.state !== "ready" && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleDownloadModel}
-                disabled={modelStatus?.state === "downloading"}
-                className="shrink-0 gap-2 border-primary/40 text-primary hover:bg-primary/10"
-              >
-                <Download className="h-3.5 w-3.5" />
-                Download Weights (524 MB)
-              </Button>
+          <div className="space-y-2 pt-1">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+              <p className="text-xs text-text-muted max-w-xl">
+                {modelStatus?.state === "ready"
+                  ? "Quantized 8-bit ModernBERT ONNX weights are cached locally and accelerating log analysis."
+                  : "LogLensAi operates with a built-in heuristic simulation when weights are not downloaded. Download the official 524 MB weights for full ModernBERT accuracy."}
+              </p>
+              {modelStatus?.state !== "ready" && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleDownloadModel}
+                  className="shrink-0 gap-2 border-primary/40 text-primary hover:bg-primary/10"
+                >
+                  <Download className="h-3.5 w-3.5" />
+                  {modelStatus?.state === "error" ? "Retry Download (524 MB)" : "Download Weights (524 MB)"}
+                </Button>
+              )}
+            </div>
+            {modelStatus?.state === "error" && modelStatus.error_message && (
+              <div className="p-2.5 rounded-lg bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs flex items-center gap-2">
+                <AlertCircle className="h-4 w-4 shrink-0 text-rose-400" />
+                <span className="font-mono text-[11px]">{modelStatus.error_message}</span>
+              </div>
             )}
           </div>
         )}
@@ -491,9 +496,6 @@ export function LayaSettingsPanel() {
           </div>
 
           <div className="flex items-center gap-2">
-            <span className="text-[11px] font-mono text-text-muted">
-              Active: <span className="text-text-primary font-semibold">{settings.active_checkpoint}</span>
-            </span>
             {activeTab === "visual" && (
               <Button
                 size="sm"
@@ -517,7 +519,17 @@ export function LayaSettingsPanel() {
 
         {/* TAB 1: Visual Rules Builder */}
         {activeTab === "visual" && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          questionsList.length === 0 ? (
+            <div className="p-8 text-center border border-dashed border-border rounded-xl">
+              <Layers className="h-8 w-8 text-text-muted mx-auto mb-2 opacity-50" />
+              <p className="text-sm font-medium text-text-primary">No classification rules configured</p>
+              <p className="text-xs text-text-muted mt-1 mb-4">Add your first custom rule to begin fast classification.</p>
+              <Button size="sm" onClick={() => setIsAddRuleOpen(true)} className="gap-1.5 bg-primary text-black hover:bg-primary/90">
+                <Plus className="h-3.5 w-3.5" /> Add Rule
+              </Button>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {questionsList.map((q) => (
               <div
                 key={q.name}
@@ -592,7 +604,7 @@ export function LayaSettingsPanel() {
               </div>
             ))}
           </div>
-        )}
+        ))}
 
         {/* TAB 2: JSON Code Editor */}
         {activeTab === "json" && (

@@ -58,11 +58,7 @@ func (a *App) UpdateLayaSettings(req models.UpdateLayaSettingsRequest) (any, *mo
 		})
 	}
 
-	return map[string]any{
-		"status":  "success",
-		"enabled": enabled,
-		"device":  device,
-	}, nil
+	return a.LayaManager.GetSettings(), nil
 }
 
 // GetLayaCheckpoints implements the get_laya_checkpoints JSON-RPC 2.0 method,

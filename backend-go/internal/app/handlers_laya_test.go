@@ -74,19 +74,19 @@ func TestUpdateLayaSettings(t *testing.T) {
 	if rpcErr != nil {
 		t.Fatalf("unexpected RPC error: %+v", rpcErr)
 	}
-	m, ok := res.(map[string]any)
+	settings, ok := res.(laya.LayaSettings)
 	if !ok {
-		t.Fatalf("expected map[string]any, got %T", res)
+		t.Fatalf("expected laya.LayaSettings, got %T", res)
 	}
-	if m["status"] != "success" || m["enabled"] != true || m["device"] != "gpu" {
-		t.Errorf("unexpected update result: %+v", m)
+	if !settings.Enabled || settings.Device != "gpu" {
+		t.Errorf("unexpected update result: %+v", settings)
 	}
 
 	// Verify persistence in GetLayaSettings
 	getRes, _ := a.GetLayaSettings(models.GetLayaSettingsRequest{})
-	settings := getRes.(laya.LayaSettings)
-	if !settings.Enabled || settings.Device != "gpu" {
-		t.Errorf("settings not updated: enabled=%v, device=%s", settings.Enabled, settings.Device)
+	persisted := getRes.(laya.LayaSettings)
+	if !persisted.Enabled || persisted.Device != "gpu" {
+		t.Errorf("settings not updated: enabled=%v, device=%s", persisted.Enabled, persisted.Device)
 	}
 
 	// 2. Partial update: update only enabled back to false
@@ -97,9 +97,9 @@ func TestUpdateLayaSettings(t *testing.T) {
 	if rpcErr != nil {
 		t.Fatalf("unexpected RPC error: %+v", rpcErr)
 	}
-	mPartial := resPartial.(map[string]any)
-	if mPartial["enabled"] != false || mPartial["device"] != "gpu" {
-		t.Errorf("unexpected partial update result: %+v", mPartial)
+	partialSettings := resPartial.(laya.LayaSettings)
+	if partialSettings.Enabled != false || partialSettings.Device != "gpu" {
+		t.Errorf("unexpected partial update result: %+v", partialSettings)
 	}
 
 	// 3. Error case: invalid device

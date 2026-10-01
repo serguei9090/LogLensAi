@@ -18,16 +18,20 @@ const (
 	DefaultHFRepoID = "nvkudva/laya-web-q8"
 	DefaultRevision = "main"
 
-	// File names in repo
-	EncoderFileName   = "encoder_q8.onnx"
-	HeadFileName      = "head_q8.onnx"
-	TokenizerFileName = "tokenizer.json"
+	// File names in repo (hosted under v1/)
+	EncoderFileName     = "encoder_q8.onnx"
+	EncoderDataFileName = "encoder_q8.onnx.data"
+	HeadFileName        = "head_q8.onnx"
+	HeadDataFileName    = "head_q8.onnx.data"
+	TokenizerFileName   = "tokenizer.json"
 
 	// Approximate file sizes for progress estimation before header arrival
-	EncoderApproxSize   int64 = 490 * 1024 * 1024
-	HeadApproxSize      int64 = 34 * 1024 * 1024
-	TokenizerApproxSize int64 = 1500 * 1024
-	TotalApproxSize     int64 = EncoderApproxSize + HeadApproxSize + TokenizerApproxSize
+	EncoderApproxSize     int64 = 3 * 1024 * 1024       // ~2.8 MB
+	EncoderDataApproxSize int64 = 468 * 1024 * 1024     // ~468 MB
+	HeadApproxSize        int64 = 250 * 1024            // ~205 KB
+	HeadDataApproxSize    int64 = 53 * 1024 * 1024      // ~53 MB
+	TokenizerApproxSize   int64 = 1500 * 1024           // ~1.5 MB
+	TotalApproxSize       int64 = EncoderApproxSize + EncoderDataApproxSize + HeadApproxSize + HeadDataApproxSize + TokenizerApproxSize
 )
 
 // ModelDownloadState describes the current state of local model files.
@@ -89,7 +93,7 @@ func NewModelManager(modelDir string) *ModelManager {
 		modelDir:   modelDir,
 		state:      ModelStateIdle,
 		totalBytes: TotalApproxSize,
-		baseURL:    fmt.Sprintf("https://huggingface.co/%s/resolve/%s", DefaultHFRepoID, DefaultRevision),
+		baseURL:    fmt.Sprintf("https://huggingface.co/%s/resolve/%s/v1", DefaultHFRepoID, DefaultRevision),
 	}
 	mm.RefreshStatus()
 	return mm
@@ -114,29 +118,27 @@ func (m *ModelManager) RefreshStatus() ModelStatus {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	enc, head, tok := filepath.Join(m.modelDir, EncoderFileName),
-		filepath.Join(m.modelDir, HeadFileName),
-		filepath.Join(m.modelDir, TokenizerFileName)
+	enc := filepath.Join(m.modelDir, EncoderFileName)
+	encData := filepath.Join(m.modelDir, EncoderDataFileName)
+	head := filepath.Join(m.modelDir, HeadFileName)
+	headData := filepath.Join(m.modelDir, HeadDataFileName)
+	tok := filepath.Join(m.modelDir, TokenizerFileName)
 
-	encExists := fileExists(enc)
-	headExists := fileExists(head)
+	encExists := fileExists(enc) && fileExists(encData)
+	headExists := fileExists(head) && fileExists(headData)
 	tokExists := fileExists(tok)
 
 	if encExists && headExists && tokExists {
 		m.state = ModelStateReady
 		m.progress = 100.0
-		var encSize, headSize, tokSize int64
-		if fi, err := os.Stat(enc); err == nil {
-			encSize = fi.Size()
+		var totalSize int64
+		for _, p := range []string{enc, encData, head, headData, tok} {
+			if fi, err := os.Stat(p); err == nil {
+				totalSize += fi.Size()
+			}
 		}
-		if fi, err := os.Stat(head); err == nil {
-			headSize = fi.Size()
-		}
-		if fi, err := os.Stat(tok); err == nil {
-			tokSize = fi.Size()
-		}
-		m.downloadedBytes = encSize + headSize + tokSize
-		m.totalBytes = m.downloadedBytes
+		m.downloadedBytes = totalSize
+		m.totalBytes = totalSize
 		m.errorMessage = ""
 	} else if m.state != ModelStateDownloading {
 		m.state = ModelStateIdle
@@ -239,7 +241,7 @@ func (m *ModelManager) CancelDownload() {
 	}
 }
 
-// downloadLoop executes sequential downloads of the 3 model components.
+// downloadLoop executes sequential downloads of the 5 model components.
 func (m *ModelManager) downloadLoop(ctx context.Context, baseURL string, onComplete func()) {
 	files := []struct {
 		name string
@@ -247,7 +249,9 @@ func (m *ModelManager) downloadLoop(ctx context.Context, baseURL string, onCompl
 	}{
 		{TokenizerFileName, TokenizerApproxSize},
 		{HeadFileName, HeadApproxSize},
+		{HeadDataFileName, HeadDataApproxSize},
 		{EncoderFileName, EncoderApproxSize},
+		{EncoderDataFileName, EncoderDataApproxSize},
 	}
 
 	var totalBytes int64

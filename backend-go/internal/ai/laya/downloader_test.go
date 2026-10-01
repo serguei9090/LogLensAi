@@ -18,8 +18,12 @@ func TestModelManager_StatusAndDownload(t *testing.T) {
 			_, _ = w.Write([]byte(`{"mock": "tokenizer"}`))
 		case "/" + HeadFileName:
 			_, _ = w.Write([]byte("mock_head_bytes_1234567890"))
+		case "/" + HeadDataFileName:
+			_, _ = w.Write([]byte("mock_head_data_bytes_1234567890"))
 		case "/" + EncoderFileName:
 			_, _ = w.Write([]byte("mock_encoder_bytes_1234567890_very_long"))
+		case "/" + EncoderDataFileName:
+			_, _ = w.Write([]byte("mock_encoder_data_bytes_1234567890_very_long"))
 		default:
 			http.NotFound(w, r)
 		}
@@ -70,9 +74,11 @@ func TestModelManager_StatusAndDownload(t *testing.T) {
 
 	// 5. Verify files exist on disk
 	encPath, headPath, tokPath := mm.GetPaths()
-	if !fileExists(encPath) || !fileExists(headPath) || !fileExists(tokPath) {
-		t.Errorf("expected all model files to exist: enc=%v, head=%v, tok=%v",
-			fileExists(encPath), fileExists(headPath), fileExists(tokPath))
+	encDataPath := filepath.Join(modelDir, EncoderDataFileName)
+	headDataPath := filepath.Join(modelDir, HeadDataFileName)
+	if !fileExists(encPath) || !fileExists(encDataPath) || !fileExists(headPath) || !fileExists(headDataPath) || !fileExists(tokPath) {
+		t.Errorf("expected all 5 model files to exist: enc=%v, encData=%v, head=%v, headData=%v, tok=%v",
+			fileExists(encPath), fileExists(encDataPath), fileExists(headPath), fileExists(headDataPath), fileExists(tokPath))
 	}
 
 	// 6. Test idempotent StartDownload when already ready
