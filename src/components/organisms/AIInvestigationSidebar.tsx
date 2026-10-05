@@ -12,19 +12,26 @@ import { useUIStore } from "@/store/uiStore";
 import { selectActiveWorkspace, useWorkspaceStore } from "@/store/workspaceStore";
 import {
   Bot,
+  Check,
   Clock,
+  Copy,
   Cpu,
+  FileText,
   Lightbulb,
   LightbulbOff,
+  Loader2,
   MessageSquare,
   Pencil,
   Plus,
   Send,
   Sparkles,
+  Square,
   User,
+  Wrench,
   X,
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { A2UIRenderer } from "../atoms/A2UIRenderer";
 import { TypingIndicator } from "../atoms/TypingIndicator";
 
@@ -179,6 +186,10 @@ interface AIMessageRowProps {
     timestamp: string | number | Date;
     context_logs?: (string | number)[] | null;
     a2ui_payload?: any;
+    laya_routed?: boolean;
+    laya_intent?: string;
+    evaluation_notice?: string;
+    steps?: { title: string; done?: boolean }[];
   };
   readonly prevMessage: { role: string } | null;
   readonly isLoading: boolean;
@@ -191,9 +202,12 @@ interface MessageContentBubbleProps {
   readonly showTypingIndicator: boolean;
   readonly thinking: string | null;
   readonly isPulseActive: boolean;
+  readonly isStreaming: boolean;
   readonly content: string;
   readonly response: string;
   readonly a2uiPayload?: any;
+  readonly evaluationNotice?: string;
+  readonly steps?: { title: string; done?: boolean }[];
   readonly onA2UIAction: (action: unknown) => void;
 }
 
@@ -202,38 +216,136 @@ function MessageContentBubble({
   showTypingIndicator,
   thinking,
   isPulseActive,
+  isStreaming,
   content,
   response,
   a2uiPayload,
+  evaluationNotice,
+  steps,
   onA2UIAction,
 }: Readonly<MessageContentBubbleProps>) {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(isUser ? content : response);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
   return (
     <div
       className={cn(
-        "px-4 py-3 rounded-2xl text-[13px] leading-relaxed shadow-sm overflow-hidden w-full break-words transition-all duration-300",
+        "px-4 py-3 rounded-2xl text-[13px] leading-relaxed shadow-sm overflow-hidden w-full break-words transition-all duration-300 relative group/bubble",
         isUser
           ? "bg-bg-surface text-text-primary border border-border-subtle rounded-tr-none"
           : "bg-bg-app text-text-secondary border border-border-subtle rounded-tl-none",
       )}
     >
+      {/* Floating Copy Action on Hover */}
+      {!showTypingIndicator && (
+        <button
+          type="button"
+          onClick={handleCopy}
+          className="absolute top-2.5 right-2.5 opacity-0 group-hover/bubble:opacity-100 transition-opacity p-1.5 rounded-lg bg-bg-surface/80 hover:bg-bg-surface border border-border-subtle text-text-muted hover:text-text-primary shadow-sm"
+          title="Copy text"
+        >
+          {copied ? <Check className="size-3 text-emerald-400" /> : <Copy className="size-3" />}
+        </button>
+      )}
+
       {showTypingIndicator ? (
-        <div className="flex items-center gap-3">
-          <TypingIndicator />
-          <span className="text-[11px] font-medium text-zinc-500 animate-pulse lowercase">
-            thinking…
-          </span>
+        <div className="flex flex-col gap-2.5">
+          <div className="flex items-center gap-3">
+            <TypingIndicator />
+            <span className="text-[11px] font-medium text-zinc-500 animate-pulse lowercase">
+              {steps && steps.length > 0 ? "investigating…" : "thinking…"}
+            </span>
+          </div>
+          {evaluationNotice && (
+            <div className="flex items-center gap-1.5 text-[10px] text-amber-400/90 bg-amber-500/10 px-2 py-0.5 rounded-full border border-amber-500/20 w-fit animate-in fade-in">
+              <Sparkles className="size-2.5 text-amber-400 animate-spin" />
+              <span>{evaluationNotice}</span>
+            </div>
+          )}
+          {steps && steps.length > 0 && (
+            <div className="flex flex-col gap-1.5 p-2 rounded-xl bg-bg-surface/50 border border-border-subtle/80 text-[11px]">
+              <div className="flex items-center gap-1.5 font-medium text-text-muted mb-0.5 px-1">
+                <Wrench className="size-3 text-emerald-400" />
+                <span>Execution Steps ({steps.filter((s) => s.done).length}/{steps.length})</span>
+              </div>
+              <div className="flex flex-col gap-1">
+                {steps.map((st, idx) => (
+                  <div
+                    key={`${st.title}-${idx}`}
+                    className={cn(
+                      "flex items-center gap-2 px-2 py-1 rounded-md transition-colors",
+                      st.done
+                        ? "text-text-secondary bg-emerald-500/5 border border-emerald-500/10"
+                        : "text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 font-medium",
+                    )}
+                  >
+                    {st.done ? (
+                      <Check className="size-3 text-emerald-400 flex-shrink-0" />
+                    ) : (
+                      <Loader2 className="size-3 text-emerald-400 animate-spin flex-shrink-0" />
+                    )}
+                    <span className="truncate">{st.title}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       ) : (
         <>
+          {evaluationNotice && !isUser && (
+            <div className="mb-2 flex items-center gap-1.5 text-[10px] text-amber-400/90 bg-amber-500/10 px-2.5 py-1 rounded-lg border border-amber-500/20 w-fit">
+              <Sparkles className="size-2.5 text-amber-400" />
+              <span>{evaluationNotice}</span>
+            </div>
+          )}
           {!isUser && (thinking !== null || isPulseActive) && (
             <ThinkingBlock content={thinking ?? ""} isStreaming={isPulseActive} />
+          )}
+          {/* Step-by-step progress cards (Antigravity-style) */}
+          {!isUser && steps && steps.length > 0 && (
+            <div className="mb-3 flex flex-col gap-1.5 p-2 rounded-xl bg-bg-surface/50 border border-border-subtle/80 text-[11px]">
+              <div className="flex items-center gap-1.5 font-medium text-text-muted mb-0.5 px-1">
+                <Wrench className="size-3 text-emerald-400" />
+                <span>Execution Steps ({steps.filter((s) => s.done).length}/{steps.length})</span>
+              </div>
+              <div className="flex flex-col gap-1">
+                {steps.map((st, idx) => (
+                  <div
+                    key={`${st.title}-${idx}`}
+                    className={cn(
+                      "flex items-center gap-2 px-2 py-1 rounded-md transition-colors",
+                      st.done
+                        ? "text-text-secondary bg-emerald-500/5 border border-emerald-500/10"
+                        : "text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 font-medium",
+                    )}
+                  >
+                    {st.done ? (
+                      <Check className="size-3 text-emerald-400 flex-shrink-0" />
+                    ) : (
+                      <Loader2 className="size-3 text-emerald-400 animate-spin flex-shrink-0" />
+                    )}
+                    <span className="truncate">{st.title}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
           )}
           <div className={cn("prose prose-invert prose-sm max-w-none", isUser && "text-right")}>
             {isUser ? (
               <p className="whitespace-pre-wrap">{content}</p>
             ) : (
               <>
-                <MarkdownContent content={response} className="text-text-primary" />
+                <MarkdownContent
+                  content={response || (steps && steps.length > 0 ? "Completed multi-step investigation." : "No response content received.")}
+                  className="text-text-primary"
+                  isStreaming={!isUser && isStreaming}
+                />
                 {a2uiPayload && <A2UIRenderer payload={a2uiPayload} onAction={onA2UIAction} />}
               </>
             )}
@@ -276,15 +388,17 @@ function AIMessageRow({
     >
       <div
         className={cn(
-          "w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 border transition-transform group-hover:scale-105",
-          isUser ? "bg-bg-surface-bright border-border-subtle" : "bg-primary/10 border-primary/20",
+          "w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 border transition-all duration-200 group-hover:scale-105 relative",
+          isUser
+            ? "bg-bg-surface-bright border-border-subtle"
+            : "bg-emerald-500/15 border-emerald-500/30 shadow-[0_0_12px_rgba(34,197,94,0.2)]",
           isSameRoleAsPrev && "opacity-0 pointer-events-none", // Hide redundant avatars
         )}
       >
         {isUser ? (
           <User className="size-4 text-text-muted" />
         ) : (
-          <Bot className="size-4 text-violet-400" />
+          <Bot className="size-4 text-emerald-400" />
         )}
       </div>
       <div
@@ -305,18 +419,37 @@ function AIMessageRow({
           showTypingIndicator={showTypingIndicator}
           thinking={thinking}
           isPulseActive={isPulseActive}
+          isStreaming={isLoading && isLastMessage}
           content={message.content}
           response={response}
           a2uiPayload={message.a2ui_payload}
+          evaluationNotice={message.evaluation_notice}
+          steps={message.steps}
           onA2UIAction={onA2UIAction}
         />
+        {/* Active streaming / multi-step investigation indicator */}
+        {!isUser && isLoading && isLastMessage && !showTypingIndicator && (
+          <div className="flex items-center gap-2 px-2 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[11px] font-medium animate-pulse">
+            <span className="size-1.5 rounded-full bg-emerald-400 animate-ping" />
+            <span>Investigating and executing steps…</span>
+          </div>
+        )}
         {!isSameRoleAsPrev && (
-          <span className="text-[9px] text-text-muted font-medium px-1 tracking-tight">
-            {new Date(message.timestamp).toLocaleTimeString([], {
-              hour: "2-digit",
-              minute: "2-digit",
-            })}
-          </span>
+          <div className="flex items-center gap-1.5 px-1">
+            <span className="text-[9px] text-text-muted font-medium tracking-tight">
+              {(() => {
+                const tsStr = String(message.timestamp);
+                const safeTs =
+                  tsStr && !tsStr.endsWith("Z") && !tsStr.includes("+") && !tsStr.includes("-", 10)
+                    ? `${tsStr.replace(" ", "T")}Z`
+                    : tsStr;
+                return new Date(safeTs).toLocaleTimeString([], {
+                  hour: "2-digit",
+                  minute: "2-digit",
+                });
+              })()}
+            </span>
+          </div>
         )}
       </div>
     </div>
@@ -340,6 +473,7 @@ export function AIInvestigationSidebar({
     fetchSessions,
     renameSession,
     sendMessage,
+    stopStream,
     isLoading,
   } = useAiStore();
 
@@ -727,24 +861,8 @@ export function AIInvestigationSidebar({
         </div>
       </ScrollArea>
 
-      <div className="p-4 bg-bg-app/50 backdrop-blur-md border-t border-border-subtle space-y-4 shrink-0">
-        {selectedLogIds.length > 0 && (
-          <div className="flex items-center justify-between px-3 py-2 bg-primary/5 border border-primary/10 rounded-xl">
-            <span className="text-[10px] font-bold text-primary/80 uppercase tracking-widest">
-              Context: {selectedLogIds.length} logs
-            </span>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={clearSelection}
-              className="h-auto p-0 text-[10px] text-primary hover:text-primary-hover transition-colors font-bold decoration-dotted underline underline-offset-2"
-            >
-              Clear Selection
-            </Button>
-          </div>
-        )}
-
-        <div className="relative group/input">
+      <div className="p-4 bg-bg-app/50 backdrop-blur-md border-t border-border-subtle space-y-3 shrink-0">
+        <div className="relative group/input bg-bg-surface-bright/50 border border-border-subtle rounded-2xl focus-within:ring-2 focus-within:ring-primary/20 focus-within:border-primary/30 transition-all p-3 flex flex-col gap-2">
           {showCommands && (
             <div className="absolute bottom-full left-0 mb-2 w-full bg-bg-surface border border-border-subtle rounded-xl overflow-hidden shadow-2xl z-50 animate-in fade-in slide-in-from-bottom-2">
               <div className="p-2 space-y-1">
@@ -772,6 +890,39 @@ export function AIInvestigationSidebar({
               </div>
             </div>
           )}
+
+          {/* Inline Attached Context Tag */}
+          {selectedLogIds.length > 0 && (
+            <div className="flex items-center gap-2 flex-wrap">
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger className="cursor-default">
+                    <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-bg-surface border border-border-subtle text-text-primary text-xs font-medium shadow-sm group/tag select-none hover:border-primary/40 transition-colors">
+                      <FileText className="size-3 text-primary shrink-0" />
+                      <span className="text-[11px] font-semibold tracking-tight">
+                        {selectedLogIds.length} {selectedLogIds.length === 1 ? "log" : "logs"}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          clearSelection();
+                        }}
+                        className="ml-1 p-0.5 rounded hover:bg-white/10 text-text-muted hover:text-text-primary transition-colors cursor-pointer"
+                        title="Remove context"
+                      >
+                        <X className="size-3" />
+                      </button>
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent side="top" className="text-xs bg-bg-surface border border-border text-text-secondary py-1 px-2.5">
+                    {selectedLogIds.length} {selectedLogIds.length === 1 ? "log" : "logs"} selected as context. Press Backspace to remove.
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            </div>
+          )}
+
           <Textarea
             ref={textareaRef}
             value={inputValue}
@@ -785,6 +936,10 @@ export function AIInvestigationSidebar({
               }
             }}
             onKeyDown={(e) => {
+              if (e.key === "Backspace" && inputValue === "" && selectedLogIds.length > 0) {
+                clearSelection();
+                return;
+              }
               if (e.key === "Enter" && !e.shiftKey) {
                 e.preventDefault();
                 setShowCommands(false);
@@ -795,45 +950,64 @@ export function AIInvestigationSidebar({
               }
             }}
             placeholder="Search patterns or analyze errors..."
-            className="min-h-[72px] max-h-[300px] bg-bg-surface-bright/50 border-border-subtle rounded-2xl resize-none py-3 pr-12 focus:ring-primary/20 text-text-primary placeholder:text-text-muted transition-all focus:border-primary/30"
+            className="w-full min-h-[56px] max-h-[260px] bg-transparent border-0 rounded-none p-0 focus:ring-0 focus-visible:ring-0 text-text-primary placeholder:text-text-muted transition-all resize-none leading-relaxed"
           />
-          <Button
-            size="icon"
-            className={cn(
-              "absolute bottom-3 right-3 rounded-xl transition-all shadow-lg",
-              inputValue.trim()
-                ? "bg-primary hover:bg-primary-hover text-bg-app"
-                : "bg-bg-surface text-text-muted opacity-50",
-            )}
-            disabled={!inputValue.trim() || isLoading}
-            onClick={handleSend}
-          >
-            <Send className="size-4" />
-          </Button>
-        </div>
 
-        <div className="flex items-center px-1">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setIsReasoningEnabled(!isReasoningEnabled)}
-            className={cn(
-              "flex items-center gap-2 px-3 py-1.5 h-auto rounded-xl transition-all border",
-              isReasoningEnabled
-                ? "bg-amber-500/10 border-amber-500/20 text-amber-300 hover:bg-amber-500/20 shadow-[0_0_15px_-5px_rgba(245,158,11,0.4)]"
-                : "bg-transparent border-border-subtle/60 text-text-muted hover:bg-bg-hover",
-            )}
-            title={isReasoningEnabled ? "Deep Reasoning Active" : "Deep Reasoning Disabled"}
-          >
-            {isReasoningEnabled ? (
-              <Lightbulb className="size-3.5 text-amber-400 animate-pulse-slow" />
+          <div className="flex items-center justify-between pt-1 border-t border-border-subtle/40">
+            {/* Thinking Icon-Only Toggle with Tooltip */}
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger
+                  type="button"
+                  onClick={() => setIsReasoningEnabled(!isReasoningEnabled)}
+                  className={cn(
+                    "size-7 rounded-lg transition-all border flex items-center justify-center cursor-pointer",
+                    isReasoningEnabled
+                      ? "bg-amber-500/10 border-amber-500/30 text-amber-300 hover:bg-amber-500/20 shadow-[0_0_12px_-3px_rgba(245,158,11,0.5)]"
+                      : "bg-transparent border-border-subtle/60 text-text-muted hover:bg-bg-hover hover:text-text-primary",
+                  )}
+                  aria-label={isReasoningEnabled ? "Thinking on" : "Thinking off"}
+                >
+                  {isReasoningEnabled ? (
+                    <Lightbulb className="size-3.5 text-amber-400 animate-pulse-slow" />
+                  ) : (
+                    <LightbulbOff className="size-3.5" />
+                  )}
+                </TooltipTrigger>
+                <TooltipContent side="top" className="text-xs bg-bg-surface border border-border text-text-secondary py-1 px-2.5">
+                  {isReasoningEnabled ? "Thinking on" : "Thinking off"}
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+
+            {isLoading ? (
+              <Button
+                size="icon"
+                type="button"
+                className="size-7 rounded-lg transition-all shadow-md bg-red-500/20 hover:bg-red-500/30 text-red-400 border border-red-500/30 active:scale-95"
+                onClick={stopStream}
+                title="Stop generating"
+              >
+                <Square className="size-3.5 fill-current" />
+              </Button>
             ) : (
-              <LightbulbOff className="size-3.5" />
+              <Button
+                size="icon"
+                type="button"
+                className={cn(
+                  "size-7 rounded-lg transition-all shadow-md",
+                  inputValue.trim()
+                    ? "bg-primary hover:bg-primary-hover text-bg-app"
+                    : "bg-bg-surface text-text-muted opacity-50",
+                )}
+                disabled={!inputValue.trim()}
+                onClick={handleSend}
+                title="Send message"
+              >
+                <Send className="size-3.5" />
+              </Button>
             )}
-            <span className="text-[10px] font-bold uppercase tracking-widest whitespace-nowrap">
-              Think
-            </span>
-          </Button>
+          </div>
         </div>
       </div>
       <AIHistorySearchModal open={isSearchModalOpen} onOpenChange={setIsSearchModalOpen} />

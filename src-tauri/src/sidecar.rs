@@ -22,8 +22,8 @@ impl SidecarManager {
         }
 
         // Determine if we are in dev mode or prod
-        // For dev: go run ./cmd/sidecar --stdio --with-http --db loglens.duckdb
-        // For prod: sidecar binary (Tauri sidecar)
+        // In dev: run fresh Go source (go run ./cmd/sidecar) so code changes are always live
+        // In prod: sidecar binary (Tauri sidecar)
         let mut cmd = if cfg!(debug_assertions) {
             let mut c = Command::new("go");
             c.current_dir("../backend-go")

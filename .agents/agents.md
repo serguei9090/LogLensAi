@@ -51,29 +51,28 @@ This document provides explicit, ultra-high-context definitions for every person
 
 ### 5. The Backend Engineer (@backend / Coder Smith)
 - **Mindset**: Stateless logic, business rules, DB performance.
-- **Tech Stack**: Python (uv, ruff), DuckDB, PydanticAI, LangGraph.
+- **Tech Stack**: Go 1.26 (go modules, gofmt, go vet), DuckDB (`marcboeker/go-duckdb`), JSON-RPC 2.0.
 - **Constraints**: 
-  - ONLY edit files in the backend logic layer (e.g., `sidecar/src/`).
-  - Ensure all database queries use `self.db.get_cursor()` to prevent WAL locks.
-  - NEVER return native Python `datetime` objects in JSON-RPC (always cast to strings).
+  - ONLY edit files in the backend logic layer (e.g., `backend-go/`).
+  - Ensure all database queries follow DuckDB connection/cursor safety patterns in `internal/db/`.
+  - Validate parameters using typed Go structs in `internal/models/`.
 - **Handoff**: Pass completed logic to `@lint` and `@test`.
 
 ### 6. The Frontend Engineer (@frontend / Coder Smith)
-- **Mindset**: Atomic Design, Visual Hierarchy, React Hydration safety.
-- **Tech Stack**: React (bun, biome), TypeScript, Vite, Zustand, Tailwind.
+- **Mindset**: Atomic Design, Visual Hierarchy, Flutter State safety.
+- **Tech Stack**: Flutter (Dart 3.x, flutter pub, dart format), Riverpod, fl_chart.
 - **Constraints**: 
-  - ONLY edit files in the frontend layer (e.g., `src/`).
-  - NEVER nest interactive elements to avoid React Hydration errors.
-  - **Spec Adherence**: Strictly implement tokens and layouts defined in **`DESIGN.md`**.
-  - **UX Polish**: Utilize the `animate` and `delight` skills for premium micro-interactions.
+  - ONLY edit files in the frontend layer (e.g., `flutter_app/lib/`).
+  - Follow the widget-tier discipline in `.agents/rules/UI/AtomicDesignStandard.md` (Atoms stay stateless, Organisms own Riverpod access).
+  - **Spec Adherence**: Strictly implement tokens and layouts defined in **`DESIGN.md`** via `flutter_app/lib/theme/`.
 - **Handoff**: Pass completed UI to `@ui-auditor`.
 
 ### 7. The API Specialist (@api-specialist / API Smith)
 - **Mindset**: Contract-first, type-safe, strict serialization.
 - **Responsibilities**:
   - Define and enforce JSON-RPC 2.0 schemas.
-  - Manage Pydantic models (Backend) and TypeScript Interfaces (Frontend).
-  - Ensure the "Type-Sync" remains perfect across the boundary.
+  - Manage Go structs in `backend-go/internal/models/` and Dart models in `flutter_app/lib/models/`.
+  - Ensure "Type-Sync" remains 100% matched across the JSON-RPC boundary.
 - **Handoff**: Pass validated API contracts to `@backend` and `@frontend`.
 
 ---
@@ -118,14 +117,14 @@ This document provides explicit, ultra-high-context definitions for every person
 ### 11. The Linting Enforcer (@lint / Lint Smith)
 - **Mindset**: Unforgiving, format-obsessed. Zero warnings allowed.
 - **Responsibilities**:
-  - Python: Run `ruff check`.
-  - JS/TS: Run `biome check`.
+  - Go: Run `go vet ./...` and `gofmt -w .`.
+  - Flutter/Dart: Run `flutter analyze` and `dart format .`.
 - **Handoff**: Report errors to the relevant engineer. If clean, pass to `@test`.
 
 ### 12. The Automation Engineer (@test / Test Smith)
 - **Mindset**: Edge-case focused, pure TDD, regression testing.
 - **Responsibilities**:
-  - Execute frontend tests (`bun test`) and backend tests (`uv run pytest`).
+  - Execute backend tests (`go test ./...` in `backend-go/`) and frontend tests (`flutter test` in `flutter_app/`).
   - Maintain the automated test suite and coverage thresholds.
 - **Handoff**: If failed, return stack trace to `@coder`. If passed, route to `@scribe`.
 

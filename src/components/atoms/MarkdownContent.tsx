@@ -1,231 +1,162 @@
 import { cn } from "@/lib/utils";
-import { Fragment, type ReactNode } from "react";
+import { Check, Copy } from "lucide-react";
+import { useState } from "react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 
 interface MarkdownContentProps {
-  /** The raw text content to render with lightweight markdown support. */
+  /** The raw text content to render with markdown support. */
   readonly content: string;
   /** Optional extra className for the root container. */
   readonly className?: string;
+  /** Whether the message is actively streaming. */
+  readonly isStreaming?: boolean;
 }
 
-/**
- * Lightweight markdown renderer for AI chat responses.
- *
- * Supports a minimal subset of markdown without external dependencies:
- * - **bold** text
- * - `inline code`
- * - ```code blocks```
- * - - bullet lists
- * - Line breaks
- *
- * @purpose Render AI assistant responses with basic formatting without
- *          pulling in heavy markdown libraries like react-markdown + remark.
- */
-export function MarkdownContent({ content, className }: MarkdownContentProps) {
-  const elements = parseMarkdown(content);
+function CodeBlockWithCopy({
+  code,
+  language,
+}: {
+  readonly code: string;
+  readonly language?: string;
+}) {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(code);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
 
   return (
-    <div className={cn("space-y-2 overflow-hidden", className)}>
-      {elements.map((el, i) => {
-        const key = typeof el === "string" ? `${i}-${el.length}` : `md-${i}`;
-        return <Fragment key={key}>{el}</Fragment>;
-      })}
+    <div className="relative group/code my-2 rounded-xl overflow-hidden border border-zinc-800/80 bg-zinc-950/90 shadow-sm">
+      <div className="flex items-center justify-between px-3 py-1.5 bg-zinc-900/60 border-b border-zinc-800/60 text-[10px] text-zinc-400 font-mono">
+        <span>{language || "code"}</span>
+        <button
+          type="button"
+          onClick={handleCopy}
+          className="flex items-center gap-1.5 text-zinc-400 hover:text-zinc-200 transition-colors px-1.5 py-0.5 rounded hover:bg-zinc-800/60 cursor-pointer"
+          title="Copy code"
+        >
+          {copied ? (
+            <>
+              <Check className="size-3 text-emerald-400" />
+              <span className="text-emerald-400 text-[10px]">Copied!</span>
+            </>
+          ) : (
+            <>
+              <Copy className="size-3" />
+              <span>Copy</span>
+            </>
+          )}
+        </button>
+      </div>
+      <pre className="px-3.5 py-3 overflow-x-auto custom-scrollbar">
+        <code className="text-[11px] font-mono text-emerald-300/90 leading-relaxed whitespace-pre">
+          {code}
+        </code>
+      </pre>
     </div>
   );
 }
 
-/** Parses markdown text into React elements. */
-function parseMarkdown(text: string): ReactNode[] {
-  const elements: ReactNode[] = [];
-  const lines = text.split("\n");
-  let i = 0;
+/**
+ * Robust markdown renderer for AI chat responses powered by react-markdown and remark-gfm.
+ * Supports GFM tables, strikethrough, autolinks, custom code blocks with copy, and blockquotes.
+ */
+export function MarkdownContent({ content, className, isStreaming = false }: MarkdownContentProps) {
+  return (
+    <div
+      className={cn(
+        "prose prose-invert prose-sm max-w-none text-text-primary leading-relaxed break-words space-y-2",
+        className,
+      )}
+    >
+      <ReactMarkdown
+        remarkPlugins={[remarkGfm]}
+        components={{
+          table({ children }) {
+            return (
+              <div className="my-3 overflow-x-auto rounded-xl border border-border-subtle bg-bg-surface/50 shadow-sm">
+                <table className="w-full text-left text-xs border-collapse">{children}</table>
+              </div>
+            );
+          },
+          thead({ children }) {
+            return (
+              <thead className="bg-bg-surface-bright/70 border-b border-border-subtle text-text-secondary font-semibold uppercase tracking-wider text-[10px]">
+                {children}
+              </thead>
+            );
+          },
+          tbody({ children }) {
+            return <tbody className="divide-y divide-border-subtle/50">{children}</tbody>;
+          },
+          tr({ children }) {
+            return <tr className="hover:bg-primary/[0.03] transition-colors">{children}</tr>;
+          },
+          th({ children }) {
+            return <th className="px-3 py-2 text-text-primary font-semibold">{children}</th>;
+          },
+          td({ children }) {
+            return <td className="px-3 py-2 text-text-secondary">{children}</td>;
+          },
+          ul({ children }) {
+            return (
+              <ul className="space-y-1 pl-4 my-2 list-disc list-outside marker:text-emerald-500/50">
+                {children}
+              </ul>
+            );
+          },
+          ol({ children }) {
+            return (
+              <ol className="space-y-1 pl-4 my-2 list-decimal list-outside marker:text-emerald-500/50">
+                {children}
+              </ol>
+            );
+          },
+          li({ children }) {
+            return <li className="text-[13px] leading-relaxed text-text-primary">{children}</li>;
+          },
+          p({ children }) {
+            return <p className="text-[13px] leading-relaxed my-1.5">{children}</p>;
+          },
+          blockquote({ children }) {
+            return (
+              <blockquote className="border-l-2 border-emerald-500/40 pl-3 my-2 text-text-muted italic text-[12px] bg-emerald-500/[0.03] py-1 rounded-r">
+                {children}
+              </blockquote>
+            );
+          },
+          strong({ children }) {
+            return <strong className="font-semibold text-zinc-100">{children}</strong>;
+          },
+          code({ className: codeClassName, children, ...props }) {
+            const match = /language-(\w+)/.exec(codeClassName || "");
+            const rawCode = String(children).replace(/\n$/, "");
 
-  while (i < lines.length) {
-    const line = lines[i];
+            // If it's a multiline or language-annotated code block, use CodeBlockWithCopy
+            if (match || rawCode.includes("\n")) {
+              return <CodeBlockWithCopy code={rawCode} language={match ? match[1] : undefined} />;
+            }
 
-    // Code block: ```...```
-    if (line.trimStart().startsWith("```")) {
-      const { element, nextIndex } = parseCodeBlock(lines, i, elements.length);
-      elements.push(element);
-      i = nextIndex;
-      continue;
-    }
-
-    // Bullet list: - item or * item
-    if (/^\s*[-*]\s+/.test(line)) {
-      const { element, nextIndex } = parseBulletList(lines, i, elements.length);
-      elements.push(element);
-      i = nextIndex;
-      continue;
-    }
-
-    // Numbered list: 1. item
-    if (/^\s*\d+[.)]\s+/.test(line)) {
-      const { element, nextIndex } = parseOrderedList(lines, i, elements.length);
-      elements.push(element);
-      i = nextIndex;
-      continue;
-    }
-
-    // Empty line = paragraph separator
-    if (line.trim() === "") {
-      i++;
-      continue;
-    }
-
-    // Regular paragraph
-    const { element, nextIndex } = parseParagraph(lines, i, elements.length);
-    elements.push(element);
-    i = nextIndex;
-  }
-
-  return elements;
-}
-
-function parseCodeBlock(lines: string[], startIndex: number, elIndex: number) {
-  const codeLines: string[] = [];
-  let i = startIndex + 1;
-  while (i < lines.length && !lines[i].trimStart().startsWith("```")) {
-    codeLines.push(lines[i]);
-    i++;
-  }
-  return {
-    element: (
-      <pre
-        key={`code-${elIndex}-${codeLines.length}`}
-        className="bg-zinc-900/80 border border-zinc-800/60 rounded-lg px-3 py-2.5 overflow-x-auto custom-scrollbar"
+            // Inline code
+            return (
+              <code
+                className="px-1.5 py-0.5 rounded bg-zinc-800/80 text-emerald-400/90 text-[11px] font-mono border border-zinc-700/40"
+                {...props}
+              >
+                {children}
+              </code>
+            );
+          },
+        }}
       >
-        <code className="text-[11px] font-mono text-emerald-300/90 leading-relaxed whitespace-pre">
-          {codeLines.join("\n")}
-        </code>
-      </pre>
-    ),
-    nextIndex: i + 1,
-  };
-}
-
-function parseBulletList(lines: string[], startIndex: number, elIndex: number) {
-  const listItems: string[] = [];
-  let i = startIndex;
-  while (i < lines.length && /^\s*[-*]\s+/.test(lines[i])) {
-    listItems.push(lines[i].replace(/^\s*[-*]\s+/, ""));
-    i++;
-  }
-  return {
-    element: (
-      <ul key={`list-${elIndex}`} className="space-y-1 pl-3">
-        {listItems.map((item, li) => (
-          <li
-            key={`li-${elIndex}-${li}`}
-            className="text-[13px] leading-relaxed flex items-start gap-2"
-          >
-            <span className="text-emerald-500/40 mt-1.5 shrink-0">•</span>
-            <span>{renderInline(item)}</span>
-          </li>
-        ))}
-      </ul>
-    ),
-    nextIndex: i,
-  };
-}
-
-function parseOrderedList(lines: string[], startIndex: number, elIndex: number) {
-  const listItems: string[] = [];
-  let i = startIndex;
-  while (i < lines.length && /^\s*\d+[.)]\s+/.test(lines[i])) {
-    listItems.push(lines[i].replace(/^\s*\d+[.)]\s+/, ""));
-    i++;
-  }
-  return {
-    element: (
-      <ol key={`ol-${elIndex}`} className="space-y-1 pl-3 list-decimal list-inside">
-        {listItems.map((item, li) => (
-          <li key={`oli-${elIndex}-${li}`} className="text-[13px] leading-relaxed">
-            {renderInline(item)}
-          </li>
-        ))}
-      </ol>
-    ),
-    nextIndex: i,
-  };
-}
-
-function parseParagraph(lines: string[], startIndex: number, elIndex: number) {
-  const paraLines: string[] = [];
-  let i = startIndex;
-  while (
-    i < lines.length &&
-    lines[i].trim() !== "" &&
-    !lines[i].trimStart().startsWith("```") &&
-    !/^\s*[-*]\s+/.test(lines[i]) &&
-    !/^\s*\d+[.)]\s+/.test(lines[i])
-  ) {
-    paraLines.push(lines[i]);
-    i++;
-  }
-  return {
-    element: (
-      <p key={`p-${elIndex}`} className="text-[13px] leading-relaxed">
-        {renderInline(paraLines.join("\n"))}
-      </p>
-    ),
-    nextIndex: i,
-  };
-}
-
-/** Renders inline markdown: **bold**, `code`, and line breaks. */
-function renderInline(text: string): ReactNode {
-  // Split by inline patterns in order: bold, code, text
-  const parts: ReactNode[] = [];
-  // Combined regex for bold (**text**) and inline code (`text`)
-  const regex = /(\*\*[^*]+\*\*|`[^`]+`)/g;
-  let lastIndex = 0;
-
-  for (const match of text.matchAll(regex)) {
-    const before = text.slice(lastIndex, match.index);
-    if (before) {
-      parts.push(renderLineBreaks(before));
-    }
-
-    const token = match[0];
-    if (token.startsWith("**")) {
-      parts.push(
-        <strong key={`b-${match.index}`} className="font-bold text-zinc-100">
-          {token.slice(2, -2)}
-        </strong>,
-      );
-    } else if (token.startsWith("`")) {
-      parts.push(
-        <code
-          key={`c-${match.index}`}
-          className="px-1.5 py-0.5 rounded bg-zinc-800/80 text-emerald-400/90 text-[11px] font-mono border border-zinc-700/40"
-        >
-          {token.slice(1, -1)}
-        </code>,
-      );
-    }
-
-    lastIndex = (match.index ?? 0) + token.length;
-  }
-
-  const remaining = text.slice(lastIndex);
-  if (remaining) {
-    parts.push(renderLineBreaks(remaining));
-  }
-
-  return parts.length === 1 ? parts[0] : parts;
-}
-
-/** Converts \n to <br /> within inline text. */
-function renderLineBreaks(text: string): ReactNode {
-  const lines = text.split("\n");
-  if (lines.length === 1) {
-    return text;
-  }
-  return lines.map((line, i) => (
-    <Fragment key={`br-${i}-${line.length}`}>
-      {line}
-      {i < lines.length - 1 && <br />}
-    </Fragment>
-  ));
+        {content}
+      </ReactMarkdown>
+      {isStreaming && (
+        <span className="inline-block w-1.5 h-3.5 bg-emerald-400 ml-0.5 animate-pulse align-middle" />
+      )}
+    </div>
+  );
 }

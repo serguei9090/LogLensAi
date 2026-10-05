@@ -1,31 +1,23 @@
----
-trigger: always_on
-description: Foundational architecture boundaries and system integrity guardrails.
----
-
-# Architecture Standards (v0.11.0)
+# Architecture Standards (LogLensAi)
 
 ## 1. MANDATORY: The Bridge Protocol (Law #1)
-- **Universal Constraint**: All React-to-Sidecar communication MUST use the `callSidecar` bridge.
-- **Forbidden**: Direct `invoke` calls are strictly prohibited.
-- **Error Handling**: All calls must be wrapped in the standardized bridge error boundary.
-- **Contract Integrity**: Every JSON-RPC method in `api.py` MUST have a corresponding `BaseModel` request class.
-- **Serialization**: Sidecar methods MUST return stringified timestamps; native `datetime` objects are forbidden.
+- **Universal Constraint**: All Flutter-to-Sidecar communication MUST use `sidecar_bridge.dart` (JSON-RPC 2.0).
+- **Transport**: Stdio pipes in desktop production mode; direct HTTP fetch (`http://127.0.0.1:5000`) in dev mode.
+- **Contract Integrity**: Every JSON-RPC method in `backend-go/internal/rpc/` MUST have corresponding typed Go request/response structs in `internal/models/` and Dart models in `flutter_app/lib/models/`.
+- **Serialization**: Timestamps must be ISO-8601 strings; never pass raw vendor/driver date types unformatted across the bridge.
 
 ## 2. Ports and Adapters (Hexagonal Law)
-- **Separation**: Business logic MUST NOT be aware of infrastructure (DB clients, HTTP frameworks).
-- **Port**: Define communication interfaces in the Domain layer first.
-- **Adapter**: Implement concrete logic (Infrastructure) only after the Port is defined.
+- **Separation**: Business logic (`internal/drain3`, `internal/query`, `internal/ai`) MUST NOT depend directly on network transports or UI layers.
+- **Port**: Define communication interfaces and repository ports in domain packages first.
+- **Adapter**: Implement concrete adapters (`internal/rpc/`, `internal/db/`, `internal/ingestion/`) behind ports.
 
-## 3. Persistence & Data Safety
-- **DuckDB Concurrency**: Use `self.db.get_cursor()` within every sidecar method. Do NOT share cursors across async boundaries.
-- **Source of Truth**: Backend Pydantic models are the authoritative schema. Frontend types MUST be generated from these models.
-- **Query Parity**: All multi-query execution flows (e.g., `count` + `data`) MUST use identical aliasing and filter logic.
+## 3. Persistence & DuckDB Data Safety
+- **Cursor Isolation**: Every DuckDB query must go through `internal/db`'s cursor/connection helpers. Never share raw cursor instances across concurrent goroutines to avoid WAL locks.
+- **Schema Authority**: Go models in `internal/models/` and schema migrations in `internal/db/` are the authoritative source of truth.
 
-## 4. UI Structure & Lifecycle
-- **Hydration Safety**: No nested interactive elements. Use `role="button"` for custom containers.
-- **Provider Parity**: Explicitly re-initialize backend providers (e.g., AI models) immediately upon settings changes.
+## 4. UI Structure & State Discipline
+- **Widget Tier Hierarchy**: Follow Atomic Design (`atoms/` -> `molecules/` -> `organisms/` -> `pages/`). Atoms remain stateless with no Riverpod access. Organisms own Riverpod access.
+- **Design Tokens**: Strictly use tokens from `flutter_app/lib/theme/` (`AppColors`, `AppSpacing`, `AppTypography`). Hardcoded hex colors are strictly forbidden.
 
-## 5. Versioning
-- **SemVer**: Strictly follow Semantic Versioning 2.0.0.
-- **Breaking Changes**: Any API signature or data schema shift REQUIRES a major version bump.
+## 5. Fast Code Intelligence (Codanna-First)
+- Before checking callers or refactoring, run `codanna retrieve callers <Symbol>` or `codanna mcp analyze_impact <Symbol>`. Never perform brute-force multi-file reads.

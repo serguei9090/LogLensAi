@@ -56,6 +56,15 @@ func DefaultBaselineQuestions() map[string]Question {
 			Type:         QuestionTypeNoul,
 			Instructions: "Does this log message indicate an active customer-facing service outage?",
 		},
+		"goal_completed": {
+			Type:         QuestionTypeChoice,
+			Instructions: "Evaluate whether the assistant answered the query and satisfied the user's objective, or if it gave up early or requires additional log data.",
+			Options: []string{
+				"completed",
+				"needs_more_data",
+				"clarification_needed",
+			},
+		},
 	}
 }
 

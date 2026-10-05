@@ -1,10 +1,17 @@
 pre-commit:
   commands:
-    biome:
-      glob: "*.{js,ts,jsx,tsx,json}"
-      run: bun run lint {staged_files}
-    ruff:
-      glob: "*.py"
-      run: uv run ruff check {staged_files}
-      fail_on_error: true
+    go-vet:
+      root: "backend-go"
+      glob: "*.go"
+      run: go vet ./...
+    flutter-analyze:
+      root: "flutter_app"
+      glob: "*.dart"
+      run: flutter analyze
+
+post-commit:
+  commands:
+    codanna-index:
+      run: codanna index .
+
 

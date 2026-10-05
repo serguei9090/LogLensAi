@@ -68,8 +68,8 @@ func TestOpen_SeedsDefaultSettings(t *testing.T) {
 	).Scan(&maskCount); err != nil {
 		t.Fatalf("checking drain_masks: %v", err)
 	}
-	if maskCount != 4 {
-		t.Errorf("expected 4 default drain_masks, got %d", maskCount)
+	if maskCount != 11 {
+		t.Errorf("expected 11 default drain_masks, got %d", maskCount)
 	}
 }
 

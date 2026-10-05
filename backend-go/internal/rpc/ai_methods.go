@@ -74,6 +74,7 @@ func sendAIMessage(ctx context.Context, a *app.App, provider graph.Provider, too
 	// with) is excluded here because run_investigation appends
 	// params.message as the new turn itself, below.
 	runnerHistory := dropLast(history)
+	ctx = context.WithValue(ctx, "workspace_id", params.WorkspaceID)
 
 	chunks, runErr := runInvestigation(ctx, provider, tools, params.WorkspaceID, sessionID, params.Message, runnerHistory, model, reasoning)
 	if runErr != nil {
@@ -318,7 +319,7 @@ func finalizeAISession(a *app.App, sessionID, responseContent, providerSessionID
 		return fmt.Errorf("rpc: inserting assistant ai_message: %w", err)
 	}
 
-	lastModified := time.Now().Format("2006-01-02 15:04:05")
+	lastModified := time.Now().UTC().Format(time.RFC3339)
 	var err error
 	if providerSessionID != "" {
 		_, err = conn.Exec(

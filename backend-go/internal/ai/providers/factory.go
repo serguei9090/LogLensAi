@@ -49,6 +49,17 @@ func NewProvider(providerName string, cfg Config) (Provider, error) {
 		}
 		return NewOpenAICompatibleProvider(cfg.APIKey, cfg.SystemPrompt, host, model), nil
 
+	case "openrouter":
+		host := cfg.Host
+		if host == "" {
+			host = "https://openrouter.ai/api/v1"
+		}
+		model := cfg.Model
+		if model == "" {
+			model = "anthropic/claude-3.5-sonnet"
+		}
+		return NewOpenAICompatibleProvider(cfg.APIKey, cfg.SystemPrompt, host, model), nil
+
 	case "lmstudio":
 		host := cfg.Host
 		if host == "" {

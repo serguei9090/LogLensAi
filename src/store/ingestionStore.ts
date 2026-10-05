@@ -267,11 +267,13 @@ export const useIngestionStore = create<IngestionState>((set, get) => ({
 
               (async () => {
                 try {
-                  // Step 2: Refresh hierarchy
-                  traceIngestion("[Store] Completion Step 2: Fetching workspace hierarchy...");
-                  const { useWorkspaceStore } = await import("@/store/workspaceStore");
-                  await useWorkspaceStore.getState().fetchHierarchy(completedWorkspaceId);
-                  traceIngestion("[Store] Completion Step 2: Workspace hierarchy fetched.");
+                  // Step 2: Request workspace hierarchy refresh via event to avoid circular store import
+                  traceIngestion("[Store] Completion Step 2: Triggering workspace hierarchy refresh event...");
+                  globalThis.dispatchEvent(
+                    new CustomEvent("loglens:refresh-hierarchy", {
+                      detail: { workspaceId: completedWorkspaceId },
+                    }),
+                  );
 
                   // Step 3: Clear completed job state from store
                   traceIngestion("[Store] Completion Step 3: Clearing completed state...");
@@ -645,3 +647,13 @@ export const useIngestionStore = create<IngestionState>((set, get) => ({
     });
   },
 }));
+
+// Listen for cross-store source job cleanup without circular imports
+if (typeof globalThis !== "undefined" && globalThis.addEventListener) {
+  globalThis.addEventListener("loglens:remove-source-jobs", ((e: CustomEvent<{ sourceId: string }>) => {
+    if (e.detail?.sourceId) {
+      useIngestionStore.getState().removeJobsForSource(e.detail.sourceId);
+    }
+  }) as EventListener);
+}
+

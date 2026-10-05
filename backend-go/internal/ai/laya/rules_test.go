@@ -50,7 +50,7 @@ func TestRuleManager_InitDefaultRules(t *testing.T) {
 
 	// Verify baseline questions
 	q := rm.GetActiveQuestions()
-	expectedNames := []string{"tool_intent", "severity", "category", "is_outage"}
+	expectedNames := []string{"tool_intent", "severity", "category", "is_outage", "goal_completed"}
 	for _, name := range expectedNames {
 		if _, ok := q[name]; !ok {
 			t.Errorf("expected baseline question %q to exist", name)

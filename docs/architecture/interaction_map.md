@@ -1,16 +1,16 @@
 # System Interaction Map
-
-This document bridges the **React 19** frontend stores, hooks, and UI components with the **Go 1.26 sidecar backend**, DuckDB persistence, Drain3 clustering, and the Laya AI System 1 decision engine.
-
+ 
+This document bridges the **Flutter (Dart 3.x)** frontend stores, providers, and UI widgets with the **Go 1.26 sidecar backend**, DuckDB persistence, Drain3 clustering, and the Laya AI System 1 decision engine.
+ 
 ---
-
-## 📡 1. The JSON-RPC 2.0 Bridge
-
-All communication between the frontend cockpit and the backend Go sidecar travels through a unified JSON-RPC 2.0 interface.
-
-- **Frontend Transport**: `src/lib/hooks/useSidecarBridge.ts` (using Tauri v2 stdio in desktop mode or HTTP fetch on `http://127.0.0.1:5000` in dev mode).
-- **Backend Dispatcher**: `backend-go/cmd/sidecar/main.go` $\rightarrow$ `backend-go/internal/rpc/dispatcher.go`.
-- **Application Method Handlers**: `backend-go/internal/app/handlers_*.go`.
+ 
+ ## 📡 1. The JSON-RPC 2.0 Bridge
+ 
+ All communication between the Flutter UI and the backend Go sidecar travels through a unified JSON-RPC 2.0 interface.
+ 
+ - **Frontend Transport**: `flutter_app/lib/services/sidecar_bridge.dart` (using process-interposed `stdin`/`stdout` pipes in desktop production mode, or HTTP fetch on `http://127.0.0.1:5000` in dev mode).
+ - **Backend Dispatcher**: `backend-go/cmd/sidecar/main.go` $\rightarrow$ `backend-go/internal/rpc/dispatcher.go`.
+ - **Application Method Handlers**: `backend-go/internal/app/handlers_*.go`.
 
 ---
 
@@ -86,8 +86,8 @@ All communication between the frontend cockpit and the backend Go sidecar travel
 
 ---
 
-## 🛠️ 4. Desktop IPC Lifecycle (Tauri v2)
+## 🛠️ 4. Desktop IPC Lifecycle (Flutter Desktop)
 
-- **Process Supervision**: Tauri v2's Rust supervisor spawns the compiled Go sidecar binary (`sidecar.exe`) on application launch.
-- **Transport**: Standard JSON-RPC strings over bidirectional `stdin`/`stdout` pipes.
-- **Graceful Shutdown**: When the main Tauri window triggers close, a termination signal is sent to the Go sidecar to gracefully flush WAL buffers, close DuckDB singletons, and terminate background tailers.
+- **Process Supervision**: Flutter's native desktop runner (Windows/macOS/Linux) launches and manages the compiled Go sidecar binary (`sidecar.exe`) via `flutter_app/lib/services/sidecar_bridge.dart`.
+- **Transport**: Standard JSON-RPC strings over bidirectional `stdin`/`stdout` pipes (or HTTP `:5000` in dev).
+- **Graceful Shutdown**: When the main Flutter window triggers close, a termination signal is sent to the Go sidecar to gracefully flush WAL buffers, close DuckDB singletons, and terminate background tailers.

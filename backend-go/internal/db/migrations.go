@@ -68,6 +68,13 @@ func migrateDrainMasks(conn *sql.DB) error {
 	extraMasks := []maskRule{
 		{Pattern: `\b([1-5][0-9]{2})\b`, Label: "HTTP_STATUS", Enabled: true},
 		{Pattern: `\b(GET|POST|PUT|DELETE|PATCH|HEAD|OPTIONS|TRACE)\b`, Label: "HTTP_METHOD", Enabled: true},
+		{Pattern: `\b(0x[0-9a-fA-F]+|[0-9a-fA-F]{16,64})\b`, Label: "HEX", Enabled: true},
+		{Pattern: `\b\d+(?:\.\d+)?(?:ms|s|ns|µs|m)\b`, Label: "DURATION", Enabled: true},
+		{Pattern: `\b[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}\b`, Label: "EMAIL", Enabled: true},
+		{Pattern: `\b(?:[0-9a-fA-F]{2}[:-]){5}[0-9a-fA-F]{2}\b`, Label: "MAC", Enabled: true},
+		{Pattern: `\b\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:?\d{2})?\b`, Label: "DATETIME", Enabled: true},
+		{Pattern: `\b(https?://[^\s]+|/[a-zA-Z0-9_\-\./]+)\b`, Label: "PATH", Enabled: false},
+		{Pattern: `\b\d+\b`, Label: "NUM", Enabled: false},
 	}
 
 	var raw sql.NullString

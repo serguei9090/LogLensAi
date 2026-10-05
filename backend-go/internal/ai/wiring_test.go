@@ -42,8 +42,8 @@ func TestWire_Defaults(t *testing.T) {
 	if w.Memory == nil {
 		t.Error("expected a non-nil Memory searcher")
 	}
-	if len(w.Tools.Schemas()) != 7 {
-		t.Errorf("expected all 7 builtin tools registered, got %d", len(w.Tools.Schemas()))
+	if len(w.Tools.Schemas()) != 8 {
+		t.Errorf("expected all 8 builtin tools registered, got %d", len(w.Tools.Schemas()))
 	}
 }
 
@@ -193,3 +193,33 @@ func TestToProviderToolSchema(t *testing.T) {
 		t.Errorf("Parameters = %s", out.Parameters)
 	}
 }
+
+func TestProviderAdapter_DynamicResolution(t *testing.T) {
+	a := newTestApp(t)
+	fallback, err := NewProviderFromSettings(a)
+	if err != nil {
+		t.Fatalf("NewProviderFromSettings: %v", err)
+	}
+
+	adapter := NewDynamicProviderAdapter(a, fallback).(*providerAdapter)
+
+	// Initially default is ollama
+	p1 := adapter.getProvider()
+	if _, ok := p1.(*providers.OllamaProvider); !ok {
+		t.Errorf("expected initial provider to be OllamaProvider, got %T", p1)
+	}
+
+	// Update settings to openrouter
+	if _, err := a.DB.Conn.Exec(`UPDATE settings SET value = 'openrouter' WHERE key = 'ai_provider'`); err != nil {
+		t.Fatalf("updating ai_provider: %v", err)
+	}
+	if _, err := a.DB.Conn.Exec(`UPDATE settings SET value = 'test-key' WHERE key = 'ai_api_key'`); err != nil {
+		t.Fatalf("updating ai_api_key: %v", err)
+	}
+
+	p2 := adapter.getProvider()
+	if _, ok := p2.(*providers.OpenAICompatibleProvider); !ok {
+		t.Errorf("expected dynamically resolved provider to be OpenAICompatibleProvider, got %T", p2)
+	}
+}
+

@@ -42,6 +42,17 @@ func drainChunks(t *testing.T, ch <-chan StreamChunk) []StreamChunk {
 	}
 }
 
+func drainContentChunks(t *testing.T, ch <-chan StreamChunk) []StreamChunk {
+	t.Helper()
+	var out []StreamChunk
+	for _, c := range drainChunks(t, ch) {
+		if c.Content != "" || c.Err != nil {
+			out = append(out, c)
+		}
+	}
+	return out
+}
+
 func TestRun_ReasoningToFinalAnswer_NoToolCalls(t *testing.T) {
 	p := &fakeProvider{respond: func(_ int, _ []ChatMessage) (ChatMessage, error) {
 		return ChatMessage{Role: "assistant", Content: "The answer is 42."}, nil
@@ -119,10 +130,10 @@ func TestRun_ToolExecutionLoop(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Run returned error: %v", err)
 	}
-	chunks := drainChunks(t, ch)
+	chunks := drainContentChunks(t, ch)
 
 	if len(chunks) != 2 {
-		t.Fatalf("expected 2 chunks (one per reasoning-node visit), got %d: %+v", len(chunks), chunks)
+		t.Fatalf("expected 2 content chunks (one per reasoning-node visit), got %d: %+v", len(chunks), chunks)
 	}
 	if chunks[0].Content != "Let me check the logs." {
 		t.Errorf("chunk 0 = %q", chunks[0].Content)
@@ -179,7 +190,7 @@ func TestRun_ToolCallErrorDoesNotAbortTurn(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Run returned error: %v", err)
 	}
-	chunks := drainChunks(t, ch)
+	chunks := drainContentChunks(t, ch)
 
 	if len(chunks) != 2 {
 		t.Fatalf("expected 2 chunks, got %d: %+v", len(chunks), chunks)
@@ -266,7 +277,7 @@ func TestRun_MaxIterationsCapsInfiniteToolLoop(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Run returned error: %v", err)
 	}
-	chunks := drainChunks(t, ch)
+	chunks := drainContentChunks(t, ch)
 	if len(chunks) != maxIterations {
 		t.Fatalf("expected Run to stop after maxIterations=%d chunks, got %d", maxIterations, len(chunks))
 	}

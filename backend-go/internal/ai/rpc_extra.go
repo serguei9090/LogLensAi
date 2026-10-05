@@ -75,6 +75,20 @@ func NewExtra(a *app.App) (*Extra, error) {
 	}, nil
 }
 
+// getProvider returns the active provider resolved from the app's current settings,
+// falling back to the initialization-time provider if settings resolution fails.
+func (e *Extra) getProvider() providers.Provider {
+	if e.provider != nil {
+		return e.provider
+	}
+	if e.app != nil {
+		if p, err := NewProviderFromSettings(e.app); err == nil && p != nil {
+			return p
+		}
+	}
+	return nil
+}
+
 // --- analyze_cluster ------------------------------------------------------
 
 // AnalyzeCluster implements the analyze_cluster RPC method, mirroring
@@ -122,7 +136,7 @@ func (e *Extra) AnalyzeCluster(ctx context.Context, req models.AnalyzeClusterReq
 		}
 	}
 
-	result, err := e.provider.AnalyzeLogs(ctx, template, samples)
+	result, err := e.getProvider().AnalyzeLogs(ctx, template, samples)
 	if err != nil {
 		return nil, &models.RPCError{Code: extraErrInternal, Message: err.Error()}
 	}
@@ -139,7 +153,7 @@ func (e *Extra) AnalyzeCluster(ctx context.Context, req models.AnalyzeClusterReq
 // App.method_list_ai_models. Returns the raw list (not wrapped in an
 // object), matching Python's `-> list[str]` return type.
 func (e *Extra) ListModels(ctx context.Context) (any, *models.RPCError) {
-	list, err := e.provider.ListModels(ctx)
+	list, err := e.getProvider().ListModels(ctx)
 	if err != nil {
 		return nil, &models.RPCError{Code: extraErrInternal, Message: err.Error()}
 	}
@@ -161,7 +175,7 @@ func (e *Extra) ListModels(ctx context.Context) (any, *models.RPCError) {
 // {"status","message"} response *shape* the frontend expects, with a
 // generic success message on success and the error's own text on failure.
 func (e *Extra) TestConnection(ctx context.Context) (any, *models.RPCError) {
-	if err := e.provider.TestConnection(ctx); err != nil {
+	if err := e.getProvider().TestConnection(ctx); err != nil {
 		return map[string]any{"status": "error", "message": err.Error()}, nil
 	}
 	return map[string]any{"status": "success", "message": "Connection successful."}, nil
@@ -193,7 +207,7 @@ func (e *Extra) GenerateFacetRegex(ctx context.Context, req models.GenerateExtra
 		"Return ONLY the raw regex string, no markdown, no explanation, no backticks."
 
 	messages := []providers.ChatMessage{{Role: "user", Content: prompt}}
-	resp, err := e.provider.Chat(ctx, messages, "", "", false, nil)
+	resp, err := e.getProvider().Chat(ctx, messages, "", "", false, nil)
 	if err != nil {
 		log.Printf("[AI] Failed to generate regex with AI: %v", err)
 		return map[string]any{"regex": fallback}, nil

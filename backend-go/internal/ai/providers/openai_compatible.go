@@ -78,11 +78,12 @@ type openAIToolCallFunctionWire struct {
 }
 
 type openAIChatRequest struct {
-	Model          string                  `json:"model"`
-	Messages       []openAIChatMessageWire `json:"messages"`
-	Tools          []openAIToolWire        `json:"tools,omitempty"`
-	Stream         bool                    `json:"stream,omitempty"`
-	ResponseFormat *openAIResponseFormat   `json:"response_format,omitempty"`
+	Model           string                  `json:"model"`
+	Messages        []openAIChatMessageWire `json:"messages"`
+	Tools           []openAIToolWire        `json:"tools,omitempty"`
+	Stream          bool                    `json:"stream,omitempty"`
+	ResponseFormat  *openAIResponseFormat   `json:"response_format,omitempty"`
+	ReasoningEffort string                  `json:"reasoning_effort,omitempty"`
 }
 
 type openAIResponseFormat struct {
@@ -92,8 +93,9 @@ type openAIResponseFormat struct {
 type openAIChatResponse struct {
 	Choices []struct {
 		Message struct {
-			Content   string               `json:"content"`
-			ToolCalls []openAIToolCallWire `json:"tool_calls"`
+			Content          string               `json:"content"`
+			ReasoningContent string               `json:"reasoning_content,omitempty"`
+			ToolCalls        []openAIToolCallWire `json:"tool_calls"`
 		} `json:"message"`
 	} `json:"choices"`
 }
@@ -101,7 +103,8 @@ type openAIChatResponse struct {
 type openAIStreamChunkWire struct {
 	Choices []struct {
 		Delta struct {
-			Content string `json:"content"`
+			Content          string `json:"content"`
+			ReasoningContent string `json:"reasoning_content"`
 		} `json:"delta"`
 	} `json:"choices"`
 }
@@ -229,6 +232,9 @@ func (p *OpenAICompatibleProvider) Chat(ctx context.Context, messages []ChatMess
 		Messages: p.formatMessages(messages),
 		Tools:    toOpenAIToolsWire(tools),
 	}
+	if reasoning {
+		payload.ReasoningEffort = "medium"
+	}
 	body, err := json.Marshal(payload)
 	if err != nil {
 		return ChatMessage{}, fmt.Errorf("openai-compatible: marshal request: %w", err)
@@ -261,9 +267,14 @@ func (p *OpenAICompatibleProvider) Chat(ctx context.Context, messages []ChatMess
 	}
 
 	msg := data.Choices[0].Message
+	content := msg.Content
+	if msg.ReasoningContent != "" {
+		content = wrapThinking(msg.ReasoningContent, content)
+	}
+
 	return ChatMessage{
 		Role:      "assistant",
-		Content:   msg.Content,
+		Content:   content,
 		ToolCalls: normalizeOpenAIToolCalls(msg.ToolCalls),
 	}, nil
 }
@@ -279,6 +290,9 @@ func (p *OpenAICompatibleProvider) ChatStream(ctx context.Context, messages []Ch
 		Messages: p.formatMessages(messages),
 		Tools:    toOpenAIToolsWire(tools),
 		Stream:   true,
+	}
+	if reasoning {
+		payload.ReasoningEffort = "medium"
 	}
 	body, err := json.Marshal(payload)
 	if err != nil {
@@ -308,6 +322,8 @@ func (p *OpenAICompatibleProvider) ChatStream(ctx context.Context, messages []Ch
 		defer close(out)
 		defer resp.Body.Close()
 
+		emittedThink := false
+
 		scanner := bufio.NewScanner(resp.Body)
 		scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
 		for scanner.Scan() {
@@ -328,11 +344,31 @@ func (p *OpenAICompatibleProvider) ChatStream(ctx context.Context, messages []Ch
 				}
 				return
 			}
-			if len(chunk.Choices) > 0 && chunk.Choices[0].Delta.Content != "" {
-				select {
-				case out <- StreamChunk{Content: chunk.Choices[0].Delta.Content}:
-				case <-ctx.Done():
-					return
+			if len(chunk.Choices) > 0 {
+				delta := chunk.Choices[0].Delta
+				if delta.ReasoningContent != "" {
+					var prefix string
+					if !emittedThink {
+						prefix = thinkOpen
+						emittedThink = true
+					}
+					select {
+					case out <- StreamChunk{Content: prefix + delta.ReasoningContent}:
+					case <-ctx.Done():
+						return
+					}
+				}
+				if delta.Content != "" {
+					var prefix string
+					if emittedThink {
+						prefix = thinkClose
+						emittedThink = false
+					}
+					select {
+					case out <- StreamChunk{Content: prefix + delta.Content}:
+					case <-ctx.Done():
+						return
+					}
 				}
 			}
 		}
@@ -343,6 +379,14 @@ func (p *OpenAICompatibleProvider) ChatStream(ctx context.Context, messages []Ch
 			case <-ctx.Done():
 			}
 			return
+		}
+
+		if emittedThink {
+			select {
+			case out <- StreamChunk{Content: thinkClose}:
+			case <-ctx.Done():
+				return
+			}
 		}
 
 		out <- StreamChunk{Done: true}

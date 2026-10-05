@@ -76,4 +76,7 @@ storage/
 **/storage/
 drain/
 .claude/
-.vscode/
+.vscode/
+models/
+laya_rules.json
+

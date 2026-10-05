@@ -11,6 +11,8 @@ export interface AiMessage {
   context_logs?: number[];
   timestamp: string;
   provider_session_id?: string;
+  evaluation_notice?: string;
+  steps?: { title: string; done?: boolean }[];
 }
 
 export interface AiSession {
@@ -31,6 +33,7 @@ interface AiStore {
   error: string | null;
   logSessionMap: Record<number, string>; // log_id -> session_id
   dashboardWidgets: Record<string, unknown>[]; // Array of A2UI payloads pinned to the dashboard
+  abortController: AbortController | null;
 
   // Actions
   setSidebarOpen: (open: boolean) => void;
@@ -49,6 +52,7 @@ interface AiStore {
     session_name?: string;
     reasoning?: boolean;
   }) => Promise<void>;
+  stopStream: () => void;
   clearError: () => void;
   addDashboardWidget: (widget: Record<string, unknown>) => void;
   clearDashboardWidgets: () => void;
@@ -64,6 +68,7 @@ export const useAiStore = create<AiStore>((set, get) => ({
   error: null,
   logSessionMap: {},
   dashboardWidgets: [],
+  abortController: null,
 
   setSidebarOpen: (isSidebarOpen) => set({ isSidebarOpen }),
   setSidebarWidth: (sidebarWidth) => set({ sidebarWidth }),
@@ -142,7 +147,26 @@ export const useAiStore = create<AiStore>((set, get) => ({
         method: "get_ai_messages",
         params: { session_id: sessionId },
       });
-      set({ messages, isLoading: false });
+      // Preserve any in-memory transient data (e.g. steps, evaluation_notice) on the latest messages
+      const existing = get().messages;
+      const merged = messages.map((m, idx) => {
+        const prev = existing.find(
+          (e) => e.id === m.id || (idx === messages.length - 1 && e.role === m.role),
+        );
+        if (prev) {
+          const rawSteps = prev.steps ?? m.steps;
+          // Completed assistant messages stored in DB should have all their steps marked as done
+          const steps = rawSteps?.map((s) => ({ ...s, done: true }));
+          return {
+            ...m,
+            steps,
+            evaluation_notice: prev.evaluation_notice ?? m.evaluation_notice,
+            a2ui_payload: prev.a2ui_payload ?? m.a2ui_payload,
+          };
+        }
+        return m;
+      });
+      set({ messages: merged, isLoading: false });
     } catch (err) {
       const msg = (err as Error).message;
       set({ error: msg, isLoading: false });
@@ -175,6 +199,10 @@ export const useAiStore = create<AiStore>((set, get) => ({
       messages: [...state.messages, tempUserMsg, tempAssistantMsg],
     }));
 
+    // Initialize AbortController for cancelable streaming
+    const controller = new AbortController();
+    set({ abortController: controller });
+
     try {
       // Connect to SSE Endpoint
       const response = await fetch(`${SIDECAR_BASE_URL}/api/stream_chat`, {
@@ -183,6 +211,7 @@ export const useAiStore = create<AiStore>((set, get) => ({
           "Content-Type": "application/json",
           Accept: "text/event-stream",
         },
+        signal: controller.signal,
         body: JSON.stringify({
           ...params,
           session_id: currentSessionId,
@@ -228,6 +257,41 @@ export const useAiStore = create<AiStore>((set, get) => ({
                   set({ currentSessionId });
                 }
 
+                if (parsed.evaluation_notice) {
+                  set((state) => {
+                    const messages = [...state.messages];
+                    const lastMsg = messages.at(-1);
+                    if (lastMsg) {
+                      lastMsg.evaluation_notice = parsed.evaluation_notice;
+                    }
+                    return { messages };
+                  });
+                }
+
+                if (parsed.step) {
+                  set((state) => {
+                    const messages = [...state.messages];
+                    const lastMsg = messages.at(-1);
+                    if (lastMsg) {
+                      if (!lastMsg.steps) {
+                        lastMsg.steps = [];
+                      }
+                      const existingIdx = lastMsg.steps.findIndex((s) => s.title === parsed.step);
+                      if (existingIdx !== -1) {
+                        if (parsed.step_done !== undefined) {
+                          lastMsg.steps[existingIdx].done = parsed.step_done;
+                        }
+                      } else {
+                        lastMsg.steps.push({
+                          title: parsed.step,
+                          done: parsed.step_done ?? false,
+                        });
+                      }
+                    }
+                    return { messages };
+                  });
+                }
+
                 if (parsed.a2ui_payload) {
                   set((state) => {
                     const messages = [...state.messages];
@@ -265,7 +329,26 @@ export const useAiStore = create<AiStore>((set, get) => ({
                     const messages = [...state.messages];
                     const lastMsg = messages.at(-1);
                     if (lastMsg) {
-                      lastMsg.content += parsed.chunk;
+                      let rawChunk = parsed.chunk;
+                      if (rawChunk.includes("[[EVAL_NOTICE]]")) {
+                        const match = rawChunk.match(
+                          /\[\[EVAL_NOTICE\]\](.*?)\[\[\/EVAL_NOTICE\]\]/,
+                        );
+                        if (match) {
+                          lastMsg.evaluation_notice = match[1];
+                          rawChunk = rawChunk.replace(
+                            /\[\[EVAL_NOTICE\]\].*?\[\[\/EVAL_NOTICE\]\]/,
+                            "",
+                          );
+                        }
+                      }
+                      if (rawChunk) {
+                        lastMsg.content += rawChunk;
+                        // Once the final answer begins arriving, mark synthesizing and any prior steps as done
+                        if (lastMsg.steps && lastMsg.steps.length > 0) {
+                          lastMsg.steps = lastMsg.steps.map((s) => ({ ...s, done: true }));
+                        }
+                      }
                     }
                     // Update temp session id if resolving dynamically
                     if (currentSessionId && lastMsg && lastMsg.session_id === "temp") {
@@ -286,7 +369,15 @@ export const useAiStore = create<AiStore>((set, get) => ({
         }
       }
 
-      set({ isLoading: false });
+      // Ensure all recorded steps are marked as done upon stream completion
+      set((state) => {
+        const messages = [...state.messages];
+        const lastMsg = messages.at(-1);
+        if (lastMsg?.steps && lastMsg.steps.length > 0) {
+          lastMsg.steps = lastMsg.steps.map((s) => ({ ...s, done: true }));
+        }
+        return { messages, isLoading: false, abortController: null };
+      });
 
       if (currentSessionId) {
         await get().fetchSessions(params.workspace_id);
@@ -294,8 +385,20 @@ export const useAiStore = create<AiStore>((set, get) => ({
         // Wait for backend transactions to commit by introducing a tiny delay
         setTimeout(() => get().fetchMessages(currentSessionId as string), 200);
       }
-    } catch (err) {
-      set({ error: (err as Error).message, isLoading: false });
+    } catch (err: any) {
+      if (err?.name === "AbortError") {
+        set({ isLoading: false, abortController: null });
+        return;
+      }
+      set({ error: (err as Error).message, isLoading: false, abortController: null });
+    }
+  },
+
+  stopStream: () => {
+    const { abortController } = get();
+    if (abortController) {
+      abortController.abort();
+      set({ isLoading: false, abortController: null });
     }
   },
 

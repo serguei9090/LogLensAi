@@ -30,6 +30,41 @@ var defaultDrainMasks = []maskRule{
 		Label:   "HTTP_METHOD",
 		Enabled: true,
 	},
+	{
+		Pattern: `\b(0x[0-9a-fA-F]+|[0-9a-fA-F]{16,64})\b`,
+		Label:   "HEX",
+		Enabled: true,
+	},
+	{
+		Pattern: `\b\d+(?:\.\d+)?(?:ms|s|ns|µs|m)\b`,
+		Label:   "DURATION",
+		Enabled: true,
+	},
+	{
+		Pattern: `\b[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}\b`,
+		Label:   "EMAIL",
+		Enabled: true,
+	},
+	{
+		Pattern: `\b(?:[0-9a-fA-F]{2}[:-]){5}[0-9a-fA-F]{2}\b`,
+		Label:   "MAC",
+		Enabled: true,
+	},
+	{
+		Pattern: `\b\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:?\d{2})?\b`,
+		Label:   "DATETIME",
+		Enabled: true,
+	},
+	{
+		Pattern: `\b(https?://[^\s]+|/[a-zA-Z0-9_\-\./]+)\b`,
+		Label:   "PATH",
+		Enabled: false,
+	},
+	{
+		Pattern: `\b\d+\b`,
+		Label:   "NUM",
+		Enabled: false,
+	},
 }
 
 // commandPaletteShortcut mirrors db.py:164's
@@ -73,6 +108,7 @@ func initializeDefaultSettings(conn *sql.DB) error {
 		{"ai_gemini_url", "http://localhost:22436"},
 		{"ai_ollama_host", "http://localhost:11434"},
 		{"ai_openai_host", "https://api.openai.com/v1"},
+		{"ai_openrouter_host", "https://openrouter.ai/api/v1"},
 		{"ai_lmstudio_host", "http://localhost:1234/v1"},
 		{"drain_similarity_threshold", "0.5"},
 		{"drain_max_children", "100"},

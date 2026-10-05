@@ -1,8 +1,11 @@
 // Assume Role: Frontend Engineer (@frontend)
 
 import { A2UIRenderer } from "@/components/atoms/A2UIRenderer";
+import { DecryptedText } from "@/components/atoms/DecryptedText";
+import { GridPattern } from "@/components/atoms/GridPattern";
 // Atomic/Molecule Imports
 import { StatCard } from "@/components/atoms/StatCard";
+
 import { ClusterRow } from "@/components/molecules/ClusterRow";
 import {
   type DashboardMode,
@@ -454,7 +457,14 @@ function AIObservationCard({
             </span>
           </div>
           <p className="text-sm font-mono text-text-primary leading-relaxed italic">
-            &quot;{stats.latest_ai_insight}&quot;
+            &quot;
+            <DecryptedText
+              text={stats.latest_ai_insight}
+              speed={25}
+              maxIterations={6}
+              className="text-text-primary"
+            />
+            &quot;
           </p>
         </div>
         <Button
@@ -626,8 +636,14 @@ function AICanvasView({ dashboardWidgets, isSidebarOpen, setSidebarOpen }: AICan
         </div>
 
         {isEmpty ? (
-          <div className="flex-1 flex items-center justify-center border border-dashed border-border/60 rounded-xl bg-bg-surface/20 min-h-[400px]">
-            <p className="text-sm text-text-muted text-center max-w-sm">
+          <div className="flex-1 flex items-center justify-center border border-dashed border-border/60 rounded-xl bg-bg-surface/20 min-h-[400px] relative overflow-hidden">
+            <GridPattern
+              width={20}
+              height={20}
+              className="opacity-40"
+              dotSize={1}
+            />
+            <p className="text-sm text-text-muted text-center max-w-sm relative z-10">
               No widgets pinned yet. Ask the AI to create a dashboard card.
               <br />
               <br />

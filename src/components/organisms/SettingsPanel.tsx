@@ -1,5 +1,6 @@
 import { HelpTooltip } from "@/components/atoms/HelpTooltip";
 import { FacetExtractionSettings } from "@/components/molecules/FacetExtractionSettings";
+import { LayaSettingsPanel } from "@/components/organisms/LayaSettingsPanel";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -39,20 +40,22 @@ import {
   Plus,
   RefreshCcw,
   RotateCcw,
+  Search,
+  Sparkles,
   Terminal,
   Trash2,
   X,
   Zap,
 } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import * as React from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
-import { LayaSettingsPanel } from "@/components/organisms/LayaSettingsPanel";
 
 type SectionId = "ai" | "laya" | "drain" | "ingestion" | "general";
 
 const SECTIONS: { id: SectionId; icon: typeof Bot; label: string; desc: string }[] = [
   { id: "ai", icon: Bot, label: "AI Intelligence", desc: "Model & analyze logic" },
-  { id: "laya", icon: Zap, label: "Laya System 1", desc: "Fast router & rules engine" },
+  { id: "laya", icon: Zap, label: "Laya AI", desc: "Fast router & rules engine" },
   { id: "drain", icon: Cpu, label: "Engine Core", desc: "Clustering parameters" },
   { id: "ingestion", icon: Network, label: "Ingestion", desc: "Live stream listeners" },
   { id: "general", icon: Palette, label: "Interface", desc: "Display & accessibility" },
@@ -71,30 +74,234 @@ function SettingInput(props: Readonly<React.InputHTMLAttributes<HTMLInputElement
   );
 }
 
+function parseOptionChildren(children: React.ReactNode): Array<{ value: string; label: string }> {
+  const items: Array<{ value: string; label: string }> = [];
+  React.Children.forEach(children, (child) => {
+    if (React.isValidElement(child)) {
+      const props = child.props as { value?: string | number; children?: React.ReactNode };
+      const val = props.value !== undefined ? String(props.value) : "";
+      const text = props.children !== undefined ? String(props.children) : val;
+      items.push({ value: val, label: text });
+    }
+  });
+  return items;
+}
+
 function SettingSelect({
   value,
   onChange,
   id,
   children,
+  className,
+  placeholder = "Select option...",
+  searchable = false,
+  searchPlaceholder = "Search options...",
+  showFreeBadge = false,
+  showFreeFilter = false,
 }: {
   readonly value: string;
   readonly onChange: (v: string) => void;
   readonly id?: string;
   readonly children: React.ReactNode;
+  readonly className?: string;
+  readonly placeholder?: string;
+  readonly searchable?: boolean;
+  readonly searchPlaceholder?: string;
+  readonly showFreeBadge?: boolean;
+  readonly showFreeFilter?: boolean;
 }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [onlyFree, setOnlyFree] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+
+  const options = useMemo(() => parseOptionChildren(children), [children]);
+  const selectedOption = options.find((o) => o.value === value);
+  const displayLabel = selectedOption ? selectedOption.label : value || placeholder;
+
+  const freeCount = useMemo(() => {
+    return options.filter((o) => {
+      const val = o.value.toLowerCase();
+      return val.endsWith(":free") || val.includes(":free") || val === "openrouter/free";
+    }).length;
+  }, [options]);
+
+  const filteredOptions = useMemo(() => {
+    if (!searchable && !onlyFree) {
+      return options;
+    }
+    const q = searchQuery.toLowerCase().trim();
+    return options.filter((opt) => {
+      const val = opt.value.toLowerCase();
+      const isFree = val.endsWith(":free") || val.includes(":free") || val === "openrouter/free";
+      if (onlyFree && !isFree) {
+        return false;
+      }
+      if (!q) {
+        return true;
+      }
+      return opt.label.toLowerCase().includes(q) || val.includes(q);
+    });
+  }, [options, searchable, onlyFree, searchQuery]);
+
+  useEffect(() => {
+    if (isOpen && searchable) {
+      const timer = setTimeout(() => {
+        searchInputRef.current?.focus();
+      }, 50);
+      return () => clearTimeout(timer);
+    }
+    if (!isOpen) {
+      setSearchQuery("");
+      setOnlyFree(false);
+    }
+  }, [isOpen, searchable]);
+
+  useEffect(() => {
+    if (!isOpen) {
+      return;
+    }
+    const handlePointerDown = (e: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [isOpen]);
+
   return (
-    <div className="relative">
-      <select
+    <div ref={containerRef} className={cn("relative w-full", className)}>
+      <button
         id={id}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className="w-full h-10 px-4 rounded-xl text-sm bg-bg-surface border border-border text-text-primary focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all appearance-none cursor-pointer"
+        type="button"
+        onClick={() => setIsOpen((prev) => !prev)}
+        className={cn(
+          "w-full h-10 pl-4 pr-10 rounded-xl text-sm bg-bg-surface border text-text-primary text-left transition-all cursor-pointer flex items-center justify-between select-none relative",
+          isOpen ? "border-primary ring-2 ring-primary/20" : "border-border hover:border-border/80",
+        )}
       >
-        {children}
-      </select>
-      <div className="absolute right-3 top-1/2 -translateY-1/2 pointer-events-none opacity-40">
-        <Check className="h-3 w-3 rotate-90" />
-      </div>
+        <span className="truncate">{displayLabel}</span>
+        <div className="absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none text-text-muted transition-transform duration-200">
+          <ChevronDown className={cn("h-4 w-4", isOpen && "rotate-180 text-primary")} />
+        </div>
+      </button>
+
+      {isOpen && (
+        <div className="absolute top-[calc(100%+4px)] left-0 w-full z-50 rounded-xl border border-border bg-[#141716] shadow-2xl overflow-hidden animate-in fade-in-50 zoom-in-95 duration-150 flex flex-col">
+          {searchable && (
+            <div className="p-2 border-b border-border/80 bg-[#141716] space-y-1.5 shrink-0">
+              <div className="relative flex items-center">
+                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-text-muted pointer-events-none" />
+                <input
+                  ref={searchInputRef}
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder={searchPlaceholder}
+                  className="w-full h-8 pl-8 pr-7 text-xs rounded-lg bg-bg-surface border border-border text-text-primary placeholder:text-text-muted/40 focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/20 transition-all"
+                />
+                {searchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => setSearchQuery("")}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-text-muted hover:text-text-primary p-0.5 cursor-pointer"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                )}
+              </div>
+
+              {(showFreeFilter || freeCount > 0) && (
+                <div className="flex items-center justify-between px-0.5 text-[10px]">
+                  <span className="text-text-muted">
+                    {filteredOptions.length} of {options.length} models
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setOnlyFree((prev) => !prev)}
+                    className={cn(
+                      "px-1.5 py-0.5 rounded text-[10px] font-mono border transition-all cursor-pointer flex items-center gap-1",
+                      onlyFree
+                        ? "bg-emerald-500/25 text-emerald-300 border-emerald-500/50 font-semibold"
+                        : "bg-white/5 text-text-muted border-border hover:text-text-primary",
+                    )}
+                  >
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                    Free only {freeCount > 0 && `(${freeCount})`}
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
+          <div className="max-h-60 overflow-y-auto p-1.5 space-y-0.5">
+            {filteredOptions.map((opt) => {
+              const isSelected = opt.value === value;
+              const valLower = opt.value.toLowerCase();
+              const isFree =
+                showFreeBadge &&
+                (valLower.endsWith(":free") ||
+                  valLower.includes(":free") ||
+                  valLower === "openrouter/free");
+              return (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => {
+                    onChange(opt.value);
+                    setIsOpen(false);
+                  }}
+                  className={cn(
+                    "w-full px-3 py-2 text-xs rounded-lg text-left transition-colors flex items-center justify-between cursor-pointer group",
+                    isSelected
+                      ? "bg-primary/15 text-primary font-medium"
+                      : "text-text-primary hover:bg-white/5 hover:text-white",
+                  )}
+                >
+                  <div className="flex items-center gap-2 truncate pr-2">
+                    <span className="truncate">{opt.label}</span>
+                    {isFree && (
+                      <span className="text-[9px] uppercase font-mono px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-400 font-bold border border-emerald-500/30 shrink-0 leading-none">
+                        FREE
+                      </span>
+                    )}
+                  </div>
+                  {isSelected && <Check className="h-3.5 w-3.5 text-primary shrink-0" />}
+                </button>
+              );
+            })}
+
+            {filteredOptions.length === 0 && (
+              <div className="p-3 text-center text-xs text-text-muted space-y-2">
+                <p>No models matching "{searchQuery}"</p>
+                {searchQuery.trim() && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onChange(searchQuery.trim());
+                      setIsOpen(false);
+                    }}
+                    className="w-full py-1.5 px-3 rounded-lg text-xs font-mono bg-primary/10 text-primary hover:bg-primary/20 border border-primary/20 transition-colors cursor-pointer"
+                  >
+                    Use "{searchQuery.trim()}" as custom model
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -116,6 +323,40 @@ function SectionLabel({
   );
 }
 
+const OPENROUTER_FREE_MODELS = [
+  {
+    id: "openrouter/free",
+    label: "Auto Free Router",
+    desc: "Routes automatically to best free model",
+  },
+  {
+    id: "meta-llama/llama-3.3-70b-instruct:free",
+    label: "Llama 3.3 70B",
+    desc: "Meta flagship 70B",
+  },
+  { id: "deepseek/deepseek-r1:free", label: "DeepSeek R1", desc: "Reasoning model" },
+  { id: "deepseek/deepseek-chat:free", label: "DeepSeek V3", desc: "General chat & code" },
+  { id: "google/gemini-2.0-flash-exp:free", label: "Gemini 2.0 Flash", desc: "Google high-speed" },
+  {
+    id: "qwen/qwen-2.5-coder-32b-instruct:free",
+    label: "Qwen 2.5 Coder 32B",
+    desc: "Specialized coding",
+  },
+  {
+    id: "mistralai/mistral-small-24b-instruct-2501:free",
+    label: "Mistral Small 24B",
+    desc: "Efficient 24B",
+  },
+];
+
+const OPENROUTER_POPULAR_MODELS = [
+  { id: "anthropic/claude-3.5-sonnet", label: "Claude 3.5 Sonnet" },
+  { id: "meta-llama/llama-3.3-70b-instruct", label: "Llama 3.3 70B" },
+  { id: "google/gemini-2.0-flash-001", label: "Gemini 2.0 Flash" },
+  { id: "deepseek/deepseek-chat", label: "DeepSeek V3" },
+  { id: "openai/gpt-4o", label: "GPT-4o" },
+];
+
 function ModelSelector({
   value,
   onChange,
@@ -135,19 +376,31 @@ function ModelSelector({
     <div className="space-y-2">
       <div className="flex items-center justify-between">
         <SectionLabel htmlFor="ai_model_selector">Model</SectionLabel>
-        {["ollama", "lmstudio", "ai-studio", "openai-compatible"].includes(provider) && (
+        {["ollama", "lmstudio", "ai-studio", "openai-compatible", "openrouter"].includes(
+          provider,
+        ) && (
           <Button
             variant="ghost"
             onClick={onRefresh}
             disabled={isFetching}
-            className="text-[9px] uppercase tracking-tighter font-bold text-primary hover:text-primary-light transition-colors disabled:opacity-30 h-auto p-0"
+            className="text-[9px] uppercase tracking-tighter font-bold text-primary hover:text-primary-light transition-colors disabled:opacity-30 h-auto p-0 cursor-pointer"
           >
             {isFetching ? "Pulling..." : "Refresh List"}
           </Button>
         )}
       </div>
       {availableModels.length > 0 ? (
-        <SettingSelect id="ai_model_selector" value={value} onChange={onChange}>
+        <SettingSelect
+          id="ai_model_selector"
+          value={value}
+          onChange={onChange}
+          searchable={availableModels.length > 5 || provider === "openrouter"}
+          searchPlaceholder={
+            provider === "openrouter" ? "Search 300+ models or filter free..." : "Search models..."
+          }
+          showFreeBadge={provider === "openrouter"}
+          showFreeFilter={provider === "openrouter"}
+        >
           {!availableModels.includes(value) && <option value={value}>{value}</option>}
           {availableModels.map((m) => (
             <option key={m} value={m}>
@@ -157,17 +410,96 @@ function ModelSelector({
         </SettingSelect>
       ) : (
         <div className="space-y-1">
-          <SettingInput
-            id="ai_model_selector"
-            value={value}
-            onChange={(e) => onChange(e.target.value)}
-            placeholder="Enter model ID manually"
-          />
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-text-muted/50 pointer-events-none" />
+            <SettingInput
+              id="ai_model_selector"
+              value={value}
+              onChange={(e) => onChange(e.target.value)}
+              className="pl-9"
+              placeholder={
+                provider === "openrouter"
+                  ? "Enter model ID (e.g. openrouter/free, anthropic/claude-3.5-sonnet)"
+                  : "Enter model ID manually"
+              }
+            />
+          </div>
           {provider === "ollama" && (
             <p className="text-[10px] text-amber-500/80 px-1 italic">
               No models found. Ensure Ollama is running or enter ID manually.
             </p>
           )}
+          {provider === "openrouter" && (
+            <p className="text-[10px] text-text-muted/60 px-1">
+              Select any free or frontier model below, or click 'Refresh List' to fetch full
+              catalogue.
+            </p>
+          )}
+        </div>
+      )}
+
+      {provider === "openrouter" && (
+        <div className="space-y-2.5 pt-2 border-t border-border/40">
+          <div>
+            <div className="flex items-center gap-1.5 mb-1.5">
+              <Sparkles className="h-3 w-3 text-emerald-400" />
+              <span className="text-[10px] uppercase font-bold tracking-wider text-emerald-400 font-mono">
+                Free Models (Zero Cost)
+              </span>
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {OPENROUTER_FREE_MODELS.map((m) => {
+                const isSelected = value === m.id;
+                return (
+                  <button
+                    key={m.id}
+                    type="button"
+                    onClick={() => onChange(m.id)}
+                    title={`${m.id} — ${m.desc}`}
+                    className={cn(
+                      "px-2.5 py-1 rounded-lg text-[10px] font-mono border transition-all cursor-pointer flex items-center gap-1.5",
+                      isSelected
+                        ? "bg-emerald-500/25 text-emerald-300 border-emerald-500/60 font-semibold shadow-sm ring-1 ring-emerald-500/20"
+                        : "bg-emerald-950/20 text-emerald-400/90 border-emerald-500/30 hover:bg-emerald-500/15 hover:border-emerald-500/50 hover:text-emerald-300",
+                    )}
+                  >
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                    <span>{m.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <div>
+            <div className="flex items-center gap-1.5 mb-1.5">
+              <Zap className="h-3 w-3 text-primary" />
+              <span className="text-[10px] uppercase font-bold tracking-wider text-text-muted font-mono">
+                Top Frontier Models
+              </span>
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {OPENROUTER_POPULAR_MODELS.map((m) => {
+                const isSelected = value === m.id;
+                return (
+                  <button
+                    key={m.id}
+                    type="button"
+                    onClick={() => onChange(m.id)}
+                    title={m.id}
+                    className={cn(
+                      "px-2 py-0.5 rounded-md text-[10px] font-mono border transition-all cursor-pointer",
+                      isSelected
+                        ? "bg-primary/20 text-primary border-primary/40 font-semibold shadow-sm"
+                        : "bg-bg-surface/60 text-text-muted border-border hover:border-text-muted hover:text-text-primary",
+                    )}
+                  >
+                    {m.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
         </div>
       )}
     </div>
@@ -209,6 +541,9 @@ function safeParse(raw: string | null): unknown {
  *
  */
 function getProviderLabel(provider: string): string {
+  if (provider === "openrouter") {
+    return "OpenRouter Unified API";
+  }
   if (provider === "gemini-cli") {
     return "Gemini CLI Integrated";
   }
@@ -230,6 +565,9 @@ function getProviderLabel(provider: string): string {
  *
  */
 function getProviderDescription(provider: string): string {
+  if (provider === "openrouter") {
+    return "Access Claude 3.5, Llama 3.3, Gemini 2.0, DeepSeek, and GPT-4o through OpenRouter.";
+  }
   if (provider === "gemini-cli") {
     return "Runs purely on your local hardware via the configured gemini-cli. Zero data egress to third-party APIs beyond the model provider.";
   }
@@ -565,7 +903,7 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
   // biome-ignore lint/correctness/useExhaustiveDependencies: Must re-fetch on these changes even if not directly used in the effect body
   useEffect(() => {
     // Trigger model pull when provider or connectivity settings change (with debounce)
-    const dynamicProviders = ["ollama", "lmstudio", "openai-compatible", "ai-studio"];
+    const dynamicProviders = ["ollama", "lmstudio", "openai-compatible", "ai-studio", "openrouter"];
     if (dynamicProviders.includes(settings.ai_provider)) {
       const timer = setTimeout(() => {
         fetchModels();
@@ -579,6 +917,7 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
     settings.ai_ollama_host,
     settings.ai_lmstudio_host,
     settings.ai_openai_host,
+    settings.ai_openrouter_host,
   ]);
 
   // Removed handleSave in favor of auto-save via update()
@@ -691,6 +1030,8 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
                         newModel = "flash";
                       } else if (v === "openai-compatible") {
                         newModel = "gpt-4o";
+                      } else if (v === "openrouter") {
+                        newModel = "anthropic/claude-3.5-sonnet";
                       } else if (v === "ai-studio") {
                         newModel = "gemini-2.0-flash";
                       }
@@ -704,6 +1045,7 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
                   >
                     <option value="gemini-cli">Gemini CLI</option>
                     <option value="ollama">Ollama</option>
+                    <option value="openrouter">OpenRouter</option>
                     <option value="lmstudio">LM Studio</option>
                     <option value="ai-studio">Gemini AI Studio</option>
                     <option value="openai-compatible">OpenAI Compatible</option>
@@ -790,7 +1132,8 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
                 )}
 
                 {(settings.ai_provider === "ai-studio" ||
-                  settings.ai_provider === "openai-compatible") && (
+                  settings.ai_provider === "openai-compatible" ||
+                  settings.ai_provider === "openrouter") && (
                   <div className="space-y-2 animate-in fade-in slide-in-from-left-2 duration-300">
                     <div className="flex items-center justify-between">
                       <SectionLabel htmlFor="ai_api_key">Secret API Key</SectionLabel>
@@ -810,7 +1153,11 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
                         value={settings.ai_api_key}
                         onChange={(e) => update("ai_api_key", e.target.value, false)}
                         onBlur={() => onSave(settings)}
-                        placeholder="Encrypted: sk-••••••••••••••••"
+                        placeholder={
+                          settings.ai_provider === "openrouter"
+                            ? "sk-or-v1-••••••••••••••••"
+                            : "Encrypted: sk-••••••••••••••••"
+                        }
                         className="pr-10"
                       />
                       <Button
@@ -827,8 +1174,9 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
                       </Button>
                     </div>
                     <p className="text-[10px] text-text-muted/50 px-1">
-                      Keys are stored securely locally. Optional for some local engines (e.g., LM
-                      Studio).
+                      {settings.ai_provider === "openrouter"
+                        ? "OpenRouter API Key. Stored securely in local DuckDB settings."
+                        : "Keys are stored securely locally. Optional for some local engines (e.g., LM Studio)."}
                     </p>
                   </div>
                 )}
@@ -880,6 +1228,23 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
                     <p className="text-[10px] text-text-muted/50 px-1">
                       Protocol & host for the OpenAI-compatible endpoint (e.g., LM Studio, Groq,
                       vLLM).
+                    </p>
+                  </div>
+                )}
+
+                {settings.ai_provider === "openrouter" && (
+                  <div className="space-y-2 animate-in fade-in slide-in-from-top-2 duration-300">
+                    <SectionLabel htmlFor="ai_openrouter_host">API Gateway URL</SectionLabel>
+                    <SettingInput
+                      id="ai_openrouter_host"
+                      type="url"
+                      value={settings.ai_openrouter_host}
+                      onChange={(e) => update("ai_openrouter_host", e.target.value, false)}
+                      onBlur={() => onSave(settings)}
+                      placeholder="https://openrouter.ai/api/v1"
+                    />
+                    <p className="text-[10px] text-text-muted/50 px-1">
+                      OpenRouter API gateway endpoint (default: https://openrouter.ai/api/v1).
                     </p>
                   </div>
                 )}
@@ -1017,9 +1382,7 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
           {activeSection === "drain" && (
             <div className="space-y-12 animate-in fade-in slide-in-from-right-4 duration-300">
               <div className="border-b border-border pb-6">
-                <h2 className="text-2xl font-bold text-text-primary">
-                  Global Core Engine (Drain3)
-                </h2>
+                <h2 className="text-2xl font-bold text-text-primary">Global Core Engine</h2>
                 <p className="text-sm text-text-muted mt-2">
                   System-wide defaults for log parsing, clustering, and pattern discovery.
                 </p>
@@ -1145,12 +1508,50 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
                           IPv4 / IPv6 Formats
                         </span>
                       </div>
-                      <div className="flex items-center justify-between gap-4 py-1">
+                      <div className="flex items-center justify-between gap-4 py-1 border-b border-primary/10">
                         <span className="text-[10px] font-semibold text-text-primary">
                           UUID / GUID
                         </span>
                         <span className="text-[9px] font-mono text-text-muted truncate">
                           Standard 36-char markers
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between gap-4 py-1 border-b border-primary/10">
+                        <span className="text-[10px] font-semibold text-text-primary">
+                          HEX MEMORY / HASH
+                        </span>
+                        <span className="text-[9px] font-mono text-text-muted truncate">
+                          0x... addresses & sha hashes
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between gap-4 py-1 border-b border-primary/10">
+                        <span className="text-[10px] font-semibold text-text-primary">
+                          DURATION
+                        </span>
+                        <span className="text-[9px] font-mono text-text-muted truncate">
+                          took ...ms / ...s latencies
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between gap-4 py-1 border-b border-primary/10">
+                        <span className="text-[10px] font-semibold text-text-primary">EMAIL</span>
+                        <span className="text-[9px] font-mono text-text-muted truncate">
+                          user@domain addresses
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between gap-4 py-1 border-b border-primary/10">
+                        <span className="text-[10px] font-semibold text-text-primary">
+                          MAC ADDRESS
+                        </span>
+                        <span className="text-[9px] font-mono text-text-muted truncate">
+                          xx:xx:xx:xx:xx:xx hardware IDs
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between gap-4 py-1">
+                        <span className="text-[10px] font-semibold text-text-primary">
+                          DATETIME
+                        </span>
+                        <span className="text-[9px] font-mono text-text-muted truncate">
+                          ISO / RFC3339 timestamps
                         </span>
                       </div>
                     </div>

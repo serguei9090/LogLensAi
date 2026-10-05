@@ -1,3 +1,4 @@
+import { GridPattern } from "@/components/atoms/GridPattern";
 import { IconButton } from "@/components/atoms/IconButton";
 import { LogLevelBadge } from "@/components/atoms/LogLevelBadge";
 import type { FilterEntry } from "@/components/molecules/FilterBuilder";
@@ -80,6 +81,7 @@ export function VirtualLogTable({
     sourceId: string;
   } | null>(null);
   const [lastSelectedId, setLastSelectedId] = useState<number | null>(null);
+  const [selectionAnchorId, setSelectionAnchorId] = useState<number | null>(null);
 
   const {
     filters,
@@ -88,10 +90,16 @@ export function VirtualLogTable({
     setSearchQuery,
     selectedLogIds,
     toggleLogSelection,
-    clearSelection,
+    clearSelection: storeClearSelection,
     setSelectedLogIds,
     isTailing,
   } = useInvestigationStore();
+
+  const handleClearSelection = useCallback(() => {
+    storeClearSelection();
+    setLastSelectedId(null);
+    setSelectionAnchorId(null);
+  }, [storeClearSelection]);
   const { logSessionMap, fetchMapping } = useAiStore();
   const activeWorkspace = useWorkspaceStore(selectActiveWorkspace);
   const ingestingSourceIds = useIngestionStore((state) => state.ingestingSourceIds);
@@ -373,29 +381,43 @@ export function VirtualLogTable({
     const isShift = event.shiftKey;
     const isMeta = event.metaKey || event.ctrlKey;
 
-    if (isShift && lastSelectedId !== null) {
-      const lastIndex = logs.findIndex((l) => l.id === lastSelectedId);
-      const currentIndex = logs.findIndex((l) => l.id === id);
+    if (isShift) {
+      // Use selectionAnchorId as the range origin, falling back to lastSelectedId
+      const anchorId = selectionAnchorId !== null ? selectionAnchorId : lastSelectedId;
 
-      if (lastIndex === -1) {
-        // Fallback if lastSelectedId is no longer in the visible set
-        setSelectedLogIds([id]);
+      if (anchorId !== null) {
+        const anchorIndex = logs.findIndex((l) => l.id === anchorId);
+        const currentIndex = logs.findIndex((l) => l.id === id);
+
+        if (anchorIndex === -1) {
+          // Fallback if anchor is no longer in the visible set
+          setSelectedLogIds([id]);
+          setSelectionAnchorId(id);
+        } else {
+          const [start, end] = [
+            Math.min(anchorIndex, currentIndex),
+            Math.max(anchorIndex, currentIndex),
+          ];
+          const rangeIds = logs.slice(start, end + 1).map((l) => l.id);
+
+          // If meta is pressed along with shift, add range to existing selection; otherwise replace
+          const newSelection = isMeta
+            ? Array.from(new Set([...selectedLogIds, ...rangeIds]))
+            : rangeIds;
+
+          setSelectedLogIds(newSelection);
+        }
       } else {
-        const [start, end] = [Math.min(lastIndex, currentIndex), Math.max(lastIndex, currentIndex)];
-        const rangeIds = logs.slice(start, end + 1).map((l) => l.id);
-
-        // If meta is pressed, add range to existing selection; otherwise replace
-        const newSelection = isMeta
-          ? Array.from(new Set([...selectedLogIds, ...rangeIds]))
-          : rangeIds;
-
-        setSelectedLogIds(newSelection);
+        setSelectedLogIds([id]);
+        setSelectionAnchorId(id);
       }
     } else if (isMeta) {
       toggleLogSelection(id);
+      setSelectionAnchorId(id);
     } else {
-      // Standard click: select only this item and clear others
+      // Standard click: select only this item and establish a new anchor
       setSelectedLogIds([id]);
+      setSelectionAnchorId(id);
     }
     setLastSelectedId(id);
   };
@@ -627,17 +649,18 @@ export function VirtualLogTable({
 
             if (hasActiveFilters) {
               return (
-                <div className="absolute inset-0 flex flex-col items-center justify-center p-8 text-center animate-in fade-in zoom-in-95 duration-300">
-                  <div className="relative mb-6">
+                <div className="absolute inset-0 flex flex-col items-center justify-center p-8 text-center animate-in fade-in zoom-in-95 duration-300 relative overflow-hidden">
+                  <GridPattern width={24} height={24} className="opacity-30" dotSize={1} />
+                  <div className="relative mb-6 z-10">
                     <div className="absolute -inset-4 bg-amber-500/10 rounded-full blur-2xl" />
                     <div className="relative bg-bg-surface border border-border shadow-2xl rounded-2xl p-6">
                       <Filter className="size-12 text-amber-400" />
                     </div>
                   </div>
-                  <h3 className="text-xl font-bold text-text-primary">
+                  <h3 className="text-xl font-bold text-text-primary z-10">
                     No logs match active filters
                   </h3>
-                  <p className="text-sm text-text-muted mt-2 max-w-[340px] leading-relaxed">
+                  <p className="text-sm text-text-muted mt-2 max-w-[340px] leading-relaxed z-10">
                     {searchQuery ? `No results found matching query "${searchQuery}". ` : ""}
                     Adjust or clear your active filters to display matching log records.
                   </p>
@@ -647,7 +670,7 @@ export function VirtualLogTable({
                       setSearchQuery("");
                     }}
                     variant="outline"
-                    className="mt-6 px-6 py-2.5 rounded-xl border-border/80 hover:bg-white/5 text-text-primary font-semibold transition-all active:scale-95"
+                    className="mt-6 px-6 py-2.5 rounded-xl border-border/80 hover:bg-white/5 text-text-primary font-semibold transition-all active:scale-95 z-10"
                   >
                     Clear Filters
                   </Button>
@@ -656,26 +679,27 @@ export function VirtualLogTable({
             }
 
             return (
-              <div className="absolute inset-0 flex flex-col items-center justify-center p-8 text-center animate-in fade-in zoom-in-95 duration-500">
-                <div className="relative mb-6">
+              <div className="absolute inset-0 flex flex-col items-center justify-center p-8 text-center animate-in fade-in zoom-in-95 duration-500 relative overflow-hidden">
+                <GridPattern width={24} height={24} className="opacity-35" dotSize={1} />
+                <div className="relative mb-6 z-10">
                   <div className="absolute -inset-4 bg-primary/10 rounded-full blur-2xl animate-pulse" />
                   <div className="relative bg-bg-surface border border-border shadow-2xl rounded-2xl p-6">
                     <FileUp className="size-12 text-primary" />
                   </div>
                 </div>
-                <h3 className="text-xl font-bold text-text-primary">No logs detected</h3>
-                <p className="text-sm text-text-muted mt-2 max-w-[280px] leading-relaxed">
+                <h3 className="text-xl font-bold text-text-primary z-10">No logs detected</h3>
+                <p className="text-sm text-text-muted mt-2 max-w-[280px] leading-relaxed z-10">
                   This workspace is currently empty. Connect a data source or upload a log file to
                   begin analysis.
                 </p>
                 <Button
                   onClick={onImport}
-                  className="mt-8 px-8 py-6 rounded-2xl bg-primary hover:bg-primary-hover text-white font-bold shadow-xl shadow-primary/20 transition-all active:scale-95 group"
+                  className="mt-8 px-8 py-6 rounded-2xl bg-primary hover:bg-primary-hover text-white font-bold shadow-xl shadow-primary/20 transition-all active:scale-95 group z-10"
                 >
                   <Rocket className="size-5 mr-2 group-hover:-translate-y-0.5 transition-transform duration-200 ease-out" />
                   Import First Log
                 </Button>
-                <div className="mt-12 flex items-center gap-6 text-[10px] font-bold uppercase tracking-widest text-text-muted/30">
+                <div className="mt-12 flex items-center gap-6 text-[10px] font-bold uppercase tracking-widest text-text-muted/30 z-10">
                   <div className="flex items-center gap-1.5">
                     <Download className="size-3" /> local files
                   </div>
@@ -716,7 +740,7 @@ export function VirtualLogTable({
                           onClick={(e) => {
                             e.stopPropagation();
                             if (selectedLogIds.length === logs.length) {
-                              clearSelection();
+                              handleClearSelection();
                             } else {
                               setSelectedLogIds(logs.map((l) => l.id));
                             }
@@ -906,8 +930,8 @@ export function VirtualLogTable({
         )}
       </section>
       {selectedLogIds.length > 0 && expandedRow === null && (
-        <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-[100] animate-in slide-in-from-bottom-4 duration-300">
-          <div className="bg-bg-tooltip border border-white/10 shadow-2xl rounded-full p-1.5 flex items-center gap-2 backdrop-blur-xl">
+        <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-[100] animate-in slide-in-from-bottom-4 duration-300 pointer-events-none">
+          <div className="bg-bg-tooltip border border-white/10 shadow-2xl rounded-full p-1.5 flex items-center gap-2 backdrop-blur-xl pointer-events-auto">
             <span className="pl-4 pr-2 text-xs font-bold text-text-primary">
               {selectedLogIds.length} lines selected
             </span>
@@ -924,7 +948,7 @@ export function VirtualLogTable({
               variant="ghost"
               size="sm"
               className="rounded-full h-8 w-8 p-0 text-text-muted hover:text-text-primary hover:bg-white/5"
-              onClick={clearSelection}
+              onClick={handleClearSelection}
               title="Clear Selection"
             >
               <X className="size-4" />

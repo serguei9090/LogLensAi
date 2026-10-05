@@ -17,6 +17,7 @@ export interface AppSettings {
   ai_gemini_url: string;
   ai_ollama_host: string;
   ai_openai_host: string;
+  ai_openrouter_host: string;
   ai_lmstudio_host: string;
   drain_similarity_threshold: number;
   drain_max_children: number;
@@ -48,6 +49,7 @@ export const defaultSettings: AppSettings = {
   ai_gemini_url: "http://localhost:22436",
   ai_ollama_host: "http://localhost:11434",
   ai_openai_host: "https://api.openai.com/v1",
+  ai_openrouter_host: "https://openrouter.ai/api/v1",
   ai_lmstudio_host: "http://localhost:1234/v1",
   drain_similarity_threshold: 0.5,
   drain_max_children: 100,
@@ -82,12 +84,73 @@ export const defaultSettings: AppSettings = {
       label: "HTTP_METHOD",
       enabled: true,
     },
+    {
+      // Memory pointers, object IDs, hexadecimal hashes
+      pattern: String.raw`\b(0x[0-9a-fA-F]+|[0-9a-fA-F]{16,64})\b`,
+      label: "HEX",
+      enabled: true,
+    },
+    {
+      // Durations (took 200ms, 1.5s, etc.)
+      pattern: String.raw`\b\d+(?:\.\d+)?(?:ms|s|ns|µs|m)\b`,
+      label: "DURATION",
+      enabled: true,
+    },
+    {
+      // Email addresses
+      pattern: String.raw`\b[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}\b`,
+      label: "EMAIL",
+      enabled: true,
+    },
+    {
+      // Hardware MAC addresses
+      pattern: String.raw`\b(?:[0-9a-fA-F]{2}[:-]){5}[0-9a-fA-F]{2}\b`,
+      label: "MAC",
+      enabled: true,
+    },
+    {
+      // ISO / SQL date-time stamps
+      pattern: String.raw`\b\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:?\d{2})?\b`,
+      label: "DATETIME",
+      enabled: true,
+    },
+    {
+      // File paths & URLs
+      pattern: String.raw`\b(https?://[^\s]+|/[a-zA-Z0-9_\-\./]+)\b`,
+      label: "PATH",
+      enabled: false,
+    },
+    {
+      // Generic numbers (integers)
+      pattern: String.raw`\b\d+\b`,
+      label: "NUM",
+      enabled: false,
+    },
   ],
   ingestion_syslog_enabled: true,
   ingestion_syslog_port: 514,
   ingestion_http_enabled: true,
   ingestion_http_port: 5002,
-  facet_extractions: [],
+  facet_extractions: [
+    {
+      name: "status_code",
+      regex: String.raw`\b([1-5][0-9]{2})\b`,
+      group: 1,
+      enabled: true,
+    },
+    {
+      name: "duration",
+      regex: String.raw`took\s+(\d+(?:\.\d+)?\s*(?:ms|s)?)`,
+      group: 1,
+      enabled: true,
+    },
+    {
+      name: "user",
+      regex: String.raw`user(?:name)?[:=]\s*([a-zA-Z0-9_\.\-]+)`,
+      group: 1,
+      enabled: true,
+    },
+  ],
   ui_command_palette_shortcut: { key: "k", ctrl: true },
   timestamp_auto_detect: true,
   timestamp_custom_regex: "",

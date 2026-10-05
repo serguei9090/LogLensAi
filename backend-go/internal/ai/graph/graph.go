@@ -5,8 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
-
-	"loglensai/backend-go/internal/ai/laya"
 )
 
 // StreamChunk is one unit of streamed output from Run, mirroring
@@ -17,8 +15,11 @@ import (
 // aiohttp_stream_chat/method_send_ai_message catch around the whole
 // `async for` loop).
 type StreamChunk struct {
-	Content string
-	Err     error
+	Content          string
+	Err              error
+	EvaluationNotice string
+	StepNotice       string
+	StepDone         bool
 }
 
 // maxIterations caps the reasoning<->tool_execution loop. graph.py/LangGraph
@@ -62,6 +63,9 @@ func Run(ctx context.Context, provider Provider, tools *ToolRegistry, initialSta
 		if state.Messages == nil {
 			state.Messages = []ChatMessage{}
 		}
+		if state.WorkspaceID != "" {
+			ctx = context.WithValue(ctx, "workspace_id", state.WorkspaceID)
+		}
 		state.Status = "started"
 
 		for i := 0; i < maxIterations; i++ {
@@ -81,10 +85,20 @@ func Run(ctx context.Context, provider Provider, tools *ToolRegistry, initialSta
 					}
 				}
 				if lastUserMsg != "" {
-					if routed, err := RouteWithLaya(ctx, tools, lastUserMsg); err == nil && routed != nil && routed.Confidence >= 0.85 {
-						state.Status = fmt.Sprintf("laya_routed:%s:%.2f", routed.SelectedLabel, routed.Confidence)
-						hint := fmt.Sprintf("[Laya System 1 Router: User intent classified as %q (confidence: %.2f). Prioritize selecting this tool if applicable.]", routed.SelectedLabel, routed.Confidence)
-						state.Messages = append([]ChatMessage{{Role: "system", Content: hint}}, state.Messages...)
+					// Ground Reasoning with verified physical facts (catalogs, time range, Laya cluster triage)
+					if tools != nil && tools.App() != nil {
+						inv, invErr := InspectWorkspace(tools.App(), state.WorkspaceID)
+						if invErr == nil && inv != nil {
+							groundingHint := inv.FormatGroundedSystemPromptContext()
+							state.Messages = append([]ChatMessage{{Role: "system", Content: groundingHint}}, state.Messages...)
+						}
+					}
+					if state.Reasoning {
+						reasoningDirective := "Analyze the problem and log context step-by-step. Wrap your preliminary reasoning inside <think> and </think> tags before providing your answer. IMPORTANT: When asked to investigate, find, or analyze logs/errors, you MUST emit tool calls (such as search_logs or get_clusters) to inspect the data rather than merely saying you will do so."
+						state.Messages = append([]ChatMessage{{Role: "system", Content: reasoningDirective}}, state.Messages...)
+					} else {
+						actionDirective := "IMPORTANT: When asked to investigate, find, or analyze logs/errors, you MUST emit tool calls (such as search_logs or get_clusters) to inspect the data rather than merely stating that you will do so."
+						state.Messages = append([]ChatMessage{{Role: "system", Content: actionDirective}}, state.Messages...)
 					}
 				}
 			}
@@ -95,22 +109,43 @@ func Run(ctx context.Context, provider Provider, tools *ToolRegistry, initialSta
 				return
 			}
 
-			select {
-			case out <- StreamChunk{Content: ParseReasoningBlocks(assistantMsg.Content)}:
-			case <-ctx.Done():
-				out <- StreamChunk{Err: ctx.Err()}
-				return
+			if assistantMsg.Content != "" {
+				select {
+				case out <- StreamChunk{
+					Content: ParseReasoningBlocks(assistantMsg.Content),
+				}:
+				case <-ctx.Done():
+					out <- StreamChunk{Err: ctx.Err()}
+					return
+				}
 			}
 
 			if state.NextNode != NodeToolExecution {
-				// final_answer is a no-op terminal node (graph.py's
-				// _node_final_answer just returns state unchanged) -- there
-				// is nothing further to do or emit.
+				// If the model completed without emitting any text (e.g. after tool execution),
+				// provide a structured summary so the user is never left with an empty bubble.
+				if assistantMsg.Content == "" {
+					var fallbackText string
+					for k := len(state.Messages) - 1; k >= 0; k-- {
+						if state.Messages[k].Role == "tool" {
+							fallbackText = fmt.Sprintf("Completed action `%s`. Result:\n```json\n%s\n```", state.Messages[k].Name, state.Messages[k].Content)
+							break
+						}
+					}
+					if fallbackText == "" {
+						fallbackText = "Investigation complete. No additional log anomalies detected."
+					}
+					select {
+					case out <- StreamChunk{Content: fallbackText}:
+					case <-ctx.Done():
+						out <- StreamChunk{Err: ctx.Err()}
+						return
+					}
+				}
 				state.Status = "complete"
 				return
 			}
 
-			nodeToolExecution(ctx, tools, &state)
+			nodeToolExecution(ctx, tools, &state, out)
 			// tool_execution always loops back to reasoning (graph.py's
 			// unconditional add_edge("tool_execution", "reasoning")).
 		}
@@ -167,7 +202,37 @@ func containsToolCallMarker(content string) bool {
 // try/except-per-call loop. When the last message has no tool_calls array
 // at all (the "TOOL_CALL:" fallback path), a single system message is
 // appended instead, matching graph.py's fallback branch exactly.
-func nodeToolExecution(ctx context.Context, tools *ToolRegistry, state *MissionState) {
+func formatStepLabel(name string, rawArgs string) string {
+	switch name {
+	case "search_logs":
+		var p struct {
+			Query string `json:"query"`
+		}
+		_ = json.Unmarshal([]byte(rawArgs), &p)
+		if p.Query != "" {
+			return fmt.Sprintf("Searching logs: %s", p.Query)
+		}
+		return "Searching logs across workspace"
+	case "get_clusters":
+		return "Inspecting log clusters and patterns"
+	case "search_memory":
+		return "Searching collective incident memory"
+	case "get_facets":
+		return "Extracting metadata facets (IPs, users)"
+	case "get_hierarchy":
+		return "Reading source hierarchy and feeds"
+	case "create_column":
+		return "Configuring custom log view column"
+	case "create_facet":
+		return "Creating regex log extraction rule"
+	case "update_laya_rules":
+		return "Refining Laya System 1 decision rules"
+	default:
+		return fmt.Sprintf("Executing tool: %s", name)
+	}
+}
+
+func nodeToolExecution(ctx context.Context, tools *ToolRegistry, state *MissionState, out chan<- StreamChunk) {
 	if len(state.Messages) == 0 {
 		return
 	}
@@ -184,6 +249,15 @@ func nodeToolExecution(ctx context.Context, tools *ToolRegistry, state *MissionS
 	for _, call := range last.ToolCalls {
 		name := call.Function.Name
 		callID := call.ID
+
+		stepDesc := formatStepLabel(name, call.Function.Arguments)
+		if out != nil {
+			select {
+			case out <- StreamChunk{StepNotice: stepDesc}:
+			case <-ctx.Done():
+				return
+			}
+		}
 
 		result, err := executeToolCall(ctx, tools, name, call.Function.Arguments)
 
@@ -203,6 +277,22 @@ func nodeToolExecution(ctx context.Context, tools *ToolRegistry, state *MissionS
 			ToolCallID: callID,
 			Name:       name,
 		})
+
+		if out != nil {
+			select {
+			case out <- StreamChunk{StepNotice: stepDesc, StepDone: true}:
+			case <-ctx.Done():
+				return
+			}
+		}
+	}
+
+	if out != nil {
+		select {
+		case out <- StreamChunk{StepNotice: "Analyzing results and synthesizing answer…"}:
+		case <-ctx.Done():
+			return
+		}
 	}
 }
 
@@ -222,22 +312,4 @@ func executeToolCall(ctx context.Context, tools *ToolRegistry, name, rawArgs str
 		return map[string]any{"error": fmt.Sprintf("Tool %s not found", name)}, nil
 	}
 	return tools.Execute(ctx, name, json.RawMessage(rawArgs))
-}
-
-// RouteWithLaya evaluates userText with Laya System 1 decision engine if enabled.
-// Returns nil if Laya is not configured, disabled, or if intent question is absent.
-func RouteWithLaya(ctx context.Context, tools *ToolRegistry, userText string) (*laya.DecisionResult, error) {
-	if tools == nil || tools.app == nil || tools.app.LayaManager == nil || tools.app.LayaEngine == nil {
-		return nil, nil
-	}
-	settings := tools.app.LayaManager.GetSettings()
-	if !settings.Enabled {
-		return nil, nil
-	}
-	questions := tools.app.LayaManager.GetActiveQuestions()
-	intentQuestion, ok := questions["tool_intent"]
-	if !ok {
-		return nil, nil
-	}
-	return tools.app.LayaEngine.Predict(ctx, intentQuestion, userText)
 }

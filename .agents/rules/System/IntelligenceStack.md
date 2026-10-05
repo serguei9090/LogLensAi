@@ -3,39 +3,28 @@ trigger: always_on
 description: Evidence stack for Beads, Codanna, local repository inspection, documentation review, and synthesis.
 ---
 
-# Intelligence Stack
+# Intelligence Stack (LogLensAi)
 
-Use the smallest evidence stack that makes the task safe. Full SDLC work requires stronger evidence than lightweight edits.
+Use the smallest evidence stack that makes the task safe and fast.
 
 ## Layers
 
 | Layer | Purpose | Tools |
 | --- | --- | --- |
-| Task state | Understand active work and durable context | `bd ready`, `bd list`, `bd create`, `bd update`, `bd remember` |
-| Physical code truth | Find symbols, callers, impact, and docs indexed by Codanna | `scripts/codanna/*.py`, `codanna search`, `codanna mcp` |
-| Local repository context | Verify exact files, tests, package scripts, and existing patterns | file reads, `rg`, package/test config |
-| External docs | Verify unstable or unfamiliar external APIs | official docs, package help, trusted primary docs |
-| Synthesis | Convert evidence into plan, spec, focused edit, or handoff | concise reasoning, spec, checklist |
+| **Task State** | Track tasks & detailed specifications | Markdown tracking in `docs/track/TODO.md` & `docs/track/specs/<ID>.md` |
+| **Physical Code Truth** | Find definitions, callers, callees, and blast radius in <1s | `codanna retrieve symbol/callers/calls`, `codanna mcp analyze_impact` |
+| **Surgical Code View** | Read and edit internal logic of identified lines | Targeted file view on exact lines (no full-repo dumps) |
+| **Verification** | Ensure zero regressions & strict reachability | `go test ./...`, `flutter test`, `flutter analyze` |
 
-## Full SDLC Entry
+## Optimal Workflow: Codanna First, Surgical Read Second
 
-1. Run `bd ready`.
-2. Use Codanna or local search to identify affected files and symbols.
-3. Read relevant rules and persona instructions.
-4. Create or update the bead before implementation.
-5. Use focused verification after implementation.
-
-## Lightweight Entry
-
-1. Inspect the target files directly.
-2. Use Codanna only when the symbol is shared, impact is unclear, or the edit touches contracts.
-3. Run the smallest useful verification.
-4. Escalate to full SDLC when impact expands.
-
-## Guardrails
-
-- Do not claim a code relationship without verifying it.
-- Do not require every layer for tiny edits.
-- Do not use missing tools as a reason to guess silently.
-- After structural changes, run Codanna indexing when available.
+1. **Locate with Codanna**: Before opening files, locate symbol definitions and callers using Codanna:
+   ```powershell
+   codanna retrieve symbol <Name>
+   codanna retrieve callers <Name>
+   codanna mcp analyze_impact <Name>
+   ```
+2. **Surgical Read**: Once Codanna provides the exact file path and line numbers, open ONLY those targeted lines to view or edit the function body.
+3. **Never Brute-Force Grep**: Avoid full-text grep scans across the repository for call hierarchies. Grep generates false positives from comments, tests, and strings; Codanna queries the true AST.
+4. **Re-index on Structural Change**: Run `codanna index .` when adding or renaming exported symbols.
 

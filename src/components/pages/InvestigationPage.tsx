@@ -374,7 +374,6 @@ function InvestigationPageImpl() {
           next.add(src.id);
           return next;
         });
-        const { useIngestionStore } = await import("@/store/ingestionStore");
         useIngestionStore.getState().addLiveSource();
         useIngestionStore.getState().startPolling(activeWorkspaceId ?? "");
 
@@ -393,7 +392,6 @@ function InvestigationPageImpl() {
           next.delete(src.id);
           return next;
         });
-        const { useIngestionStore } = await import("@/store/ingestionStore");
         useIngestionStore.getState().removeLiveSource();
 
         toast.info(`Live monitoring stopped for ${src.name}`);

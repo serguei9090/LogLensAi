@@ -1,75 +1,51 @@
-# UI Architecture Standards (Global)
+# UI Architecture Standards (Flutter / LogLensAi)
 
 ## 1. Core Principles (Invariants)
-* **Presentation Only:** `packages/ui` NEVER imports `packages/core`. No business logic, no API calls, no persistence. Data enters via props.
-* **Token Truth:** Source of Truth is **Style Dictionary (JSON)**. Generated output is Read-Only.
-* **Public API:** Deep imports prohibited (e.g., `import X from 'ui/atoms/X'`). Import only from root: `@{scope}/ui`.
-* **Platform Split:**
-    * Web/Desktop: `*.tsx` (No React Native imports).
-    * Native: `*.native.tsx` (No `react-dom`/HTML imports).
-    * Shared logic: Use `*.ts` or strict interface abstraction.
-    * Entry Points: `index.ts` (Web), `index.native.ts` (Native).
+* **Design Token Strictness:** Source of truth is `DESIGN.md` ported to `flutter_app/lib/theme/` (`AppColors`, `AppSpacing`, `AppTypography`). Hardcoded hex colors and arbitrary margins/paddings are strictly prohibited.
+* **Separation of Concerns:** Atoms and Molecules must be stateless presentation widgets. No direct Riverpod `ref.watch` or `ref.read` calls inside Atoms.
+* **State Ownership:** Organisms and Pages own Riverpod state integration.
 
-## 2. Workflow (Component Classification)
-1.  **Is it a single block?** -> **Atom**.
-2.  **Does it mix Atoms?** -> **Molecule**.
-3.  **Does it have Logic/Layout?** -> **Organism**.
-4.  **Is it a Page Skeleton?** -> **Template**.
-5.  **Does it Fetch Data?** -> **Page**.
+## 2. Widget Tier Classification (`flutter_app/lib/widgets/`)
+1. **Atoms (`widgets/atoms/`):** Smallest foundational widgets (e.g., `StatusDot`, `LogLevelBadge`, `IconButton`, `TailSwitch`). Pure props in, UI out. No business logic, no Riverpod state reads.
+2. **Molecules (`widgets/molecules/`):** Composed combinations of atoms (e.g., `SearchBar`, `FilterBuilder`, `ClusterRow`, `SourceItem`). Simple callback event handlers.
+3. **Organisms (`widgets/organisms/`):** Complex UI panels and sections (e.g., `LogToolbar`, `VirtualLogTable`, `Sidebar`, `AIInvestigationSidebar`). May connect to Riverpod providers.
+4. **Pages (`pages/`):** Full screen compositions (e.g., `DashboardPage`, `InvestigationPage`, `SettingsPage`). Own page-level layout and coordination.
 
-## 3. Atomic Hierarchy (packages/ui)
-**2.0 Tokens** (`/tokens`):
-    *   `src/**/*.json`: **Source of Truth** (Raw Design Values).
-    *   `dist/`: **Generated** (TS/CSS outputs via Style Dictionary).
-**2.1 Atoms** (`/atoms`): Smallest blocks (Button, Icon). No external margins. Props in/UI out.
-**2.2 Molecules** (`/molecules`): Compositions of atoms (SearchInput). No business logic.
-**2.3 Organisms** (`/organisms`): Complex sections (Header, LoginForm). Internal layout allowed. No data fetching.
-**2.4 Templates** (`/templates`): Layout skeletons (DashboardLayout). Slots/children only.
-**2.5 Pages** (`apps/*/pages`): **State Owners.** Data fetching, `core` hooks, and wiring happen here.
+## 3. Forbidden Patterns (Strict)
+1. **Logic Leak:** Making raw HTTP or subprocess sidecar calls directly from widgets. All calls go through Riverpod providers wrapping `sidecar_bridge.dart`.
+2. **Style Drift:** Hardcoding hex colors like `Color(0xFF22C55E)` instead of `AppColors.primary`.
+3. **Over-virtualization / Jitter:** In list and log views, preserve keys and avoid unconstrained infinite height rebuilds.
 
-## 4. File Standards
-Path: `packages/ui/src/[type]/[Name]/`
-* `[Name].tsx` (Web implementation)
-* `[Name].native.tsx` (Native implementation - Optional)
-* `[Name].types.ts` (Prop interfaces - Required)
-* `[Name].styles.ts` (Styles using Generated Tokens - Required)
-* `index.ts` (Web Public API - Required)
-* `index.native.ts` (Mobile Public API - Required)
+## 4. Golden Example (The Ideal Molecule)
+```dart
+// flutter_app/lib/widgets/molecules/filter_builder.dart
+import 'package:flutter/material.dart';
+import 'package:flutter_app/theme/app_colors.dart';
+import 'package:flutter_app/theme/app_spacing.dart';
+import 'package:flutter_app/widgets/atoms/log_level_badge.dart';
 
-## 5. Forbidden Patterns (Strict)
-1.  **Logic Leak:** `useEffect(() => fetch('/api'))` inside `packages/ui`.
-2.  **Style Drift:** `backgroundColor: '#ff0000'` (Must use `tokens.colors.danger`).
-3.  **Layout Pollution:** Atoms defining `margin` (Layout belongs to parent/Molecules).
-4.  **Cross-Pollution:** Importing `react-native` in a `.tsx` file or `react-dom` in `.native.tsx`.
-5.  **Polluted Entry:** Exporting Native components in `index.ts` (Web Entry) or Web components in `index.native.ts` (Native Entry).
+class FilterBuilder extends StatelessWidget {
+  final String activeLevel;
+  final ValueChanged<String> onLevelSelected;
 
-## 6. Golden Example (The Ideal Molecule)
-```tsx
-// packages/ui/src/molecules/SearchInput/SearchInput.tsx
-import React, { useState } from 'react';
-import { View, TextInput } from 'react-native'; // Or 'react-dom' divs depends on platform
-import { Button } from '../../atoms/Button';
-import { tokens } from '../../tokens/dist/js/tokens'; // Generated Imports
-import { SearchInputProps } from './SearchInput.types';
+  const FilterBuilder({
+    super.key,
+    required this.activeLevel,
+    required this.onLevelSelected,
+  });
 
-export const SearchInput = ({ onSearch, placeholder }: SearchInputProps) => {
-  const [query, setQuery] = useState('');
-
-  // PURE UI LOGIC ONLY. No useEffect(fetch).
-  const handleSubmit = () => {
-    if (query.length > 0) onSearch(query);
-  };
-
-  return (
-    <View style={{ flexDirection: 'row', gap: tokens.spacing.sm }}>
-      <TextInput 
-        value={query}
-        onChangeText={setQuery}
-        placeholder={placeholder}
-        style={{ borderColor: tokens.colors.primary, borderWidth: 1 }}
-      />
-      <Button onPress={handleSubmit} label="Go" />
-    </View>
-  );
-};
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        LogLevelBadge(
+          level: activeLevel,
+          isSelected: true,
+          onTap: () => onLevelSelected(activeLevel),
+        ),
+        const SizedBox(width: AppSpacing.sm),
+      ],
+    );
+  }
+}
 ```

@@ -116,7 +116,7 @@ func (a *App) GetAIMessages(sessionID string) (any, *models.RPCError) {
 // registration decodes {session_id, name} manually; this method just takes
 // the already-decoded fields.
 func (a *App) RenameAISession(sessionID, name string) (any, *models.RPCError) {
-	now := time.Now().Format("2006-01-02 15:04:05")
+	now := time.Now().UTC().Format(time.RFC3339)
 	if _, err := a.DB.Conn.Exec(
 		`UPDATE ai_sessions SET name = ?, last_modified = ? WHERE session_id = ?`,
 		name, now, sessionID,
@@ -984,9 +984,8 @@ func nullStringOrNil(s sql.NullString) any {
 
 // formatAnyTimestamp normalizes a scanned TIMESTAMP column (go-duckdb may
 // hand back a time.Time, string, or []byte depending on column/driver
-// version) into the "YYYY-MM-DD HH:MM:SS" string form Python's `str(datetime)`
-// produces for method_get_ai_sessions/method_get_ai_messages/etc. Returns
-// nil for a SQL NULL, matching Python's `str(row[n]) if row[n] else None`.
+// version) into an ISO 8601 UTC string (RFC3339) so browsers correctly parse
+// them in the user's local timezone.
 func formatAnyTimestamp(v any) any {
 	switch t := v.(type) {
 	case nil:
@@ -995,17 +994,28 @@ func formatAnyTimestamp(v any) any {
 		if t.IsZero() {
 			return nil
 		}
-		return t.Format("2006-01-02 15:04:05")
+		return t.UTC().Format(time.RFC3339)
 	case string:
 		if t == "" {
 			return nil
+		}
+		// If string has format "YYYY-MM-DD HH:MM:SS" without timezone, treat as UTC RFC3339
+		if parsed, err := time.Parse("2006-01-02 15:04:05", t); err == nil {
+			return parsed.UTC().Format(time.RFC3339)
+		}
+		if parsed, err := time.Parse(time.RFC3339, t); err == nil {
+			return parsed.UTC().Format(time.RFC3339)
 		}
 		return t
 	case []byte:
 		if len(t) == 0 {
 			return nil
 		}
-		return string(t)
+		s := string(t)
+		if parsed, err := time.Parse("2006-01-02 15:04:05", s); err == nil {
+			return parsed.UTC().Format(time.RFC3339)
+		}
+		return s
 	default:
 		return fmt.Sprintf("%v", t)
 	}

@@ -37,7 +37,11 @@ describe("useKeyboardShortcuts", () => {
       },
     ];
 
-    vi.spyOn(navigator, "platform", "get").mockReturnValue("MacIntel");
+    Object.defineProperty(navigator, "platform", {
+      value: "MacIntel",
+      configurable: true,
+      writable: true,
+    });
     renderHook(() => useKeyboardShortcuts(shortcuts));
 
     const event = new KeyboardEvent("keydown", {

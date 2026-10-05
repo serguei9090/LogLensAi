@@ -102,8 +102,13 @@ type geminiTool struct {
 	FunctionDeclarations []geminiFunctionDeclaration `json:"functionDeclarations"`
 }
 
+type geminiThinkingConfig struct {
+	ThinkingBudget int `json:"thinkingBudget,omitempty"`
+}
+
 type geminiGenerationConfig struct {
-	ResponseMIMEType string `json:"responseMimeType,omitempty"`
+	ResponseMIMEType string                `json:"responseMimeType,omitempty"`
+	ThinkingConfig   *geminiThinkingConfig `json:"thinkingConfig,omitempty"`
 }
 
 type geminiGenerateRequest struct {
@@ -314,6 +319,15 @@ func (p *GeminiProvider) Chat(ctx context.Context, messages []ChatMessage, sessi
 		Contents: contents,
 		Tools:    toGeminiTools(tools),
 	}
+	if reasoning {
+		payload.GenerationConfig = &geminiGenerationConfig{
+			ThinkingConfig: &geminiThinkingConfig{ThinkingBudget: 2048},
+		}
+	} else {
+		payload.GenerationConfig = &geminiGenerationConfig{
+			ThinkingConfig: &geminiThinkingConfig{ThinkingBudget: 0},
+		}
+	}
 	if systemInstruction != "" {
 		payload.SystemInstruction = &geminiContent{Parts: []geminiPart{{Text: systemInstruction}}}
 	}
@@ -371,6 +385,15 @@ func (p *GeminiProvider) ChatStream(ctx context.Context, messages []ChatMessage,
 	payload := geminiGenerateRequest{
 		Contents: contents,
 		Tools:    toGeminiTools(tools),
+	}
+	if reasoning {
+		payload.GenerationConfig = &geminiGenerationConfig{
+			ThinkingConfig: &geminiThinkingConfig{ThinkingBudget: 2048},
+		}
+	} else {
+		payload.GenerationConfig = &geminiGenerationConfig{
+			ThinkingConfig: &geminiThinkingConfig{ThinkingBudget: 0},
+		}
 	}
 	if systemInstruction != "" {
 		payload.SystemInstruction = &geminiContent{Parts: []geminiPart{{Text: systemInstruction}}}

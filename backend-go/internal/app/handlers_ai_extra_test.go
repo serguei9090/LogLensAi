@@ -497,7 +497,7 @@ func TestFormatAnyTimestamp_HandlesNilAndTypes(t *testing.T) {
 	if got := formatAnyTimestamp(""); got != nil {
 		t.Errorf("expected empty string to become nil, got %v", got)
 	}
-	if got := formatAnyTimestamp("2024-01-01 00:00:00"); got != "2024-01-01 00:00:00" {
+	if got := formatAnyTimestamp("2024-01-01 00:00:00"); got != "2024-01-01T00:00:00Z" {
 		t.Errorf("string passthrough failed: %v", got)
 	}
 }

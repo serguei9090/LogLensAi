@@ -31,7 +31,13 @@ The **only active modules** are:
 
 - **Frontend**: Flutter (Dart), desktop targets (Windows/macOS/Linux), Riverpod for state, `fl_chart` for charting
 - **Communication**: JSON-RPC 2.0 — HTTP on port 5000 in dev, stdin/stdout in prod (unchanged from the old stack)
-- **Backend Sidecar**: Go, DuckDB (`marcboeker/go-duckdb`), hand-ported Drain3 clustering, hand-written AI state machine + tool registry
+- **Backend Sidecar**: Go, DuckDB (`marcboeker/go-duckdb`), hand-ported Drain3 clustering, ONNX runtime (`yalue/onnxruntime_go`), hand-written AI state machine + tool registry
+- **Laya AI (System 1 Decision Engine)**:
+  - Official GitHub: [NandhaKishorM/laya](https://github.com/NandhaKishorM/laya)
+  - Base Model (Hugging Face): [convaiinnovations/laya](https://huggingface.co/convaiinnovations/laya)
+  - Fine-Tuned Checkpoint: [Ankit1106/laya-typed-decisions](https://huggingface.co/Ankit1106/laya-typed-decisions)
+  - Quantized 8-bit ONNX Model (Local/Browser): [nvkudva/laya-web-q8](https://huggingface.co/nvkudva/laya-web-q8)
+  - Web Runtime (ONNX Runtime TypeScript): [nvkudva/laya-web](https://github.com/nvkudva/laya-web)
 - **Desktop Shell**: Flutter's own native desktop runner (no separate Rust shell)
 - **Package Manager**: Go modules (`go.mod`) for the backend, `pub`/`flutter pub` for the frontend
 - **Linter/Formatter**: `go vet` / `gofmt` (backend), `flutter analyze` / `dart format` (frontend)
@@ -44,6 +50,7 @@ The **only active modules** are:
 | Runtime | Flutter SDK | `3.44.4` stable (Dart SDK `^3.12.2`) |
 | Backend | `github.com/marcboeker/go-duckdb` | `v1.8.5` |
 | Backend | `github.com/yalue/onnxruntime_go` | `v1.31.0` |
+| Model | `nvkudva/laya-web-q8` (ONNX Q8 ModernBERT-large) | `~524 MB` |
 | Backend | `github.com/fsnotify/fsnotify` | `v1.10.1` |
 | Backend | `github.com/google/uuid` | `v1.6.0` |
 | Backend | `golang.org/x/crypto` | `v0.55.0` |
@@ -151,6 +158,18 @@ All 67 methods are registered in `backend-go/internal/rpc/` (`RegisterStubs` + `
 - **Testing (ADK Standard)**: Real code over mocks. Test public interface behavior. Fast and isolated tests. High coverage for edge cases. Backend: `go test ./...` from `backend-go/`. Frontend: `flutter test` from `flutter_app/`.
 - **Conventional Commits**: ALL commits must follow the `feat|fix|refactor|docs|test|chore` format.
 - **No silent gaps**: missing logic gets a `TODO(ID)` with a detail file in `docs/track/specs/`
+- **Fast Code Intelligence (Codanna-First & Surgical Read Protocol)**:
+  - The repository is fully indexed by Codanna in `.codanna/index`.
+  - **The Two-Step Workflow**:
+    1. **Codanna First (Structure & Reachability in <1s)**: Use Codanna to locate exact symbol definitions, line ranges, callers, callees, and blast radius without burning context window tokens or guessing.
+       - Find symbol definition & exact line range: `codanna retrieve symbol <SymbolName>`
+       - Find exact callers (who calls X): `codanna retrieve callers <SymbolName>`
+       - Find callees (what X calls): `codanna retrieve calls <SymbolName>`
+       - Full dependency & transitive blast radius: `codanna mcp analyze_impact <SymbolName>`
+       - Interface/trait implementations: `codanna retrieve implementations <InterfaceName>`
+    2. **Surgical Read Second (Logic & Edits)**: Once Codanna provides the exact file path and line numbers, perform a focused, surgical file view strictly on those lines to inspect internal logic or apply diffs.
+  - **Strictly Prohibited**: NEVER brute-force search (`grep`, `find`, or whole-repo file scans) to trace call graphs or verify reachability. Grep produces noisy false positives (comments, mocks, imports); Codanna queries the true indexed AST.
+  - **Re-indexing**: Run `codanna index .` after substantial refactors or new exported files.
 
 ## 🤖 Automated Development Pipeline (Jules)
 

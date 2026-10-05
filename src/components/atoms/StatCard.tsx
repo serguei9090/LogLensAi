@@ -1,5 +1,4 @@
-// Assume Role: Frontend Engineer (@frontend)
-
+import { SpotlightCard } from "@/components/atoms/SpotlightCard";
 import { cn } from "@/lib/utils";
 import type React from "react";
 
@@ -14,6 +13,7 @@ interface StatCardProps {
 
 /**
  * StatCard component for displaying dashboard metrics with trend indicators.
+ * Enhanced with react-bits inspired cursor spotlight glow.
  * Follows atomic design (Atom).
  */
 export function StatCard({
@@ -39,7 +39,10 @@ export function StatCard({
   }
 
   return (
-    <div className="bg-bg-surface/40 border border-white/5 rounded-xl p-4 relative overflow-hidden group hover:border-primary/20 transition-[border-color,background-color] duration-200 hover:bg-bg-surface/60 animate-fade-in-up">
+    <SpotlightCard
+      spotlightColor="rgba(34, 197, 94, 0.15)"
+      className="p-4 group hover:border-primary/25 transition-[border-color,background-color] duration-200 hover:bg-bg-surface/60 animate-fade-in-up"
+    >
       <div className="flex items-start justify-between gap-3">
         <div className="flex-1">
           <p className="text-[10px] font-bold uppercase tracking-wider text-text-muted mb-1">
@@ -65,13 +68,14 @@ export function StatCard({
             </p>
           )}
         </div>
-        <div className="p-2 rounded-lg bg-bg-base/50 border border-white/5 group-hover:border-primary/10 transition-colors duration-200">
+        <div className="p-2 rounded-lg bg-bg-base/50 border border-white/5 group-hover:border-primary/20 transition-colors duration-200">
           {icon}
         </div>
       </div>
 
       {/* Subtle accent line - optimized to use GPU-accelerated transform scaling */}
-      <div className="absolute bottom-0 left-0 h-0.5 w-full bg-primary origin-left scale-x-0 group-hover:scale-x-100 transition-transform duration-300 ease-out opacity-30" />
-    </div>
+      <div className="absolute bottom-0 left-0 h-0.5 w-full bg-primary origin-left scale-x-0 group-hover:scale-x-100 transition-transform duration-300 ease-out opacity-40" />
+    </SpotlightCard>
   );
 }
+

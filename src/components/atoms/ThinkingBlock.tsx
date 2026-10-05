@@ -1,3 +1,4 @@
+import { DecryptedText } from "@/components/atoms/DecryptedText";
 import { cn } from "@/lib/utils";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
@@ -79,29 +80,74 @@ export function ThinkingBlock({
     }
   }
 
+  // Extract the latest active line for 1-line trail preview
+  const lines = content.split("\n").map((l) => l.trim()).filter(Boolean);
+  const latestThoughtLine = lines.length > 0 ? lines[lines.length - 1] : "";
+
   return (
-    <div className="mb-6">
-      <button
-        type="button"
-        onClick={() => setIsExpanded((prev) => !prev)}
-        className="flex items-center gap-2.5 py-1 text-left transition-colors focus-visible:outline-none group select-none"
-      >
-        <span className="text-[#a1a1aa] group-hover:text-[#d4d4d8] transition-colors">
-          {isExpanded ? (
-            <ChevronDown className="size-3.5 stroke-[2.5px]" />
-          ) : (
-            <ChevronRight className="size-3.5 stroke-[2.5px]" />
-          )}
-        </span>
-        <span
-          className={cn(
-            "text-[13px] font-medium text-[#a1a1aa] group-hover:text-[#d4d4d8] transition-colors lowercase",
-            isStreaming && "animate-pulse",
-          )}
+    <div className="mb-6 space-y-2">
+      <div className="flex flex-col gap-1.5">
+        <button
+          type="button"
+          onClick={() => setIsExpanded((prev) => !prev)}
+          className="flex items-center gap-2.5 py-1 text-left transition-colors focus-visible:outline-none group select-none cursor-pointer w-fit"
         >
-          {thoughtText}
-        </span>
-      </button>
+          <span className="text-[#a1a1aa] group-hover:text-[#d4d4d8] transition-colors">
+            {isExpanded ? (
+              <ChevronDown className="size-3.5 stroke-[2.5px]" />
+            ) : (
+              <ChevronRight className="size-3.5 stroke-[2.5px]" />
+            )}
+          </span>
+          <span
+            className={cn(
+              "text-[13px] font-medium text-[#a1a1aa] group-hover:text-[#d4d4d8] transition-colors lowercase flex items-center gap-2",
+              isStreaming && "text-amber-400/90",
+            )}
+          >
+            {isStreaming && (
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75" />
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500" />
+              </span>
+            )}
+            {isStreaming ? (
+              thoughtText
+            ) : (
+              <DecryptedText
+                text={thoughtText}
+                speed={20}
+                maxIterations={4}
+                className="text-[#a1a1aa] group-hover:text-[#d4d4d8] font-sans"
+              />
+            )}
+          </span>
+        </button>
+
+        {/* 1-Line Live Ticker / Trail Preview when collapsed */}
+        {!isExpanded && latestThoughtLine && (
+          <div
+            onClick={() => setIsExpanded(true)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                setIsExpanded(true);
+              }
+            }}
+            role="button"
+            tabIndex={0}
+            className={cn(
+              "text-[12px] font-mono text-text-muted/70 pl-6 pr-3 py-1 rounded-md bg-bg-surface-subtle/40 border border-border-subtle/30 truncate max-w-full cursor-pointer hover:text-text-secondary hover:border-border-subtle transition-all select-none flex items-center gap-2",
+              isStreaming && "border-amber-500/20 text-amber-200/70 bg-amber-500/5",
+            )}
+            title="Click to expand reasoning trail"
+          >
+            <span className="text-[10px] uppercase font-semibold text-text-muted/50 tracking-wider">
+              trail:
+            </span>
+            <span className="truncate">{latestThoughtLine}</span>
+          </div>
+        )}
+      </div>
 
       {/* Expanded full thinking — animated height + scrollable */}
       <div
@@ -118,8 +164,13 @@ export function ThinkingBlock({
       >
         <div ref={contentRef} className="pl-6 pr-2 py-3 border-l-2 border-[#27272a] ml-1.5 mt-1">
           {/* Subtle internal header */}
-          <div className="text-[11px] font-bold tracking-wider text-[#a1a1aa]/40 uppercase mb-3 select-none">
-            reasoning chain
+          <div className="text-[11px] font-bold tracking-wider text-[#a1a1aa]/40 uppercase mb-3 select-none flex items-center justify-between">
+            <span>reasoning chain</span>
+            {isStreaming && (
+              <span className="text-[10px] text-amber-400 font-normal lowercase animate-pulse">
+                streaming live…
+              </span>
+            )}
           </div>
           <div className="text-[14px] text-[#d4d4d8]/80 whitespace-pre-wrap font-sans leading-relaxed break-words">
             {content}

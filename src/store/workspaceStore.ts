@@ -1,4 +1,4 @@
-// Assume Role: Frontend Engineer (@frontend)
+import { callSidecar } from "@/lib/hooks/useSidecarBridge";
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
@@ -264,7 +264,6 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
 
       removeWorkspace: async (id) => {
         try {
-          const { callSidecar } = await import("../lib/hooks/useSidecarBridge");
           await callSidecar("delete_workspace", { workspace_id: id });
         } catch (error) {
           console.error("[WorkspaceStore] Failed to delete workspace in backend sidecar:", error);
@@ -287,7 +286,6 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
       createSource: async (workspaceId, sourceData, folderId) => {
         set({ isHierarchyLoading: true });
         try {
-          const { callSidecar } = await import("../lib/hooks/useSidecarBridge");
           const res = await callSidecar<{ source_id: string }>("create_log_source", {
             workspace_id: workspaceId,
             name: sourceData.name,
@@ -315,16 +313,14 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
       removeSource: async (workspaceId, sourceId) => {
         set({ isHierarchyLoading: true });
         try {
-          const { callSidecar } = await import("../lib/hooks/useSidecarBridge");
           await callSidecar("delete_log_source", { source_id: sourceId });
 
           set((state) => ({
             workspaces: removeSourceFromWorkspaces(state.workspaces, workspaceId, sourceId),
           }));
 
-          // Clean up any pending jobs for this source
-          const { useIngestionStore } = await import("./ingestionStore");
-          useIngestionStore.getState().removeJobsForSource(sourceId);
+          // Clean up any pending jobs for this source via custom event to avoid circular store import
+          globalThis.dispatchEvent(new CustomEvent("loglens:remove-source-jobs", { detail: { sourceId } }));
 
           // Refresh hierarchy
           const get = useWorkspaceStore.getState as any;
@@ -342,7 +338,6 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
       renameSource: async (workspaceId, sourceId, name) => {
         set({ isHierarchyLoading: true });
         try {
-          const { callSidecar } = await import("../lib/hooks/useSidecarBridge");
           await callSidecar("update_log_source", { source_id: sourceId, name });
 
           set((state) => ({
@@ -376,7 +371,6 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
           set({ isHierarchyLoading: true });
         }
         try {
-          const { callSidecar } = await import("../lib/hooks/useSidecarBridge");
           const res = await callSidecar<{ workspace_id: string; root: HierarchyNode }>(
             "get_hierarchy",
             {
@@ -402,7 +396,6 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
       createFolder: async (workspaceId, name, parentId) => {
         set({ isHierarchyLoading: true });
         try {
-          const { callSidecar } = await import("../lib/hooks/useSidecarBridge");
           await callSidecar("create_folder", {
             workspace_id: workspaceId,
             name,
@@ -418,7 +411,6 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
       updateFolder: async (folderId, name, parentId) => {
         set({ isHierarchyLoading: true });
         try {
-          const { callSidecar } = await import("../lib/hooks/useSidecarBridge");
           await callSidecar("update_folder", { folder_id: folderId, name, parent_id: parentId });
           const state = (useWorkspaceStore.getState as any)();
           if (state.activeWorkspaceId) {
@@ -432,7 +424,6 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
       deleteFolder: async (folderId) => {
         set({ isHierarchyLoading: true });
         try {
-          const { callSidecar } = await import("../lib/hooks/useSidecarBridge");
           await callSidecar("delete_folder", { folder_id: folderId });
           const state = (useWorkspaceStore.getState as any)();
           if (state.activeWorkspaceId) {
@@ -446,7 +437,6 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
       moveSource: async (sourceId, folderId) => {
         set({ isHierarchyLoading: true });
         try {
-          const { callSidecar } = await import("../lib/hooks/useSidecarBridge");
           await callSidecar("move_source", { source_id: sourceId, folder_id: folderId });
           const state = (useWorkspaceStore.getState as any)();
           if (state.activeWorkspaceId) {
@@ -481,3 +471,13 @@ export const selectActiveSource = (state: WorkspaceStore): LogSource | null => {
   }
   return ws.sources.find((s) => s.id === activeId) ?? null;
 };
+
+// Listen for cross-store hierarchy refresh requests without circular imports
+if (typeof globalThis !== "undefined" && globalThis.addEventListener) {
+  globalThis.addEventListener("loglens:refresh-hierarchy", ((e: CustomEvent<{ workspaceId: string }>) => {
+    if (e.detail?.workspaceId) {
+      useWorkspaceStore.getState().fetchHierarchy(e.detail.workspaceId);
+    }
+  }) as EventListener);
+}
+

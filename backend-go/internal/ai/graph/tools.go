@@ -50,6 +50,14 @@ func NewToolRegistry(a *app.App, memory MemorySearcher) *ToolRegistry {
 	return r
 }
 
+// App returns the underlying *app.App instance bound to this registry.
+func (r *ToolRegistry) App() *app.App {
+	if r == nil {
+		return nil
+	}
+	return r.app
+}
+
 // Register wires (or overwrites) one tool's schema and implementation,
 // mirroring how graph.py's hardcoded tool_mapping associates a name with a
 // (ParamModel, func) pair -- generalised here into an explicit registry so
@@ -685,4 +693,24 @@ func (r *ToolRegistry) updateLayaRules(_ context.Context, args json.RawMessage) 
 		"timestamp":     chk.Timestamp,
 		"message":       fmt.Sprintf("Successfully created checkpoint %s with updated rule '%s'", chk.ID, qName),
 	}, nil
+}
+
+// RouteWithLaya evaluates user query intent against Laya's active tool_intent rule.
+// Returns nil if Laya is uninitialized or disabled.
+func RouteWithLaya(ctx context.Context, reg *ToolRegistry, query string) (*laya.DecisionResult, error) {
+	if reg == nil || reg.app == nil || reg.app.LayaManager == nil || reg.app.LayaEngine == nil {
+		return nil, nil
+	}
+
+	settings := reg.app.LayaManager.GetSettings()
+	if !settings.Enabled {
+		return nil, nil
+	}
+
+	q, ok := settings.Questions["tool_intent"]
+	if !ok {
+		return nil, nil
+	}
+
+	return reg.app.LayaEngine.Predict(ctx, q, query)
 }

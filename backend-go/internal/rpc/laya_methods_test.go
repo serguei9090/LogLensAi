@@ -79,9 +79,17 @@ func TestRegisterApp_LayaMethodsDispatchEndToEnd(t *testing.T) {
 	if resp.Error != nil {
 		t.Fatalf("update_laya_settings dispatch error: %+v", resp.Error)
 	}
-	updMap, ok := resp.Result.(map[string]any)
-	if !ok || updMap["status"] != "success" || updMap["enabled"] != true || updMap["device"] != "gpu" {
-		t.Fatalf("unexpected update_laya_settings result: %+v", resp.Result)
+	switch v := resp.Result.(type) {
+	case laya.LayaSettings:
+		if !v.Enabled || v.Device != "gpu" {
+			t.Fatalf("unexpected update_laya_settings result: %+v", v)
+		}
+	case map[string]any:
+		if v["enabled"] != true || v["device"] != "gpu" {
+			t.Fatalf("unexpected update_laya_settings result: %+v", v)
+		}
+	default:
+		t.Fatalf("unexpected update_laya_settings result type %T: %+v", resp.Result, resp.Result)
 	}
 
 	// 3. get_laya_checkpoints dispatch

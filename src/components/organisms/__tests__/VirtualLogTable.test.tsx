@@ -70,10 +70,10 @@ vi.mock("@/store/workspaceStore", () => ({
 }));
 
 // Mock portal
-vi.mock("react-dom", async () => {
-  const actual = await vi.importActual("react-dom");
+vi.mock("react-dom", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("react-dom")>();
   return {
-    ...(actual as any),
+    ...actual,
     createPortal: (node: any) => node,
   };
 });

@@ -86,7 +86,7 @@ func Wire(a *app.App) (*Wiring, error) {
 	tools := graph.NewToolRegistry(a, memory)
 
 	return &Wiring{
-		Provider: NewProviderAdapter(provider),
+		Provider: NewDynamicProviderAdapter(a, provider),
 		Tools:    tools,
 		Memory:   memory,
 	}, nil
@@ -119,6 +119,11 @@ func NewProviderFromSettings(a *app.App) (providers.Provider, error) {
 		cfg.Host = s["ai_ollama_host"]
 	case "openai", "openai-compatible":
 		cfg.Host = s["ai_openai_host"]
+	case "openrouter":
+		cfg.Host = s["ai_openrouter_host"]
+		if cfg.Host == "" {
+			cfg.Host = "https://openrouter.ai/api/v1"
+		}
 	case "lmstudio":
 		cfg.Host = s["ai_lmstudio_host"]
 	case "ai-studio", "gemini":
@@ -137,12 +142,28 @@ func NewProviderFromSettings(a *app.App) (providers.Provider, error) {
 // here does the field-for-field translation between them rather than either
 // package changing its own types.
 type providerAdapter struct {
-	provider providers.Provider
+	app      *app.App
+	fallback providers.Provider
 }
 
 // NewProviderAdapter wraps p so it satisfies graph.Provider.
 func NewProviderAdapter(p providers.Provider) graph.Provider {
-	return &providerAdapter{provider: p}
+	return &providerAdapter{fallback: p}
+}
+
+// NewDynamicProviderAdapter wraps an app.App and a fallback provider,
+// resolving the active provider dynamically from app settings on every call.
+func NewDynamicProviderAdapter(a *app.App, fallback providers.Provider) graph.Provider {
+	return &providerAdapter{app: a, fallback: fallback}
+}
+
+func (a *providerAdapter) getProvider() providers.Provider {
+	if a.app != nil {
+		if p, err := NewProviderFromSettings(a.app); err == nil && p != nil {
+			return p
+		}
+	}
+	return a.fallback
 }
 
 // Chat implements graph.Provider by converting graph's message/tool-schema
@@ -164,7 +185,7 @@ func (a *providerAdapter) Chat(
 		pTools[i] = toProviderToolSchema(t)
 	}
 
-	resp, err := a.provider.Chat(ctx, pMessages, sessionID, model, reasoning, pTools)
+	resp, err := a.getProvider().Chat(ctx, pMessages, sessionID, model, reasoning, pTools)
 	if err != nil {
 		return graph.ChatMessage{}, err
 	}

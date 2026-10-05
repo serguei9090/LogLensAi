@@ -86,7 +86,7 @@ func streamChatHandler(a *app.App, provider graph.Provider, tools *graph.ToolReg
 		}
 		runnerHistory := dropLast(history)
 
-		ctx := r.Context()
+		ctx := context.WithValue(r.Context(), "workspace_id", req.WorkspaceID)
 		chunks, runErr := runInvestigation(ctx, provider, tools, req.WorkspaceID, sessionID, req.Message, runnerHistory, model, reasoning)
 		if runErr != nil {
 			writeSSE(w, map[string]any{"error": runErr.Error()})
@@ -108,9 +108,22 @@ func streamChatHandler(a *app.App, provider graph.Provider, tools *graph.ToolReg
 					streamErr = chunk.Err
 					break drain
 				}
-				full.WriteString(chunk.Content)
-				writeSSE(w, map[string]any{"chunk": chunk.Content})
-				flush()
+				if chunk.EvaluationNotice != "" {
+					writeSSE(w, map[string]any{"evaluation_notice": chunk.EvaluationNotice})
+					flush()
+				}
+				if chunk.StepNotice != "" {
+					writeSSE(w, map[string]any{
+						"step": chunk.StepNotice,
+						"step_done": chunk.StepDone,
+					})
+					flush()
+				}
+				if chunk.Content != "" {
+					full.WriteString(chunk.Content)
+					writeSSE(w, map[string]any{"chunk": chunk.Content})
+					flush()
+				}
 			case <-ctx.Done():
 				streamErr = ctx.Err()
 				break drain

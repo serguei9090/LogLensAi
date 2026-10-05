@@ -46,6 +46,12 @@
       "sourceType": "github",
       "computedHash": "65fd05ea4b4739db288f19b82cfd5ca7db72d3dfacc65b7ef4d58ec55f211d9f"
     },
+    "developing-genkit-go": {
+      "source": "genkit-ai/skills",
+      "sourceType": "github",
+      "skillPath": "skills/developing-genkit-go/SKILL.md",
+      "computedHash": "1fe9b4183909cf51b6f9753512d86f09d43ede87cb13c2dd4742c4ca5f5a04ec"
+    },
     "distill": {
       "source": "pbakaus/impeccable",
       "sourceType": "github",
