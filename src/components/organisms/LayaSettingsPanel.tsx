@@ -108,7 +108,9 @@ export function LayaSettingsPanel() {
   const handleToggleEnabled = async (checked: boolean) => {
     try {
       await updateSettings({ enabled: checked, workspaceId: activeWorkspaceId });
-      toast.success(checked ? "Laya System 1 Accelerator enabled" : "Laya System 1 Accelerator disabled");
+      toast.success(
+        checked ? "Laya System 1 Accelerator enabled" : "Laya System 1 Accelerator disabled",
+      );
     } catch {
       toast.error("Failed to update Laya setting");
     }
@@ -131,7 +133,6 @@ export function LayaSettingsPanel() {
       toast.error("Failed to start model download");
     }
   };
-
 
   const handleSaveJsonRules = async () => {
     try {
@@ -260,28 +261,25 @@ export function LayaSettingsPanel() {
   };
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-200">
+    <div className="space-y-6 animate-in fade-in duration-200">
       {/* Top Banner & Accelerator Switch */}
-      <div className="p-6 rounded-2xl bg-bg-surface border border-border/80 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-6">
-        <div className="space-y-1.5">
-          <div className="flex items-center gap-2.5">
-            <div className="p-2 rounded-xl bg-primary/10 text-primary">
-              <Zap className="h-5 w-5" />
-            </div>
+      <div className="p-4 sm:p-5 rounded-2xl bg-bg-surface border border-border/80 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div className="p-2.5 rounded-xl bg-primary/10 text-primary border border-primary/20 shrink-0">
+            <Zap className="h-5 w-5" />
+          </div>
+          <div className="flex items-center gap-2.5 flex-wrap">
             <h3 className="text-base font-semibold text-text-primary tracking-tight">
               Laya System 1 Decision Engine
             </h3>
             <span className="text-[10px] uppercase font-mono px-2 py-0.5 rounded-full bg-primary/15 text-primary border border-primary/20">
               ModernBERT 8-bit
             </span>
+            <HelpTooltip content="Non-autoregressive decision engine that performs ultra-fast tool routing, log severity scoring, and cluster triage in ~30ms before touching costly generative LLMs." />
           </div>
-          <p className="text-xs text-text-muted leading-relaxed max-w-2xl">
-            Non-autoregressive decision engine that performs ultra-fast tool routing, log severity scoring,
-            and cluster triage in ~30ms before touching costly generative LLMs.
-          </p>
         </div>
 
-        <div className="flex items-center gap-3 self-end md:self-center">
+        <div className="flex items-center gap-3 self-end md:self-center shrink-0">
           <Button
             variant="outline"
             size="sm"
@@ -307,38 +305,48 @@ export function LayaSettingsPanel() {
         <div className="flex items-center gap-2">
           <Cpu className="h-4 w-4 text-primary" />
           <h4 className="text-xs font-semibold uppercase tracking-wider text-text-muted font-mono">
-            Hardware Acceleration & Memory Profile
+            Hardware Acceleration & Runtime
           </h4>
-          <HelpTooltip content="CPU mode runs with 0 MB GPU VRAM footprint, leaving your entire GPU memory free for running 8B/14B models in Ollama." />
+          <HelpTooltip content="Select CPU execution to keep all GPU VRAM available for local generative LLMs, or GPU acceleration for lowest latency." />
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
           {/* CPU Card */}
           <button
             type="button"
             onClick={() => handleDeviceChange("cpu")}
             className={cn(
-              "p-4 rounded-xl border text-left transition-all relative overflow-hidden",
+              "p-4 rounded-xl border text-left transition-all relative overflow-hidden group cursor-pointer",
               settings.device === "cpu"
-                ? "border-primary bg-primary/5 shadow-sm"
-                : "border-border bg-bg-surface hover:border-border/80",
+                ? "border-primary bg-primary/5 shadow-sm ring-1 ring-primary/20"
+                : "border-border bg-bg-surface hover:border-border/80 hover:bg-bg-surface/80",
             )}
           >
             <div className="flex items-center justify-between mb-2">
-              <span className="text-sm font-semibold text-text-primary">CPU Mode (Zero VRAM)</span>
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-semibold text-text-primary">CPU Mode</span>
+                <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-bg-base border border-border text-text-muted">
+                  Zero VRAM
+                </span>
+                <HelpTooltip content="Uses ONNX Runtime OpenMP threads. Leaves 100% of your GPU memory free for local LLMs in Ollama." />
+              </div>
               {settings.device === "cpu" && (
-                <span className="flex items-center gap-1 text-[11px] font-mono text-primary bg-primary/10 px-2 py-0.5 rounded-md">
+                <span className="flex items-center gap-1 text-[11px] font-mono text-primary bg-primary/10 px-2 py-0.5 rounded-md font-medium">
                   <Check className="h-3 w-3" /> Selected
                 </span>
               )}
             </div>
-            <p className="text-xs text-text-muted mb-3">
-              Uses ONNX Runtime OpenMP threads. Leaves 100% of your GPU memory free for local LLMs.
-            </p>
-            <div className="flex items-center gap-4 text-[11px] font-mono text-text-muted/80">
-              <span>RAM: ~520 MB</span>
-              <span className="text-primary font-semibold">VRAM: 0 MB</span>
-              <span>Latency: ~45–70 ms</span>
+
+            <div className="flex items-center gap-2 text-[11px] font-mono flex-wrap pt-1">
+              <span className="px-2 py-0.5 rounded bg-bg-base/80 border border-border/60 text-text-muted">
+                RAM: ~520 MB
+              </span>
+              <span className="px-2 py-0.5 rounded bg-primary/10 border border-primary/20 text-primary font-medium">
+                VRAM: 0 MB
+              </span>
+              <span className="px-2 py-0.5 rounded bg-bg-base/80 border border-border/60 text-text-muted">
+                Latency: ~45–70 ms
+              </span>
             </div>
           </button>
 
@@ -347,36 +355,46 @@ export function LayaSettingsPanel() {
             type="button"
             onClick={() => handleDeviceChange("gpu")}
             className={cn(
-              "p-4 rounded-xl border text-left transition-all relative overflow-hidden",
+              "p-4 rounded-xl border text-left transition-all relative overflow-hidden group cursor-pointer",
               settings.device === "gpu"
-                ? "border-primary bg-primary/5 shadow-sm"
-                : "border-border bg-bg-surface hover:border-border/80",
+                ? "border-primary bg-primary/5 shadow-sm ring-1 ring-primary/20"
+                : "border-border bg-bg-surface hover:border-border/80 hover:bg-bg-surface/80",
             )}
           >
             <div className="flex items-center justify-between mb-2">
-              <span className="text-sm font-semibold text-text-primary">GPU Acceleration (DirectML / CUDA)</span>
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-semibold text-text-primary">GPU Acceleration</span>
+                <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-bg-base border border-border text-text-muted">
+                  DirectML / CUDA
+                </span>
+                <HelpTooltip content="Leverages DirectML or NVIDIA CUDA for maximum inference speed and lowest latency (~3x faster)." />
+              </div>
               {settings.device === "gpu" && (
-                <span className="flex items-center gap-1 text-[11px] font-mono text-primary bg-primary/10 px-2 py-0.5 rounded-md">
+                <span className="flex items-center gap-1 text-[11px] font-mono text-primary bg-primary/10 px-2 py-0.5 rounded-md font-medium">
                   <Check className="h-3 w-3" /> Selected
                 </span>
               )}
             </div>
-            <p className="text-xs text-text-muted mb-3">
-              Leverages DirectML or NVIDIA CUDA for maximum inference speed and lowest latency.
-            </p>
-            <div className="flex items-center gap-4 text-[11px] font-mono text-text-muted/80">
-              <span>RAM: ~120 MB</span>
-              <span>VRAM: ~550 MB</span>
-              <span className="text-primary font-semibold">Latency: ~18–25 ms</span>
+
+            <div className="flex items-center gap-2 text-[11px] font-mono flex-wrap pt-1">
+              <span className="px-2 py-0.5 rounded bg-bg-base/80 border border-border/60 text-text-muted">
+                RAM: ~120 MB
+              </span>
+              <span className="px-2 py-0.5 rounded bg-bg-base/80 border border-border/60 text-text-muted">
+                VRAM: ~550 MB
+              </span>
+              <span className="px-2 py-0.5 rounded bg-primary/10 border border-primary/20 text-primary font-medium">
+                Latency: ~18–25 ms
+              </span>
             </div>
           </button>
         </div>
       </div>
 
       {/* Model Weights & Local Cache Status */}
-      <div className="p-4 rounded-xl border border-border bg-bg-surface space-y-3">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
+      <div className="p-4 rounded-xl border border-border bg-bg-surface">
+        <div className="flex items-center justify-between flex-wrap gap-3">
+          <div className="flex items-center gap-2.5">
             <HardDrive className="h-4 w-4 text-primary" />
             <h4 className="text-xs font-semibold uppercase tracking-wider text-text-muted font-mono">
               Model Weights & Local Cache
@@ -384,8 +402,9 @@ export function LayaSettingsPanel() {
             <span className="text-[10px] font-mono text-text-muted hidden sm:inline">
               nvkudva/laya-web-q8 (524 MB)
             </span>
+            <HelpTooltip content="Quantized 8-bit ModernBERT ONNX weights cached locally to accelerate non-autoregressive log routing and triage." />
           </div>
-          <div>
+          <div className="flex items-center gap-3">
             {modelStatus?.state === "ready" && (
               <span className="flex items-center gap-1.5 text-xs font-medium text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-1 rounded-full">
                 <CheckCircle2 className="h-3.5 w-3.5" /> Local Weights Ready
@@ -393,24 +412,45 @@ export function LayaSettingsPanel() {
             )}
             {modelStatus?.state === "downloading" && (
               <span className="flex items-center gap-1.5 text-xs font-medium text-amber-400 bg-amber-500/10 border border-amber-500/20 px-2.5 py-1 rounded-full animate-pulse">
-                <Loader2 className="h-3.5 w-3.5 animate-spin" /> Downloading {modelStatus.progress.toFixed(1)}%
+                <Loader2 className="h-3.5 w-3.5 animate-spin" /> Downloading{" "}
+                {modelStatus.progress.toFixed(1)}%
               </span>
             )}
             {(!modelStatus || modelStatus.state === "idle") && (
-              <span className="flex items-center gap-1.5 text-xs font-medium text-amber-400/90 bg-amber-500/10 border border-amber-500/20 px-2.5 py-1 rounded-full">
-                <AlertCircle className="h-3.5 w-3.5" /> Simulated Fallback Mode
-              </span>
+              <div className="flex items-center gap-2">
+                <span className="flex items-center gap-1.5 text-xs font-medium text-amber-400/90 bg-amber-500/10 border border-amber-500/20 px-2.5 py-1 rounded-full">
+                  <AlertCircle className="h-3.5 w-3.5" /> Simulated Fallback
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleDownloadModel}
+                  className="h-7 text-xs gap-1.5 border-primary/40 text-primary hover:bg-primary/10"
+                >
+                  <Download className="h-3.5 w-3.5" /> Download (524 MB)
+                </Button>
+              </div>
             )}
             {modelStatus?.state === "error" && (
-              <span className="flex items-center gap-1.5 text-xs font-medium text-rose-400 bg-rose-500/10 border border-rose-500/20 px-2.5 py-1 rounded-full">
-                <AlertCircle className="h-3.5 w-3.5" /> Download Error
-              </span>
+              <div className="flex items-center gap-2">
+                <span className="flex items-center gap-1.5 text-xs font-medium text-rose-400 bg-rose-500/10 border border-rose-500/20 px-2.5 py-1 rounded-full">
+                  <AlertCircle className="h-3.5 w-3.5" /> Download Error
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleDownloadModel}
+                  className="h-7 text-xs gap-1.5 border-rose-500/40 text-rose-400 hover:bg-rose-500/10"
+                >
+                  <Download className="h-3.5 w-3.5" /> Retry (524 MB)
+                </Button>
+              </div>
             )}
           </div>
         </div>
 
-        {modelStatus?.state === "downloading" ? (
-          <div className="space-y-2 pt-1">
+        {modelStatus?.state === "downloading" && (
+          <div className="space-y-2 pt-3 border-t border-border/40 mt-3">
             <div className="w-full bg-border/60 rounded-full h-2 overflow-hidden">
               <div
                 className="bg-primary h-full transition-all duration-300 rounded-full"
@@ -425,32 +465,12 @@ export function LayaSettingsPanel() {
               </span>
             </div>
           </div>
-        ) : (
-          <div className="space-y-2 pt-1">
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-              <p className="text-xs text-text-muted max-w-xl">
-                {modelStatus?.state === "ready"
-                  ? "Quantized 8-bit ModernBERT ONNX weights are cached locally and accelerating log analysis."
-                  : "LogLensAi operates with a built-in heuristic simulation when weights are not downloaded. Download the official 524 MB weights for full ModernBERT accuracy."}
-              </p>
-              {modelStatus?.state !== "ready" && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleDownloadModel}
-                  className="shrink-0 gap-2 border-primary/40 text-primary hover:bg-primary/10"
-                >
-                  <Download className="h-3.5 w-3.5" />
-                  {modelStatus?.state === "error" ? "Retry Download (524 MB)" : "Download Weights (524 MB)"}
-                </Button>
-              )}
-            </div>
-            {modelStatus?.state === "error" && modelStatus.error_message && (
-              <div className="p-2.5 rounded-lg bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs flex items-center gap-2">
-                <AlertCircle className="h-4 w-4 shrink-0 text-rose-400" />
-                <span className="font-mono text-[11px]">{modelStatus.error_message}</span>
-              </div>
-            )}
+        )}
+
+        {modelStatus?.state === "error" && modelStatus.error_message && (
+          <div className="mt-3 p-2.5 rounded-lg bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs flex items-center gap-2">
+            <AlertCircle className="h-4 w-4 shrink-0 text-rose-400" />
+            <span className="font-mono text-[11px]">{modelStatus.error_message}</span>
           </div>
         )}
       </div>
@@ -532,93 +552,106 @@ export function LayaSettingsPanel() {
         </div>
 
         {/* TAB 1: Visual Rules Builder */}
-        {activeTab === "visual" && (
-          questionsList.length === 0 ? (
+        {activeTab === "visual" &&
+          (questionsList.length === 0 ? (
             <div className="p-8 text-center border border-dashed border-border rounded-xl">
               <Layers className="h-8 w-8 text-text-muted mx-auto mb-2 opacity-50" />
-              <p className="text-sm font-medium text-text-primary">No classification rules configured</p>
-              <p className="text-xs text-text-muted mt-1 mb-4">Add your first custom rule to begin fast classification.</p>
-              <Button size="sm" onClick={() => setIsAddRuleOpen(true)} className="gap-1.5 bg-primary text-black hover:bg-primary/90">
+              <p className="text-sm font-medium text-text-primary">
+                No classification rules configured
+              </p>
+              <p className="text-xs text-text-muted mt-1 mb-4">
+                Add your first custom rule to begin fast classification.
+              </p>
+              <Button
+                size="sm"
+                onClick={() => setIsAddRuleOpen(true)}
+                className="gap-1.5 bg-primary text-black hover:bg-primary/90"
+              >
                 <Plus className="h-3.5 w-3.5" /> Add Rule
               </Button>
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {questionsList.map((q) => (
-              <div
-                key={q.name}
-                className="p-5 rounded-xl border border-border bg-bg-surface/80 flex flex-col justify-between space-y-4 hover:border-border/90 transition-all"
-              >
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm font-mono font-bold text-text-primary">{q.name}</span>
-                      <span
-                        className={cn(
-                          "text-[10px] uppercase font-mono px-2 py-0.5 rounded-md font-semibold",
-                          q.type === "choice" && "bg-blue-500/10 text-blue-400 border border-blue-500/20",
-                          q.type === "score" && "bg-amber-500/10 text-amber-400 border border-amber-500/20",
-                          q.type === "noul" && "bg-purple-500/10 text-purple-400 border border-purple-500/20",
-                        )}
+              {questionsList.map((q) => (
+                <div
+                  key={q.name}
+                  className="p-5 rounded-xl border border-border bg-bg-surface/80 flex flex-col justify-between space-y-4 hover:border-border/90 transition-all"
+                >
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-mono font-bold text-text-primary">
+                          {q.name}
+                        </span>
+                        <span
+                          className={cn(
+                            "text-[10px] uppercase font-mono px-2 py-0.5 rounded-md font-semibold",
+                            q.type === "choice" &&
+                              "bg-blue-500/10 text-blue-400 border border-blue-500/20",
+                            q.type === "score" &&
+                              "bg-amber-500/10 text-amber-400 border border-amber-500/20",
+                            q.type === "noul" &&
+                              "bg-purple-500/10 text-purple-400 border border-purple-500/20",
+                          )}
+                        >
+                          {q.type}
+                        </span>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteRule(q.name)}
+                        className="text-text-muted hover:text-red-400 transition-colors p-1"
+                        title="Delete rule"
                       >
-                        {q.type}
-                      </span>
+                        <Trash2 className="h-4 w-4" />
+                      </button>
                     </div>
 
-                    <button
-                      type="button"
-                      onClick={() => handleDeleteRule(q.name)}
-                      className="text-text-muted hover:text-red-400 transition-colors p-1"
-                      title="Delete rule"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
+                    <p className="text-xs text-text-muted leading-relaxed italic">
+                      "{q.instructions}"
+                    </p>
                   </div>
 
-                  <p className="text-xs text-text-muted leading-relaxed italic">
-                    "{q.instructions}"
-                  </p>
+                  {/* Options or Rubric tags */}
+                  <div className="pt-2 border-t border-border/50">
+                    {q.type === "choice" && q.options && (
+                      <div className="flex flex-wrap gap-1.5">
+                        {q.options.map((opt) => (
+                          <span
+                            key={opt}
+                            className="text-[11px] font-mono bg-bg-surface-active px-2 py-0.5 rounded-md border border-border/60 text-text-primary"
+                          >
+                            {opt}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+
+                    {q.type === "score" && q.rubric && (
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[11px] font-mono text-text-muted">Rubric Scale:</span>
+                        {q.rubric.map((lvl) => (
+                          <span
+                            key={lvl}
+                            className="text-[11px] font-mono font-semibold px-2 py-0.5 rounded-md bg-amber-500/10 text-amber-400 border border-amber-500/20"
+                          >
+                            {lvl}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+
+                    {q.type === "noul" && (
+                      <span className="text-[11px] font-mono text-purple-400">
+                        Evaluates calibrated True / False boolean probability
+                      </span>
+                    )}
+                  </div>
                 </div>
-
-                {/* Options or Rubric tags */}
-                <div className="pt-2 border-t border-border/50">
-                  {q.type === "choice" && q.options && (
-                    <div className="flex flex-wrap gap-1.5">
-                      {q.options.map((opt) => (
-                        <span
-                          key={opt}
-                          className="text-[11px] font-mono bg-bg-surface-active px-2 py-0.5 rounded-md border border-border/60 text-text-primary"
-                        >
-                          {opt}
-                        </span>
-                      ))}
-                    </div>
-                  )}
-
-                  {q.type === "score" && q.rubric && (
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-[11px] font-mono text-text-muted">Rubric Scale:</span>
-                      {q.rubric.map((lvl) => (
-                        <span
-                          key={lvl}
-                          className="text-[11px] font-mono font-semibold px-2 py-0.5 rounded-md bg-amber-500/10 text-amber-400 border border-amber-500/20"
-                        >
-                          {lvl}
-                        </span>
-                      ))}
-                    </div>
-                  )}
-
-                  {q.type === "noul" && (
-                    <span className="text-[11px] font-mono text-purple-400">
-                      Evaluates calibrated True / False boolean probability
-                    </span>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-        ))}
+              ))}
+            </div>
+          ))}
 
         {/* TAB 2: JSON Code Editor */}
         {activeTab === "json" && (
@@ -800,7 +833,9 @@ export function LayaSettingsPanel() {
                       return (
                         <div key={lbl} className="space-y-1">
                           <div className="flex items-center justify-between text-[11px] font-mono">
-                            <span className={cn(isTop ? "text-primary font-bold" : "text-text-muted")}>
+                            <span
+                              className={cn(isTop ? "text-primary font-bold" : "text-text-muted")}
+                            >
                               {lbl}
                             </span>
                             <span className="text-text-muted">{pct}%</span>
@@ -1025,7 +1060,8 @@ export function LayaSettingsPanel() {
               </DialogTitle>
             </div>
             <DialogDescription className="text-xs text-text-muted">
-              Learn how Laya classifies Drain3 cluster templates locally on CPU with zero cloud costs.
+              Learn how Laya classifies Drain3 cluster templates locally on CPU with zero cloud
+              costs.
             </DialogDescription>
           </DialogHeader>
 
@@ -1036,12 +1072,23 @@ export function LayaSettingsPanel() {
                 Primary Role: Background Smart Cluster Tagging
               </div>
               <p>
-                Laya runs as a background worker on your local CPU. When the Drain3 pattern miner discovers or updates log template patterns, Laya evaluates the template in ~30ms and saves structured triage tags directly into DuckDB:
+                Laya runs as a background worker on your local CPU. When the Drain3 pattern miner
+                discovers or updates log template patterns, Laya evaluates the template in ~30ms and
+                saves structured triage tags directly into DuckDB:
               </p>
               <ul className="list-disc pl-4 space-y-1 text-text-muted font-mono text-[11px]">
-                <li><strong className="text-text-primary">category</strong>: application, database, network, auth, disk_io, third_party</li>
-                <li><strong className="text-text-primary">severity</strong>: 1.0 (trivial) to 5.0 (catastrophic)</li>
-                <li><strong className="text-text-primary">is_outage</strong>: whether the pattern reflects customer-facing service downtime</li>
+                <li>
+                  <strong className="text-text-primary">category</strong>: application, database,
+                  network, auth, disk_io, third_party
+                </li>
+                <li>
+                  <strong className="text-text-primary">severity</strong>: 1.0 (trivial) to 5.0
+                  (catastrophic)
+                </li>
+                <li>
+                  <strong className="text-text-primary">is_outage</strong>: whether the pattern
+                  reflects customer-facing service downtime
+                </li>
               </ul>
             </div>
 
@@ -1053,30 +1100,39 @@ export function LayaSettingsPanel() {
                 <div className="p-3 rounded-xl border border-blue-500/20 bg-blue-500/5 space-y-1">
                   <div className="flex items-center justify-between">
                     <span className="font-mono font-bold text-blue-400">1. Choice</span>
-                    <span className="text-[10px] font-mono uppercase bg-blue-500/10 text-blue-400 px-1.5 py-0.5 rounded">Categorical</span>
+                    <span className="text-[10px] font-mono uppercase bg-blue-500/10 text-blue-400 px-1.5 py-0.5 rounded">
+                      Categorical
+                    </span>
                   </div>
                   <p className="text-text-muted text-[11px]">
-                    Selects exactly one label from a closed set of options (e.g. subsystem routing, error classification).
+                    Selects exactly one label from a closed set of options (e.g. subsystem routing,
+                    error classification).
                   </p>
                 </div>
 
                 <div className="p-3 rounded-xl border border-amber-500/20 bg-amber-500/5 space-y-1">
                   <div className="flex items-center justify-between">
                     <span className="font-mono font-bold text-amber-400">2. Score</span>
-                    <span className="text-[10px] font-mono uppercase bg-amber-500/10 text-amber-400 px-1.5 py-0.5 rounded">Ordinal Rubric</span>
+                    <span className="text-[10px] font-mono uppercase bg-amber-500/10 text-amber-400 px-1.5 py-0.5 rounded">
+                      Ordinal Rubric
+                    </span>
                   </div>
                   <p className="text-text-muted text-[11px]">
-                    Rates severity or confidence against an integer rubric scale (e.g. 1 to 5), computing an expected value.
+                    Rates severity or confidence against an integer rubric scale (e.g. 1 to 5),
+                    computing an expected value.
                   </p>
                 </div>
 
                 <div className="p-3 rounded-xl border border-purple-500/20 bg-purple-500/5 space-y-1">
                   <div className="flex items-center justify-between">
                     <span className="font-mono font-bold text-purple-400">3. Noul</span>
-                    <span className="text-[10px] font-mono uppercase bg-purple-500/10 text-purple-400 px-1.5 py-0.5 rounded">Calibrated Boolean</span>
+                    <span className="text-[10px] font-mono uppercase bg-purple-500/10 text-purple-400 px-1.5 py-0.5 rounded">
+                      Calibrated Boolean
+                    </span>
                   </div>
                   <p className="text-text-muted text-[11px]">
-                    Produces a calibrated True / False probability (e.g. "Does this template represent an outage?").
+                    Produces a calibrated True / False probability (e.g. "Does this template
+                    represent an outage?").
                   </p>
                 </div>
               </div>
@@ -1088,7 +1144,10 @@ export function LayaSettingsPanel() {
                 How the LLM Uses Laya Tags
               </div>
               <p className="text-text-muted text-[11px]">
-                Chat queries go directly to your configured LLM (Claude, GPT-4o, Ollama, etc.). The LLM receives Laya's cluster triage tags in its grounded context and through the <code className="text-primary font-mono text-[10px]">get_clusters</code> tool, allowing it to instantly identify failing subsystems without extra API tokens.
+                Chat queries go directly to your configured LLM (Claude, GPT-4o, Ollama, etc.). The
+                LLM receives Laya's cluster triage tags in its grounded context and through the{" "}
+                <code className="text-primary font-mono text-[10px]">get_clusters</code> tool,
+                allowing it to instantly identify failing subsystems without extra API tokens.
               </p>
             </div>
           </div>
