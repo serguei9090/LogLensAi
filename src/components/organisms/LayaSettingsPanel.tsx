@@ -29,6 +29,7 @@ import {
   Info,
   Layers,
   Loader2,
+  Pencil,
   Play,
   Plus,
   RotateCcw,
@@ -63,6 +64,7 @@ export function LayaSettingsPanel() {
 
   // New/Edit Question Modal State
   const [isAddRuleOpen, setIsAddRuleOpen] = useState(false);
+  const [editingRuleName, setEditingRuleName] = useState<string | null>(null);
   const [ruleName, setRuleName] = useState("");
   const [ruleType, setRuleType] = useState<QuestionType>("choice");
   const [ruleInstructions, setRuleInstructions] = useState("");
@@ -154,6 +156,32 @@ export function LayaSettingsPanel() {
     }
   };
 
+  const handleOpenAddRule = () => {
+    setEditingRuleName(null);
+    setRuleName("");
+    setRuleType("choice");
+    setRuleInstructions("");
+    setRuleOptions("");
+    setRuleRubric("1, 2, 3, 4, 5");
+    setIsAddRuleOpen(true);
+  };
+
+  const handleOpenEditRule = (q: {
+    name: string;
+    type: QuestionType;
+    instructions?: string;
+    options?: string[];
+    rubric?: number[];
+  }) => {
+    setEditingRuleName(q.name);
+    setRuleName(q.name);
+    setRuleType(q.type);
+    setRuleInstructions(q.instructions || "");
+    setRuleOptions(q.options?.join(", ") || "");
+    setRuleRubric(q.rubric?.join(", ") || "1, 2, 3, 4, 5");
+    setIsAddRuleOpen(true);
+  };
+
   const handleSaveVisualRule = async () => {
     const trimmedName = ruleName.trim();
     if (!trimmedName) {
@@ -166,6 +194,11 @@ export function LayaSettingsPanel() {
     }
 
     const updatedQuestions = { ...(settings.questions || {}) };
+
+    // If editing and renamed, remove previous rule key
+    if (editingRuleName && editingRuleName !== trimmedName) {
+      delete updatedQuestions[editingRuleName];
+    }
 
     if (ruleType === "choice") {
       const opts = ruleOptions
@@ -205,15 +238,20 @@ export function LayaSettingsPanel() {
     try {
       await saveRules(
         "User (Visual Builder)",
-        `Updated rule: ${trimmedName}`,
+        editingRuleName ? `Updated rule: ${trimmedName}` : `Added rule: ${trimmedName}`,
         updatedQuestions,
         activeWorkspaceId,
       );
       setIsAddRuleOpen(false);
+      setEditingRuleName(null);
       setRuleName("");
       setRuleInstructions("");
       setRuleOptions("");
-      toast.success(`Rule "${trimmedName}" saved as new checkpoint`);
+      toast.success(
+        editingRuleName
+          ? `Rule "${trimmedName}" updated as new checkpoint`
+          : `Rule "${trimmedName}" saved as new checkpoint`,
+      );
     } catch {
       toast.error("Failed to save rule");
     }
@@ -533,7 +571,7 @@ export function LayaSettingsPanel() {
             {activeTab === "visual" && (
               <Button
                 size="sm"
-                onClick={() => setIsAddRuleOpen(true)}
+                onClick={handleOpenAddRule}
                 className="h-8 text-xs font-medium gap-1.5 bg-primary text-black hover:bg-primary/90 shrink-0"
               >
                 <Plus className="h-3.5 w-3.5" /> Add Rule
@@ -564,77 +602,68 @@ export function LayaSettingsPanel() {
               </p>
               <Button
                 size="sm"
-                onClick={() => setIsAddRuleOpen(true)}
+                onClick={handleOpenAddRule}
                 className="gap-1.5 bg-primary text-black hover:bg-primary/90"
               >
                 <Plus className="h-3.5 w-3.5" /> Add Rule
               </Button>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
               {questionsList.map((q) => (
                 <div
                   key={q.name}
-                  className="p-5 rounded-xl border border-border bg-bg-surface/80 flex flex-col justify-between space-y-4 hover:border-border/90 transition-all"
+                  className="flex items-center justify-between p-3 px-4 rounded-xl border border-border/70 bg-bg-surface/60 hover:bg-bg-surface/90 hover:border-border transition-all gap-4 group"
                 >
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm font-mono font-bold text-text-primary">
-                          {q.name}
-                        </span>
-                        <span
-                          className={cn(
-                            "text-[10px] uppercase font-mono px-2 py-0.5 rounded-md font-semibold",
-                            q.type === "choice" &&
-                              "bg-blue-500/10 text-blue-400 border border-blue-500/20",
-                            q.type === "score" &&
-                              "bg-amber-500/10 text-amber-400 border border-amber-500/20",
-                            q.type === "noul" &&
-                              "bg-purple-500/10 text-purple-400 border border-purple-500/20",
-                          )}
-                        >
-                          {q.type}
-                        </span>
-                      </div>
-
-                      <button
-                        type="button"
-                        onClick={() => handleDeleteRule(q.name)}
-                        className="text-text-muted hover:text-red-400 transition-colors p-1"
-                        title="Delete rule"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
-                    </div>
-
-                    <p className="text-xs text-text-muted leading-relaxed italic">
-                      "{q.instructions}"
-                    </p>
+                  {/* Left: Identifier + Type Badge */}
+                  <div className="flex items-center gap-2.5 min-w-[190px] shrink-0">
+                    <span className="text-xs font-mono font-bold text-text-primary">{q.name}</span>
+                    <span
+                      className={cn(
+                        "text-[10px] uppercase font-mono px-2 py-0.5 rounded-md font-semibold",
+                        q.type === "choice" &&
+                          "bg-blue-500/10 text-blue-400 border border-blue-500/20",
+                        q.type === "score" &&
+                          "bg-amber-500/10 text-amber-400 border border-amber-500/20",
+                        q.type === "noul" &&
+                          "bg-purple-500/10 text-purple-400 border border-purple-500/20",
+                      )}
+                    >
+                      {q.type}
+                    </span>
                   </div>
 
-                  {/* Options or Rubric tags */}
-                  <div className="pt-2 border-t border-border/50">
+                  {/* Center: Instruction Prompt + Scope Tags */}
+                  <div className="flex-1 min-w-0 flex items-center gap-3">
+                    <p className="text-xs text-text-muted truncate italic" title={q.instructions}>
+                      "{q.instructions}"
+                    </p>
+
                     {q.type === "choice" && q.options && (
-                      <div className="flex flex-wrap gap-1.5">
-                        {q.options.map((opt) => (
+                      <div className="hidden lg:flex items-center gap-1 shrink-0">
+                        {q.options.slice(0, 3).map((opt) => (
                           <span
                             key={opt}
-                            className="text-[11px] font-mono bg-bg-surface-active px-2 py-0.5 rounded-md border border-border/60 text-text-primary"
+                            className="text-[10px] font-mono bg-bg-surface-active px-1.5 py-0.5 rounded border border-border/50 text-text-muted truncate max-w-[100px]"
                           >
                             {opt}
                           </span>
                         ))}
+                        {q.options.length > 3 && (
+                          <span className="text-[10px] font-mono text-text-muted/60">
+                            +{q.options.length - 3}
+                          </span>
+                        )}
                       </div>
                     )}
 
                     {q.type === "score" && q.rubric && (
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-[11px] font-mono text-text-muted">Rubric Scale:</span>
+                      <div className="hidden lg:flex items-center gap-1 shrink-0">
+                        <span className="text-[10px] font-mono text-text-muted">Scale:</span>
                         {q.rubric.map((lvl) => (
                           <span
                             key={lvl}
-                            className="text-[11px] font-mono font-semibold px-2 py-0.5 rounded-md bg-amber-500/10 text-amber-400 border border-amber-500/20"
+                            className="text-[10px] font-mono font-semibold px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20"
                           >
                             {lvl}
                           </span>
@@ -643,10 +672,32 @@ export function LayaSettingsPanel() {
                     )}
 
                     {q.type === "noul" && (
-                      <span className="text-[11px] font-mono text-purple-400">
-                        Evaluates calibrated True / False boolean probability
+                      <span className="hidden lg:inline text-[10px] font-mono text-purple-400/80 shrink-0">
+                        True / False Probability
                       </span>
                     )}
+                  </div>
+
+                  {/* Right: Actions (Edit & Delete) */}
+                  <div className="flex items-center gap-1 shrink-0">
+                    <Button
+                      variant="ghost"
+                      size="icon-sm"
+                      onClick={() => handleOpenEditRule(q)}
+                      className="h-7 w-7 text-text-muted hover:text-primary hover:bg-primary/10 transition-colors p-1 cursor-pointer"
+                      title="Edit rule"
+                    >
+                      <Pencil className="h-3.5 w-3.5" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon-sm"
+                      onClick={() => handleDeleteRule(q.name)}
+                      className="h-7 w-7 text-text-muted hover:text-red-400 hover:bg-red-500/10 transition-colors p-1 cursor-pointer"
+                      title="Delete rule"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
                   </div>
                 </div>
               ))}
@@ -861,14 +912,22 @@ export function LayaSettingsPanel() {
       </div>
 
       {/* Modal: Add/Edit Rule */}
-      <Dialog open={isAddRuleOpen} onOpenChange={setIsAddRuleOpen}>
+      <Dialog
+        open={isAddRuleOpen}
+        onOpenChange={(open) => {
+          setIsAddRuleOpen(open);
+          if (!open) setEditingRuleName(null);
+        }}
+      >
         <DialogContent className="sm:max-w-[500px] bg-bg-surface border-border">
           <DialogHeader>
             <DialogTitle className="text-sm font-semibold text-text-primary">
-              Add Decision Rule
+              {editingRuleName ? `Edit Rule: ${editingRuleName}` : "Add Decision Rule"}
             </DialogTitle>
             <DialogDescription className="text-xs text-text-muted">
-              Define a typed question for Laya to answer in a single forward pass.
+              {editingRuleName
+                ? "Modify the prompt, primitive type, or options for this rule."
+                : "Define a typed question for Laya to answer in a single forward pass."}
             </DialogDescription>
           </DialogHeader>
 
@@ -943,7 +1002,10 @@ export function LayaSettingsPanel() {
             <Button
               variant="outline"
               size="sm"
-              onClick={() => setIsAddRuleOpen(false)}
+              onClick={() => {
+                setIsAddRuleOpen(false);
+                setEditingRuleName(null);
+              }}
               className="text-xs"
             >
               Cancel
@@ -953,7 +1015,7 @@ export function LayaSettingsPanel() {
               onClick={handleSaveVisualRule}
               className="text-xs bg-primary text-black hover:bg-primary/90"
             >
-              Save Rule Checkpoint
+              {editingRuleName ? "Update Rule" : "Save Rule Checkpoint"}
             </Button>
           </DialogFooter>
         </DialogContent>
