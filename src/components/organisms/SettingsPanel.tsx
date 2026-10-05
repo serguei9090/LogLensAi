@@ -36,7 +36,6 @@ import {
   Layers,
   Loader2,
   Network,
-  Palette,
   Plus,
   RefreshCcw,
   RotateCcw,
@@ -51,14 +50,13 @@ import * as React from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
-type SectionId = "ai" | "laya" | "drain" | "ingestion" | "general";
+type SectionId = "ai" | "laya" | "drain" | "ingestion";
 
 const SECTIONS: { id: SectionId; icon: typeof Bot; label: string; desc: string }[] = [
   { id: "ai", icon: Bot, label: "AI Intelligence", desc: "Model & analyze logic" },
   { id: "laya", icon: Zap, label: "Laya AI", desc: "Fast router & rules engine" },
   { id: "drain", icon: Cpu, label: "Engine Core", desc: "Clustering parameters" },
   { id: "ingestion", icon: Network, label: "Ingestion", desc: "Live stream listeners" },
-  { id: "general", icon: Palette, label: "Interface", desc: "Display & accessibility" },
 ];
 
 function SettingInput(props: Readonly<React.InputHTMLAttributes<HTMLInputElement>>) {
@@ -645,102 +643,6 @@ function parseRemote(remoteSettings: Record<string, string>, prev: AppSettings):
     next.facet_extractions = next.facet_extractions.filter((f) => f.name.trim() || f.regex.trim());
   }
   return next;
-}
-
-function ShortcutCapture({
-  value,
-  onChange,
-}: {
-  readonly value: KeyboardShortcut;
-  readonly onChange: (v: KeyboardShortcut) => void;
-}) {
-  const [isRecording, setIsRecording] = useState(false);
-
-  useEffect(() => {
-    if (!isRecording) {
-      return;
-    }
-
-    const handleKeyDown = (e: KeyboardEvent) => {
-      // Prevent browser defaults for most keys while recording
-      if (e.key !== "Escape" && !e.key.startsWith("F")) {
-        e.preventDefault();
-      }
-      e.stopPropagation();
-
-      // We only care about the key if it's not a modifier itself
-      if (!["Control", "Shift", "Alt", "Meta"].includes(e.key)) {
-        if (e.key === "Escape") {
-          setIsRecording(false);
-          return;
-        }
-
-        const shortcut: KeyboardShortcut = {
-          key: e.key.toLowerCase(),
-          ctrl: e.ctrlKey,
-          alt: e.altKey,
-          shift: e.shiftKey,
-          meta: e.metaKey,
-        };
-
-        onChange(shortcut);
-        setIsRecording(false);
-      }
-    };
-
-    globalThis.addEventListener("keydown", handleKeyDown, true);
-    return () => globalThis.removeEventListener("keydown", handleKeyDown, true);
-  }, [isRecording, onChange]);
-
-  const displayShortcut = () => {
-    // Use optional chain — value or value.key may be undefined during legacy migration
-    if (!value?.key) {
-      return "None";
-    }
-    const parts = [];
-    if (value.ctrl) {
-      parts.push("Ctrl");
-    }
-    if (value.alt) {
-      parts.push("Alt");
-    }
-    if (value.shift) {
-      parts.push("Shift");
-    }
-    if (value.meta) {
-      parts.push("Win/Cmd");
-    }
-    parts.push(value.key.toUpperCase());
-    return parts.join(" + ");
-  };
-
-  return (
-    <div className="flex items-center gap-3">
-      <div
-        className={cn(
-          "h-10 px-4 rounded-xl flex items-center justify-center font-mono text-sm border transition-all min-w-[140px]",
-          isRecording
-            ? "bg-primary/20 border-primary text-primary animate-pulse"
-            : "bg-bg-surface border-border text-text-primary",
-        )}
-      >
-        {isRecording ? "Press Any Key" : displayShortcut()}
-      </div>
-      <Button
-        variant="outline"
-        size="sm"
-        onClick={() => setIsRecording(!isRecording)}
-        className={cn(
-          "h-10 px-6 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all",
-          isRecording
-            ? "bg-red-500/10 text-red-400 border-red-500/20 hover:bg-red-500/20"
-            : "bg-bg-surface border-border hover:bg-white/5",
-        )}
-      >
-        {isRecording ? "Cancel (Esc)" : "Change Shortcut"}
-      </Button>
-    </div>
-  );
 }
 
 export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSettings) => void }) {
@@ -1939,93 +1841,6 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
                       </code>
                     </span>
                   </p>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Interface Section */}
-          {activeSection === "general" && (
-            <div className="space-y-8 animate-in fade-in slide-in-from-right-4 duration-300">
-              <div className="border-b border-border pb-6">
-                <h2 className="text-2xl font-bold text-text-primary">Interface</h2>
-                <p className="text-sm text-text-muted mt-2">
-                  Accessibility and display preferences for your workspace.
-                </p>
-              </div>
-
-              <div className="grid grid-cols-2 gap-8">
-                <div className="space-y-2">
-                  <SectionLabel htmlFor="ui_row_height">Row Density</SectionLabel>
-                  <SettingSelect
-                    id="ui_row_height"
-                    value={settings.ui_row_height}
-                    onChange={(v) => update("ui_row_height", v)}
-                  >
-                    <option value="compact">Ultra Compact</option>
-                    <option value="default">Balanced</option>
-                    <option value="comfortable">Comfortable</option>
-                  </SettingSelect>
-                </div>
-                <div className="space-y-2">
-                  <SectionLabel htmlFor="ui_font_size">Reading Size</SectionLabel>
-                  <SettingSelect
-                    id="ui_font_size"
-                    value={settings.ui_font_size}
-                    onChange={(v) => update("ui_font_size", v)}
-                  >
-                    <option value="12px">12px — Minimal</option>
-                    <option value="13px">13px — Optimized</option>
-                    <option value="14px">14px</option>
-                    <option value="16px">16px — Enhanced</option>
-                  </SettingSelect>
-                </div>
-              </div>
-
-              <div className="group relative overflow-hidden rounded-2xl border border-border bg-gradient-to-br from-bg-surface/50 to-bg-base p-1">
-                <div className="absolute inset-0 bg-primary/2 opacity-0 group-hover:opacity-100 transition-opacity" />
-                <div className="relative px-6 py-5">
-                  <p className="text-[10px] uppercase font-bold tracking-widest text-text-muted/50 mb-3">
-                    Live Typography Preview
-                  </p>
-                  <div
-                    className="font-mono leading-relaxed px-4 py-3 bg-bg-base/80 rounded-xl border border-border/40 shadow-inner"
-                    style={{ fontSize: settings.ui_font_size }}
-                  >
-                    <span className="text-text-muted/60">Mar 27 16:45:01 </span>
-                    <span className="text-error/80 font-bold tracking-tight px-1.5 rounded bg-error/10 mr-2">
-                      CRITICAL
-                    </span>
-                    <span className="text-text-primary">
-                      Worker[4] lost quorum connectivity to peer-93. Re-electing...
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="pt-8 border-t border-border/30">
-                <div className="flex items-center justify-between mb-4">
-                  <div>
-                    <h3 className="text-sm font-bold text-text-primary">Keyboard Shortcuts</h3>
-                    <p className="text-[10px] text-text-muted mt-0.5">
-                      Customize global key bindings for faster navigation.
-                    </p>
-                  </div>
-                </div>
-
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between p-5 bg-bg-surface/50 border border-border rounded-2xl group hover:bg-bg-surface transition-all">
-                    <div>
-                      <p className="text-sm font-bold text-text-primary">Command Palette</p>
-                      <p className="text-[10px] text-text-muted mt-0.5">
-                        Quickly navigate workspaces and sources.
-                      </p>
-                    </div>
-                    <ShortcutCapture
-                      value={settings.ui_command_palette_shortcut}
-                      onChange={(key) => update("ui_command_palette_shortcut", key)}
-                    />
-                  </div>
                 </div>
               </div>
             </div>
