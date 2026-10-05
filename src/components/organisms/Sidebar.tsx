@@ -100,19 +100,63 @@ function SidebarImpl({
       transition={{ type: "spring", stiffness: 400, damping: 40 }}
       className="h-screen bg-bg-sidebar border-r border-border-subtle flex flex-col select-none overflow-hidden relative"
     >
-      {/* Logo Section */}
-      <div className="h-16 border-b border-border-subtle flex items-center px-4 shrink-0 overflow-hidden">
-        <div className="bg-primary/10 border border-primary/20 p-1.5 rounded-lg shrink-0 flex items-center justify-center">
-          <Terminal className="h-5 w-5 text-primary" />
-        </div>
-        {!sidebarCollapsed && (
-          <motion.h1
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            className="ml-3 font-bold text-[15px] tracking-tight text-text-primary whitespace-nowrap"
-          >
-            LogLens<span className="text-primary">Ai</span>
-          </motion.h1>
+      {/* Logo / Header Section */}
+      <div
+        className={cn(
+          "h-14 border-b border-border-subtle flex items-center shrink-0 overflow-hidden",
+          sidebarCollapsed ? "justify-center px-0" : "justify-between px-3",
+        )}
+      >
+        {!sidebarCollapsed ? (
+          <>
+            <div className="flex items-center gap-2.5 overflow-hidden">
+              <div className="bg-primary/10 border border-primary/20 p-1.5 rounded-lg shrink-0 flex items-center justify-center">
+                <Terminal className="h-4 w-4 text-primary" />
+              </div>
+              <motion.h1
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                className="font-bold text-[14px] tracking-tight text-text-primary whitespace-nowrap"
+              >
+                LogLens<span className="text-primary">Ai</span>
+              </motion.h1>
+            </div>
+            <TooltipProvider delay={0}>
+              <Tooltip>
+                <TooltipTrigger
+                  onClick={toggleSidebar}
+                  className="h-8 w-8 rounded-lg flex items-center justify-center text-text-muted hover:text-text-primary hover:bg-white/5 transition-colors shrink-0 outline-none border-none bg-transparent cursor-pointer"
+                  aria-label="Collapse sidebar"
+                >
+                  <PanelLeftClose className="h-4 w-4" />
+                </TooltipTrigger>
+                <TooltipContent
+                  side="right"
+                  className="bg-bg-surface-bright border-border text-text-primary text-xs"
+                >
+                  Collapse sidebar
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          </>
+        ) : (
+          <TooltipProvider delay={0}>
+            <Tooltip>
+              <TooltipTrigger
+                onClick={toggleSidebar}
+                className="h-9 w-9 rounded-xl flex items-center justify-center text-text-muted hover:text-text-primary hover:bg-white/5 transition-all outline-none border border-transparent hover:border-border-subtle bg-transparent cursor-pointer"
+                aria-label="Open sidebar"
+              >
+                <PanelLeftOpen className="h-4 w-4" />
+              </TooltipTrigger>
+              <TooltipContent
+                side="right"
+                className="bg-bg-surface-bright border-border text-text-primary text-xs font-medium"
+              >
+                Open sidebar
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
         )}
       </div>
 
@@ -330,7 +374,7 @@ function SidebarImpl({
           </div>
         </ScrollArea>
 
-        <div className="mt-auto border-t border-border-subtle bg-bg-sidebar px-2 py-4 space-y-1 overflow-hidden shrink-0">
+        <div className="mt-auto border-t border-border-subtle bg-bg-sidebar px-2 py-3 space-y-1 overflow-hidden shrink-0">
           <TooltipProvider delay={0}>
             <SidebarNavItem
               icon={<LayoutDashboard className="h-4 w-4" />}
@@ -347,23 +391,6 @@ function SidebarImpl({
               collapsed={sidebarCollapsed}
               onClick={() => onNavSelect("settings")}
             />
-
-            <div className="pt-2 border-t border-border-subtle/40 mt-1">
-              <SidebarNavItem
-                icon={
-                  sidebarCollapsed ? (
-                    <PanelLeftOpen className="h-4 w-4" />
-                  ) : (
-                    <PanelLeftClose className="h-4 w-4" />
-                  )
-                }
-                label={sidebarCollapsed ? "Expand Sidebar" : "Collapse Sidebar"}
-                active={false}
-                collapsed={sidebarCollapsed}
-                onClick={toggleSidebar}
-                className="opacity-50 hover:opacity-100"
-              />
-            </div>
           </TooltipProvider>
         </div>
         <ConfirmationDialog
