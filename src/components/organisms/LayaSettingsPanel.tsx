@@ -477,13 +477,13 @@ export function LayaSettingsPanel() {
 
       {/* Tabs Header */}
       <div className="space-y-4">
-        <div className="flex items-center justify-between border-b border-border pb-3">
-          <div className="flex items-center gap-1 bg-bg-surface p-1 rounded-xl border border-border">
+        <div className="flex items-center justify-between border-b border-border pb-3 flex-wrap gap-3">
+          <div className="flex items-center gap-1 bg-bg-surface p-1 rounded-xl border border-border shrink-0">
             <button
               type="button"
               onClick={() => setActiveTab("visual")}
               className={cn(
-                "px-3 py-1.5 text-xs font-medium rounded-lg transition-all flex items-center gap-1.5",
+                "px-3 py-1.5 text-xs font-medium rounded-lg transition-all flex items-center gap-1.5 whitespace-nowrap shrink-0",
                 activeTab === "visual"
                   ? "bg-primary text-black font-semibold shadow-xs"
                   : "text-text-muted hover:text-text-primary",
@@ -495,7 +495,7 @@ export function LayaSettingsPanel() {
               type="button"
               onClick={() => setActiveTab("json")}
               className={cn(
-                "px-3 py-1.5 text-xs font-medium rounded-lg transition-all flex items-center gap-1.5",
+                "px-3 py-1.5 text-xs font-medium rounded-lg transition-all flex items-center gap-1.5 whitespace-nowrap shrink-0",
                 activeTab === "json"
                   ? "bg-primary text-black font-semibold shadow-xs"
                   : "text-text-muted hover:text-text-primary",
@@ -507,7 +507,7 @@ export function LayaSettingsPanel() {
               type="button"
               onClick={() => setActiveTab("history")}
               className={cn(
-                "px-3 py-1.5 text-xs font-medium rounded-lg transition-all flex items-center gap-1.5",
+                "px-3 py-1.5 text-xs font-medium rounded-lg transition-all flex items-center gap-1.5 whitespace-nowrap shrink-0",
                 activeTab === "history"
                   ? "bg-primary text-black font-semibold shadow-xs"
                   : "text-text-muted hover:text-text-primary",
@@ -519,7 +519,7 @@ export function LayaSettingsPanel() {
               type="button"
               onClick={() => setActiveTab("test")}
               className={cn(
-                "px-3 py-1.5 text-xs font-medium rounded-lg transition-all flex items-center gap-1.5",
+                "px-3 py-1.5 text-xs font-medium rounded-lg transition-all flex items-center gap-1.5 whitespace-nowrap shrink-0",
                 activeTab === "test"
                   ? "bg-primary text-black font-semibold shadow-xs"
                   : "text-text-muted hover:text-text-primary",
@@ -529,12 +529,12 @@ export function LayaSettingsPanel() {
             </button>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 shrink-0">
             {activeTab === "visual" && (
               <Button
                 size="sm"
                 onClick={() => setIsAddRuleOpen(true)}
-                className="h-8 text-xs font-medium gap-1.5 bg-primary text-black hover:bg-primary/90"
+                className="h-8 text-xs font-medium gap-1.5 bg-primary text-black hover:bg-primary/90 shrink-0"
               >
                 <Plus className="h-3.5 w-3.5" /> Add Rule
               </Button>
@@ -543,9 +543,9 @@ export function LayaSettingsPanel() {
               <Button
                 size="sm"
                 onClick={() => setIsSaveCheckpointOpen(true)}
-                className="h-8 text-xs font-medium gap-1.5 bg-primary text-black hover:bg-primary/90"
+                className="h-8 text-xs font-medium gap-1.5 bg-primary text-black hover:bg-primary/90 shrink-0"
               >
-                <Sparkles className="h-3.5 w-3.5" /> Commit Checkpoint
+                <Sparkles className="h-3.5 w-3.5" /> Commit
               </Button>
             )}
           </div>
