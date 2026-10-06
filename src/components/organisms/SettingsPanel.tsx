@@ -367,6 +367,9 @@ function ModelSelector({
   isFetching,
   onRefresh,
   provider,
+  isVerified,
+  onTestConnection,
+  isTestingConnection,
 }: {
   readonly value: string;
   readonly onChange: (v: string) => void;
@@ -374,25 +377,42 @@ function ModelSelector({
   readonly isFetching: boolean;
   readonly onRefresh: () => void;
   readonly provider: string;
+  readonly isVerified: boolean;
+  readonly onTestConnection: () => void;
+  readonly isTestingConnection: boolean;
 }) {
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between">
         <SectionLabel htmlFor="ai_model_selector">Model</SectionLabel>
-        {["ollama", "lmstudio", "ai-studio", "openai-compatible", "openrouter"].includes(
-          provider,
-        ) && (
+        {isVerified &&
+          ["ollama", "lmstudio", "ai-studio", "openai-compatible", "openrouter", "openai"].includes(
+            provider,
+          ) && (
+            <Button
+              variant="ghost"
+              onClick={onRefresh}
+              disabled={isFetching}
+              className="text-[9px] uppercase tracking-tighter font-bold text-primary hover:text-primary-light transition-colors disabled:opacity-30 h-auto p-0 cursor-pointer"
+            >
+              {isFetching ? "Pulling..." : "Refresh List"}
+            </Button>
+          )}
+      </div>
+
+      {!isVerified ? (
+        <div className="h-10 px-3.5 rounded-xl border border-dashed border-border/80 bg-bg-surface/50 flex items-center justify-between text-xs text-text-muted">
+          <span className="truncate pr-2">Connect provider to select model</span>
           <Button
             variant="ghost"
-            onClick={onRefresh}
-            disabled={isFetching}
-            className="text-[9px] uppercase tracking-tighter font-bold text-primary hover:text-primary-light transition-colors disabled:opacity-30 h-auto p-0 cursor-pointer"
+            onClick={onTestConnection}
+            disabled={isTestingConnection}
+            className="text-[10px] uppercase font-bold text-primary hover:text-primary-light transition-colors h-7 px-2.5 rounded-lg bg-primary/10 hover:bg-primary/20 shrink-0"
           >
-            {isFetching ? "Pulling..." : "Refresh List"}
+            {isTestingConnection ? "Testing..." : "Test Connection"}
           </Button>
-        )}
-      </div>
-      {availableModels.length > 0 ? (
+        </div>
+      ) : availableModels.length > 0 ? (
         <SettingSelect
           id="ai_model_selector"
           value={value}
@@ -404,7 +424,7 @@ function ModelSelector({
           showFreeBadge={provider === "openrouter"}
           showFreeFilter={provider === "openrouter"}
         >
-          {!availableModels.includes(value) && <option value={value}>{value}</option>}
+          {!availableModels.includes(value) && value && <option value={value}>{value}</option>}
           {availableModels.map((m) => (
             <option key={m} value={m}>
               {m}
@@ -931,20 +951,10 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
                     value={settings.ai_provider}
                     showCheckForOption={(optVal) => verifiedProviders.includes(optVal)}
                     onChange={(v) => {
-                      let newModel = settings.ai_model;
+                      let newModel = "";
                       const cached = providerModelsCache[v];
                       if (cached && cached.length > 0) {
                         newModel = cached[0];
-                      } else if (v === "ollama") {
-                        newModel = "gemma4:e2b";
-                      } else if (v === "openai" || v === "openai-compatible") {
-                        newModel = "gpt-4o";
-                      } else if (v === "openrouter") {
-                        newModel = "anthropic/claude-3.5-sonnet";
-                      } else if (v === "ai-studio") {
-                        newModel = "gemini-2.0-flash";
-                      } else if (v === "lmstudio") {
-                        newModel = "";
                       }
 
                       const updated = { ...settings, ai_provider: v, ai_model: newModel };
@@ -1104,6 +1114,9 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
                   isFetching={isFetchingModels}
                   onRefresh={fetchModels}
                   provider={settings.ai_provider}
+                  isVerified={verifiedProviders.includes(settings.ai_provider)}
+                  onTestConnection={handleTestConnection}
+                  isTestingConnection={isTestingConnection}
                 />
 
                 {settings.ai_provider === "openai-compatible" && (

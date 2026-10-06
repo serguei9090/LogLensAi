@@ -564,20 +564,10 @@ export function AIInvestigationSidebar({
   );
 
   const handleProviderChange = (newProvider: string) => {
-    let newModel = settings.ai_model;
+    let newModel = "";
     const cached = providerModelsCache[newProvider];
     if (cached && cached.length > 0) {
       newModel = cached[0];
-    } else if (newProvider === "ollama") {
-      newModel = "gemma4:e2b";
-    } else if (newProvider === "openai" || newProvider === "openai-compatible") {
-      newModel = "gpt-4o";
-    } else if (newProvider === "openrouter") {
-      newModel = "anthropic/claude-3.5-sonnet";
-    } else if (newProvider === "ai-studio") {
-      newModel = "gemini-2.0-flash";
-    } else if (newProvider === "lmstudio") {
-      newModel = "";
     }
     updateSettings({ ai_provider: newProvider, ai_model: newModel });
   };
