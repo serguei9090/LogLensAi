@@ -16,18 +16,7 @@ import { useAiStore } from "@/store/aiStore";
 import { useInvestigationStore } from "@/store/investigationStore";
 import { useUIStore } from "@/store/uiStore";
 import type { LogSource } from "@/store/workspaceStore";
-import {
-  Columns,
-  Cpu,
-  Download,
-  Eye,
-  EyeOff,
-  LayoutTemplate,
-  List,
-  Plus,
-  Sparkles,
-  Upload,
-} from "lucide-react";
+import { Columns, Cpu, Download, LayoutTemplate, List, Plus, Sparkles, Upload } from "lucide-react";
 import { useMemo, useState } from "react";
 import { LoadTemplateModal } from "./LoadTemplateModal";
 import { SaveTemplateModal } from "./SaveTemplateModal";
@@ -84,14 +73,8 @@ export function LogToolbar({
   const { timeRange, timeRangeBounds, setTimeRange, resetTimeRangeToAllTime } =
     useInvestigationStore();
   const { isSidebarOpen, setSidebarOpen } = useAiStore();
-  const {
-    facetSidebarCollapsed,
-    toggleFacetSidebar,
-    columnManagerCollapsed,
-    toggleColumnManager,
-    visibleColumns,
-    toggleColumnVisibility,
-  } = useUIStore();
+  const { facetSidebarCollapsed, toggleFacetSidebar, columnManagerCollapsed, toggleColumnManager } =
+    useUIStore();
 
   const isFiltered = useMemo(() => {
     return (
@@ -264,41 +247,6 @@ export function LogToolbar({
           <div className="flex items-center gap-2">
             <FilterBuilder filters={activeFilters} onChange={onFilterChange} />
             <HighlightBuilder highlights={activeHighlights} onChange={onHighlightChange} />
-
-            <DropdownMenu>
-              <DropdownMenuTrigger
-                disabled={!_activeSourceId}
-                className="p-1.5 rounded-md hover:bg-bg-hover text-text-muted hover:text-text-primary transition-colors ml-1 disabled:opacity-50 disabled:pointer-events-none"
-                title="Toggle Columns"
-              >
-                <Columns className="size-4" />
-              </DropdownMenuTrigger>
-              <DropdownMenuContent
-                align="end"
-                className="w-48 bg-bg-surface border-border-subtle p-2"
-              >
-                <div className="text-[9px] font-bold text-text-muted uppercase tracking-wider px-2 py-1 border-b border-border/30 mb-1">
-                  Visible Columns
-                </div>
-                {Object.keys(visibleColumns).map((colName) => (
-                  <DropdownMenuItem
-                    key={colName}
-                    onClick={(e) => {
-                      e.preventDefault();
-                      toggleColumnVisibility(colName);
-                    }}
-                    className="flex items-center justify-between gap-2 text-xs py-1.5 px-2 hover:bg-white/5 rounded cursor-pointer select-none"
-                  >
-                    <span className="capitalize">{colName.replace("_", " ")}</span>
-                    {visibleColumns[colName] ? (
-                      <Eye className="size-3.5 text-primary" />
-                    ) : (
-                      <EyeOff className="size-3.5 text-text-muted/40" />
-                    )}
-                  </DropdownMenuItem>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
 
             <DropdownMenu>
               <DropdownMenuTrigger
