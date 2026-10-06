@@ -664,7 +664,7 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
   const { activeWorkspaceId, reset: resetWorkspaces } = useWorkspaceStore();
   const { clearState: clearIngestion } = useIngestionStore();
   const { reset: resetInvestigation } = useInvestigationStore();
-  const { updateSettings } = useSettingsStore();
+  const { updateSettings, flushPendingSettings } = useSettingsStore();
 
   const update = <K extends keyof AppSettings>(key: K, value: AppSettings[K], immediate = true) => {
     const newSettings = { ...settings, [key]: value };
@@ -747,9 +747,9 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
   const [isTestingConnection, setIsTestingConnection] = useState(false);
 
   const handleTestConnection = async () => {
-    // Ensure current settings are saved before testing.
-    // onSave returns void, so no await needed — calling synchronously is correct.
+    // Ensure current settings are saved and flushed to backend before testing.
     onSave(settings);
+    await flushPendingSettings();
 
     setIsTestingConnection(true);
     try {
@@ -759,6 +759,8 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
       });
       if (res.status === "success") {
         toast.success(res.message);
+        // Automatically refresh available models for this provider on successful connection test
+        fetchModels();
       } else if (res.status === "warning") {
         toast.warning(res.message);
       } else {
@@ -821,6 +823,10 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
     fetchModels,
     settings.ai_provider,
     settings.ai_api_key,
+    settings.ai_openrouter_api_key,
+    settings.ai_openai_api_key,
+    settings.ai_gemini_api_key,
+    settings.ai_openai_compat_api_key,
     settings.ai_ollama_host,
     settings.ai_lmstudio_host,
     settings.ai_openai_host,

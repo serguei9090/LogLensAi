@@ -51,7 +51,7 @@ func (f *fakeProvider) AnalyzeLogs(_ context.Context, template string, samples [
 func (f *fakeProvider) TestConnection(context.Context) error { return f.testConnErr }
 
 func newTestExtra(a *app.App, fake providers.Provider) *Extra {
-	return &Extra{app: a, provider: fake, memory: newLazyMemoryService(a.DataDir(), a.DB.Conn)}
+	return &Extra{app: a, provider: fake, isExplicitProvider: true, memory: newLazyMemoryService(a.DataDir(), a.DB.Conn)}
 }
 
 // --- analyze_cluster --------------------------------------------------------

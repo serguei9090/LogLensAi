@@ -167,6 +167,7 @@ interface SettingsStore {
   settings: AppSettings;
   fetchSettings: (workspaceId?: string) => Promise<void>;
   updateSettings: (newSettings: Partial<AppSettings>, workspaceId?: string) => Promise<void>;
+  flushPendingSettings: (workspaceId?: string) => Promise<void>;
 }
 
 let saveTimeout: ReturnType<typeof setTimeout> | null = null;
@@ -282,5 +283,24 @@ export const useSettingsStore = create<SettingsStore>((set) => ({
         console.error("Failed to persist settings to sidecar:", err);
       }
     }, 300);
+  },
+
+  flushPendingSettings: async (workspaceId?: string) => {
+    if (saveTimeout) {
+      clearTimeout(saveTimeout);
+      saveTimeout = null;
+    }
+    const payloadToSend = { ...pendingSettingsPayload };
+    pendingSettingsPayload = {};
+    if (Object.keys(payloadToSend).length > 0) {
+      try {
+        await callSidecar({
+          method: "update_settings",
+          params: { settings: payloadToSend, workspace_id: workspaceId },
+        });
+      } catch (err) {
+        console.error("Failed to flush settings to sidecar:", err);
+      }
+    }
   },
 }));

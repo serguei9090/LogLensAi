@@ -498,7 +498,7 @@ export function AIInvestigationSidebar({
   } = useAiStore();
 
   const activeWorkspace = useWorkspaceStore(selectActiveWorkspace);
-  const { settings, fetchSettings, updateSettings } = useSettingsStore();
+  const { settings, fetchSettings, updateSettings, flushPendingSettings } = useSettingsStore();
   const { selectedLogIds, clearSelection } = useInvestigationStore();
 
   const [inputValue, setInputValue] = useState("");
@@ -516,8 +516,8 @@ export function AIInvestigationSidebar({
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const fetchModels = useCallback(
-    async (forceRefresh = false) => {
-      const currentProvider = settings.ai_provider;
+    async (forceRefresh = false, targetProvider?: string) => {
+      const currentProvider = targetProvider || settings.ai_provider;
       if (!currentProvider) {
         return;
       }
@@ -529,6 +529,9 @@ export function AIInvestigationSidebar({
 
       setIsFetchingModels(true);
       try {
+        if (forceRefresh) {
+          await flushPendingSettings();
+        }
         const models = await callSidecar<string[]>({ method: "list_ai_models", params: {} });
         if (models && Array.isArray(models) && models.length > 0) {
           setAvailableModels(models);
@@ -543,7 +546,7 @@ export function AIInvestigationSidebar({
         setIsFetchingModels(false);
       }
     },
-    [settings.ai_provider, providerModelsCache],
+    [settings.ai_provider, providerModelsCache, flushPendingSettings],
   );
 
   const handleProviderChange = (newProvider: string) => {
@@ -1091,9 +1094,7 @@ export function AIInvestigationSidebar({
                         id: "openrouter",
                         name: "OpenRouter",
                         isConfigured: Boolean(
-                          settings.ai_openrouter_api_key?.trim() ||
-                            settings.ai_api_key?.trim() ||
-                            settings.ai_openrouter_host?.trim(),
+                          settings.ai_openrouter_api_key?.trim() || settings.ai_api_key?.trim(),
                         ),
                       },
                       {
@@ -1212,7 +1213,7 @@ export function AIInvestigationSidebar({
                                       if (!isActiveProvider) {
                                         handleProviderChange(provider.id);
                                       }
-                                      fetchModels(true);
+                                      fetchModels(true, provider.id);
                                     }}
                                     disabled={isFetchingModels}
                                     className="px-2.5 py-1 text-[11px] font-medium rounded-md bg-primary/10 hover:bg-primary/20 text-primary border border-primary/20 cursor-pointer disabled:opacity-50 transition-colors inline-block"

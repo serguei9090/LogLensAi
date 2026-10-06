@@ -56,9 +56,10 @@ const extraErrInternal = -32603
 // meant a second ONNX embedder, which is exactly why the rag.Service handle
 // below is lazy too (see lazyMemoryService's doc comment).
 type Extra struct {
-	app      *app.App
-	provider providers.Provider
-	memory   *lazyMemoryService
+	app                *app.App
+	provider           providers.Provider
+	memory             *lazyMemoryService
+	isExplicitProvider bool
 }
 
 // NewExtra constructs an Extra for a. Like Wire, it does no network/model
@@ -75,10 +76,10 @@ func NewExtra(a *app.App) (*Extra, error) {
 	}, nil
 }
 
-// getProvider returns the active provider resolved from the app's current settings,
-// falling back to the initialization-time provider if settings resolution fails.
+// getProvider returns the active provider resolved dynamically from the app's current settings,
+// unless an explicit provider was injected (e.g. in unit tests), or falling back to the initialization-time provider.
 func (e *Extra) getProvider() providers.Provider {
-	if e.provider != nil {
+	if e.isExplicitProvider && e.provider != nil {
 		return e.provider
 	}
 	if e.app != nil {
@@ -86,7 +87,7 @@ func (e *Extra) getProvider() providers.Provider {
 			return p
 		}
 	}
-	return nil
+	return e.provider
 }
 
 // --- analyze_cluster ------------------------------------------------------

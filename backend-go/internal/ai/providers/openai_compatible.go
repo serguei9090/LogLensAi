@@ -192,17 +192,18 @@ func (p *OpenAICompatibleProvider) ListModels(ctx context.Context) ([]string, er
 
 	resp, err := p.httpClient.Do(req)
 	if err != nil {
-		return nil, nil //nolint:nilerr // parity: Python swallows and returns []
+		return nil, fmt.Errorf("openai-compatible: request failed: %w", err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, nil
+		bodyBytes, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("openai-compatible: HTTP %d: %s", resp.StatusCode, strings.TrimSpace(string(bodyBytes)))
 	}
 
 	var data openAIModelsResponse
 	if err := json.NewDecoder(resp.Body).Decode(&data); err != nil {
-		return nil, nil
+		return nil, fmt.Errorf("openai-compatible: decode response: %w", err)
 	}
 
 	items := data.Data
