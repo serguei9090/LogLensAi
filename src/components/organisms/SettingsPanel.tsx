@@ -1056,18 +1056,19 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
                             }
                             className="pr-10"
                           />
-                          <Button
-                            variant="ghost"
-                            size="icon-sm"
+                          <button
+                            type="button"
                             onClick={() => setShowApiKey(!showApiKey)}
-                            className="absolute right-3 top-1/2 -translate-y-1/2 text-text-muted hover:text-text-primary transition-colors p-1"
+                            className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center justify-center p-1.5 rounded-lg text-text-muted hover:text-text-primary hover:bg-white/5 transition-colors cursor-pointer select-none"
+                            title={showApiKey ? "Hide API Key" : "Show API Key"}
+                            aria-label={showApiKey ? "Hide API Key" : "Show API Key"}
                           >
                             {showApiKey ? (
-                              <EyeOff className="size-3.5" />
+                              <EyeOff className="size-4" />
                             ) : (
-                              <Eye className="size-3.5" />
+                              <Eye className="size-4" />
                             )}
-                          </Button>
+                          </button>
                         </div>
                         <p className="text-[10px] text-text-muted/50 px-1">
                           {settings.ai_provider === "openrouter"
