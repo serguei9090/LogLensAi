@@ -108,8 +108,28 @@ func NewProviderFromSettings(a *app.App) (providers.Provider, error) {
 		name = "ollama"
 	}
 
+	apiKey := s["ai_api_key"]
+	switch name {
+	case "openai":
+		if k := s["ai_openai_api_key"]; k != "" {
+			apiKey = k
+		}
+	case "openai-compatible":
+		if k := s["ai_openai_compat_api_key"]; k != "" {
+			apiKey = k
+		}
+	case "openrouter":
+		if k := s["ai_openrouter_api_key"]; k != "" {
+			apiKey = k
+		}
+	case "ai-studio", "gemini":
+		if k := s["ai_gemini_api_key"]; k != "" {
+			apiKey = k
+		}
+	}
+
 	cfg := providers.Config{
-		APIKey:       s["ai_api_key"],
+		APIKey:       apiKey,
 		SystemPrompt: s["ai_system_prompt"],
 		Model:        s["ai_model"],
 	}
@@ -117,7 +137,9 @@ func NewProviderFromSettings(a *app.App) (providers.Provider, error) {
 	switch name {
 	case "ollama":
 		cfg.Host = s["ai_ollama_host"]
-	case "openai", "openai-compatible":
+	case "openai":
+		cfg.Host = "https://api.openai.com/v1"
+	case "openai-compatible":
 		cfg.Host = s["ai_openai_host"]
 	case "openrouter":
 		cfg.Host = s["ai_openrouter_host"]

@@ -550,6 +550,8 @@ export function AIInvestigationSidebar({
     let newModel = settings.ai_model;
     if (newProvider === "ollama") {
       newModel = "gemma4:e2b";
+    } else if (newProvider === "openai") {
+      newModel = "gpt-4o";
     } else if (newProvider === "openai-compatible") {
       newModel = "gpt-4o";
     } else if (newProvider === "openrouter") {
@@ -1070,54 +1072,52 @@ export function AIInvestigationSidebar({
                         id: "ollama",
                         name: "Ollama",
                         isConfigured: Boolean(settings.ai_ollama_host?.trim()),
-                        defaultModels: [
-                          "gemma4:e2b",
-                          "llama3.2:latest",
-                          "mistral:latest",
-                          "qwen2.5:latest",
-                        ],
+                      },
+                      {
+                        id: "openai",
+                        name: "OpenAI (Official)",
+                        isConfigured: Boolean(
+                          settings.ai_openai_api_key?.trim() || settings.ai_api_key?.trim(),
+                        ),
                       },
                       {
                         id: "ai-studio",
                         name: "Google AI Studio",
-                        isConfigured: Boolean(settings.ai_api_key?.trim()),
-                        defaultModels: ["gemini-2.0-flash", "gemini-1.5-pro", "gemini-1.5-flash"],
+                        isConfigured: Boolean(
+                          settings.ai_gemini_api_key?.trim() || settings.ai_api_key?.trim(),
+                        ),
                       },
                       {
                         id: "openrouter",
                         name: "OpenRouter",
                         isConfigured: Boolean(
-                          settings.ai_api_key?.trim() || settings.ai_openrouter_host?.trim(),
+                          settings.ai_openrouter_api_key?.trim() ||
+                            settings.ai_api_key?.trim() ||
+                            settings.ai_openrouter_host?.trim(),
                         ),
-                        defaultModels: [
-                          "anthropic/claude-3.5-sonnet",
-                          "google/gemini-2.0-flash-exp:free",
-                          "meta-llama/llama-3.3-70b-instruct",
-                          "deepseek/deepseek-chat",
-                        ],
                       },
                       {
                         id: "openai-compatible",
                         name: "OpenAI Compatible",
                         isConfigured: Boolean(
-                          settings.ai_api_key?.trim() || settings.ai_openai_host?.trim(),
+                          settings.ai_openai_host?.trim() ||
+                            settings.ai_openai_compat_api_key?.trim() ||
+                            settings.ai_api_key?.trim(),
                         ),
-                        defaultModels: ["gpt-4o", "gpt-4o-mini", "o1", "o3-mini"],
                       },
                       {
                         id: "lmstudio",
                         name: "LM Studio",
                         isConfigured: Boolean(settings.ai_lmstudio_host?.trim()),
-                        defaultModels: ["local-model"],
                       },
                     ].map((provider) => {
                       const isActiveProvider = settings.ai_provider === provider.id;
-                      // Determine available models for this provider
+                      // Determine available models for this provider: only verified/pulled models
                       const rawModels = providerModelsCache[provider.id]?.length
                         ? providerModelsCache[provider.id]
                         : isActiveProvider && availableModels.length > 0
                           ? availableModels
-                          : provider.defaultModels;
+                          : [];
 
                       // Filter models if search query is active
                       const filteredModels = modelSearchQuery.trim()
@@ -1199,9 +1199,30 @@ export function AIInvestigationSidebar({
                             )}
 
                             <div className="max-h-60 overflow-y-auto space-y-0.5">
-                              {filteredModels.length === 0 ? (
+                              {rawModels.length === 0 ? (
+                                <div className="px-3 py-3 text-center text-xs text-text-muted space-y-2">
+                                  <p className="text-[11px] leading-relaxed">
+                                    No models loaded yet. Confirm connection and fetch available
+                                    models.
+                                  </p>
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      if (!isActiveProvider) {
+                                        handleProviderChange(provider.id);
+                                      }
+                                      fetchModels(true);
+                                    }}
+                                    disabled={isFetchingModels}
+                                    className="px-2.5 py-1 text-[11px] font-medium rounded-md bg-primary/10 hover:bg-primary/20 text-primary border border-primary/20 cursor-pointer disabled:opacity-50 transition-colors inline-block"
+                                  >
+                                    {isFetchingModels ? "Fetching..." : "Fetch Models"}
+                                  </button>
+                                </div>
+                              ) : filteredModels.length === 0 ? (
                                 <div className="px-2 py-2 text-center text-xs text-text-muted/60">
-                                  No models found
+                                  No models matching search
                                 </div>
                               ) : (
                                 filteredModels.map((m) => {

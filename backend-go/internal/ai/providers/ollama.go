@@ -191,25 +191,23 @@ func (p *OllamaProvider) formatMessages(messages []ChatMessage, reasoning bool) 
 // --- Provider implementation ---------------------------------------------
 
 func (p *OllamaProvider) ListModels(ctx context.Context) ([]string, error) {
-	fallback := []string{DefaultOllamaModel, "llama3", "mistral"}
-
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, p.host+"/api/tags", nil)
 	if err != nil {
-		return fallback, nil
+		return nil, fmt.Errorf("ollama: build list models request: %w", err)
 	}
 	resp, err := p.httpClient.Do(req)
 	if err != nil {
-		return fallback, nil
+		return nil, fmt.Errorf("ollama: list models request: %w", err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return fallback, nil
+		return nil, fmt.Errorf("ollama: list models returned HTTP %d", resp.StatusCode)
 	}
 
 	var data ollamaTagsResponse
 	if err := json.NewDecoder(resp.Body).Decode(&data); err != nil {
-		return fallback, nil
+		return nil, fmt.Errorf("ollama: decode tags response: %w", err)
 	}
 
 	models := make([]string, 0, len(data.Models))

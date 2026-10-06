@@ -38,7 +38,7 @@ func NewProvider(providerName string, cfg Config) (Provider, error) {
 		}
 		return NewOllamaProvider(host, cfg.SystemPrompt, cfg.Model), nil
 
-	case "openai", "openai-compatible":
+	case "openai":
 		host := cfg.Host
 		if host == "" {
 			host = DefaultOpenAIHost
@@ -46,6 +46,17 @@ func NewProvider(providerName string, cfg Config) (Provider, error) {
 		model := cfg.Model
 		if model == "" {
 			model = DefaultOpenAIModel
+		}
+		return NewOpenAICompatibleProvider(cfg.APIKey, cfg.SystemPrompt, host, model), nil
+
+	case "openai-compatible":
+		host := cfg.Host
+		if host == "" {
+			host = "http://localhost:1234/v1"
+		}
+		model := cfg.Model
+		if model == "" {
+			model = "gpt-4o"
 		}
 		return NewOpenAICompatibleProvider(cfg.APIKey, cfg.SystemPrompt, host, model), nil
 

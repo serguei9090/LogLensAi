@@ -194,19 +194,16 @@ func TestOllamaChatStream_NDJSONParsing(t *testing.T) {
 	}
 }
 
-func TestOllamaListModels_FallbackOnFailure(t *testing.T) {
+func TestOllamaListModels_ErrorOnFailure(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusServiceUnavailable)
 	}))
 	defer srv.Close()
 
 	p := NewOllamaProvider(srv.URL, "", "")
-	models, err := p.ListModels(context.Background())
-	if err != nil {
-		t.Fatalf("expected nil error (parity), got %v", err)
-	}
-	if len(models) == 0 {
-		t.Errorf("expected fallback model list, got empty")
+	_, err := p.ListModels(context.Background())
+	if err == nil {
+		t.Fatalf("expected error on failure, got nil")
 	}
 }
 

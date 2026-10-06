@@ -539,6 +539,9 @@ function safeParse(raw: string | null): unknown {
  *
  */
 function getProviderLabel(provider: string): string {
+  if (provider === "openai") {
+    return "OpenAI Official API";
+  }
   if (provider === "openrouter") {
     return "OpenRouter Unified API";
   }
@@ -560,6 +563,9 @@ function getProviderLabel(provider: string): string {
  *
  */
 function getProviderDescription(provider: string): string {
+  if (provider === "openai") {
+    return "Direct connection to official OpenAI API infrastructure (GPT-4o, o1, o3-mini).";
+  }
   if (provider === "openrouter") {
     return "Access Claude 3.5, Llama 3.3, Gemini 2.0, DeepSeek, and GPT-4o through OpenRouter.";
   }
@@ -927,6 +933,8 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
                       let newModel = settings.ai_model;
                       if (v === "ollama") {
                         newModel = "gemma4:e2b";
+                      } else if (v === "openai") {
+                        newModel = "gpt-4o";
                       } else if (v === "openai-compatible") {
                         newModel = "gpt-4o";
                       } else if (v === "openrouter") {
@@ -943,6 +951,7 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
                     }}
                   >
                     <option value="ollama">Ollama</option>
+                    <option value="openai">OpenAI (Official)</option>
                     <option value="openrouter">OpenRouter</option>
                     <option value="lmstudio">LM Studio</option>
                     <option value="ai-studio">Gemini AI Studio</option>
@@ -1004,55 +1013,78 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
                   </div>
                 )}
 
-                {(settings.ai_provider === "ai-studio" ||
+                {(settings.ai_provider === "openai" ||
+                  settings.ai_provider === "ai-studio" ||
                   settings.ai_provider === "openai-compatible" ||
-                  settings.ai_provider === "openrouter") && (
-                  <div className="space-y-2 animate-in fade-in slide-in-from-left-2 duration-300">
-                    <div className="flex items-center justify-between">
-                      <SectionLabel htmlFor="ai_api_key">Secret API Key</SectionLabel>
-                      <Button
-                        variant="ghost"
-                        onClick={handleTestConnection}
-                        disabled={isTestingConnection || !settings.ai_api_key}
-                        className="text-[9px] uppercase tracking-tighter font-bold text-primary hover:text-primary-light transition-colors disabled:opacity-30 h-auto p-0"
-                      >
-                        {isTestingConnection ? "Testing..." : "Test Connection"}
-                      </Button>
-                    </div>
-                    <div className="relative group/key">
-                      <SettingInput
-                        id="ai_api_key"
-                        type={showApiKey ? "text" : "password"}
-                        value={settings.ai_api_key}
-                        onChange={(e) => update("ai_api_key", e.target.value, false)}
-                        onBlur={() => onSave(settings)}
-                        placeholder={
-                          settings.ai_provider === "openrouter"
-                            ? "sk-or-v1-••••••••••••••••"
-                            : "Encrypted: sk-••••••••••••••••"
-                        }
-                        className="pr-10"
-                      />
-                      <Button
-                        variant="ghost"
-                        size="icon-sm"
-                        onClick={() => setShowApiKey(!showApiKey)}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-text-muted hover:text-text-primary transition-colors p-1"
-                      >
-                        {showApiKey ? (
-                          <EyeOff className="size-3.5" />
-                        ) : (
-                          <Eye className="size-3.5" />
-                        )}
-                      </Button>
-                    </div>
-                    <p className="text-[10px] text-text-muted/50 px-1">
-                      {settings.ai_provider === "openrouter"
-                        ? "OpenRouter API Key. Stored securely in local DuckDB settings."
-                        : "Keys are stored securely locally. Optional for some local engines (e.g., LM Studio)."}
-                    </p>
-                  </div>
-                )}
+                  settings.ai_provider === "openrouter") &&
+                  (() => {
+                    const keyField =
+                      settings.ai_provider === "openai"
+                        ? "ai_openai_api_key"
+                        : settings.ai_provider === "ai-studio"
+                          ? "ai_gemini_api_key"
+                          : settings.ai_provider === "openrouter"
+                            ? "ai_openrouter_api_key"
+                            : "ai_openai_compat_api_key";
+                    const keyValue = settings[keyField] || settings.ai_api_key || "";
+                    const isKeyRequired = settings.ai_provider !== "openai-compatible";
+
+                    return (
+                      <div className="space-y-2 animate-in fade-in slide-in-from-left-2 duration-300">
+                        <div className="flex items-center justify-between">
+                          <SectionLabel htmlFor={keyField}>Secret API Key</SectionLabel>
+                          <Button
+                            variant="ghost"
+                            onClick={handleTestConnection}
+                            disabled={isTestingConnection || (isKeyRequired && !keyValue.trim())}
+                            className="text-[9px] uppercase tracking-tighter font-bold text-primary hover:text-primary-light transition-colors disabled:opacity-30 h-auto p-0"
+                          >
+                            {isTestingConnection ? "Testing..." : "Test Connection"}
+                          </Button>
+                        </div>
+                        <div className="relative group/key">
+                          <SettingInput
+                            id={keyField}
+                            type={showApiKey ? "text" : "password"}
+                            value={keyValue}
+                            onChange={(e) => update(keyField as any, e.target.value, false)}
+                            onBlur={() => onSave(settings)}
+                            placeholder={
+                              settings.ai_provider === "openrouter"
+                                ? "sk-or-v1-••••••••••••••••"
+                                : settings.ai_provider === "openai"
+                                  ? "sk-proj-••••••••••••••••"
+                                  : settings.ai_provider === "ai-studio"
+                                    ? "AIzaSy••••••••••••••••"
+                                    : "Optional: sk-••••••••••••••••"
+                            }
+                            className="pr-10"
+                          />
+                          <Button
+                            variant="ghost"
+                            size="icon-sm"
+                            onClick={() => setShowApiKey(!showApiKey)}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-text-muted hover:text-text-primary transition-colors p-1"
+                          >
+                            {showApiKey ? (
+                              <EyeOff className="size-3.5" />
+                            ) : (
+                              <Eye className="size-3.5" />
+                            )}
+                          </Button>
+                        </div>
+                        <p className="text-[10px] text-text-muted/50 px-1">
+                          {settings.ai_provider === "openrouter"
+                            ? "OpenRouter API Key. Stored securely in local DuckDB settings."
+                            : settings.ai_provider === "openai"
+                              ? "OpenAI API Key (sk-proj-...). Stored securely in local DuckDB settings."
+                              : settings.ai_provider === "ai-studio"
+                                ? "Google AI Studio Gemini API Key. Stored securely in local DuckDB settings."
+                                : "API Key for your OpenAI-compatible gateway (optional for local proxies like LM Studio/vLLM)."}
+                        </p>
+                      </div>
+                    );
+                  })()}
               </div>
 
               {/* Model Selector Row */}

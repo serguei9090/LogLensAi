@@ -13,6 +13,10 @@ export interface AppSettings {
   ai_provider: string;
   ai_model: string;
   ai_api_key: string;
+  ai_gemini_api_key?: string;
+  ai_openai_api_key?: string;
+  ai_openrouter_api_key?: string;
+  ai_openai_compat_api_key?: string;
   ai_system_prompt: string;
   ai_ollama_host: string;
   ai_openai_host: string;
@@ -43,6 +47,10 @@ export const defaultSettings: AppSettings = {
   ai_provider: "ollama",
   ai_model: "gemma4:e2b",
   ai_api_key: "",
+  ai_gemini_api_key: "",
+  ai_openai_api_key: "",
+  ai_openrouter_api_key: "",
+  ai_openai_compat_api_key: "",
   ai_system_prompt:
     "You are LogLens Assistant, a senior DevOps engineer and SRE specializing in root cause analysis.",
   ai_ollama_host: "http://localhost:11434",

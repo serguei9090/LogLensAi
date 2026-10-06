@@ -260,28 +260,27 @@ func extractGeminiText(parts []geminiPart) string {
 // --- Provider implementation ---------------------------------------------
 
 func (p *GeminiProvider) ListModels(ctx context.Context) ([]string, error) {
-	fallback := []string{DefaultGeminiModel}
 	if p.apiKey == "" {
-		return fallback, nil
+		return []string{}, nil
 	}
 
 	req, err := p.newRequest(ctx, http.MethodGet, p.baseURL+"/models", nil)
 	if err != nil {
-		return fallback, nil
+		return nil, fmt.Errorf("gemini: create list models request: %w", err)
 	}
 	resp, err := p.httpClient.Do(req)
 	if err != nil {
-		return fallback, nil
+		return nil, fmt.Errorf("gemini: list models request: %w", err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return fallback, nil
+		return nil, fmt.Errorf("gemini: list models returned HTTP %d", resp.StatusCode)
 	}
 
 	var data geminiModelsResponse
 	if err := json.NewDecoder(resp.Body).Decode(&data); err != nil {
-		return fallback, nil
+		return nil, fmt.Errorf("gemini: decode list models response: %w", err)
 	}
 
 	models := make([]string, 0, len(data.Models))
@@ -290,9 +289,6 @@ func (p *GeminiProvider) ListModels(ctx context.Context) ([]string, error) {
 		if strings.Contains(lower, "gemini") || strings.Contains(lower, "gemma") {
 			models = append(models, m.Name)
 		}
-	}
-	if len(models) == 0 {
-		return fallback, nil
 	}
 	return models, nil
 }
