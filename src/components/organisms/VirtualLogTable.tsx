@@ -586,13 +586,13 @@ export function VirtualLogTable({
                         </div>
                       </div>
                       <div className="space-y-2">
-                        <h3 className="text-xl font-bold text-text-primary">
-                          {isIndexing ? "Indexing Dataset..." : "Retrieving Logs..."}
+                        <h3 className="text-xl font-bold text-text-primary animate-pulse">
+                          {isIndexing ? "Indexing Dataset..." : "Retrieving logs..."}
                         </h3>
                         <p className="text-sm text-text-muted leading-relaxed">
                           {isIndexing
                             ? "Building database indices and mapping patterns for the complete file. Almost ready."
-                            : "Hydrating log records from storage and applying active filters."}
+                            : "Hydrating log records from storage."}
                         </p>
                       </div>
                       {isIndexing && (
@@ -635,19 +635,21 @@ export function VirtualLogTable({
                     </>
                   )}
                 </div>
-                <div className="mt-12 flex items-center gap-6 text-[10px] font-bold uppercase tracking-widest text-text-muted/30">
-                  <div className="flex items-center gap-1.5">
-                    <Download className="size-3" /> local files
+                {(isQueued || isIndexing) && (
+                  <div className="mt-12 flex items-center gap-6 text-[10px] font-bold uppercase tracking-widest text-text-muted/30">
+                    <div className="flex items-center gap-1.5">
+                      <Download className="size-3" /> local files
+                    </div>
+                    <div className="w-1 h-1 rounded-full bg-current" />
+                    <div className="flex items-center gap-1.5">
+                      <Rocket className="size-3" /> live streams
+                    </div>
+                    <div className="w-1 h-1 rounded-full bg-current" />
+                    <div className="flex items-center gap-1.5">
+                      <Sparkles className="size-3" /> ssh tailing
+                    </div>
                   </div>
-                  <div className="w-1 h-1 rounded-full bg-current" />
-                  <div className="flex items-center gap-1.5">
-                    <Rocket className="size-3" /> live streams
-                  </div>
-                  <div className="w-1 h-1 rounded-full bg-current" />
-                  <div className="flex items-center gap-1.5">
-                    <Sparkles className="size-3" /> ssh tailing
-                  </div>
-                </div>
+                )}
               </div>
             );
           }
