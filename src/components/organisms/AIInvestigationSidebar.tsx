@@ -2,8 +2,18 @@ import { MarkdownContent } from "@/components/atoms/MarkdownContent";
 import { ThinkingBlock } from "@/components/atoms/ThinkingBlock";
 import { AIHistorySearchModal } from "@/components/organisms/AIHistorySearchModal";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Textarea } from "@/components/ui/textarea";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { callSidecar } from "@/lib/hooks/useSidecarBridge";
 import { cn } from "@/lib/utils";
 import { useAiStore } from "@/store/aiStore";
 import { useInvestigationStore } from "@/store/investigationStore";
@@ -13,9 +23,9 @@ import { selectActiveWorkspace, useWorkspaceStore } from "@/store/workspaceStore
 import {
   Bot,
   Check,
+  ChevronDown,
   Clock,
   Copy,
-  Cpu,
   FileText,
   Lightbulb,
   LightbulbOff,
@@ -31,7 +41,6 @@ import {
   X,
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { A2UIRenderer } from "../atoms/A2UIRenderer";
 import { TypingIndicator } from "../atoms/TypingIndicator";
 
@@ -271,7 +280,9 @@ function MessageContentBubble({
             <div className="flex flex-col gap-1.5 p-2 rounded-xl bg-bg-surface/50 border border-border-subtle/80 text-[11px]">
               <div className="flex items-center gap-1.5 font-medium text-text-muted mb-0.5 px-1">
                 <Wrench className="size-3 text-emerald-400" />
-                <span>Execution Steps ({steps.filter((s) => s.done).length}/{steps.length})</span>
+                <span>
+                  Execution Steps ({steps.filter((s) => s.done).length}/{steps.length})
+                </span>
               </div>
               <div className="flex flex-col gap-1">
                 {steps.map((st, idx) => (
@@ -312,7 +323,9 @@ function MessageContentBubble({
             <div className="mb-3 flex flex-col gap-1.5 p-2 rounded-xl bg-bg-surface/50 border border-border-subtle/80 text-[11px]">
               <div className="flex items-center gap-1.5 font-medium text-text-muted mb-0.5 px-1">
                 <Wrench className="size-3 text-emerald-400" />
-                <span>Execution Steps ({steps.filter((s) => s.done).length}/{steps.length})</span>
+                <span>
+                  Execution Steps ({steps.filter((s) => s.done).length}/{steps.length})
+                </span>
               </div>
               <div className="flex flex-col gap-1">
                 {steps.map((st, idx) => (
@@ -342,7 +355,12 @@ function MessageContentBubble({
             ) : (
               <>
                 <MarkdownContent
-                  content={response || (steps && steps.length > 0 ? "Completed multi-step investigation." : "No response content received.")}
+                  content={
+                    response ||
+                    (steps && steps.length > 0
+                      ? "Completed multi-step investigation."
+                      : "No response content received.")
+                  }
                   className="text-text-primary"
                   isStreaming={!isUser && isStreaming}
                 />
@@ -457,10 +475,10 @@ function AIMessageRow({
 }
 
 export function AIInvestigationSidebar({
-  onEngineSettingsOpen,
+  onEngineSettingsOpen: _onEngineSettingsOpen,
 }: {
   readonly onEngineSettingsOpen?: () => void;
-}) {
+} = {}) {
   const {
     isSidebarOpen,
     setSidebarOpen,
@@ -478,7 +496,7 @@ export function AIInvestigationSidebar({
   } = useAiStore();
 
   const activeWorkspace = useWorkspaceStore(selectActiveWorkspace);
-  const { settings, fetchSettings } = useSettingsStore();
+  const { settings, fetchSettings, updateSettings } = useSettingsStore();
   const { selectedLogIds, clearSelection } = useInvestigationStore();
 
   const [inputValue, setInputValue] = useState("");
@@ -488,8 +506,44 @@ export function AIInvestigationSidebar({
   const [pendingSessionName, setPendingSessionName] = useState("");
   const [showCommands, setShowCommands] = useState(false);
   const [isReasoningEnabled, setIsReasoningEnabled] = useState(true);
+  const [availableModels, setAvailableModels] = useState<string[]>([]);
+  const [isFetchingModels, setIsFetchingModels] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  const fetchModels = useCallback(async () => {
+    setIsFetchingModels(true);
+    try {
+      const models = await callSidecar<string[]>({ method: "list_ai_models", params: {} });
+      if (models && Array.isArray(models)) {
+        setAvailableModels(models);
+      }
+    } catch (e) {
+      console.error("Failed to fetch ai models:", e);
+    } finally {
+      setIsFetchingModels(false);
+    }
+  }, []);
+
+  const handleProviderChange = (newProvider: string) => {
+    let newModel = settings.ai_model;
+    if (newProvider === "ollama") {
+      newModel = "gemma4:e2b";
+    } else if (newProvider === "gemini-cli") {
+      newModel = "flash";
+    } else if (newProvider === "openai-compatible") {
+      newModel = "gpt-4o";
+    } else if (newProvider === "openrouter") {
+      newModel = "anthropic/claude-3.5-sonnet";
+    } else if (newProvider === "ai-studio") {
+      newModel = "gemini-2.0-flash";
+    }
+    updateSettings({ ai_provider: newProvider, ai_model: newModel });
+  };
+
+  const handleModelChange = (modelName: string) => {
+    updateSettings({ ai_model: modelName });
+  };
 
   const handleA2UIAction = useCallback((action: unknown) => {
     if (!action || typeof action !== "object" || !("type" in action)) {
@@ -591,7 +645,15 @@ export function AIInvestigationSidebar({
       fetchSessions(activeWorkspace.id);
     }
     fetchSettings();
-  }, [activeWorkspace?.id, isSidebarOpen, fetchSessions, fetchSettings]);
+    fetchModels();
+  }, [activeWorkspace?.id, isSidebarOpen, fetchSessions, fetchSettings, fetchModels]);
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: Refetch models whenever provider changes
+  useEffect(() => {
+    if (isSidebarOpen) {
+      fetchModels();
+    }
+  }, [isSidebarOpen, settings.ai_provider, fetchModels]);
 
   useEffect(() => {
     if (!currentSessionId && !pendingSessionName) {
@@ -769,16 +831,6 @@ export function AIInvestigationSidebar({
           <Button
             variant="ghost"
             size="icon"
-            className="h-8 w-8 text-text-muted hover:text-amber-400 hover:bg-amber-500/10"
-            onClick={onEngineSettingsOpen}
-            title="Engine Settings"
-          >
-            <Cpu className="h-4 w-4" />
-          </Button>
-
-          <Button
-            variant="ghost"
-            size="icon"
             className="h-8 w-8 rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-hover"
             onClick={() => setSidebarOpen(false)}
           >
@@ -915,8 +967,12 @@ export function AIInvestigationSidebar({
                       </button>
                     </div>
                   </TooltipTrigger>
-                  <TooltipContent side="top" className="text-xs bg-bg-surface border border-border text-text-secondary py-1 px-2.5">
-                    {selectedLogIds.length} {selectedLogIds.length === 1 ? "log" : "logs"} selected as context. Press Backspace to remove.
+                  <TooltipContent
+                    side="top"
+                    className="text-xs bg-bg-surface border border-border text-text-secondary py-1 px-2.5"
+                  >
+                    {selectedLogIds.length} {selectedLogIds.length === 1 ? "log" : "logs"} selected
+                    as context. Press Backspace to remove.
                   </TooltipContent>
                 </Tooltip>
               </TooltipProvider>
@@ -954,31 +1010,130 @@ export function AIInvestigationSidebar({
           />
 
           <div className="flex items-center justify-between pt-1 border-t border-border-subtle/40">
-            {/* Thinking Icon-Only Toggle with Tooltip */}
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger
-                  type="button"
-                  onClick={() => setIsReasoningEnabled(!isReasoningEnabled)}
-                  className={cn(
-                    "size-7 rounded-lg transition-all border flex items-center justify-center cursor-pointer",
-                    isReasoningEnabled
-                      ? "bg-amber-500/10 border-amber-500/30 text-amber-300 hover:bg-amber-500/20 shadow-[0_0_12px_-3px_rgba(245,158,11,0.5)]"
-                      : "bg-transparent border-border-subtle/60 text-text-muted hover:bg-bg-hover hover:text-text-primary",
-                  )}
-                  aria-label={isReasoningEnabled ? "Thinking on" : "Thinking off"}
+            <div className="flex items-center gap-1.5 overflow-hidden min-w-0 pr-1">
+              {/* Provider & Model Selector Dropdown */}
+              <DropdownMenu>
+                <DropdownMenuTrigger
+                  className="h-7 px-2 gap-1.5 text-xs text-text-secondary hover:text-text-primary bg-bg-surface/50 hover:bg-bg-surface border border-border-subtle/60 rounded-lg max-w-[210px] flex items-center justify-between font-normal shrink-0 cursor-pointer outline-none transition-colors"
+                  title={`Provider: ${settings.ai_provider} | Model: ${settings.ai_model}`}
                 >
-                  {isReasoningEnabled ? (
-                    <Lightbulb className="size-3.5 text-amber-400 animate-pulse-slow" />
+                  <span className="truncate text-[11px] font-medium font-mono text-text-primary">
+                    {settings.ai_model || "Select Model"}
+                  </span>
+                  {isFetchingModels ? (
+                    <Loader2 className="size-3 animate-spin text-text-muted shrink-0" />
                   ) : (
-                    <LightbulbOff className="size-3.5" />
+                    <ChevronDown className="size-3 text-text-muted shrink-0 opacity-70" />
                   )}
-                </TooltipTrigger>
-                <TooltipContent side="top" className="text-xs bg-bg-surface border border-border text-text-secondary py-1 px-2.5">
-                  {isReasoningEnabled ? "Thinking on" : "Thinking off"}
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent
+                  align="start"
+                  side="top"
+                  className="w-56 p-1 bg-bg-surface border border-border-subtle shadow-xl rounded-xl z-[120]"
+                >
+                  <DropdownMenuLabel className="text-[10px] uppercase font-bold text-text-muted tracking-wider px-2 py-1">
+                    AI Provider
+                  </DropdownMenuLabel>
+                  <div className="grid grid-cols-2 gap-1 px-1 pb-1">
+                    {[
+                      { id: "ollama", label: "Ollama" },
+                      { id: "gemini-cli", label: "Gemini CLI" },
+                      { id: "ai-studio", label: "AI Studio" },
+                      { id: "openrouter", label: "OpenRouter" },
+                      { id: "openai-compatible", label: "OpenAI" },
+                      { id: "lmstudio", label: "LM Studio" },
+                    ].map((p) => (
+                      <button
+                        key={p.id}
+                        type="button"
+                        onClick={() => handleProviderChange(p.id)}
+                        className={cn(
+                          "px-2 py-1 text-[11px] rounded-md font-medium text-left truncate transition-colors cursor-pointer",
+                          settings.ai_provider === p.id
+                            ? "bg-primary/15 text-primary border border-primary/30"
+                            : "text-text-secondary hover:bg-white/5 hover:text-text-primary",
+                        )}
+                      >
+                        {p.label}
+                      </button>
+                    ))}
+                  </div>
+
+                  <DropdownMenuSeparator className="my-1 bg-border-subtle/50" />
+
+                  <div className="flex items-center justify-between px-2 py-1">
+                    <DropdownMenuLabel className="p-0 text-[10px] uppercase font-bold text-text-muted tracking-wider">
+                      Model
+                    </DropdownMenuLabel>
+                    <button
+                      type="button"
+                      onClick={() => fetchModels()}
+                      className="text-[10px] text-primary hover:underline cursor-pointer disabled:opacity-50"
+                      disabled={isFetchingModels}
+                    >
+                      {isFetchingModels ? "Refreshing..." : "Refresh"}
+                    </button>
+                  </div>
+
+                  <div className="max-h-48 overflow-y-auto space-y-0.5 px-1 py-0.5">
+                    {availableModels.length > 0 ? (
+                      availableModels.map((m) => (
+                        <DropdownMenuItem
+                          key={m}
+                          onClick={() => handleModelChange(m)}
+                          className={cn(
+                            "text-xs px-2 py-1.5 rounded-lg cursor-pointer flex items-center justify-between font-mono",
+                            settings.ai_model === m
+                              ? "bg-primary/15 text-primary font-bold"
+                              : "text-text-secondary hover:text-text-primary hover:bg-white/5",
+                          )}
+                        >
+                          <span className="truncate">{m}</span>
+                          {settings.ai_model === m && (
+                            <Check className="size-3 text-primary shrink-0 ml-1.5" />
+                          )}
+                        </DropdownMenuItem>
+                      ))
+                    ) : (
+                      <div className="px-2 py-2 text-[11px] text-text-muted italic text-center">
+                        {isFetchingModels
+                          ? "Loading models..."
+                          : `Current: ${settings.ai_model || "None configured"}`}
+                      </div>
+                    )}
+                  </div>
+                </DropdownMenuContent>
+              </DropdownMenu>
+
+              {/* Thinking Icon-Only Toggle with Tooltip */}
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger
+                    type="button"
+                    onClick={() => setIsReasoningEnabled(!isReasoningEnabled)}
+                    className={cn(
+                      "size-7 rounded-lg transition-all border flex items-center justify-center cursor-pointer shrink-0",
+                      isReasoningEnabled
+                        ? "bg-amber-500/10 border-amber-500/30 text-amber-300 hover:bg-amber-500/20 shadow-[0_0_12px_-3px_rgba(245,158,11,0.5)]"
+                        : "bg-transparent border-border-subtle/60 text-text-muted hover:bg-bg-hover hover:text-text-primary",
+                    )}
+                    aria-label={isReasoningEnabled ? "Thinking on" : "Thinking off"}
+                  >
+                    {isReasoningEnabled ? (
+                      <Lightbulb className="size-3.5 text-amber-400 animate-pulse-slow" />
+                    ) : (
+                      <LightbulbOff className="size-3.5" />
+                    )}
+                  </TooltipTrigger>
+                  <TooltipContent
+                    side="top"
+                    className="text-xs bg-bg-surface border border-border text-text-secondary py-1 px-2.5"
+                  >
+                    {isReasoningEnabled ? "Thinking on" : "Thinking off"}
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            </div>
 
             {isLoading ? (
               <Button
