@@ -111,10 +111,10 @@ export function TailSwitch({
             }
           }}
           className={cn(
-            "relative inline-flex items-center gap-1.5 rounded-full border pl-2 pr-1.5 py-0.5 text-xs font-semibold transition-all duration-200 select-none cursor-pointer outline-none",
+            "relative inline-flex items-center gap-2 rounded-full border px-3 h-8 text-xs font-medium transition-all duration-200 select-none cursor-pointer outline-none",
             checked && !effectiveDisabled
               ? "border-emerald-500/40 bg-emerald-950/60 text-emerald-400 shadow-[0_0_12px_0_rgba(52,211,153,0.15)] hover:bg-emerald-900/60"
-              : "border-zinc-700/80 bg-zinc-900/90 text-zinc-400 hover:border-zinc-600 hover:text-zinc-300",
+              : "border-zinc-700/80 bg-zinc-900/90 text-zinc-300 hover:border-zinc-600 hover:text-zinc-100",
             effectiveDisabled &&
               "opacity-60 cursor-not-allowed hover:border-zinc-700/80 hover:text-zinc-400",
             className,
@@ -133,13 +133,13 @@ export function TailSwitch({
             />
           </span>
 
-          {/* Stable Label */}
-          <span className="leading-none">{label}</span>
+          {/* Main Label */}
+          <span className="font-semibold text-xs leading-none tracking-tight">{label}</span>
 
-          {/* Micro Transport Chip */}
+          {/* Compact embedded chip badge */}
           <span
             className={cn(
-              "inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[9px] font-mono uppercase font-bold tracking-wider leading-none shadow-xs shrink-0",
+              "inline-flex items-center gap-0.5 rounded-full border px-1.5 py-0.5 text-[8px] font-mono uppercase font-bold tracking-wider leading-none shadow-xs shrink-0 -mr-1",
               badge.chipBg,
             )}
           >
