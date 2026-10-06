@@ -485,10 +485,20 @@ export function VirtualLogTable({
           const showHydrating =
             !showPreparing &&
             !showOverlay &&
-            (isRehydrating || (!isIngesting && !isQueued && logs.length === 0 && isFetching));
+            (isRehydrating ||
+              isTransitioning ||
+              (!isIngesting && !isQueued && logs.length === 0 && (isFetching || Boolean(source))));
 
+          // Atomic Source Lock: A known source NEVER shows "No logs detected" if data is still
+          // transitioning, fetching, or has total > 0.
           const isEmpty =
-            logs.length === 0 && !showPreparing && !showOverlay && !showHydrating && !isFetching;
+            logs.length === 0 &&
+            !showPreparing &&
+            !showOverlay &&
+            !showHydrating &&
+            !isFetching &&
+            !isTransitioning &&
+            (total === 0 || !source);
           if (showPreparing) {
             return (
               <div className="absolute inset-0 flex flex-col items-center justify-center p-8 text-center animate-in fade-in zoom-in-95 duration-500 bg-bg-base/50 backdrop-blur-sm z-50">
