@@ -1079,31 +1079,24 @@ export function AIInvestigationSidebar({
                       {
                         id: "openai",
                         name: "OpenAI (Official)",
-                        isConfigured: Boolean(
-                          settings.ai_openai_api_key?.trim() || settings.ai_api_key?.trim(),
-                        ),
+                        isConfigured: Boolean(settings.ai_openai_api_key?.trim()),
                       },
                       {
                         id: "ai-studio",
                         name: "Google AI Studio",
-                        isConfigured: Boolean(
-                          settings.ai_gemini_api_key?.trim() || settings.ai_api_key?.trim(),
-                        ),
+                        isConfigured: Boolean(settings.ai_gemini_api_key?.trim()),
                       },
                       {
                         id: "openrouter",
                         name: "OpenRouter",
-                        isConfigured: Boolean(
-                          settings.ai_openrouter_api_key?.trim() || settings.ai_api_key?.trim(),
-                        ),
+                        isConfigured: Boolean(settings.ai_openrouter_api_key?.trim()),
                       },
                       {
                         id: "openai-compatible",
                         name: "OpenAI Compatible",
                         isConfigured: Boolean(
                           settings.ai_openai_host?.trim() ||
-                            settings.ai_openai_compat_api_key?.trim() ||
-                            settings.ai_api_key?.trim(),
+                            settings.ai_openai_compat_api_key?.trim(),
                         ),
                       },
                       {

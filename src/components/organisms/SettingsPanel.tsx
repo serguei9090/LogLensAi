@@ -1032,7 +1032,7 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
                           : settings.ai_provider === "openrouter"
                             ? "ai_openrouter_api_key"
                             : "ai_openai_compat_api_key";
-                    const keyValue = settings[keyField] || settings.ai_api_key || "";
+                    const keyValue = settings[keyField] ?? "";
                     const isKeyRequired = settings.ai_provider !== "openai-compatible";
 
                     return (
@@ -1054,7 +1054,10 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
                             type={showApiKey ? "text" : "password"}
                             value={keyValue}
                             onChange={(e) => update(keyField as any, e.target.value, false)}
-                            onBlur={() => onSave(settings)}
+                            onBlur={(e) => {
+                              const latest = { ...settings, [keyField]: e.target.value };
+                              onSave(latest);
+                            }}
                             placeholder={
                               settings.ai_provider === "openrouter"
                                 ? "sk-or-v1-••••••••••••••••"
