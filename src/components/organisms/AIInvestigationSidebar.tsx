@@ -34,6 +34,7 @@ import {
   MessageSquare,
   Pencil,
   Plus,
+  Search,
   Send,
   Sparkles,
   Square,
@@ -508,30 +509,47 @@ export function AIInvestigationSidebar({
   const [showCommands, setShowCommands] = useState(false);
   const [isReasoningEnabled, setIsReasoningEnabled] = useState(true);
   const [availableModels, setAvailableModels] = useState<string[]>([]);
+  const [providerModelsCache, setProviderModelsCache] = useState<Record<string, string[]>>({});
+  const [modelSearchQuery, setModelSearchQuery] = useState("");
   const [isFetchingModels, setIsFetchingModels] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  const fetchModels = useCallback(async () => {
-    setIsFetchingModels(true);
-    try {
-      const models = await callSidecar<string[]>({ method: "list_ai_models", params: {} });
-      if (models && Array.isArray(models)) {
-        setAvailableModels(models);
+  const fetchModels = useCallback(
+    async (forceRefresh = false) => {
+      const currentProvider = settings.ai_provider;
+      if (!currentProvider) {
+        return;
       }
-    } catch (e) {
-      console.error("Failed to fetch ai models:", e);
-    } finally {
-      setIsFetchingModels(false);
-    }
-  }, []);
+
+      if (!forceRefresh && providerModelsCache[currentProvider]?.length) {
+        setAvailableModels(providerModelsCache[currentProvider]);
+        return;
+      }
+
+      setIsFetchingModels(true);
+      try {
+        const models = await callSidecar<string[]>({ method: "list_ai_models", params: {} });
+        if (models && Array.isArray(models) && models.length > 0) {
+          setAvailableModels(models);
+          setProviderModelsCache((prev) => ({
+            ...prev,
+            [currentProvider]: models,
+          }));
+        }
+      } catch (e) {
+        console.error("Failed to fetch ai models:", e);
+      } finally {
+        setIsFetchingModels(false);
+      }
+    },
+    [settings.ai_provider, providerModelsCache],
+  );
 
   const handleProviderChange = (newProvider: string) => {
     let newModel = settings.ai_model;
     if (newProvider === "ollama") {
       newModel = "gemma4:e2b";
-    } else if (newProvider === "gemini-cli") {
-      newModel = "flash";
     } else if (newProvider === "openai-compatible") {
       newModel = "gpt-4o";
     } else if (newProvider === "openrouter") {
@@ -1038,7 +1056,7 @@ export function AIInvestigationSidebar({
                     </span>
                     <button
                       type="button"
-                      onClick={() => fetchModels()}
+                      onClick={() => fetchModels(true)}
                       className="text-[10px] text-primary hover:underline cursor-pointer disabled:opacity-50"
                       disabled={isFetchingModels}
                     >
@@ -1064,12 +1082,6 @@ export function AIInvestigationSidebar({
                         name: "Google AI Studio",
                         isConfigured: Boolean(settings.ai_api_key?.trim()),
                         defaultModels: ["gemini-2.0-flash", "gemini-1.5-pro", "gemini-1.5-flash"],
-                      },
-                      {
-                        id: "gemini-cli",
-                        name: "Gemini CLI",
-                        isConfigured: Boolean(settings.ai_gemini_url?.trim()),
-                        defaultModels: ["flash", "pro"],
                       },
                       {
                         id: "openrouter",
@@ -1100,11 +1112,19 @@ export function AIInvestigationSidebar({
                       },
                     ].map((provider) => {
                       const isActiveProvider = settings.ai_provider === provider.id;
-                      // If active provider and we have remote models fetched, prioritize those
-                      const providerModels =
-                        isActiveProvider && availableModels.length > 0
+                      // Determine available models for this provider
+                      const rawModels = providerModelsCache[provider.id]?.length
+                        ? providerModelsCache[provider.id]
+                        : isActiveProvider && availableModels.length > 0
                           ? availableModels
                           : provider.defaultModels;
+
+                      // Filter models if search query is active
+                      const filteredModels = modelSearchQuery.trim()
+                        ? rawModels.filter((m) =>
+                            m.toLowerCase().includes(modelSearchQuery.trim().toLowerCase()),
+                          )
+                        : rawModels;
 
                       if (!provider.isConfigured) {
                         return (
@@ -1122,7 +1142,14 @@ export function AIInvestigationSidebar({
                       }
 
                       return (
-                        <DropdownMenuSub key={provider.id}>
+                        <DropdownMenuSub
+                          key={provider.id}
+                          onOpenChange={(open) => {
+                            if (!open) {
+                              setModelSearchQuery("");
+                            }
+                          }}
+                        >
                           <DropdownMenuSubTrigger
                             className={cn(
                               "px-2 py-1.5 rounded-lg text-xs cursor-pointer flex items-center justify-between transition-colors",
@@ -1133,38 +1160,79 @@ export function AIInvestigationSidebar({
                           >
                             <span className="truncate">{provider.name}</span>
                           </DropdownMenuSubTrigger>
-                          <DropdownMenuSubContent className="w-56 p-1 bg-bg-surface border border-border-subtle shadow-2xl rounded-xl z-[130]">
-                            <div className="px-2 py-1 text-[10px] uppercase font-bold text-text-muted tracking-wider select-none">
-                              {provider.name} Models
+                          <DropdownMenuSubContent className="w-64 p-1.5 bg-bg-surface border border-border-subtle shadow-2xl rounded-xl z-[130]">
+                            <div className="flex items-center justify-between px-2 py-1 select-none border-b border-border-subtle/50 mb-1">
+                              <span className="text-[10px] uppercase font-bold text-text-muted tracking-wider">
+                                {provider.name} Models
+                              </span>
+                              <span className="text-[10px] text-text-muted/60">
+                                {rawModels.length}
+                              </span>
                             </div>
-                            <div className="max-h-56 overflow-y-auto space-y-0.5 mt-0.5">
-                              {providerModels.map((m) => {
-                                const isCurrentModel = isActiveProvider && settings.ai_model === m;
-                                return (
-                                  <DropdownMenuItem
-                                    key={m}
-                                    onClick={() => {
-                                      if (!isActiveProvider) {
-                                        handleProviderChange(provider.id);
-                                        handleModelChange(m);
-                                      } else {
-                                        handleModelChange(m);
-                                      }
+
+                            {/* Search bar displayed if there are more than 7 models */}
+                            {rawModels.length > 7 && (
+                              <div className="relative px-1 mb-1.5">
+                                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 size-3 text-text-muted/60 pointer-events-none" />
+                                <input
+                                  type="text"
+                                  value={modelSearchQuery}
+                                  onChange={(e) => setModelSearchQuery(e.target.value)}
+                                  placeholder="Search models..."
+                                  className="w-full h-7 pl-7 pr-6 text-xs rounded-lg bg-bg-app border border-border-subtle/80 text-text-primary placeholder:text-text-muted/40 focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/20 transition-all"
+                                  onClick={(e) => e.stopPropagation()}
+                                  onKeyDown={(e) => e.stopPropagation()}
+                                />
+                                {modelSearchQuery && (
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setModelSearchQuery("");
                                     }}
-                                    className={cn(
-                                      "text-xs px-2 py-1.5 rounded-lg cursor-pointer flex items-center justify-between font-mono",
-                                      isCurrentModel
-                                        ? "bg-primary/15 text-primary font-bold"
-                                        : "text-text-secondary hover:text-text-primary hover:bg-white/5",
-                                    )}
+                                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-text-muted hover:text-text-primary p-0.5"
                                   >
-                                    <span className="truncate">{m}</span>
-                                    {isCurrentModel && (
-                                      <Check className="size-3 text-primary shrink-0 ml-1.5" />
-                                    )}
-                                  </DropdownMenuItem>
-                                );
-                              })}
+                                    <X className="size-2.5" />
+                                  </button>
+                                )}
+                              </div>
+                            )}
+
+                            <div className="max-h-60 overflow-y-auto space-y-0.5">
+                              {filteredModels.length === 0 ? (
+                                <div className="px-2 py-2 text-center text-xs text-text-muted/60">
+                                  No models found
+                                </div>
+                              ) : (
+                                filteredModels.map((m) => {
+                                  const isCurrentModel =
+                                    isActiveProvider && settings.ai_model === m;
+                                  return (
+                                    <DropdownMenuItem
+                                      key={m}
+                                      onClick={() => {
+                                        if (!isActiveProvider) {
+                                          handleProviderChange(provider.id);
+                                          handleModelChange(m);
+                                        } else {
+                                          handleModelChange(m);
+                                        }
+                                      }}
+                                      className={cn(
+                                        "text-xs px-2 py-1.5 rounded-lg cursor-pointer flex items-center justify-between font-mono",
+                                        isCurrentModel
+                                          ? "bg-primary/15 text-primary font-bold"
+                                          : "text-text-secondary hover:text-text-primary hover:bg-white/5",
+                                      )}
+                                    >
+                                      <span className="truncate">{m}</span>
+                                      {isCurrentModel && (
+                                        <Check className="size-3 text-primary shrink-0 ml-1.5" />
+                                      )}
+                                    </DropdownMenuItem>
+                                  );
+                                })
+                              )}
                             </div>
                           </DropdownMenuSubContent>
                         </DropdownMenuSub>

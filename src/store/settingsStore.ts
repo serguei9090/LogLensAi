@@ -14,7 +14,6 @@ export interface AppSettings {
   ai_model: string;
   ai_api_key: string;
   ai_system_prompt: string;
-  ai_gemini_url: string;
   ai_ollama_host: string;
   ai_openai_host: string;
   ai_openrouter_host: string;
@@ -46,7 +45,6 @@ export const defaultSettings: AppSettings = {
   ai_api_key: "",
   ai_system_prompt:
     "You are LogLens Assistant, a senior DevOps engineer and SRE specializing in root cause analysis.",
-  ai_gemini_url: "http://localhost:22436",
   ai_ollama_host: "http://localhost:11434",
   ai_openai_host: "https://api.openai.com/v1",
   ai_openrouter_host: "https://openrouter.ai/api/v1",
@@ -163,6 +161,9 @@ interface SettingsStore {
   updateSettings: (newSettings: Partial<AppSettings>, workspaceId?: string) => Promise<void>;
 }
 
+let saveTimeout: ReturnType<typeof setTimeout> | null = null;
+let pendingSettingsPayload: Record<string, unknown> = {};
+
 export const useSettingsStore = create<SettingsStore>((set) => ({
   settings: defaultSettings,
 
@@ -246,36 +247,32 @@ export const useSettingsStore = create<SettingsStore>((set) => ({
     // 1. Update local state immediately for UI responsiveness
     set((state) => ({ settings: { ...state.settings, ...newSettings } }));
 
-    // 2. Debounced persistence to sidecar
-    // We use a module-level variable or a simple timeout to debounce the RPC call
+    // 2. Accumulate all changed fields so fast sequential updates aren't dropped
+    for (const [k, v] of Object.entries(newSettings)) {
+      if (k === "drain_masks" || k === "facet_extractions") {
+        pendingSettingsPayload[k] = JSON.stringify(v);
+      } else {
+        pendingSettingsPayload[k] = v;
+      }
+    }
+
     if (saveTimeout) {
       clearTimeout(saveTimeout);
     }
 
     saveTimeout = setTimeout(async () => {
-      try {
-        const payload: Record<string, string | number | boolean> = {};
-        // The sidecar expects a dict of settings to update.
-        // To be safe and consistent with the existing API, we'll send the updated fields.
-        for (const [k, v] of Object.entries(newSettings)) {
-          if (k === "drain_masks" || k === "facet_extractions") {
-            payload[k] = JSON.stringify(v);
-          } else {
-            payload[k] = v as string | number | boolean;
-          }
-        }
+      const payloadToSend = { ...pendingSettingsPayload };
+      pendingSettingsPayload = {};
+      saveTimeout = null;
 
+      try {
         await callSidecar({
           method: "update_settings",
-          params: { settings: payload, workspace_id: workspaceId },
+          params: { settings: payloadToSend, workspace_id: workspaceId },
         });
       } catch (err) {
         console.error("Failed to persist settings to sidecar:", err);
-      } finally {
-        saveTimeout = null;
       }
-    }, 500);
+    }, 300);
   },
 }));
-
-let saveTimeout: ReturnType<typeof setTimeout> | null = null;

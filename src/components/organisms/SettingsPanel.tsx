@@ -542,9 +542,6 @@ function getProviderLabel(provider: string): string {
   if (provider === "openrouter") {
     return "OpenRouter Unified API";
   }
-  if (provider === "gemini-cli") {
-    return "Gemini CLI Integrated";
-  }
   if (provider === "ollama") {
     return "Local Inference";
   }
@@ -565,9 +562,6 @@ function getProviderLabel(provider: string): string {
 function getProviderDescription(provider: string): string {
   if (provider === "openrouter") {
     return "Access Claude 3.5, Llama 3.3, Gemini 2.0, DeepSeek, and GPT-4o through OpenRouter.";
-  }
-  if (provider === "gemini-cli") {
-    return "Runs purely on your local hardware via the configured gemini-cli. Zero data egress to third-party APIs beyond the model provider.";
   }
   if (provider === "ollama") {
     return "Ensure Ollama is running and desired model is pulled locally.";
@@ -933,8 +927,6 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
                       let newModel = settings.ai_model;
                       if (v === "ollama") {
                         newModel = "gemma4:e2b";
-                      } else if (v === "gemini-cli") {
-                        newModel = "flash";
                       } else if (v === "openai-compatible") {
                         newModel = "gpt-4o";
                       } else if (v === "openrouter") {
@@ -950,7 +942,6 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
                       setTimeout(() => setSaved(false), 2000);
                     }}
                   >
-                    <option value="gemini-cli">Gemini CLI</option>
                     <option value="ollama">Ollama</option>
                     <option value="openrouter">OpenRouter</option>
                     <option value="lmstudio">LM Studio</option>
@@ -958,31 +949,6 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
                     <option value="openai-compatible">OpenAI Compatible</option>
                   </SettingSelect>
                 </div>
-
-                {settings.ai_provider === "gemini-cli" && (
-                  <div className="space-y-2 animate-in fade-in slide-in-from-left-2 duration-300">
-                    <div className="flex items-center justify-between">
-                      <SectionLabel htmlFor="ai_gemini_url">A2A Server URL</SectionLabel>
-                      <Button
-                        variant="ghost"
-                        onClick={handleTestConnection}
-                        disabled={isTestingConnection}
-                        className="text-[9px] uppercase tracking-tighter font-bold text-primary hover:text-primary-light transition-colors disabled:opacity-30 h-auto p-0"
-                      >
-                        {isTestingConnection ? "Testing..." : "Test Connection"}
-                      </Button>
-                    </div>
-                    <SettingInput
-                      id="ai_gemini_url"
-                      type="url"
-                      value={settings.ai_gemini_url}
-                      onChange={(e) => update("ai_gemini_url", e.target.value, false)}
-                      onBlur={() => onSave(settings)}
-                      placeholder="http://localhost:22436"
-                    />
-                    <p className="text-[10px] text-text-muted/50 px-1">Daemon port for Hot Mode.</p>
-                  </div>
-                )}
 
                 {settings.ai_provider === "ollama" && (
                   <div className="space-y-2 animate-in fade-in slide-in-from-left-2 duration-300">
@@ -1091,35 +1057,14 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
 
               {/* Model Selector Row */}
               <div className="grid grid-cols-2 gap-8 pt-4 border-t border-border/30">
-                {settings.ai_provider === "gemini-cli" ? (
-                  <div className="space-y-2">
-                    <SectionLabel htmlFor="ai_model">Gemini Model Strategy</SectionLabel>
-                    <SettingSelect
-                      id="ai_model"
-                      value={settings.ai_model}
-                      onChange={(v) => update("ai_model", v)}
-                    >
-                      <option value="flash">Flash</option>
-                      <option value="pro">Pro</option>
-                      <option value="flash-lite">Flash Lite</option>
-                      <option value="auto">Auto</option>
-                      <option value="auto-gemini-3">Auto Gemini 3</option>
-                      <option value="auto-gemini-2.5">Auto Gemini 2.5</option>
-                    </SettingSelect>
-                    <p className="text-[10px] text-text-muted/50 px-1">
-                      Choose 'Flash' for speed or 'Pro' for deeper analysis.
-                    </p>
-                  </div>
-                ) : (
-                  <ModelSelector
-                    value={settings.ai_model}
-                    onChange={(v) => update("ai_model", v)}
-                    availableModels={availableModels}
-                    isFetching={isFetchingModels}
-                    onRefresh={fetchModels}
-                    provider={settings.ai_provider}
-                  />
-                )}
+                <ModelSelector
+                  value={settings.ai_model}
+                  onChange={(v) => update("ai_model", v)}
+                  availableModels={availableModels}
+                  isFetching={isFetchingModels}
+                  onRefresh={fetchModels}
+                  provider={settings.ai_provider}
+                />
 
                 {settings.ai_provider === "openai-compatible" && (
                   <div className="space-y-2 animate-in fade-in slide-in-from-top-2 duration-300">
@@ -1249,21 +1194,6 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
                   </div>
                 )}
               </div>
-
-              {settings.ai_provider === "gemini-cli" && (
-                <div className="flex items-start gap-4 bg-primary/5 border border-primary/20 rounded-2xl p-5 group hover:bg-primary/10 transition-colors">
-                  <div className="bg-primary/20 p-2 rounded-xl">
-                    <Layers className="h-5 w-5 text-primary" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-bold text-primary">Gemini CLI Integrated</p>
-                    <p className="text-xs text-text-secondary mt-1 leading-relaxed">
-                      Runs purely on your local hardware via the configured gemini-cli. Zero data
-                      egress to third-party APIs beyond the model provider.
-                    </p>
-                  </div>
-                </div>
-              )}
 
               <div className="flex items-center justify-between bg-bg-surface/50 border border-border rounded-2xl p-5 hover:bg-bg-surface transition-colors">
                 <div className="flex items-center gap-4">
