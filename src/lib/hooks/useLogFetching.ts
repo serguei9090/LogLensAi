@@ -38,6 +38,7 @@ export function useLogFetching(workspaceId: string | null, activeSourceId: strin
   const [isFetching, setIsFetching] = useState(false);
   const [isConnected, setIsConnected] = useState(true);
   const [anomalousClusters, setAnomalousClusters] = useState<Set<string>>(new Set());
+  const [loadedSourceId, setLoadedSourceId] = useState<string | null>(null);
 
   // Keep track of the active source key to prevent fetching bounds, anomalies,
   // and facets redundantly on every search/filter/sort action.
@@ -177,25 +178,19 @@ export function useLogFetching(workspaceId: string | null, activeSourceId: strin
       }
 
       // Process Bounds
+      const store = useInvestigationStore.getState();
+      let activeStartTime = store.timeRange.start;
+      let activeEndTime = store.timeRange.end;
+
       if (bounds?.min_time && bounds.max_time) {
         const minIso = bounds.min_time.replace(" ", "T");
         const maxIso = bounds.max_time.replace(" ", "T");
-        const store = useInvestigationStore.getState();
         const boundsChanged =
           store.timeRangeBounds.start !== minIso || store.timeRangeBounds.end !== maxIso;
         store.setTimeRangeBounds({ start: minIso, end: maxIso });
         if (boundsChanged || (!store.timeRange.start && !store.timeRange.end)) {
-          // Pre-cache parameters with updated bounds start/end so that setting the store timeRange
-          // does not trigger a duplicate log fetch on the next render pass.
-          lastFetchedParamsRef.current = {
-            searchQuery: debouncedQuery,
-            filters: JSON.stringify(queryParams.combinedFilters),
-            sortBy,
-            sortOrder,
-            startTime: minIso,
-            endTime: maxIso,
-            showAnomalies,
-          };
+          activeStartTime = minIso;
+          activeEndTime = maxIso;
           store.setTimeRange({ start: minIso, end: maxIso, label: "All Time" });
         }
       }
@@ -215,20 +210,15 @@ export function useLogFetching(workspaceId: string | null, activeSourceId: strin
       setIsConnected(true);
       lastSourceKeyRef.current = sourceKey;
 
-      if (
-        !lastFetchedParamsRef.current ||
-        lastFetchedParamsRef.current.startTime !== timeRange.start
-      ) {
-        lastFetchedParamsRef.current = {
-          searchQuery: debouncedQuery,
-          filters: JSON.stringify(queryParams.combinedFilters),
-          sortBy,
-          sortOrder,
-          startTime: timeRange.start || "",
-          endTime: timeRange.end || "",
-          showAnomalies,
-        };
-      }
+      lastFetchedParamsRef.current = {
+        searchQuery: debouncedQuery,
+        filters: JSON.stringify(queryParams.combinedFilters),
+        sortBy,
+        sortOrder,
+        startTime: activeStartTime || "",
+        endTime: activeEndTime || "",
+        showAnomalies,
+      };
     },
     [
       debouncedQuery,
@@ -318,6 +308,9 @@ export function useLogFetching(workspaceId: string | null, activeSourceId: strin
           await fetchAllLogsAndMetadata(workspaceId, currentSourceRef, queryParams, sourceKey);
         } else {
           await fetchPartialLogs(workspaceId, currentSourceRef, queryParams);
+        }
+        if (currentSourceRef === activeSourceId) {
+          setLoadedSourceId(currentSourceRef);
         }
 
         // NOTE: Do NOT call stopIngestion() here.
@@ -414,5 +407,6 @@ export function useLogFetching(workspaceId: string | null, activeSourceId: strin
     fetchLogs,
     fetchMoreLogs,
     queryParams,
+    loadedSourceId,
   };
 }

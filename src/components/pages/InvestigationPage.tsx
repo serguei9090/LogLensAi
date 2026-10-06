@@ -136,9 +136,7 @@ function InvestigationPageImpl() {
   const lastSourceRef = useRef<string | null>(null);
   const lastWorkspaceRef = useRef<string | null>(null);
 
-  // Clear logs immediately when switching to a DIFFERENT source or workspace to prevent "ghost data".
-  // Do NOT clear if we just deselected the source (activeSourceId is null), so the state
-  // is preserved when navigating to the workspace overview and back.
+  // Clear logs immediately when switching to a DIFFERENT workspace to prevent "ghost data".
   useEffect(() => {
     if (!activeWorkspaceId) {
       return;
@@ -151,41 +149,17 @@ function InvestigationPageImpl() {
       setLogs([], 0);
       setAvailableFacets({});
       useInvestigationStore.getState().setTimeRange({ start: "", end: "", label: "All Time" });
-    } else if (
-      activeSourceId &&
-      lastSourceRef.current &&
-      lastSourceRef.current !== activeSourceId
-    ) {
-      // Read transitioningSourceIds reactively via the prop already subscribed at line 165,
-      // NOT via getState() which is a stale snapshot at the time this effect runs.
-      const isTransitioning = transitioningSourceIds.has(activeSourceId);
-      const isRetrieving = retrievingSourceIds.has(activeSourceId);
-      if (!activeJobForSource && !isTransitioning && !isRetrieving) {
-        setLogs([], 0);
-        setAvailableFacets({});
-        useInvestigationStore.getState().setTimeRange({ start: "", end: "", label: "All Time" });
-      }
     }
 
     if (activeSourceId) {
       lastSourceRef.current = activeSourceId;
     }
     lastWorkspaceRef.current = activeWorkspaceId;
-  }, [
-    activeWorkspaceId,
-    activeSourceId,
-    activeJobForSource,
-    retrievingSourceIds,
-    transitioningSourceIds,
-    setLogs,
-    setAvailableFacets,
-  ]);
+  }, [activeWorkspaceId, activeSourceId, setLogs, setAvailableFacets]);
 
   // Memoize the query params to reduce complexity in fetchLogs
-  const { isFetching, isConnected, anomalousClusters, fetchLogs, fetchMoreLogs } = useLogFetching(
-    activeWorkspaceId,
-    activeSourceId,
-  );
+  const { isFetching, isConnected, anomalousClusters, fetchLogs, fetchMoreLogs, loadedSourceId } =
+    useLogFetching(activeWorkspaceId, activeSourceId);
 
   const {
     tailingSourceIds,
@@ -201,7 +175,8 @@ function InvestigationPageImpl() {
   // 1. Source is in the ingestingSourceIds set (startIngestion called)
   // 2. Source is transitioning (between callSidecar returning and first poll detecting a job)
   // 3. A queued/pending/processing job exists for this source
-  // 4. Data is being fetched and no logs are loaded yet
+  // 4. Source just changed and logs for the newly selected source have not arrived yet
+  // 5. Data is being fetched and no logs are loaded yet
   const isSourceLoading = useMemo(() => {
     if (activeSourceId && ingestingSourceIds.includes(activeSourceId)) {
       return true;
@@ -216,10 +191,15 @@ function InvestigationPageImpl() {
     if (activeSourceId && retrievingSourceIds.has(activeSourceId)) {
       return true;
     }
+    // Block view if active source switched but new source logs haven't arrived yet
+    if (activeSourceId && loadedSourceId !== activeSourceId) {
+      return true;
+    }
     // Only block the whole view if we don't have any logs loaded yet
     return isFetching && logs.length === 0;
   }, [
     activeSourceId,
+    loadedSourceId,
     ingestingSourceIds,
     transitioningSourceIds,
     activeJobForSource,
@@ -403,12 +383,6 @@ function InvestigationPageImpl() {
 
   const handleSelectSource = (sourceId: string | null) => {
     setActiveSource(activeWorkspaceId, sourceId);
-    if (sourceId) {
-      // Force an immediate full fetch to ensure loading animation and data render on the first click
-      setTimeout(() => {
-        fetchLogs({ forceFull: true });
-      }, 0);
-    }
   };
   const handleRemoveSource = async (sourceId: string) => {
     const src = sources.find((s) => s.id === sourceId);
