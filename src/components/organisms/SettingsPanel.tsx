@@ -649,8 +649,9 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
   const [settings, setSettings] = useState<AppSettings>(defaultSettings);
   const [activeSection, setActiveSection] = useState<SectionId>("ai");
   const [saved, setSaved] = useState(false);
-  const [availableModels, setAvailableModels] = useState<string[]>([]);
+  const [providerModelsCache, setProviderModelsCache] = useState<Record<string, string[]>>({});
   const [isFetchingModels, setIsFetchingModels] = useState(false);
+  const availableModels = providerModelsCache[settings.ai_provider] || [];
 
   const [isToolsExpanded, setIsToolsExpanded] = useState(false);
   const [isSkillModalOpen, setIsSkillModalOpen] = useState(false);
@@ -795,43 +796,29 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
     loadSettings();
   }, []);
 
-  const fetchModels = useCallback(async () => {
-    setIsFetchingModels(true);
-    try {
-      const models = await callSidecar<string[]>({ method: "list_ai_models", params: {} });
-      if (models && Array.isArray(models)) {
-        setAvailableModels(models);
+  const fetchModels = useCallback(
+    async (targetProvider?: string) => {
+      const provider = targetProvider || settings.ai_provider;
+      if (!provider) {
+        return;
       }
-    } catch (e) {
-      console.error("Failed to fetch ai models:", e);
-    } finally {
-      setIsFetchingModels(false);
-    }
-  }, []);
-
-  // biome-ignore lint/correctness/useExhaustiveDependencies: Must re-fetch on these changes even if not directly used in the effect body
-  useEffect(() => {
-    // Trigger model pull when provider or connectivity settings change (with debounce)
-    const dynamicProviders = ["ollama", "lmstudio", "openai-compatible", "ai-studio", "openrouter"];
-    if (dynamicProviders.includes(settings.ai_provider)) {
-      const timer = setTimeout(() => {
-        fetchModels();
-      }, 1000);
-      return () => clearTimeout(timer);
-    }
-  }, [
-    fetchModels,
-    settings.ai_provider,
-    settings.ai_api_key,
-    settings.ai_openrouter_api_key,
-    settings.ai_openai_api_key,
-    settings.ai_gemini_api_key,
-    settings.ai_openai_compat_api_key,
-    settings.ai_ollama_host,
-    settings.ai_lmstudio_host,
-    settings.ai_openai_host,
-    settings.ai_openrouter_host,
-  ]);
+      setIsFetchingModels(true);
+      try {
+        const models = await callSidecar<string[]>({ method: "list_ai_models", params: {} });
+        if (models && Array.isArray(models)) {
+          setProviderModelsCache((prev) => ({
+            ...prev,
+            [provider]: models,
+          }));
+        }
+      } catch (e) {
+        console.error("Failed to fetch ai models:", e);
+      } finally {
+        setIsFetchingModels(false);
+      }
+    },
+    [settings.ai_provider],
+  );
 
   // Removed handleSave in favor of auto-save via update()
 

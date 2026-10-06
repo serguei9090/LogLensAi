@@ -508,7 +508,6 @@ export function AIInvestigationSidebar({
   const [pendingSessionName, setPendingSessionName] = useState("");
   const [showCommands, setShowCommands] = useState(false);
   const [isReasoningEnabled, setIsReasoningEnabled] = useState(true);
-  const [availableModels, setAvailableModels] = useState<string[]>([]);
   const [providerModelsCache, setProviderModelsCache] = useState<Record<string, string[]>>({});
   const [modelSearchQuery, setModelSearchQuery] = useState("");
   const [isFetchingModels, setIsFetchingModels] = useState(false);
@@ -523,7 +522,6 @@ export function AIInvestigationSidebar({
       }
 
       if (!forceRefresh && providerModelsCache[currentProvider]?.length) {
-        setAvailableModels(providerModelsCache[currentProvider]);
         return;
       }
 
@@ -534,7 +532,6 @@ export function AIInvestigationSidebar({
         }
         const models = await callSidecar<string[]>({ method: "list_ai_models", params: {} });
         if (models && Array.isArray(models) && models.length > 0) {
-          setAvailableModels(models);
           setProviderModelsCache((prev) => ({
             ...prev,
             [currentProvider]: models,
@@ -669,15 +666,7 @@ export function AIInvestigationSidebar({
       fetchSessions(activeWorkspace.id);
     }
     fetchSettings();
-    fetchModels();
-  }, [activeWorkspace?.id, isSidebarOpen, fetchSessions, fetchSettings, fetchModels]);
-
-  // biome-ignore lint/correctness/useExhaustiveDependencies: Refetch models whenever provider changes
-  useEffect(() => {
-    if (isSidebarOpen) {
-      fetchModels();
-    }
-  }, [isSidebarOpen, settings.ai_provider, fetchModels]);
+  }, [activeWorkspace?.id, isSidebarOpen, fetchSessions, fetchSettings]);
 
   useEffect(() => {
     if (!currentSessionId && !pendingSessionName) {
@@ -1106,12 +1095,8 @@ export function AIInvestigationSidebar({
                       },
                     ].map((provider) => {
                       const isActiveProvider = settings.ai_provider === provider.id;
-                      // Determine available models for this provider: only verified/pulled models
-                      const rawModels = providerModelsCache[provider.id]?.length
-                        ? providerModelsCache[provider.id]
-                        : isActiveProvider && availableModels.length > 0
-                          ? availableModels
-                          : [];
+                      // Determine available models for this provider: only verified/pulled models cached for this specific provider
+                      const rawModels = providerModelsCache[provider.id] || [];
 
                       // Filter models if search query is active
                       const filteredModels = modelSearchQuery.trim()
