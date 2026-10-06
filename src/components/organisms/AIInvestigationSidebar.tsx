@@ -6,7 +6,9 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -1010,7 +1012,7 @@ export function AIInvestigationSidebar({
 
           <div className="flex items-center justify-between pt-1 border-t border-border-subtle/40">
             <div className="flex items-center gap-1.5 overflow-hidden min-w-0 pr-1">
-              {/* Provider & Model Selector Dropdown */}
+              {/* VS Code-style Provider & Model Selector Dropdown */}
               <DropdownMenu>
                 <DropdownMenuTrigger
                   className="h-7 px-2 gap-1.5 text-xs text-text-secondary hover:text-text-primary bg-bg-surface/50 hover:bg-bg-surface border border-border-subtle/60 rounded-lg max-w-[210px] flex items-center justify-between font-normal shrink-0 cursor-pointer outline-none transition-colors"
@@ -1028,42 +1030,12 @@ export function AIInvestigationSidebar({
                 <DropdownMenuContent
                   align="start"
                   side="top"
-                  className="w-56 p-1 bg-bg-surface border border-border-subtle shadow-xl rounded-xl z-[120]"
+                  className="w-56 p-1.5 bg-bg-surface border border-border-subtle shadow-xl rounded-xl z-[120]"
                 >
-                  <div className="text-[10px] uppercase font-bold text-text-muted tracking-wider px-2 py-1 select-none">
-                    AI Provider
-                  </div>
-                  <div className="grid grid-cols-2 gap-1 px-1 pb-1">
-                    {[
-                      { id: "ollama", label: "Ollama" },
-                      { id: "gemini-cli", label: "Gemini CLI" },
-                      { id: "ai-studio", label: "AI Studio" },
-                      { id: "openrouter", label: "OpenRouter" },
-                      { id: "openai-compatible", label: "OpenAI" },
-                      { id: "lmstudio", label: "LM Studio" },
-                    ].map((p) => (
-                      <button
-                        key={p.id}
-                        type="button"
-                        onClick={() => handleProviderChange(p.id)}
-                        className={cn(
-                          "px-2 py-1 text-[11px] rounded-md font-medium text-left truncate transition-colors cursor-pointer",
-                          settings.ai_provider === p.id
-                            ? "bg-primary/15 text-primary border border-primary/30"
-                            : "text-text-secondary hover:bg-white/5 hover:text-text-primary",
-                        )}
-                      >
-                        {p.label}
-                      </button>
-                    ))}
-                  </div>
-
-                  <DropdownMenuSeparator className="my-1 bg-border-subtle/50" />
-
-                  <div className="flex items-center justify-between px-2 py-1">
-                    <div className="text-[10px] uppercase font-bold text-text-muted tracking-wider select-none">
-                      Model
-                    </div>
+                  <div className="flex items-center justify-between px-2 py-1 select-none">
+                    <span className="text-[10px] uppercase font-bold text-text-muted tracking-wider">
+                      AI Providers
+                    </span>
                     <button
                       type="button"
                       onClick={() => fetchModels()}
@@ -1074,32 +1046,130 @@ export function AIInvestigationSidebar({
                     </button>
                   </div>
 
-                  <div className="max-h-48 overflow-y-auto space-y-0.5 px-1 py-0.5">
-                    {availableModels.length > 0 ? (
-                      availableModels.map((m) => (
-                        <DropdownMenuItem
-                          key={m}
-                          onClick={() => handleModelChange(m)}
-                          className={cn(
-                            "text-xs px-2 py-1.5 rounded-lg cursor-pointer flex items-center justify-between font-mono",
-                            settings.ai_model === m
-                              ? "bg-primary/15 text-primary font-bold"
-                              : "text-text-secondary hover:text-text-primary hover:bg-white/5",
-                          )}
-                        >
-                          <span className="truncate">{m}</span>
-                          {settings.ai_model === m && (
-                            <Check className="size-3 text-primary shrink-0 ml-1.5" />
-                          )}
-                        </DropdownMenuItem>
-                      ))
-                    ) : (
-                      <div className="px-2 py-2 text-[11px] text-text-muted italic text-center">
-                        {isFetchingModels
-                          ? "Loading models..."
-                          : `Current: ${settings.ai_model || "None configured"}`}
-                      </div>
-                    )}
+                  <div className="space-y-0.5 mt-1">
+                    {[
+                      {
+                        id: "ollama",
+                        name: "Ollama",
+                        isConfigured: Boolean(settings.ai_ollama_host?.trim()),
+                        defaultModels: [
+                          "gemma4:e2b",
+                          "llama3.2:latest",
+                          "mistral:latest",
+                          "qwen2.5:latest",
+                        ],
+                      },
+                      {
+                        id: "ai-studio",
+                        name: "Google AI Studio",
+                        isConfigured: Boolean(settings.ai_api_key?.trim()),
+                        defaultModels: ["gemini-2.0-flash", "gemini-1.5-pro", "gemini-1.5-flash"],
+                      },
+                      {
+                        id: "gemini-cli",
+                        name: "Gemini CLI",
+                        isConfigured: Boolean(settings.ai_gemini_url?.trim()),
+                        defaultModels: ["flash", "pro"],
+                      },
+                      {
+                        id: "openrouter",
+                        name: "OpenRouter",
+                        isConfigured: Boolean(
+                          settings.ai_api_key?.trim() || settings.ai_openrouter_host?.trim(),
+                        ),
+                        defaultModels: [
+                          "anthropic/claude-3.5-sonnet",
+                          "google/gemini-2.0-flash-exp:free",
+                          "meta-llama/llama-3.3-70b-instruct",
+                          "deepseek/deepseek-chat",
+                        ],
+                      },
+                      {
+                        id: "openai-compatible",
+                        name: "OpenAI Compatible",
+                        isConfigured: Boolean(
+                          settings.ai_api_key?.trim() || settings.ai_openai_host?.trim(),
+                        ),
+                        defaultModels: ["gpt-4o", "gpt-4o-mini", "o1", "o3-mini"],
+                      },
+                      {
+                        id: "lmstudio",
+                        name: "LM Studio",
+                        isConfigured: Boolean(settings.ai_lmstudio_host?.trim()),
+                        defaultModels: ["local-model"],
+                      },
+                    ].map((provider) => {
+                      const isActiveProvider = settings.ai_provider === provider.id;
+                      // If active provider and we have remote models fetched, prioritize those
+                      const providerModels =
+                        isActiveProvider && availableModels.length > 0
+                          ? availableModels
+                          : provider.defaultModels;
+
+                      if (!provider.isConfigured) {
+                        return (
+                          <div
+                            key={provider.id}
+                            className="relative flex items-center justify-between px-2 py-1.5 rounded-lg text-xs text-text-muted/40 cursor-not-allowed select-none group/item"
+                            title="Configure API key / host in Settings to enable this provider"
+                          >
+                            <span className="truncate">{provider.name}</span>
+                            <span className="text-[10px] text-amber-500/60 font-medium">
+                              Not configured
+                            </span>
+                          </div>
+                        );
+                      }
+
+                      return (
+                        <DropdownMenuSub key={provider.id}>
+                          <DropdownMenuSubTrigger
+                            className={cn(
+                              "px-2 py-1.5 rounded-lg text-xs cursor-pointer flex items-center justify-between transition-colors",
+                              isActiveProvider
+                                ? "bg-primary/10 text-primary font-semibold"
+                                : "text-text-secondary hover:text-text-primary hover:bg-white/5",
+                            )}
+                          >
+                            <span className="truncate">{provider.name}</span>
+                          </DropdownMenuSubTrigger>
+                          <DropdownMenuSubContent className="w-56 p-1 bg-bg-surface border border-border-subtle shadow-2xl rounded-xl z-[130]">
+                            <div className="px-2 py-1 text-[10px] uppercase font-bold text-text-muted tracking-wider select-none">
+                              {provider.name} Models
+                            </div>
+                            <div className="max-h-56 overflow-y-auto space-y-0.5 mt-0.5">
+                              {providerModels.map((m) => {
+                                const isCurrentModel = isActiveProvider && settings.ai_model === m;
+                                return (
+                                  <DropdownMenuItem
+                                    key={m}
+                                    onClick={() => {
+                                      if (!isActiveProvider) {
+                                        handleProviderChange(provider.id);
+                                        handleModelChange(m);
+                                      } else {
+                                        handleModelChange(m);
+                                      }
+                                    }}
+                                    className={cn(
+                                      "text-xs px-2 py-1.5 rounded-lg cursor-pointer flex items-center justify-between font-mono",
+                                      isCurrentModel
+                                        ? "bg-primary/15 text-primary font-bold"
+                                        : "text-text-secondary hover:text-text-primary hover:bg-white/5",
+                                    )}
+                                  >
+                                    <span className="truncate">{m}</span>
+                                    {isCurrentModel && (
+                                      <Check className="size-3 text-primary shrink-0 ml-1.5" />
+                                    )}
+                                  </DropdownMenuItem>
+                                );
+                              })}
+                            </div>
+                          </DropdownMenuSubContent>
+                        </DropdownMenuSub>
+                      );
+                    })}
                   </div>
                 </DropdownMenuContent>
               </DropdownMenu>
