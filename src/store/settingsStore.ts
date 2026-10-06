@@ -167,6 +167,8 @@ export const defaultSettings: AppSettings = {
 
 interface SettingsStore {
   settings: AppSettings;
+  verifiedProviders: string[];
+  markProviderVerified: (provider: string) => void;
   fetchSettings: (workspaceId?: string) => Promise<void>;
   updateSettings: (newSettings: Partial<AppSettings>, workspaceId?: string) => Promise<void>;
   flushPendingSettings: (workspaceId?: string) => Promise<void>;
@@ -175,8 +177,44 @@ interface SettingsStore {
 let saveTimeout: ReturnType<typeof setTimeout> | null = null;
 let pendingSettingsPayload: Record<string, unknown> = {};
 
+const VERIFIED_PROVIDERS_STORAGE_KEY = "loglens_verified_providers";
+
+function getInitialVerifiedProviders(): string[] {
+  try {
+    const raw = localStorage.getItem(VERIFIED_PROVIDERS_STORAGE_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) {
+        return parsed;
+      }
+    }
+  } catch (e) {
+    console.debug("Failed to read verified providers from localStorage:", e);
+  }
+  return [];
+}
+
 export const useSettingsStore = create<SettingsStore>((set) => ({
   settings: defaultSettings,
+  verifiedProviders: getInitialVerifiedProviders(),
+
+  markProviderVerified: (provider: string) => {
+    if (!provider) {
+      return;
+    }
+    set((state) => {
+      if (state.verifiedProviders.includes(provider)) {
+        return state;
+      }
+      const updated = [...state.verifiedProviders, provider];
+      try {
+        localStorage.setItem(VERIFIED_PROVIDERS_STORAGE_KEY, JSON.stringify(updated));
+      } catch (e) {
+        console.debug("Failed to save verified providers to localStorage:", e);
+      }
+      return { verifiedProviders: updated };
+    });
+  },
 
   fetchSettings: async (workspaceId?: string) => {
     try {

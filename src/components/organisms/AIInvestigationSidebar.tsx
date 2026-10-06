@@ -498,7 +498,14 @@ export function AIInvestigationSidebar({
   } = useAiStore();
 
   const activeWorkspace = useWorkspaceStore(selectActiveWorkspace);
-  const { settings, fetchSettings, updateSettings, flushPendingSettings } = useSettingsStore();
+  const {
+    settings,
+    fetchSettings,
+    updateSettings,
+    flushPendingSettings,
+    verifiedProviders,
+    markProviderVerified,
+  } = useSettingsStore();
   const { selectedLogIds, clearSelection } = useInvestigationStore();
 
   const [inputValue, setInputValue] = useState("");
@@ -535,6 +542,7 @@ export function AIInvestigationSidebar({
         }
         const models = await callSidecar<string[]>({ method: "list_ai_models", params: {} });
         if (models && Array.isArray(models) && models.length > 0) {
+          markProviderVerified(currentProvider);
           setProviderModelsCache((prev) => ({
             ...prev,
             [currentProvider]: models,
@@ -546,21 +554,30 @@ export function AIInvestigationSidebar({
         setIsFetchingModels(false);
       }
     },
-    [settings.ai_provider, providerModelsCache, flushPendingSettings, updateSettings],
+    [
+      settings.ai_provider,
+      providerModelsCache,
+      flushPendingSettings,
+      updateSettings,
+      markProviderVerified,
+    ],
   );
 
   const handleProviderChange = (newProvider: string) => {
     let newModel = settings.ai_model;
-    if (newProvider === "ollama") {
+    const cached = providerModelsCache[newProvider];
+    if (cached && cached.length > 0) {
+      newModel = cached[0];
+    } else if (newProvider === "ollama") {
       newModel = "gemma4:e2b";
-    } else if (newProvider === "openai") {
-      newModel = "gpt-4o";
-    } else if (newProvider === "openai-compatible") {
+    } else if (newProvider === "openai" || newProvider === "openai-compatible") {
       newModel = "gpt-4o";
     } else if (newProvider === "openrouter") {
       newModel = "anthropic/claude-3.5-sonnet";
     } else if (newProvider === "ai-studio") {
       newModel = "gemini-2.0-flash";
+    } else if (newProvider === "lmstudio") {
+      newModel = "";
     }
     updateSettings({ ai_provider: newProvider, ai_model: newModel });
   };
@@ -1140,7 +1157,12 @@ export function AIInvestigationSidebar({
                                 : "text-text-secondary hover:text-text-primary hover:bg-white/5",
                             )}
                           >
-                            <span className="truncate">{provider.name}</span>
+                            <div className="flex items-center gap-1.5 truncate">
+                              <span className="truncate">{provider.name}</span>
+                              {verifiedProviders.includes(provider.id) && (
+                                <Check className="size-3 text-emerald-400 shrink-0" />
+                              )}
+                            </div>
                           </DropdownMenuSubTrigger>
                           <DropdownMenuSubContent className="w-64 p-1.5 bg-bg-surface border border-border-subtle shadow-2xl rounded-xl z-[130]">
                             <div className="flex items-center justify-between px-2 py-1 select-none border-b border-border-subtle/50 mb-1">

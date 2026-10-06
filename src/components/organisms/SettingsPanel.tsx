@@ -96,6 +96,7 @@ function SettingSelect({
   searchPlaceholder = "Search options...",
   showFreeBadge = false,
   showFreeFilter = false,
+  showCheckForOption,
 }: {
   readonly value: string;
   readonly onChange: (v: string) => void;
@@ -107,6 +108,7 @@ function SettingSelect({
   readonly searchPlaceholder?: string;
   readonly showFreeBadge?: boolean;
   readonly showFreeFilter?: boolean;
+  readonly showCheckForOption?: (optionValue: string) => boolean;
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -252,6 +254,9 @@ function SettingSelect({
                 (valLower.endsWith(":free") ||
                   valLower.includes(":free") ||
                   valLower === "openrouter/free");
+              const shouldShowCheck = showCheckForOption
+                ? showCheckForOption(opt.value)
+                : isSelected;
               return (
                 <button
                   key={opt.value}
@@ -275,7 +280,7 @@ function SettingSelect({
                       </span>
                     )}
                   </div>
-                  {isSelected && <Check className="h-3.5 w-3.5 text-primary shrink-0" />}
+                  {shouldShowCheck && <Check className="h-3.5 w-3.5 text-primary shrink-0" />}
                 </button>
               );
             })}
@@ -665,7 +670,8 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
   const { activeWorkspaceId, reset: resetWorkspaces } = useWorkspaceStore();
   const { clearState: clearIngestion } = useIngestionStore();
   const { reset: resetInvestigation } = useInvestigationStore();
-  const { updateSettings, flushPendingSettings } = useSettingsStore();
+  const { updateSettings, flushPendingSettings, verifiedProviders, markProviderVerified } =
+    useSettingsStore();
 
   const update = <K extends keyof AppSettings>(key: K, value: AppSettings[K], immediate = true) => {
     const newSettings = { ...settings, [key]: value };
@@ -760,6 +766,7 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
       });
       if (res.status === "success") {
         toast.success(res.message);
+        markProviderVerified(settings.ai_provider);
         // Automatically refresh available models for this provider on successful connection test
         fetchModels();
       } else if (res.status === "warning") {
@@ -922,18 +929,22 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
                   <SettingSelect
                     id="ai_provider"
                     value={settings.ai_provider}
+                    showCheckForOption={(optVal) => verifiedProviders.includes(optVal)}
                     onChange={(v) => {
                       let newModel = settings.ai_model;
-                      if (v === "ollama") {
+                      const cached = providerModelsCache[v];
+                      if (cached && cached.length > 0) {
+                        newModel = cached[0];
+                      } else if (v === "ollama") {
                         newModel = "gemma4:e2b";
-                      } else if (v === "openai") {
-                        newModel = "gpt-4o";
-                      } else if (v === "openai-compatible") {
+                      } else if (v === "openai" || v === "openai-compatible") {
                         newModel = "gpt-4o";
                       } else if (v === "openrouter") {
                         newModel = "anthropic/claude-3.5-sonnet";
                       } else if (v === "ai-studio") {
                         newModel = "gemini-2.0-flash";
+                      } else if (v === "lmstudio") {
+                        newModel = "";
                       }
 
                       const updated = { ...settings, ai_provider: v, ai_model: newModel };
