@@ -6,7 +6,6 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
@@ -1031,9 +1030,9 @@ export function AIInvestigationSidebar({
                   side="top"
                   className="w-56 p-1 bg-bg-surface border border-border-subtle shadow-xl rounded-xl z-[120]"
                 >
-                  <DropdownMenuLabel className="text-[10px] uppercase font-bold text-text-muted tracking-wider px-2 py-1">
+                  <div className="text-[10px] uppercase font-bold text-text-muted tracking-wider px-2 py-1 select-none">
                     AI Provider
-                  </DropdownMenuLabel>
+                  </div>
                   <div className="grid grid-cols-2 gap-1 px-1 pb-1">
                     {[
                       { id: "ollama", label: "Ollama" },
@@ -1062,9 +1061,9 @@ export function AIInvestigationSidebar({
                   <DropdownMenuSeparator className="my-1 bg-border-subtle/50" />
 
                   <div className="flex items-center justify-between px-2 py-1">
-                    <DropdownMenuLabel className="p-0 text-[10px] uppercase font-bold text-text-muted tracking-wider">
+                    <div className="text-[10px] uppercase font-bold text-text-muted tracking-wider select-none">
                       Model
-                    </DropdownMenuLabel>
+                    </div>
                     <button
                       type="button"
                       onClick={() => fetchModels()}
