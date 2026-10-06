@@ -16,7 +16,7 @@ import { useAiStore } from "@/store/aiStore";
 import { useInvestigationStore } from "@/store/investigationStore";
 import { useUIStore } from "@/store/uiStore";
 import type { LogSource } from "@/store/workspaceStore";
-import { Columns, Cpu, Download, LayoutTemplate, List, Plus, Sparkles, Upload } from "lucide-react";
+import { Bookmark, Columns, Cpu, Download, LayoutTemplate, List, Plus, Sparkles, Upload } from "lucide-react";
 import { useMemo, useState } from "react";
 import { LoadTemplateModal } from "./LoadTemplateModal";
 import { SaveTemplateModal } from "./SaveTemplateModal";
@@ -251,25 +251,31 @@ export function LogToolbar({
             <DropdownMenu>
               <DropdownMenuTrigger
                 disabled={!_activeSourceId}
-                className="p-1.5 rounded-md hover:bg-bg-hover text-text-muted hover:text-text-primary transition-colors ml-1 disabled:opacity-50 disabled:pointer-events-none"
-                title="Template Actions"
+                className="p-1.5 rounded-md hover:bg-bg-hover text-text-muted hover:text-text-primary transition-colors ml-1 disabled:opacity-50 disabled:pointer-events-none cursor-pointer outline-none"
+                title="Saved Filter & Highlight Views"
               >
-                <LayoutTemplate className="size-4" />
+                <Bookmark className="size-4" />
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-48 bg-bg-surface border-border-subtle">
+              <DropdownMenuContent
+                align="end"
+                className="w-52 bg-bg-surface border-border-subtle p-1"
+              >
+                <div className="text-[9px] font-bold text-text-muted uppercase tracking-wider px-2 py-1 border-b border-border/30 mb-1">
+                  Saved Views
+                </div>
                 <DropdownMenuItem
                   onClick={() => setIsSaveTemplateModalOpen(true)}
-                  className="gap-2 text-xs py-2"
+                  className="gap-2 text-xs py-2 cursor-pointer"
                 >
                   <Plus className="size-3.5" />
-                  Save as Template
+                  Save as View
                 </DropdownMenuItem>
                 <DropdownMenuItem
                   onClick={() => setIsLoadTemplateModalOpen(true)}
-                  className="gap-2 text-xs py-2"
+                  className="gap-2 text-xs py-2 cursor-pointer"
                 >
                   <List className="size-3.5" />
-                  Load Template
+                  Load Saved View
                 </DropdownMenuItem>
                 {onEngineSettingsOpen && (
                   <>
