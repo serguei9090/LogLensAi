@@ -949,7 +949,7 @@ export function VirtualLogTable({
           <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-[100] animate-in slide-in-from-bottom-4 duration-300 pointer-events-none">
             <div className="bg-bg-tooltip border border-white/10 shadow-2xl rounded-full p-1.5 flex items-center gap-2 backdrop-blur-xl pointer-events-auto">
               <span className="pl-4 pr-2 text-xs font-bold text-text-primary">
-                {selectedLogIds.length} lines selected
+                {selectedLogIds.length} selected
               </span>
               <div className="w-px h-4 bg-white/10" />
               <Button
@@ -958,7 +958,7 @@ export function VirtualLogTable({
                 onClick={() => useAiStore.getState().setSidebarOpen(true)}
               >
                 <Sparkles className="h-4 w-4 mr-2" />
-                Batch AI Analysis ({selectedLogIds.length})
+                AI Analysis
               </Button>
               <Button
                 variant="ghost"
