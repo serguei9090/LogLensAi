@@ -133,18 +133,18 @@ export function TailSwitch({
             />
           </span>
 
-          {/* Main Label */}
+          {/* Main Stable Label */}
           <span className="font-semibold text-xs leading-none tracking-tight">{label}</span>
 
-          {/* Compact embedded chip badge */}
+          {/* Micro Transport Badge anchored to bottom-right corner */}
           <span
             className={cn(
-              "inline-flex items-center gap-0.5 rounded-full border px-1.5 py-0.5 text-[8px] font-mono uppercase font-bold tracking-wider leading-none shadow-xs shrink-0 -mr-1",
+              "absolute -bottom-1 -right-1 inline-flex items-center justify-center p-0.5 rounded-full border shadow-sm transition-transform group-hover:scale-110",
               badge.chipBg,
             )}
+            title={badge.label}
           >
             {badge.icon}
-            <span>{badge.label}</span>
           </span>
         </TooltipTrigger>
         <TooltipContent
