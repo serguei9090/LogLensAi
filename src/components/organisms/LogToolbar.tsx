@@ -194,14 +194,24 @@ export function LogToolbar({
             <div className="h-5 w-px bg-zinc-800 shrink-0" />
 
             {/* Tail control moved to left */}
-            <div
-              className={cn(
-                "flex items-center gap-3 shrink-0",
-                !_activeSourceId && "opacity-50 pointer-events-none",
-              )}
-            >
-              <TailSwitch checked={isTailing} onCheckedChange={onTailToggle} />
-            </div>
+            {(() => {
+              const currentSource = _sources.find((s) => s.id === _activeSourceId);
+              return (
+                <div
+                  className={cn(
+                    "flex items-center gap-3 shrink-0",
+                    !_activeSourceId && "opacity-50 pointer-events-none",
+                  )}
+                >
+                  <TailSwitch
+                    checked={isTailing}
+                    onCheckedChange={onTailToggle}
+                    sourceType={currentSource?.type}
+                    sourceName={currentSource?.name}
+                  />
+                </div>
+              );
+            })()}
           </>
         )}
       </div>
