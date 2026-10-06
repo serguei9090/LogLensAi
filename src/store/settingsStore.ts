@@ -168,6 +168,8 @@ export const defaultSettings: AppSettings = {
 interface SettingsStore {
   settings: AppSettings;
   verifiedProviders: string[];
+  providerModelsCache: Record<string, string[]>;
+  setProviderCachedModels: (provider: string, models: string[]) => void;
   markProviderVerified: (provider: string) => void;
   fetchSettings: (workspaceId?: string) => Promise<void>;
   updateSettings: (newSettings: Partial<AppSettings>, workspaceId?: string) => Promise<void>;
@@ -178,6 +180,7 @@ let saveTimeout: ReturnType<typeof setTimeout> | null = null;
 let pendingSettingsPayload: Record<string, unknown> = {};
 
 const VERIFIED_PROVIDERS_STORAGE_KEY = "loglens_verified_providers";
+const PROVIDER_MODELS_CACHE_KEY = "loglens_provider_models_cache";
 
 function getInitialVerifiedProviders(): string[] {
   try {
@@ -194,9 +197,43 @@ function getInitialVerifiedProviders(): string[] {
   return [];
 }
 
+function getInitialProviderModelsCache(): Record<string, string[]> {
+  try {
+    const raw = localStorage.getItem(PROVIDER_MODELS_CACHE_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+        return parsed;
+      }
+    }
+  } catch (e) {
+    console.debug("Failed to read provider models cache from localStorage:", e);
+  }
+  return {};
+}
+
 export const useSettingsStore = create<SettingsStore>((set) => ({
   settings: defaultSettings,
   verifiedProviders: getInitialVerifiedProviders(),
+  providerModelsCache: getInitialProviderModelsCache(),
+
+  setProviderCachedModels: (provider: string, models: string[]) => {
+    if (!provider || !Array.isArray(models)) {
+      return;
+    }
+    set((state) => {
+      const updated = {
+        ...state.providerModelsCache,
+        [provider]: models,
+      };
+      try {
+        localStorage.setItem(PROVIDER_MODELS_CACHE_KEY, JSON.stringify(updated));
+      } catch (e) {
+        console.debug("Failed to save provider models cache to localStorage:", e);
+      }
+      return { providerModelsCache: updated };
+    });
+  },
 
   markProviderVerified: (provider: string) => {
     if (!provider) {

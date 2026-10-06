@@ -674,9 +674,7 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
   const [settings, setSettings] = useState<AppSettings>(defaultSettings);
   const [activeSection, setActiveSection] = useState<SectionId>("ai");
   const [saved, setSaved] = useState(false);
-  const [providerModelsCache, setProviderModelsCache] = useState<Record<string, string[]>>({});
   const [isFetchingModels, setIsFetchingModels] = useState(false);
-  const availableModels = providerModelsCache[settings.ai_provider] || [];
 
   const [isToolsExpanded, setIsToolsExpanded] = useState(false);
   const [isSkillModalOpen, setIsSkillModalOpen] = useState(false);
@@ -690,8 +688,16 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
   const { activeWorkspaceId, reset: resetWorkspaces } = useWorkspaceStore();
   const { clearState: clearIngestion } = useIngestionStore();
   const { reset: resetInvestigation } = useInvestigationStore();
-  const { updateSettings, flushPendingSettings, verifiedProviders, markProviderVerified } =
-    useSettingsStore();
+  const {
+    updateSettings,
+    flushPendingSettings,
+    verifiedProviders,
+    markProviderVerified,
+    providerModelsCache,
+    setProviderCachedModels,
+  } = useSettingsStore();
+
+  const availableModels = providerModelsCache[settings.ai_provider] || [];
 
   const update = <K extends keyof AppSettings>(key: K, value: AppSettings[K], immediate = true) => {
     const newSettings = { ...settings, [key]: value };
@@ -832,11 +838,8 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
       setIsFetchingModels(true);
       try {
         const models = await callSidecar<string[]>({ method: "list_ai_models", params: {} });
-        if (models && Array.isArray(models)) {
-          setProviderModelsCache((prev) => ({
-            ...prev,
-            [provider]: models,
-          }));
+        if (models && Array.isArray(models) && models.length > 0) {
+          setProviderCachedModels(provider, models);
         }
       } catch (e) {
         console.error("Failed to fetch ai models:", e);
@@ -844,7 +847,7 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
         setIsFetchingModels(false);
       }
     },
-    [settings.ai_provider],
+    [settings.ai_provider, setProviderCachedModels],
   );
 
   // Removed handleSave in favor of auto-save via update()

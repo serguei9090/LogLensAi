@@ -505,6 +505,8 @@ export function AIInvestigationSidebar({
     flushPendingSettings,
     verifiedProviders,
     markProviderVerified,
+    providerModelsCache,
+    setProviderCachedModels,
   } = useSettingsStore();
   const { selectedLogIds, clearSelection } = useInvestigationStore();
 
@@ -515,7 +517,6 @@ export function AIInvestigationSidebar({
   const [pendingSessionName, setPendingSessionName] = useState("");
   const [showCommands, setShowCommands] = useState(false);
   const [isReasoningEnabled, setIsReasoningEnabled] = useState(true);
-  const [providerModelsCache, setProviderModelsCache] = useState<Record<string, string[]>>({});
   const [modelSearchQuery, setModelSearchQuery] = useState("");
   const [isFetchingModels, setIsFetchingModels] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -543,10 +544,7 @@ export function AIInvestigationSidebar({
         const models = await callSidecar<string[]>({ method: "list_ai_models", params: {} });
         if (models && Array.isArray(models) && models.length > 0) {
           markProviderVerified(currentProvider);
-          setProviderModelsCache((prev) => ({
-            ...prev,
-            [currentProvider]: models,
-          }));
+          setProviderCachedModels(currentProvider, models);
         }
       } catch (e) {
         console.error("Failed to fetch ai models:", e);
@@ -560,6 +558,7 @@ export function AIInvestigationSidebar({
       flushPendingSettings,
       updateSettings,
       markProviderVerified,
+      setProviderCachedModels,
     ],
   );
 
