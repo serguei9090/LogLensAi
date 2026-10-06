@@ -527,7 +527,10 @@ export function AIInvestigationSidebar({
 
       setIsFetchingModels(true);
       try {
-        if (forceRefresh) {
+        if (targetProvider && targetProvider !== settings.ai_provider) {
+          await updateSettings({ ai_provider: targetProvider });
+          await flushPendingSettings();
+        } else if (forceRefresh) {
           await flushPendingSettings();
         }
         const models = await callSidecar<string[]>({ method: "list_ai_models", params: {} });
@@ -543,7 +546,7 @@ export function AIInvestigationSidebar({
         setIsFetchingModels(false);
       }
     },
-    [settings.ai_provider, providerModelsCache, flushPendingSettings],
+    [settings.ai_provider, providerModelsCache, flushPendingSettings, updateSettings],
   );
 
   const handleProviderChange = (newProvider: string) => {

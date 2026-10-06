@@ -108,24 +108,18 @@ func NewProviderFromSettings(a *app.App) (providers.Provider, error) {
 		name = "ollama"
 	}
 
-	apiKey := s["ai_api_key"]
+	apiKey := ""
 	switch name {
 	case "openai":
-		if k := s["ai_openai_api_key"]; k != "" {
-			apiKey = k
-		}
+		apiKey = s["ai_openai_api_key"]
 	case "openai-compatible":
-		if k := s["ai_openai_compat_api_key"]; k != "" {
-			apiKey = k
-		}
+		apiKey = s["ai_openai_compat_api_key"]
 	case "openrouter":
-		if k := s["ai_openrouter_api_key"]; k != "" {
-			apiKey = k
-		}
+		apiKey = s["ai_openrouter_api_key"]
 	case "ai-studio", "gemini":
-		if k := s["ai_gemini_api_key"]; k != "" {
-			apiKey = k
-		}
+		apiKey = s["ai_gemini_api_key"]
+	default:
+		apiKey = s["ai_api_key"]
 	}
 
 	cfg := providers.Config{
@@ -150,6 +144,9 @@ func NewProviderFromSettings(a *app.App) (providers.Provider, error) {
 		cfg.Host = s["ai_lmstudio_host"]
 	case "ai-studio", "gemini":
 		cfg.Host = s["ai_gemini_url"]
+		if cfg.Host == "" {
+			cfg.Host = "https://generativelanguage.googleapis.com"
+		}
 	}
 
 	return providers.NewProvider(name, cfg)

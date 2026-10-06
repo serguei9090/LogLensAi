@@ -18,6 +18,7 @@ export interface AppSettings {
   ai_openrouter_api_key?: string;
   ai_openai_compat_api_key?: string;
   ai_system_prompt: string;
+  ai_gemini_url?: string;
   ai_ollama_host: string;
   ai_openai_host: string;
   ai_openrouter_host: string;
@@ -53,6 +54,7 @@ export const defaultSettings: AppSettings = {
   ai_openai_compat_api_key: "",
   ai_system_prompt:
     "You are LogLens Assistant, a senior DevOps engineer and SRE specializing in root cause analysis.",
+  ai_gemini_url: "https://generativelanguage.googleapis.com",
   ai_ollama_host: "http://localhost:11434",
   ai_openai_host: "https://api.openai.com/v1",
   ai_openrouter_host: "https://openrouter.ai/api/v1",
