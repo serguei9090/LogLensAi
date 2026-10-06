@@ -16,7 +16,17 @@ import { useAiStore } from "@/store/aiStore";
 import { useInvestigationStore } from "@/store/investigationStore";
 import { useUIStore } from "@/store/uiStore";
 import type { LogSource } from "@/store/workspaceStore";
-import { Bookmark, Columns, Cpu, Download, LayoutTemplate, List, Plus, Sparkles, Upload } from "lucide-react";
+import {
+  Bookmark,
+  Columns,
+  Cpu,
+  Download,
+  LayoutTemplate,
+  List,
+  Plus,
+  Sparkles,
+  Upload,
+} from "lucide-react";
 import { useMemo, useState } from "react";
 import { LoadTemplateModal } from "./LoadTemplateModal";
 import { SaveTemplateModal } from "./SaveTemplateModal";
@@ -109,26 +119,21 @@ export function LogToolbar({
       <div className="flex items-center gap-3 shrink-0">
         <StatusDot active={status} />
 
-        <Button
-          onClick={onImportOpen}
-          className="gap-2 text-xs font-semibold px-2.5 2xl:px-3 py-1.5 shrink-0"
-          title="Import Logs"
-        >
-          <Upload className="h-3.5 w-3.5" />
-          <span className="hidden 2xl:inline">Import</span>
+        <Button size="icon" onClick={onImportOpen} className="size-8 shrink-0" title="Import Logs">
+          <Upload className="size-4" />
         </Button>
 
         {_activeSourceId && (
           <>
             <Button
-              variant="secondary"
+              variant="outline"
+              size="icon"
               onClick={onExport}
               disabled={!_activeSourceId}
-              className="gap-2 text-xs font-semibold px-2.5 2xl:px-3 py-1.5 shrink-0"
+              className="size-8 shrink-0 bg-bg-surface-bright/50 border-border-subtle text-text-muted hover:text-text-primary"
               title="Export Logs"
             >
-              <Download className="h-3.5 w-3.5" />
-              <span className="hidden 2xl:inline">Export</span>
+              <Download className="size-4" />
             </Button>
 
             <Button
