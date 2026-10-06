@@ -941,33 +941,37 @@ export function VirtualLogTable({
           </div>
         )}
       </section>
-      {selectedLogIds.length > 0 && expandedRow === null && (
-        <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-[100] animate-in slide-in-from-bottom-4 duration-300 pointer-events-none">
-          <div className="bg-bg-tooltip border border-white/10 shadow-2xl rounded-full p-1.5 flex items-center gap-2 backdrop-blur-xl pointer-events-auto">
-            <span className="pl-4 pr-2 text-xs font-bold text-text-primary">
-              {selectedLogIds.length} lines selected
-            </span>
-            <div className="w-px h-4 bg-white/10" />
-            <Button
-              size="sm"
-              className="rounded-full bg-violet-600 hover:bg-violet-500 text-white shadow-lg animate-in fade-in slide-in-from-bottom-5 duration-300"
-              onClick={() => useAiStore.getState().setSidebarOpen(true)}
-            >
-              <Sparkles className="h-4 w-4 mr-2" />
-              Batch AI Analysis ({selectedLogIds.length})
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="rounded-full h-8 w-8 p-0 text-text-muted hover:text-text-primary hover:bg-white/5"
-              onClick={handleClearSelection}
-              title="Clear Selection"
-            >
-              <X className="size-4" />
-            </Button>
+      {selectedLogIds.length > 0 &&
+        expandedRow === null &&
+        logs.length > 0 &&
+        !isTransitioning &&
+        !isFetching && (
+          <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-[100] animate-in slide-in-from-bottom-4 duration-300 pointer-events-none">
+            <div className="bg-bg-tooltip border border-white/10 shadow-2xl rounded-full p-1.5 flex items-center gap-2 backdrop-blur-xl pointer-events-auto">
+              <span className="pl-4 pr-2 text-xs font-bold text-text-primary">
+                {selectedLogIds.length} lines selected
+              </span>
+              <div className="w-px h-4 bg-white/10" />
+              <Button
+                size="sm"
+                className="rounded-full bg-violet-600 hover:bg-violet-500 text-white shadow-lg animate-in fade-in slide-in-from-bottom-5 duration-300"
+                onClick={() => useAiStore.getState().setSidebarOpen(true)}
+              >
+                <Sparkles className="h-4 w-4 mr-2" />
+                Batch AI Analysis ({selectedLogIds.length})
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="rounded-full h-8 w-8 p-0 text-text-muted hover:text-text-primary hover:bg-white/5"
+                onClick={handleClearSelection}
+                title="Clear Selection"
+              >
+                <X className="size-4" />
+              </Button>
+            </div>
           </div>
-        </div>
-      )}
+        )}
       {selectionInfo &&
         createPortal(
           <div
