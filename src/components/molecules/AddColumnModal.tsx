@@ -142,13 +142,13 @@ export function AddColumnModal({ open, onOpenChange, onSave }: AddColumnModalPro
           let matchIndicator = null;
           if (row.match !== null) {
             matchIndicator = (
-              <p className="font-mono text-[11px] text-primary mt-0.5 break-all whitespace-pre-wrap">
+              <p className="font-mono text-xs text-primary mt-0.5 break-all whitespace-pre-wrap">
                 → <span className="bg-primary/10 px-1 rounded">{row.match}</span>
               </p>
             );
           } else if (regex && !regexError) {
             matchIndicator = (
-              <p className="font-mono text-[11px] text-text-muted/40 mt-0.5 break-all whitespace-pre-wrap">
+              <p className="font-mono text-xs text-text-muted/40 mt-0.5 break-all whitespace-pre-wrap">
                 → no match
               </p>
             );
@@ -157,7 +157,7 @@ export function AddColumnModal({ open, onOpenChange, onSave }: AddColumnModalPro
           return (
             <div key={key} className="px-3 py-2 group hover:bg-white/[0.02]">
               {/* Raw line — wrapped */}
-              <p className="font-mono text-[11px] text-text-muted break-all whitespace-pre-wrap leading-tight">
+              <p className="font-mono text-xs text-text-muted break-all whitespace-pre-wrap leading-tight">
                 {row.raw}
               </p>
               {/* Extracted value */}

@@ -137,9 +137,7 @@ export function FacetExtractionSettings({
 
       {/* Interactive Preset Pillows */}
       <div className="flex items-center gap-1.5 flex-wrap pt-1">
-        <span className="text-[10px] uppercase font-bold text-text-muted mr-1">
-          Standard Facets:
-        </span>
+        <span className="text-xs uppercase font-bold text-text-muted mr-1">Standard Facets:</span>
         {COMMON_FACET_PRESETS.map((preset) => {
           const matchedRule = rules.find((r) => r.name === preset.name);
           const isAdded = Boolean(matchedRule);
@@ -151,7 +149,7 @@ export function FacetExtractionSettings({
               type="button"
               onClick={() => togglePreset(preset)}
               className={cn(
-                "inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-semibold transition-all border cursor-pointer select-none",
+                "inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold transition-all border cursor-pointer select-none",
                 isAdded && isEnabled
                   ? "bg-primary/15 border-primary/40 text-primary hover:bg-primary/25 hover:border-primary/60 shadow-sm shadow-primary/10"
                   : isAdded && !isEnabled
@@ -179,22 +177,22 @@ export function FacetExtractionSettings({
         <table className="w-full text-left border-collapse">
           <thead>
             <tr className="border-b border-border bg-bg-surface/50">
-              <th className="px-4 py-2 text-[10px] font-bold uppercase text-text-muted w-32">
+              <th className="px-4 py-2 text-xs font-bold uppercase text-text-muted w-32">
                 Facet Name
               </th>
-              <th className="px-4 py-2 text-[10px] font-bold uppercase text-text-muted">
+              <th className="px-4 py-2 text-xs font-bold uppercase text-text-muted">
                 Regex Pattern
               </th>
-              <th className="px-4 py-2 text-[10px] font-bold uppercase text-text-muted w-20 text-center">
+              <th className="px-4 py-2 text-xs font-bold uppercase text-text-muted w-20 text-center">
                 <div className="inline-flex items-center justify-center gap-1">
                   <span>Group</span>
                   <HelpTooltip content="The 1-based capturing group number in the regex to extract (e.g. 1 for the first parenthesis '(\d+)'). Named groups like '(?<status>\d+)' map automatically." />
                 </div>
               </th>
-              <th className="px-4 py-2 text-[10px] font-bold uppercase text-text-muted w-16 text-center">
+              <th className="px-4 py-2 text-xs font-bold uppercase text-text-muted w-16 text-center">
                 Status
               </th>
-              <th className="px-4 py-2 text-[10px] font-bold uppercase text-text-muted w-12" />
+              <th className="px-4 py-2 text-xs font-bold uppercase text-text-muted w-12" />
             </tr>
           </thead>
           <tbody className="divide-y divide-border/50">
@@ -267,7 +265,7 @@ export function FacetExtractionSettings({
             { name: "custom_facet", regex: String.raw`(\w+)`, group: 1, enabled: true },
           ]);
         }}
-        className="w-full flex items-center justify-center gap-2 py-3 border border-dashed border-border rounded-xl text-[10px] font-bold text-text-muted hover:border-primary hover:text-primary hover:bg-primary/5 transition-all uppercase tracking-tighter cursor-pointer h-auto"
+        className="w-full flex items-center justify-center gap-2 py-3 border border-dashed border-border rounded-xl text-xs font-bold text-text-muted hover:border-primary hover:text-primary hover:bg-primary/5 transition-all uppercase tracking-tighter cursor-pointer h-auto"
       >
         <Plus className="size-3" />
         Add Custom Facet Instruction
@@ -275,8 +273,8 @@ export function FacetExtractionSettings({
 
       <div className="grid grid-cols-2 gap-3">
         <div className="p-3 bg-bg-surface/40 border border-border rounded-xl">
-          <p className="text-[10px] text-text-muted uppercase font-bold mb-1">Cheat Sheet</p>
-          <ul className="text-[11px] text-text-muted space-y-1">
+          <p className="text-xs text-text-muted uppercase font-bold mb-1">Cheat Sheet</p>
+          <ul className="text-xs text-text-muted space-y-1">
             <li>
               <code className="text-primary-muted">\d+</code> - Match digits
             </li>
@@ -288,7 +286,7 @@ export function FacetExtractionSettings({
             </li>
           </ul>
         </div>
-        <div className="p-3 bg-bg-surface/40 border border-border rounded-xl text-[11px] text-text-muted flex flex-col justify-center">
+        <div className="p-3 bg-bg-surface/40 border border-border rounded-xl text-xs text-text-muted flex flex-col justify-center">
           <p>
             Named groups like{" "}
             <code className="bg-bg-surface px-1 rounded border border-border">

@@ -56,7 +56,7 @@ export function IngestionOverlay({ job, className }: IngestionOverlayProps) {
             </ProgressTrack>
           </Progress>
 
-          <div className="flex justify-between items-center text-[9px] font-black uppercase tracking-[0.2em] text-text-muted/80 px-0.5">
+          <div className="flex justify-between items-center text-xs font-bold uppercase tracking-widest text-text-muted/80 px-0.5">
             <span className="flex items-center gap-2">
               <span className="size-1 rounded-full bg-primary animate-pulse" />
               {job ? `${progress}% Complete` : "Loading..."}
@@ -70,7 +70,7 @@ export function IngestionOverlay({ job, className }: IngestionOverlayProps) {
       </div>
 
       {/* Footer metadata */}
-      <div className="absolute bottom-12 flex items-center gap-4 text-[10px] text-text-muted/30 font-mono tracking-tighter">
+      <div className="absolute bottom-12 flex items-center gap-4 text-xs text-text-muted/40 font-mono tracking-tight">
         <span className="px-2 py-0.5 rounded border border-border/30 bg-bg-surface/30">
           {job ? `JOB_${job.id}` : "JOB_PENDING"}
         </span>

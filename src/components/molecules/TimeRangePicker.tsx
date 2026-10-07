@@ -220,7 +220,7 @@ function TimeInputRow({
     <div className={`flex flex-col gap-2 ${disabled ? "opacity-30 pointer-events-none" : ""}`}>
       <div className="flex items-center gap-1.5">
         <div className={`size-1.5 rounded-full ${dotColor} shrink-0`} />
-        <span className="text-[11px] font-semibold text-text-secondary">{label}</span>
+        <span className="text-xs font-semibold text-text-secondary">{label}</span>
       </div>
       <div className="flex items-center gap-1">
         <TimeSegmentInput value={h} max={23} onChange={onH} onNext={() => focusFirst(mRef)} />
@@ -599,7 +599,7 @@ export function TimeRangePicker({ value, onChange, className }: TimeRangePickerP
       nav: "hidden",
       month_grid: "w-full border-collapse",
       weekdays: "flex mb-1",
-      weekday: "w-9 text-center text-[10px] font-bold text-text-muted uppercase tracking-wider",
+      weekday: "w-9 text-center text-xs font-bold text-text-muted uppercase tracking-wider",
       week: "flex transition-colors",
       day: "h-9 w-9 relative",
       day_button:
@@ -638,7 +638,7 @@ export function TimeRangePicker({ value, onChange, className }: TimeRangePickerP
           <div className="flex">
             {/* ── 1. Presets ────────────────────────────────── */}
             <div className="w-[140px] border-r border-border/20 p-2 space-y-0.5 bg-white/[0.02] shrink-0">
-              <p className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-text-muted opacity-50">
+              <p className="px-3 py-2 text-xs font-bold uppercase tracking-widest text-text-muted opacity-50">
                 Quick Select
               </p>
               {PRESETS.map((p) => (
@@ -671,7 +671,7 @@ export function TimeRangePicker({ value, onChange, className }: TimeRangePickerP
               className="p-4 border-r border-border/20 shrink-0 flex flex-col"
               style={{ minWidth: "600px" }}
             >
-              <p className="text-[10px] font-bold uppercase tracking-widest text-text-muted opacity-50 mb-3">
+              <p className="text-xs font-bold uppercase tracking-widest text-text-muted opacity-50 mb-3">
                 Range Selection
               </p>
 
@@ -760,7 +760,7 @@ export function TimeRangePicker({ value, onChange, className }: TimeRangePickerP
                 <div className="flex flex-col gap-1 border-r border-border/10">
                   <div className="flex items-center gap-1.5 grayscale opacity-50">
                     <div className="size-1.5 rounded-full bg-emerald-500" />
-                    <span className="text-[10px] font-bold uppercase tracking-wide">
+                    <span className="text-xs font-bold uppercase tracking-wide">
                       Start Selection
                     </span>
                   </div>
@@ -785,9 +785,7 @@ export function TimeRangePicker({ value, onChange, className }: TimeRangePickerP
                 <div className="flex flex-col gap-1">
                   <div className="flex items-center gap-1.5 grayscale opacity-50">
                     <div className="size-1.5 rounded-full bg-amber-500" />
-                    <span className="text-[10px] font-bold uppercase tracking-wide">
-                      End Selection
-                    </span>
+                    <span className="text-xs font-bold uppercase tracking-wide">End Selection</span>
                   </div>
                   <div className="pl-3 text-xs font-mono text-text-primary">
                     {range?.to ? (
@@ -816,7 +814,7 @@ export function TimeRangePicker({ value, onChange, className }: TimeRangePickerP
 
             {/* ── 3. Time Controls ──────────────────────────── */}
             <div className="flex flex-col p-4 gap-5" style={{ minWidth: "168px" }}>
-              <p className="text-[10px] font-bold uppercase tracking-widest text-text-muted opacity-50">
+              <p className="text-xs font-bold uppercase tracking-widest text-text-muted opacity-50">
                 Time (HH:MM:SS)
               </p>
 
@@ -845,7 +843,7 @@ export function TimeRangePicker({ value, onChange, className }: TimeRangePickerP
                 disabled={!hasEndDate}
               />
 
-              <p className="text-[9px] text-text-muted/50 italic text-center leading-tight mt-auto">
+              <p className="text-xs text-text-muted/50 italic text-center leading-tight mt-auto">
                 {hasEndDate ? "Precise end point" : "Streaming (Now)"}
               </p>
 

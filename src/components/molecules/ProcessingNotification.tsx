@@ -39,10 +39,10 @@ export function ProcessingNotification() {
               <Sparkles className="size-2 text-primary-green absolute -top-1 -right-1 animate-pulse" />
             </div>
             <div>
-              <h4 className="text-[10px] font-bold uppercase tracking-widest text-text-primary">
+              <h4 className="text-xs font-bold uppercase tracking-widest text-text-primary">
                 Drain3 Pattern Mining
               </h4>
-              <p className="text-[9px] text-text-muted font-mono">
+              <p className="text-xs text-text-muted font-mono">
                 {activeJobs.length} active Drain3 {activeJobs.length === 1 ? "task" : "tasks"}
               </p>
             </div>
@@ -61,10 +61,10 @@ export function ProcessingNotification() {
           </div>
 
           <div className="mt-2 flex justify-between items-center">
-            <span className="text-[8px] font-mono text-text-muted uppercase">
+            <span className="text-xs font-mono text-text-muted uppercase">
               {totalProcessed.toLocaleString()} / {totalLines.toLocaleString()}
             </span>
-            <span className="text-[8px] font-bold text-primary-green opacity-0 group-hover:opacity-100 transition-opacity">
+            <span className="text-xs font-bold text-primary-green opacity-0 group-hover:opacity-100 transition-opacity uppercase tracking-wider">
               Mining Patterns
             </span>
           </div>

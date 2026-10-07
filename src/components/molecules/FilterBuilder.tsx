@@ -63,7 +63,7 @@ export function FilterBuilder({ filters, onChange }: FilterBuilderProps) {
           <Filter className="h-3.5 w-3.5" />
           <span className="hidden 2xl:inline">Filters</span>
           {filters.length > 0 && (
-            <span className="bg-emerald-500/20 text-emerald-300 rounded px-1 text-[10px] font-bold">
+            <span className="bg-emerald-500/20 text-emerald-300 rounded px-1 text-xs font-bold leading-none">
               {filters.length}
             </span>
           )}
@@ -83,7 +83,7 @@ export function FilterBuilder({ filters, onChange }: FilterBuilderProps) {
           {/* Field & Operator pills */}
           <div className="px-3 pt-3 pb-2 flex gap-2">
             <div className="flex-1">
-              <p className="text-[10px] uppercase tracking-wider text-zinc-600 mb-1 font-medium">
+              <p className="text-xs uppercase tracking-wider text-zinc-600 mb-1 font-medium">
                 Field
               </p>
               <div className="flex flex-wrap gap-1">
@@ -107,7 +107,7 @@ export function FilterBuilder({ filters, onChange }: FilterBuilderProps) {
           </div>
 
           <div className="px-3 pb-2">
-            <p className="text-[10px] uppercase tracking-wider text-zinc-600 mb-1 font-medium">
+            <p className="text-xs uppercase tracking-wider text-zinc-600 mb-1 font-medium">
               Operator
             </p>
             <div className="flex flex-wrap gap-1">
@@ -153,13 +153,11 @@ export function FilterBuilder({ filters, onChange }: FilterBuilderProps) {
           {filters.length > 0 && (
             <div className="border-t border-zinc-800 px-3 py-2 space-y-1.5">
               <div className="flex items-center justify-between mb-1">
-                <p className="text-[10px] uppercase tracking-wider text-zinc-600 font-medium">
-                  Active
-                </p>
+                <p className="text-xs uppercase tracking-wider text-zinc-600 font-medium">Active</p>
                 <button
                   type="button"
                   onClick={() => onChange([])}
-                  className="text-[10px] text-zinc-600 hover:text-red-400 transition-colors"
+                  className="text-xs text-zinc-600 hover:text-red-400 transition-colors"
                 >
                   Clear all
                 </button>
@@ -178,7 +176,7 @@ export function FilterBuilder({ filters, onChange }: FilterBuilderProps) {
                         [newF[i - 1], newF[i]] = [newF[i], newF[i - 1]];
                         onChange(newF);
                       }}
-                      className="text-[8px] text-zinc-500 hover:text-emerald-400 disabled:opacity-0"
+                      className="text-xs text-zinc-500 hover:text-emerald-400 disabled:opacity-0 leading-none"
                     >
                       ▲
                     </button>
@@ -190,15 +188,15 @@ export function FilterBuilder({ filters, onChange }: FilterBuilderProps) {
                         [newF[i + 1], newF[i]] = [newF[i], newF[i + 1]];
                         onChange(newF);
                       }}
-                      className="text-[8px] text-zinc-500 hover:text-emerald-400 disabled:opacity-0"
+                      className="text-xs text-zinc-500 hover:text-emerald-400 disabled:opacity-0 leading-none"
                     >
                       ▼
                     </button>
                   </div>
-                  <span className="text-[10px] text-emerald-500/80 font-mono font-bold shrink-0">
+                  <span className="text-xs text-emerald-500/80 font-mono font-bold shrink-0">
                     {f.field}
                   </span>
-                  <span className="text-[10px] text-zinc-600 italic shrink-0">{f.operator}</span>
+                  <span className="text-xs text-zinc-600 italic shrink-0">{f.operator}</span>
                   <span className="text-xs text-zinc-200 font-mono flex-1 truncate">{f.value}</span>
                   <button
                     type="button"

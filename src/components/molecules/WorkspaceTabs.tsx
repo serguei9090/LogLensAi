@@ -102,13 +102,13 @@ export function WorkspaceTabs({
               onClick={() => onSelectSource(src.id)}
               title={src.path}
               className={cn(
-                "flex items-center gap-1.5 px-2 py-1.5 rounded text-[11px] font-semibold transition-all outline-none",
+                "flex items-center gap-1.5 px-2 py-1.5 rounded text-xs font-semibold transition-all outline-none",
                 labelStyles,
               )}
             >
               {/* Fusion icon or live-tail indicator */}
               {isFusion && (
-                <span className="text-violet-400/70 text-[9px] font-bold uppercase tracking-wider">
+                <span className="text-violet-400/70 text-xs font-bold uppercase tracking-wider">
                   ⚡
                 </span>
               )}
@@ -135,7 +135,7 @@ export function WorkspaceTabs({
                     }
                   }}
                   onBlur={() => handleConfirmRename(src.id)}
-                  className="bg-primary/20 border border-primary/30 rounded px-1.5 py-0.5 text-[11px] font-semibold text-primary outline-none w-[140px]"
+                  className="bg-primary/20 border border-primary/30 rounded px-1.5 py-0.5 text-xs font-semibold text-primary outline-none w-[140px]"
                   onClick={(e) => e.stopPropagation()}
                 />
               ) : (
@@ -196,7 +196,7 @@ export function WorkspaceTabs({
                     isActive && "opacity-60 hover:opacity-100",
                   )}
                 >
-                  <span className="text-[10px] font-bold">⚙️</span>
+                  <span className="text-xs font-bold">⚙️</span>
                 </button>
               )}
 

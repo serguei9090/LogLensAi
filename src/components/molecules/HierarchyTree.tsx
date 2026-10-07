@@ -125,7 +125,7 @@ function HierarchyTreeImpl({
             <Button
               variant="ghost"
               onClick={() => setIsAddingFolder(true)}
-              className="flex items-center justify-start gap-2 px-2 py-1 h-7 text-[11px] text-text-muted hover:text-primary transition-colors w-full mt-2"
+              className="flex items-center justify-start gap-2 px-2 py-1 h-7 text-xs text-text-muted hover:text-primary transition-colors w-full mt-2"
             >
               <FolderPlus className="h-3 w-3" />
               <span>New Folder</span>
@@ -150,7 +150,7 @@ function HierarchyTreeImpl({
                       setIsAddingFolder(false);
                     }
                   }}
-                  className="flex-1 bg-black/20 border border-border-subtle rounded px-1.5 py-0.5 text-[11px] outline-none text-text-primary"
+                  className="flex-1 bg-black/20 border border-border-subtle rounded px-1.5 py-0.5 text-xs outline-none text-text-primary"
                 />
               </div>
             )}
@@ -196,11 +196,11 @@ function HierarchyTreeImpl({
                   setRenamingFolderId(null);
                 }
               }}
-              className="w-full bg-black/40 border border-primary/30 rounded px-1.5 py-0.5 text-[11px] text-text-primary outline-none"
+              className="w-full bg-black/40 border border-primary/30 rounded px-1.5 py-0.5 text-xs text-text-primary outline-none"
             />
           </div>
         ) : (
-          <div className="group flex items-center gap-1 px-2 py-1 text-[12px] text-text-secondary hover:text-text-primary hover:bg-bg-hover rounded transition-colors">
+          <div className="group flex items-center gap-1 px-2 py-1 text-xs text-text-secondary hover:text-text-primary hover:bg-bg-hover rounded transition-colors">
             <button
               type="button"
               onClick={() => setIsExpanded(!isExpanded)}

@@ -63,7 +63,7 @@ export function HighlightBuilder({ highlights, onChange }: HighlightBuilderProps
           <Highlighter className="h-3.5 w-3.5" />
           <span className="hidden 2xl:inline">Highlights</span>
           {highlights.length > 0 && (
-            <span className="bg-amber-500/20 text-amber-300 rounded px-1 text-[10px] font-bold">
+            <span className="bg-amber-500/20 text-amber-300 rounded px-1.5 py-0.5 text-xs font-bold leading-none">
               {highlights.length}
             </span>
           )}
@@ -82,9 +82,7 @@ export function HighlightBuilder({ highlights, onChange }: HighlightBuilderProps
 
           {/* Color palette */}
           <div className="px-3 pt-3 pb-2">
-            <p className="text-[10px] uppercase tracking-wider text-zinc-600 mb-2 font-medium">
-              Color
-            </p>
+            <p className="text-xs uppercase tracking-wider text-zinc-600 mb-2 font-medium">Color</p>
             <div className="flex gap-2 flex-wrap">
               {/* Custom Color Picker Trigger */}
               <Popover>
@@ -112,7 +110,7 @@ export function HighlightBuilder({ highlights, onChange }: HighlightBuilderProps
                         <Input
                           value={pendingColor}
                           onChange={(e) => setPendingColor(e.target.value)}
-                          className="h-8 text-[10px] font-mono bg-zinc-800 border-zinc-700 text-zinc-200 uppercase px-2 focus-visible:ring-1 focus-visible:ring-amber-500/50"
+                          className="h-8 text-xs font-mono bg-zinc-800 border-zinc-700 text-zinc-200 uppercase px-2 focus-visible:ring-1 focus-visible:ring-amber-500/50"
                           placeholder="#000000"
                         />
                         <button
@@ -169,7 +167,7 @@ export function HighlightBuilder({ highlights, onChange }: HighlightBuilderProps
 
           {/* Term input */}
           <div className="px-3 pb-3">
-            <p className="text-[10px] uppercase tracking-wider text-zinc-600 mb-1.5 font-medium">
+            <p className="text-xs uppercase tracking-wider text-zinc-600 mb-1.5 font-medium">
               Term
             </p>
             <div className="flex gap-2 items-center">
@@ -198,13 +196,11 @@ export function HighlightBuilder({ highlights, onChange }: HighlightBuilderProps
           {highlights.length > 0 && (
             <div className="border-t border-zinc-800 px-3 py-2 space-y-1.5">
               <div className="flex items-center justify-between mb-1">
-                <p className="text-[10px] uppercase tracking-wider text-zinc-600 font-medium">
-                  Active
-                </p>
+                <p className="text-xs uppercase tracking-wider text-zinc-600 font-medium">Active</p>
                 <button
                   type="button"
                   onClick={() => onChange([])}
-                  className="text-[10px] text-zinc-600 hover:text-red-400 transition-colors"
+                  className="text-xs text-zinc-600 hover:text-red-400 transition-colors"
                 >
                   Clear all
                 </button>

@@ -94,29 +94,29 @@ export function ClusterRow({
         onClick={toggleExpand}
         className="flex items-start gap-4 text-left w-full cursor-pointer focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary/50"
       >
-        <span className="text-[10px] font-mono text-text-muted py-1 w-6">#{index + 1}</span>
+        <span className="text-xs font-mono text-text-muted py-1 w-6">#{index + 1}</span>
         <div className="flex-1 overflow-hidden">
           <div className="flex items-center gap-2 mb-1.5 flex-wrap">
             <p
               className={cn(
-                "text-[11px] font-mono text-text-primary truncate leading-relaxed group-hover:text-primary transition-colors flex-1 min-w-[200px]",
+                "text-xs font-mono text-text-primary truncate leading-relaxed group-hover:text-primary transition-colors flex-1 min-w-[200px]",
                 type === "error" && "text-error opacity-90",
               )}
             >
               {template}
             </p>
             {category && (
-              <span className="text-[9px] uppercase font-mono px-1.5 py-0.5 rounded bg-white/5 border border-white/10 text-text-muted">
+              <span className="text-xs uppercase font-mono px-1.5 py-0.5 rounded bg-white/5 border border-white/10 text-text-muted">
                 {category}
               </span>
             )}
             {severity !== undefined && (
-              <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20">
+              <span className="text-xs font-mono px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20">
                 Sev {severity.toFixed(1)}
               </span>
             )}
             {isOutage && (
-              <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-rose-500/15 text-rose-400 border border-rose-500/30 animate-pulse">
+              <span className="text-xs font-mono px-1.5 py-0.5 rounded bg-rose-500/15 text-rose-400 border border-rose-500/30 animate-pulse">
                 OUTAGE
               </span>
             )}
@@ -132,7 +132,7 @@ export function ClusterRow({
                 )}
               />
             </div>
-            <span className="text-[10px] font-mono text-text-muted shrink-0 w-16 text-right">
+            <span className="text-xs font-mono text-text-muted shrink-0 w-16 text-right">
               {count.toLocaleString()} hits
             </span>
           </div>
@@ -141,19 +141,19 @@ export function ClusterRow({
 
       {expanded && (
         <span className="mt-2 pl-10 pr-2 space-y-2 border-t border-border/20 pt-3 block w-full">
-          <span className="text-[10px] font-bold uppercase tracking-wider text-text-muted mb-2 flex items-center gap-2">
+          <span className="text-xs font-bold uppercase tracking-wider text-text-muted mb-2 flex items-center gap-2">
             <span>Example Logs (Up to 10)</span>
             {loading && <RefreshCcw className="size-3 animate-spin text-primary" />}
           </span>
 
           {loading && samples.length === 0 && (
-            <span className="text-[10px] font-mono text-text-muted py-4 uppercase tracking-widest animate-pulse block">
+            <span className="text-xs font-mono text-text-muted py-4 uppercase tracking-widest animate-pulse block">
               Retrieving sample logs...
             </span>
           )}
 
           {!loading && samples.length === 0 && (
-            <span className="text-[10px] font-mono text-text-muted py-2 block">
+            <span className="text-xs font-mono text-text-muted py-2 block">
               No sample logs found.
             </span>
           )}
@@ -163,7 +163,7 @@ export function ClusterRow({
             return (
               <span
                 key={key}
-                className="p-2.5 rounded bg-bg-base/60 border border-border/30 text-[10px] font-mono text-text-secondary whitespace-pre-wrap break-all leading-normal selection:bg-primary/20 selection:text-text-primary block"
+                className="p-2.5 rounded bg-bg-base/60 border border-border/30 text-xs font-mono text-text-secondary whitespace-pre-wrap break-all leading-normal selection:bg-primary/20 selection:text-text-primary block"
               >
                 {text}
               </span>

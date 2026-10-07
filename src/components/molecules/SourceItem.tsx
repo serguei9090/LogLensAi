@@ -90,7 +90,7 @@ function SourceItemImpl({
               onRenamingChange(false);
             }
           }}
-          className="w-full bg-bg-app/40 border border-primary/30 rounded px-1.5 py-0.5 text-[11px] text-text-primary outline-none focus:ring-1 focus:ring-primary/40"
+          className="w-full bg-bg-app/40 border border-primary/30 rounded px-1.5 py-0.5 text-xs text-text-primary outline-none focus:ring-1 focus:ring-primary/40"
         />
       </div>
     );
@@ -103,7 +103,7 @@ function SourceItemImpl({
         role="button"
         tabIndex={0}
         className={cn(
-          "flex-1 flex items-center gap-2 px-2 py-1.5 text-[12px] rounded transition-all text-left outline-none border-none bg-transparent cursor-pointer overflow-hidden focus-visible:ring-1 focus-visible:ring-primary/40 select-none",
+          "flex-1 flex items-center gap-2 px-2 py-1.5 text-xs rounded transition-all text-left outline-none border-none bg-transparent cursor-pointer overflow-hidden focus-visible:ring-1 focus-visible:ring-primary/40 select-none",
           active
             ? "text-primary font-medium bg-primary/5 shadow-[inset_1px_0_0_0_currentColor]"
             : "text-text-muted hover:text-text-secondary hover:bg-bg-hover",

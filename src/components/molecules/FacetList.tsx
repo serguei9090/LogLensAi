@@ -57,7 +57,7 @@ export function FacetList({
       <div className={cn("p-4 space-y-4 select-none", className)}>
         <div className="flex items-center gap-2.5 px-3 py-2 rounded-lg bg-primary/10 border border-primary/20 animate-pulse">
           <Loader2 className="h-4 w-4 text-primary animate-spin shrink-0" />
-          <span className="text-[11px] font-medium text-primary tracking-wide">
+          <span className="text-xs font-medium text-primary tracking-wide">
             Analyzing metadata facets...
           </span>
         </div>
@@ -78,7 +78,7 @@ export function FacetList({
     return (
       <div className={cn("px-6 py-10 text-center", className)}>
         <Database className="h-8 w-8 text-text-muted/40 mx-auto mb-3" />
-        <p className="text-[11px] text-text-muted">No metadata facets detected in current view.</p>
+        <p className="text-xs text-text-muted">No metadata facets detected in current view.</p>
       </div>
     );
   }
@@ -98,7 +98,7 @@ export function FacetList({
               <ChevronRight className="h-3.5 w-3.5 text-text-muted" />
             )}
             <span className="text-xs font-medium capitalize flex-1 text-left">{key}</span>
-            <span className="text-[10px] text-text-muted group-hover:text-primary">
+            <span className="text-xs text-text-muted group-hover:text-primary">
               {values.length}
             </span>
           </button>
@@ -123,14 +123,14 @@ export function FacetList({
                         type="button"
                         onClick={() => handleApplyFilter(key, v.value)}
                         className={cn(
-                          "w-full flex items-center justify-between group py-1 px-2 rounded text-[11px] transition-all",
+                          "w-full flex items-center justify-between group py-1 px-2 rounded text-xs transition-all",
                           isActive
                             ? "bg-primary/10 text-primary"
                             : "text-text-muted hover:bg-bg-hover hover:text-text-primary",
                         )}
                       >
                         <span className="truncate max-w-[140px] font-mono">{v.value}</span>
-                        <span className="text-[9px] opacity-40 group-hover:opacity-100">
+                        <span className="text-xs opacity-60 group-hover:opacity-100 font-mono">
                           {v.count}
                         </span>
                       </button>

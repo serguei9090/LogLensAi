@@ -26,10 +26,10 @@ export function LevelBar({ level, count, total }: Readonly<LevelBarProps>) {
   return (
     <div className="group">
       <div className="flex justify-between items-end mb-1.5">
-        <span className="text-[10px] font-bold uppercase tracking-tight text-text-primary group-hover:text-primary transition-colors">
+        <span className="text-xs font-bold uppercase tracking-tight text-text-primary group-hover:text-primary transition-colors">
           {level}
         </span>
-        <span className="text-[10px] font-mono text-text-muted bg-bg-base/50 px-1.5 py-0.5 rounded border border-border/30">
+        <span className="text-xs font-mono text-text-muted bg-bg-base/50 px-1.5 py-0.5 rounded border border-border/30">
           {count.toLocaleString()}
         </span>
       </div>

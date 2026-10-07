@@ -40,7 +40,7 @@ export function ConfirmationDialog({
             </div>
             <DialogTitle className="text-text-primary text-xl font-semibold">{title}</DialogTitle>
           </div>
-          <DialogDescription className="text-text-secondary text-[14px] leading-relaxed">
+          <DialogDescription className="text-text-secondary text-sm leading-relaxed">
             {description}
           </DialogDescription>
         </DialogHeader>
