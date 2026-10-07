@@ -113,8 +113,15 @@ function SettingSelect({
   const [isOpen, setIsOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [onlyFree, setOnlyFree] = useState(false);
+  const [highlightedIndex, setHighlightedIndex] = useState<number>(-1);
   const containerRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const optionsListRef = useRef<HTMLDivElement>(null);
+
+  const listboxId = useMemo(
+    () => (id ? `${id}-listbox` : `select-listbox-${Math.random().toString(36).slice(2, 9)}`),
+    [id],
+  );
 
   const options = useMemo(() => parseOptionChildren(children), [children]);
   const selectedOption = options.find((o) => o.value === value);
@@ -145,6 +152,26 @@ function SettingSelect({
     });
   }, [options, searchable, onlyFree, searchQuery]);
 
+  // Keep highlighted option within valid bounds
+  useEffect(() => {
+    if (isOpen) {
+      const idx = filteredOptions.findIndex((o) => o.value === value);
+      setHighlightedIndex(idx >= 0 ? idx : 0);
+    } else {
+      setHighlightedIndex(-1);
+    }
+  }, [isOpen, value, filteredOptions]);
+
+  // Scroll active option into view when navigating via arrow keys
+  useEffect(() => {
+    if (isOpen && highlightedIndex >= 0 && optionsListRef.current) {
+      const optionEl = optionsListRef.current.children[highlightedIndex] as HTMLElement | undefined;
+      if (optionEl && typeof optionEl.scrollIntoView === "function") {
+        optionEl.scrollIntoView({ block: "nearest" });
+      }
+    }
+  }, [isOpen, highlightedIndex]);
+
   useEffect(() => {
     if (isOpen && searchable) {
       const timer = setTimeout(() => {
@@ -170,6 +197,20 @@ function SettingSelect({
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         setIsOpen(false);
+        return;
+      }
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        setHighlightedIndex((prev) => (prev < filteredOptions.length - 1 ? prev + 1 : 0));
+      } else if (e.key === "ArrowUp") {
+        e.preventDefault();
+        setHighlightedIndex((prev) => (prev > 0 ? prev - 1 : filteredOptions.length - 1));
+      } else if (e.key === "Enter" && !e.shiftKey) {
+        if (highlightedIndex >= 0 && highlightedIndex < filteredOptions.length) {
+          e.preventDefault();
+          onChange(filteredOptions[highlightedIndex].value);
+          setIsOpen(false);
+        }
       }
     };
     document.addEventListener("mousedown", handlePointerDown);
@@ -178,13 +219,18 @@ function SettingSelect({
       document.removeEventListener("mousedown", handlePointerDown);
       document.removeEventListener("keydown", handleKeyDown);
     };
-  }, [isOpen]);
+  }, [isOpen, filteredOptions, highlightedIndex, onChange]);
 
   return (
     <div ref={containerRef} className={cn("relative w-full", className)}>
       <button
         id={id}
         type="button"
+        role="combobox"
+        aria-haspopup="listbox"
+        aria-expanded={isOpen}
+        aria-controls={listboxId}
+        aria-label={displayLabel}
         onClick={() => setIsOpen((prev) => !prev)}
         className={cn(
           "w-full h-10 pl-4 pr-10 rounded-xl text-sm bg-bg-surface border text-text-primary text-left transition-all cursor-pointer flex items-center justify-between select-none relative",
@@ -198,7 +244,12 @@ function SettingSelect({
       </button>
 
       {isOpen && (
-        <div className="absolute top-[calc(100%+4px)] left-0 w-full z-50 rounded-xl border border-border bg-[#141716] shadow-2xl overflow-hidden animate-in fade-in-50 zoom-in-95 duration-150 flex flex-col">
+        <div
+          id={listboxId}
+          role="listbox"
+          tabIndex={-1}
+          className="absolute top-[calc(100%+4px)] left-0 w-full z-50 rounded-xl border border-border bg-[#141716] shadow-2xl overflow-hidden animate-in fade-in-50 zoom-in-95 duration-150 flex flex-col"
+        >
           {searchable && (
             <div className="p-2 border-b border-border/80 bg-[#141716] space-y-1.5 shrink-0">
               <div className="relative flex items-center">
@@ -209,12 +260,14 @@ function SettingSelect({
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder={searchPlaceholder}
+                  aria-label={searchPlaceholder}
                   className="w-full h-8 pl-8 pr-7 text-xs rounded-lg bg-bg-surface border border-border text-text-primary placeholder:text-text-muted/40 focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/20 transition-all"
                 />
                 {searchQuery && (
                   <button
                     type="button"
                     onClick={() => setSearchQuery("")}
+                    aria-label="Clear search query"
                     className="absolute right-2 top-1/2 -translate-y-1/2 text-text-muted hover:text-text-primary p-0.5 cursor-pointer"
                   >
                     <X className="h-3 w-3" />
@@ -223,7 +276,11 @@ function SettingSelect({
               </div>
 
               {(showFreeFilter || freeCount > 0) && (
-                <div className="flex items-center justify-between px-0.5 text-[10px]">
+                <div
+                  className="flex items-center justify-between px-0.5 text-[10px]"
+                  aria-live="polite"
+                  aria-atomic="true"
+                >
                   <span className="text-text-muted">
                     {filteredOptions.length} of {options.length} models
                   </span>
@@ -245,9 +302,10 @@ function SettingSelect({
             </div>
           )}
 
-          <div className="max-h-60 overflow-y-auto p-1.5 space-y-0.5">
-            {filteredOptions.map((opt) => {
+          <div ref={optionsListRef} className="max-h-60 overflow-y-auto p-1.5 space-y-0.5">
+            {filteredOptions.map((opt, idx) => {
               const isSelected = opt.value === value;
+              const isHighlighted = idx === highlightedIndex;
               const valLower = opt.value.toLowerCase();
               const isFree =
                 showFreeBadge &&
@@ -261,15 +319,20 @@ function SettingSelect({
                 <button
                   key={opt.value}
                   type="button"
+                  role="option"
+                  aria-selected={isSelected}
                   onClick={() => {
                     onChange(opt.value);
                     setIsOpen(false);
                   }}
+                  onMouseEnter={() => setHighlightedIndex(idx)}
                   className={cn(
-                    "w-full px-3 py-2 text-xs rounded-lg text-left transition-colors flex items-center justify-between cursor-pointer group",
+                    "w-full px-3 py-2 text-xs rounded-lg text-left transition-colors flex items-center justify-between cursor-pointer group outline-none",
                     isSelected
                       ? "bg-primary/15 text-primary font-medium"
-                      : "text-text-primary hover:bg-white/5 hover:text-white",
+                      : isHighlighted
+                        ? "bg-white/10 text-white"
+                        : "text-text-primary hover:bg-white/5 hover:text-white",
                   )}
                 >
                   <div className="flex items-center gap-2 truncate pr-2">

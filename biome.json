@@ -31,7 +31,8 @@
       },
       "a11y": {
         "noHeaderScope": "off",
-        "useAltText": "off"
+        "useAltText": "off",
+        "useSemanticElements": "off"
       }
     }
   },
