@@ -277,7 +277,7 @@ function SettingSelect({
 
               {(showFreeFilter || freeCount > 0) && (
                 <div
-                  className="flex items-center justify-between px-0.5 text-[10px]"
+                  className="flex items-center justify-between px-0.5 text-xs"
                   aria-live="polite"
                   aria-atomic="true"
                 >
@@ -288,7 +288,7 @@ function SettingSelect({
                     type="button"
                     onClick={() => setOnlyFree((prev) => !prev)}
                     className={cn(
-                      "px-1.5 py-0.5 rounded text-[10px] font-mono border transition-all cursor-pointer flex items-center gap-1",
+                      "px-1.5 py-0.5 rounded text-xs font-mono border transition-all cursor-pointer flex items-center gap-1",
                       onlyFree
                         ? "bg-emerald-500/25 text-emerald-300 border-emerald-500/50 font-semibold"
                         : "bg-white/5 text-text-muted border-border hover:text-text-primary",
@@ -338,7 +338,7 @@ function SettingSelect({
                   <div className="flex items-center gap-2 truncate pr-2">
                     <span className="truncate">{opt.label}</span>
                     {isFree && (
-                      <span className="text-[9px] uppercase font-mono px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-400 font-bold border border-emerald-500/30 shrink-0 leading-none">
+                      <span className="text-xs uppercase font-mono px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-400 font-bold border border-emerald-500/30 shrink-0 leading-none">
                         FREE
                       </span>
                     )}
@@ -382,7 +382,7 @@ function SectionLabel({
   return (
     <label
       htmlFor={htmlFor}
-      className="block text-[11px] font-bold uppercase tracking-wider text-text-muted mb-2 ml-1"
+      className="block text-xs font-bold uppercase tracking-widest text-text-muted mb-2 ml-0.5 select-none"
     >
       {children}
     </label>
@@ -456,7 +456,7 @@ function ModelSelector({
               variant="ghost"
               onClick={onRefresh}
               disabled={isFetching}
-              className="text-[9px] uppercase tracking-tighter font-bold text-primary hover:text-primary-light transition-colors disabled:opacity-30 h-auto p-0 cursor-pointer"
+              className="text-xs uppercase tracking-wider font-bold text-primary hover:text-primary-light transition-colors disabled:opacity-30 h-auto p-0 cursor-pointer"
             >
               {isFetching ? "Pulling..." : "Refresh List"}
             </Button>
@@ -470,7 +470,7 @@ function ModelSelector({
             variant="ghost"
             onClick={onTestConnection}
             disabled={isTestingConnection}
-            className="text-[10px] uppercase font-bold text-primary hover:text-primary-light transition-colors h-7 px-2.5 rounded-lg bg-primary/10 hover:bg-primary/20 shrink-0"
+            className="text-xs uppercase tracking-wider font-bold text-primary hover:text-primary-light transition-colors h-7 px-2.5 rounded-lg bg-primary/10 hover:bg-primary/20 shrink-0"
           >
             {isTestingConnection ? "Testing..." : "Test Connection"}
           </Button>
@@ -511,12 +511,12 @@ function ModelSelector({
             />
           </div>
           {provider === "ollama" && (
-            <p className="text-[10px] text-amber-500/80 px-1 italic">
+            <p className="text-xs text-amber-500/80 px-1 italic">
               No models found. Ensure Ollama is running or enter ID manually.
             </p>
           )}
           {provider === "openrouter" && (
-            <p className="text-[10px] text-text-muted/60 px-1">
+            <p className="text-xs text-text-muted/60 px-1">
               Select any free or frontier model below, or click 'Refresh List' to fetch full
               catalogue.
             </p>
@@ -529,7 +529,7 @@ function ModelSelector({
           <div>
             <div className="flex items-center gap-1.5 mb-1.5">
               <Sparkles className="h-3 w-3 text-emerald-400" />
-              <span className="text-[10px] uppercase font-bold tracking-wider text-emerald-400 font-mono">
+              <span className="text-xs uppercase font-bold tracking-wider text-emerald-400 font-mono">
                 Free Models (Zero Cost)
               </span>
             </div>
@@ -543,7 +543,7 @@ function ModelSelector({
                     onClick={() => onChange(m.id)}
                     title={`${m.id} — ${m.desc}`}
                     className={cn(
-                      "px-2.5 py-1 rounded-lg text-[10px] font-mono border transition-all cursor-pointer flex items-center gap-1.5",
+                      "px-2.5 py-1 rounded-lg text-xs font-mono border transition-all cursor-pointer flex items-center gap-1.5",
                       isSelected
                         ? "bg-emerald-500/25 text-emerald-300 border-emerald-500/60 font-semibold shadow-sm ring-1 ring-emerald-500/20"
                         : "bg-emerald-950/20 text-emerald-400/90 border-emerald-500/30 hover:bg-emerald-500/15 hover:border-emerald-500/50 hover:text-emerald-300",
@@ -560,7 +560,7 @@ function ModelSelector({
           <div>
             <div className="flex items-center gap-1.5 mb-1.5">
               <Zap className="h-3 w-3 text-primary" />
-              <span className="text-[10px] uppercase font-bold tracking-wider text-text-muted font-mono">
+              <span className="text-xs uppercase font-bold tracking-wider text-text-muted font-mono">
                 Top Frontier Models
               </span>
             </div>
@@ -574,7 +574,7 @@ function ModelSelector({
                     onClick={() => onChange(m.id)}
                     title={m.id}
                     className={cn(
-                      "px-2 py-0.5 rounded-md text-[10px] font-mono border transition-all cursor-pointer",
+                      "px-2 py-0.5 rounded-md text-xs font-mono border transition-all cursor-pointer",
                       isSelected
                         ? "bg-primary/20 text-primary border-primary/40 font-semibold shadow-sm"
                         : "bg-bg-surface/60 text-text-muted border-border hover:border-text-muted hover:text-text-primary",
@@ -946,8 +946,8 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
                 )}
               />
               <div>
-                <p className="text-[13px] font-semibold">{label}</p>
-                <p className="text-[10px] mt-0.5 opacity-60 leading-none">{desc}</p>
+                <p className="text-sm font-semibold">{label}</p>
+                <p className="text-xs mt-0.5 opacity-60 leading-none">{desc}</p>
               </div>
               {activeSection === id && (
                 <div className="absolute left-0 top-1/4 bottom-1/4 w-1 bg-primary rounded-full" />
@@ -959,7 +959,7 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
         <div className="mt-auto pt-6 flex flex-col gap-4">
           <div
             className={cn(
-              "flex items-center gap-2 px-4 py-2 rounded-xl text-[10px] font-bold uppercase tracking-wider transition-all duration-500",
+              "flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all duration-500",
               saved
                 ? "text-primary bg-primary/5 border border-primary/20"
                 : "text-text-muted opacity-40",
@@ -981,7 +981,7 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
           <Button
             variant="ghost"
             onClick={() => setIsResetModalOpen(true)}
-            className="flex items-center gap-2 px-4 py-3 text-text-muted hover:text-amber-400 hover:bg-amber-500/5 rounded-2xl text-[11px] font-bold uppercase transition-all border border-transparent hover:border-amber-500/10 group h-auto w-full justify-start"
+            className="flex items-center gap-2 px-4 py-3 text-text-muted hover:text-amber-400 hover:bg-amber-500/5 rounded-2xl text-xs font-bold uppercase tracking-wider transition-all border border-transparent hover:border-amber-500/10 group h-auto w-full justify-start"
           >
             <RotateCcw className="size-4 shrink-0 opacity-50 group-hover:opacity-100" />
             Reset Settings
@@ -990,7 +990,7 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
           <Button
             variant="ghost"
             onClick={() => setIsFactoryResetModalOpen(true)}
-            className="flex items-center gap-2 px-4 py-3 text-text-muted hover:text-red-400 hover:bg-red-500/5 rounded-2xl text-[11px] font-bold uppercase transition-all border border-transparent hover:border-red-500/10 group h-auto w-full justify-start"
+            className="flex items-center gap-2 px-4 py-3 text-text-muted hover:text-red-400 hover:bg-red-500/5 rounded-2xl text-xs font-bold uppercase tracking-wider transition-all border border-transparent hover:border-red-500/10 group h-auto w-full justify-start"
           >
             <Trash2 className="size-4 shrink-0 opacity-50 group-hover:opacity-100" />
             Factory Reset
@@ -1047,7 +1047,7 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
                         variant="ghost"
                         onClick={handleTestConnection}
                         disabled={isTestingConnection}
-                        className="text-[9px] uppercase tracking-tighter font-bold text-primary hover:text-primary-light transition-colors disabled:opacity-30 h-auto p-0"
+                        className="text-xs uppercase tracking-wider font-bold text-primary hover:text-primary-light transition-colors disabled:opacity-30 h-auto p-0"
                       >
                         {isTestingConnection ? "Testing..." : "Test Connection"}
                       </Button>
@@ -1060,9 +1060,7 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
                       onBlur={() => onSave(settings)}
                       placeholder="http://localhost:11434"
                     />
-                    <p className="text-[10px] text-text-muted/50 px-1">
-                      Local Ollama instance URL.
-                    </p>
+                    <p className="text-xs text-text-muted/60 px-1">Local Ollama instance URL.</p>
                   </div>
                 )}
 
@@ -1074,7 +1072,7 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
                         variant="ghost"
                         onClick={handleTestConnection}
                         disabled={isTestingConnection}
-                        className="text-[9px] uppercase tracking-tighter font-bold text-primary hover:text-primary-light transition-colors disabled:opacity-30 h-auto p-0"
+                        className="text-xs uppercase tracking-wider font-bold text-primary hover:text-primary-light transition-colors disabled:opacity-30 h-auto p-0"
                       >
                         {isTestingConnection ? "Testing..." : "Test Connection"}
                       </Button>
@@ -1087,7 +1085,7 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
                       onBlur={() => onSave(settings)}
                       placeholder="http://localhost:1234/v1"
                     />
-                    <p className="text-[10px] text-text-muted/50 px-1">
+                    <p className="text-xs text-text-muted/60 px-1">
                       Local LM Studio API URL (usually port 1234).
                     </p>
                   </div>
@@ -1117,7 +1115,7 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
                             variant="ghost"
                             onClick={handleTestConnection}
                             disabled={isTestingConnection || (isKeyRequired && !keyValue.trim())}
-                            className="text-[9px] uppercase tracking-tighter font-bold text-primary hover:text-primary-light transition-colors disabled:opacity-30 h-auto p-0"
+                            className="text-xs uppercase tracking-wider font-bold text-primary hover:text-primary-light transition-colors disabled:opacity-30 h-auto p-0"
                           >
                             {isTestingConnection ? "Testing..." : "Test Connection"}
                           </Button>
@@ -1157,7 +1155,7 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
                             )}
                           </button>
                         </div>
-                        <p className="text-[10px] text-text-muted/50 px-1">
+                        <p className="text-xs text-text-muted/50 px-1">
                           {settings.ai_provider === "openrouter"
                             ? "OpenRouter API Key. Stored securely in local DuckDB settings."
                             : settings.ai_provider === "openai"
@@ -1196,7 +1194,7 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
                       onBlur={() => onSave(settings)}
                       placeholder="http://localhost:1234/v1 or https://api.groq.com/openai/v1"
                     />
-                    <p className="text-[10px] text-text-muted/50 px-1">
+                    <p className="text-xs text-text-muted/50 px-1">
                       Protocol & host for the OpenAI-compatible endpoint (e.g., LM Studio, Groq,
                       vLLM).
                     </p>
@@ -1214,7 +1212,7 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
                       onBlur={() => onSave(settings)}
                       placeholder="https://openrouter.ai/api/v1"
                     />
-                    <p className="text-[10px] text-text-muted/50 px-1">
+                    <p className="text-xs text-text-muted/50 px-1">
                       OpenRouter API gateway endpoint (default: https://openrouter.ai/api/v1).
                     </p>
                   </div>
@@ -1227,10 +1225,10 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
                   <Bot className="h-4 w-4 text-primary" />
                 </div>
                 <div>
-                  <p className="text-[11px] font-bold text-primary uppercase tracking-wider">
+                  <p className="text-xs font-bold text-primary uppercase tracking-wider">
                     {getProviderLabel(settings.ai_provider)}
                   </p>
-                  <p className="text-[10px] text-text-muted">
+                  <p className="text-xs text-text-muted">
                     {getProviderDescription(settings.ai_provider)}
                   </p>
                 </div>
@@ -1274,7 +1272,7 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
                         <p className="text-sm font-bold text-text-primary">
                           Enable Log Search Tool
                         </p>
-                        <p className="text-[10px] text-text-muted mt-0.5">
+                        <p className="text-xs text-text-muted mt-0.5">
                           Allow AI to autonomously search the DuckDB storage for error contexts.
                         </p>
                       </div>
@@ -1289,7 +1287,7 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
                         <p className="text-sm font-bold text-text-primary">
                           Enable Associative Memory
                         </p>
-                        <p className="text-[10px] text-text-muted mt-0.5">
+                        <p className="text-xs text-text-muted mt-0.5">
                           Allow AI to save and autonomously retrieve past issue resolutions.
                         </p>
                       </div>
@@ -1321,7 +1319,7 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
                   </div>
                   <div>
                     <p className="text-sm font-bold text-text-primary">Agentic MCP Server</p>
-                    <p className="text-[10px] text-text-muted mt-0.5">
+                    <p className="text-xs text-text-muted mt-0.5">
                       Expose log analysis tools via SSE Port 5001 for external AI agents.
                     </p>
                   </div>
@@ -1360,7 +1358,7 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
                         <h3 className="text-base font-bold text-text-primary">
                           Drain3 Clustering Engine
                         </h3>
-                        <span className="text-[10px] font-mono uppercase px-2 py-0.5 rounded-full bg-primary/15 text-primary border border-primary/25">
+                        <span className="text-xs font-mono uppercase px-2 py-0.5 rounded-full bg-primary/15 text-primary border border-primary/25">
                           Active
                         </span>
                       </div>
@@ -1448,7 +1446,7 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
                         }
                         className="w-full h-2 bg-border rounded-lg appearance-none cursor-pointer accent-primary"
                       />
-                      <p className="text-[10px] text-text-muted/60 mt-4 leading-relaxed">
+                      <p className="text-xs text-text-muted/60 mt-4 leading-relaxed">
                         The similarity threshold determines how 'close' two log lines must be to
                         share a template. Lower values 0.1–0.4 are better for high-variance logs.
                       </p>
@@ -1460,76 +1458,74 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
                         <Button
                           variant="ghost"
                           onClick={handleResetMasks}
-                          className="text-[10px] font-bold text-primary/60 hover:text-primary transition-colors flex items-center gap-1.5 uppercase pr-1 cursor-pointer h-auto p-0"
+                          className="text-xs font-bold text-primary/60 hover:text-primary transition-colors flex items-center gap-1.5 uppercase pr-1 cursor-pointer h-auto p-0"
                         >
                           <RotateCcw className="size-3" />
                           Reset to Standard
                         </Button>
                       </div>
                       <div className="space-y-2">
-                        <p className="text-[10px] text-text-muted px-1 -mt-2">
+                        <p className="text-xs text-text-muted px-1 -mt-2">
                           Sanitize logs by replacing dynamic variables like IPs or IDs with tokens
                           before clustering.
                         </p>
 
                         {/* Standard Heuristics Visibility */}
                         <div className="bg-bg-card/30 border border-border rounded-xl p-3 space-y-2 opacity-80 scale-[0.98] origin-left">
-                          <p className="text-[10px] font-bold text-primary-muted uppercase tracking-wider mb-1">
+                          <p className="text-xs font-bold text-primary-muted uppercase tracking-wider mb-1">
                             Standard System Heuristics
                           </p>
                           <div className="flex items-center justify-between gap-4 py-1 border-b border-primary/10">
-                            <span className="text-[10px] font-semibold text-text-primary">
+                            <span className="text-xs font-semibold text-text-primary">
                               IP ADDRESS
                             </span>
-                            <span className="text-[9px] font-mono text-text-muted truncate">
+                            <span className="text-xs font-mono text-text-muted truncate">
                               IPv4 / IPv6 Formats
                             </span>
                           </div>
                           <div className="flex items-center justify-between gap-4 py-1 border-b border-primary/10">
-                            <span className="text-[10px] font-semibold text-text-primary">
+                            <span className="text-xs font-semibold text-text-primary">
                               UUID / GUID
                             </span>
-                            <span className="text-[9px] font-mono text-text-muted truncate">
+                            <span className="text-xs font-mono text-text-muted truncate">
                               Standard 36-char markers
                             </span>
                           </div>
                           <div className="flex items-center justify-between gap-4 py-1 border-b border-primary/10">
-                            <span className="text-[10px] font-semibold text-text-primary">
+                            <span className="text-xs font-semibold text-text-primary">
                               HEX MEMORY / HASH
                             </span>
-                            <span className="text-[9px] font-mono text-text-muted truncate">
+                            <span className="text-xs font-mono text-text-muted truncate">
                               0x... addresses & sha hashes
                             </span>
                           </div>
                           <div className="flex items-center justify-between gap-4 py-1 border-b border-primary/10">
-                            <span className="text-[10px] font-semibold text-text-primary">
+                            <span className="text-xs font-semibold text-text-primary">
                               DURATION
                             </span>
-                            <span className="text-[9px] font-mono text-text-muted truncate">
+                            <span className="text-xs font-mono text-text-muted truncate">
                               took ...ms / ...s latencies
                             </span>
                           </div>
                           <div className="flex items-center justify-between gap-4 py-1 border-b border-primary/10">
-                            <span className="text-[10px] font-semibold text-text-primary">
-                              EMAIL
-                            </span>
-                            <span className="text-[9px] font-mono text-text-muted truncate">
+                            <span className="text-xs font-semibold text-text-primary">EMAIL</span>
+                            <span className="text-xs font-mono text-text-muted truncate">
                               user@domain addresses
                             </span>
                           </div>
                           <div className="flex items-center justify-between gap-4 py-1 border-b border-primary/10">
-                            <span className="text-[10px] font-semibold text-text-primary">
+                            <span className="text-xs font-semibold text-text-primary">
                               MAC ADDRESS
                             </span>
-                            <span className="text-[9px] font-mono text-text-muted truncate">
+                            <span className="text-xs font-mono text-text-muted truncate">
                               xx:xx:xx:xx:xx:xx hardware IDs
                             </span>
                           </div>
                           <div className="flex items-center justify-between gap-4 py-1">
-                            <span className="text-[10px] font-semibold text-text-primary">
+                            <span className="text-xs font-semibold text-text-primary">
                               DATETIME
                             </span>
-                            <span className="text-[9px] font-mono text-text-muted truncate">
+                            <span className="text-xs font-mono text-text-muted truncate">
                               ISO / RFC3339 timestamps
                             </span>
                           </div>
@@ -1561,7 +1557,7 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
                                       newMasks[idx].label = e.target.value;
                                       update("drain_masks", newMasks);
                                     }}
-                                    className="w-full bg-transparent border-none text-[11px] font-bold text-primary focus:ring-0 px-0 h-6 uppercase"
+                                    className="w-full bg-transparent border-none text-xs font-bold text-primary focus:ring-0 px-0 h-6 uppercase"
                                     placeholder="LABEL"
                                   />
                                 </div>
@@ -1574,7 +1570,7 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
                                       newMasks[idx].pattern = e.target.value;
                                       update("drain_masks", newMasks);
                                     }}
-                                    className="w-full bg-transparent border-none text-[11px] text-text-primary font-mono focus:ring-0 px-0 h-6"
+                                    className="w-full bg-transparent border-none text-xs text-text-primary font-mono focus:ring-0 px-0 h-6"
                                     placeholder="Regex Pattern"
                                   />
                                 </div>
@@ -1602,7 +1598,7 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
                               { label: "NEW_MASK", pattern: "", enabled: true },
                             ]);
                           }}
-                          className="w-full flex items-center justify-center gap-2 py-3 border border-dashed border-border rounded-xl text-[10px] font-bold text-text-muted hover:border-primary hover:text-primary hover:bg-primary/5 transition-all uppercase tracking-tighter cursor-pointer h-auto"
+                          className="w-full flex items-center justify-center gap-2 py-3 border border-dashed border-border rounded-xl text-xs font-bold text-text-muted hover:border-primary hover:text-primary hover:bg-primary/5 transition-all uppercase tracking-wider cursor-pointer h-auto"
                         >
                           <Plus className="size-3" />
                           Add Custom Masking Instruction
@@ -1614,7 +1610,7 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
                     <div className="bg-red-500/5 border border-red-500/10 rounded-2xl p-6 flex items-center justify-between">
                       <div>
                         <p className="text-sm font-bold text-red-400">Pattern Memory</p>
-                        <p className="text-[10px] text-text-muted mt-1 max-w-[300px]">
+                        <p className="text-xs text-text-muted mt-1 max-w-[300px]">
                           Clearing patterns will force the engine to re-learn log templates from
                           scratch. This does not affect your masking rules.
                         </p>
@@ -1650,7 +1646,7 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
                         </h3>
                         <span
                           className={cn(
-                            "text-[10px] font-mono uppercase px-2 py-0.5 rounded-full border",
+                            "text-xs font-mono uppercase px-2 py-0.5 rounded-full border",
                             settings.timestamp_auto_detect
                               ? "bg-primary/15 text-primary border-primary/25"
                               : "bg-bg-surface text-text-muted border-border",
@@ -1683,7 +1679,7 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
                           <p className="text-sm font-bold text-text-primary">
                             Auto-Detect Timestamps
                           </p>
-                          <p className="text-[10px] text-text-muted mt-0.5">
+                          <p className="text-xs text-text-muted mt-0.5">
                             Scan log messages automatically for standard date formats (ISO, Apache,
                             Syslog, etc.).
                           </p>
@@ -1709,7 +1705,7 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
                             onBlur={() => onSave(settings)}
                             placeholder="e.g. ^\[(?P<timestamp>[^\]]+)\]"
                           />
-                          <p className="text-[10px] text-text-muted/50 px-1">
+                          <p className="text-xs text-text-muted/50 px-1">
                             Use a custom regex pattern to extract the timestamp string (requires a{" "}
                             <code>?P&lt;timestamp&gt;</code> capture group).
                           </p>
@@ -1729,7 +1725,7 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
                             onBlur={() => onSave(settings)}
                             placeholder="e.g. %d/%b/%Y:%H:%M:%S"
                           />
-                          <p className="text-[10px] text-text-muted/50 px-1">
+                          <p className="text-xs text-text-muted/50 px-1">
                             Optionally provide a custom <code>strptime</code> format string to parse
                             the extracted timestamp.
                           </p>
@@ -1756,7 +1752,7 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
                         <h3 className="text-base font-bold text-text-primary">
                           Metadata Extraction (Facets)
                         </h3>
-                        <span className="text-[10px] font-mono uppercase px-2 py-0.5 rounded-full bg-blue-500/15 text-blue-400 border border-blue-500/25">
+                        <span className="text-xs font-mono uppercase px-2 py-0.5 rounded-full bg-blue-500/15 text-blue-400 border border-blue-500/25">
                           {(settings.facet_extractions || []).filter((r) => r.enabled).length} Rules
                           Active
                         </span>
@@ -1808,7 +1804,7 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
                     </div>
                     <div>
                       <p className="text-sm font-bold text-text-primary">Syslog UDP Listener</p>
-                      <p className="text-[10px] text-text-muted mt-0.5">
+                      <p className="text-xs text-text-muted mt-0.5">
                         Accept logs from Linux/Unix servers using standard syslog format.
                       </p>
                     </div>
@@ -1845,7 +1841,7 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
                     </div>
                     <div>
                       <p className="text-sm font-bold text-text-primary">HTTP Ingestion API</p>
-                      <p className="text-[10px] text-text-muted mt-0.5">
+                      <p className="text-xs text-text-muted mt-0.5">
                         Ingest logs via POST requests to <code>/ingest</code> using JSON payloads.
                       </p>
                     </div>
@@ -1872,10 +1868,10 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
                 </div>
 
                 <div className="p-4 bg-primary/5 rounded-2xl border border-primary/10">
-                  <p className="text-[11px] font-bold text-primary uppercase tracking-widest mb-2 font-mono">
+                  <p className="text-xs font-bold text-primary uppercase tracking-widest mb-2 font-mono">
                     Routing Instructions
                   </p>
-                  <p className="text-[10px] text-text-secondary leading-relaxed space-y-2 flex flex-col">
+                  <p className="text-xs text-text-secondary leading-relaxed space-y-2 flex flex-col">
                     <span>
                       To route logs to a specific workspace and collection, use the path:{" "}
                       <code className="bg-white/5 px-1.5 py-0.5 rounded text-text-primary ml-1">
@@ -1932,7 +1928,7 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
             <div className="p-5 space-y-5 overflow-y-auto custom-scrollbar">
               <div className="space-y-4">
                 <div className="p-3 bg-primary/10 border border-primary/20 rounded-xl">
-                  <p className="text-[11px] text-primary/90 leading-relaxed font-medium">
+                  <p className="text-xs text-primary/90 leading-relaxed font-medium">
                     Skills allow you to create custom AI capabilities (like scripts or prompt
                     injections) using the Antigravity <code>.agents/skills/</code> architecture.
                     Upload a valid skill folder containing a <code>SKILL.md</code>.
@@ -1953,9 +1949,7 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
                       <p className="text-xs text-text-secondary group-hover:text-text-primary font-medium">
                         Click to select skill folder
                       </p>
-                      <p className="text-[10px] text-text-muted mt-1">
-                        Must contain a SKILL.md file
-                      </p>
+                      <p className="text-xs text-text-muted mt-1">Must contain a SKILL.md file</p>
                     </div>
                     {/* @ts-ignore */}
                     <input type="file" webkitdirectory="true" className="hidden" />
@@ -1991,7 +1985,7 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
               Network Ingestion to their factory defaults.
               <br />
               <br />
-              <span className="text-red-400 font-bold uppercase text-[10px]">
+              <span className="text-red-400 font-bold uppercase text-xs">
                 Warning: This action cannot be undone and the application will reload.
               </span>
             </DialogDescription>
@@ -2063,7 +2057,7 @@ export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSetti
                 <li>All Global and Workspace Settings</li>
               </ul>
               <br />
-              <span className="text-red-400 font-bold uppercase text-[10px]">
+              <span className="text-red-400 font-bold uppercase text-xs">
                 Warning: This action is irreversible. The app will be wiped and reloaded.
               </span>
             </div>
