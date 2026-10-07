@@ -31,7 +31,7 @@ export function SidebarNavItem({
       disabled={disabled || active}
       onClick={disabled ? undefined : onClick}
       className={cn(
-        "flex items-center px-3 py-2.5 text-[13px] rounded-md transition-all text-left outline-none overflow-hidden border-none bg-transparent w-full h-auto",
+        "flex items-center px-3 py-2.5 text-sm rounded-md transition-all text-left outline-none overflow-hidden border-none bg-transparent w-full h-auto",
         active
           ? "bg-primary/10 text-primary font-medium border border-primary/20 cursor-default"
           : "text-text-secondary hover:bg-bg-hover hover:text-text-primary cursor-pointer",
@@ -43,7 +43,7 @@ export function SidebarNavItem({
       <span className="shrink-0">{icon}</span>
       {!collapsed && <span className="flex-1 whitespace-nowrap truncate">{label}</span>}
       {!collapsed && badge && (
-        <span className="ml-auto text-[8px] bg-bg-surface-bright text-text-muted border border-border px-1 rounded">
+        <span className="ml-auto text-xs font-mono bg-bg-surface-bright text-text-muted border border-border px-1.5 py-0.5 rounded">
           {badge}
         </span>
       )}

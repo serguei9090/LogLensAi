@@ -45,9 +45,7 @@ export function StatCard({
     >
       <div className="flex items-start justify-between gap-3">
         <div className="flex-1">
-          <p className="text-[10px] font-bold uppercase tracking-wider text-text-muted mb-1">
-            {label}
-          </p>
+          <p className="text-xs font-bold uppercase tracking-wider text-text-muted mb-1">{label}</p>
           <div className="flex items-baseline gap-2">
             {loading ? (
               <div className="h-6 w-16 bg-white/10 rounded animate-pulse my-0.5" />
@@ -57,13 +55,13 @@ export function StatCard({
               </h3>
             )}
             {trend && !loading && (
-              <span className={cn("text-[10px] font-bold", trendColor)}>{trendSymbol}</span>
+              <span className={cn("text-xs font-bold", trendColor)}>{trendSymbol}</span>
             )}
           </div>
           {loading ? (
             <div className="h-3 w-24 bg-white/5 rounded animate-pulse mt-1.5" />
           ) : (
-            <p className="text-[9px] text-text-muted mt-1 font-medium opacity-60 group-hover:opacity-100 transition-opacity uppercase tracking-tighter">
+            <p className="text-xs text-text-muted mt-1 font-medium opacity-60 group-hover:opacity-100 transition-opacity uppercase tracking-wider">
               {subValue}
             </p>
           )}
@@ -78,4 +76,3 @@ export function StatCard({
     </SpotlightCard>
   );
 }
-

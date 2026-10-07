@@ -97,13 +97,13 @@ const LiveDataTable = ({ title, query }: { title: string; query: string }) => {
   return (
     <Card className="bg-bg-surface/50 border-border/60 mb-4 overflow-hidden">
       <CardHeader className="py-3 px-4 border-b border-border/60">
-        <CardTitle className="text-[11px] font-bold text-text-primary uppercase tracking-widest">
+        <CardTitle className="text-xs font-bold text-text-primary uppercase tracking-widest">
           {title}
         </CardTitle>
       </CardHeader>
       <CardContent className="p-0">
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-[11px]">
+          <table className="w-full text-left text-xs">
             <tbody>
               {logs.map((log) => (
                 <tr
@@ -230,7 +230,7 @@ export const A2UIRenderer: React.FC<A2UIRendererProps> = ({ payload, onAction })
     const parsed = parseA2UIMarkup(rawPayload.raw);
     if (!parsed) {
       return (
-        <div className="text-[10px] text-text-muted italic opacity-80 p-3 border border-border/40 rounded-lg bg-bg-surface-bright/50">
+        <div className="text-xs text-text-muted italic opacity-80 p-3 border border-border/40 rounded-lg bg-bg-surface-bright/50">
           [Malformed A2UI Blueprint]
         </div>
       );
@@ -244,7 +244,7 @@ export const A2UIRenderer: React.FC<A2UIRendererProps> = ({ payload, onAction })
     switch (comp.type) {
       case "text":
         return (
-          <p key={index} className="text-text-secondary text-[13px] leading-relaxed mb-2">
+          <p key={index} className="text-text-secondary text-sm leading-relaxed mb-2">
             {comp.text}
           </p>
         );
@@ -255,7 +255,7 @@ export const A2UIRenderer: React.FC<A2UIRendererProps> = ({ payload, onAction })
             key={index}
             variant="outline"
             size="sm"
-            className="h-8 border-emerald-500/20 bg-emerald-500/5 text-emerald-400 hover:bg-emerald-500/10 hover:text-emerald-300 text-[11px] font-bold uppercase tracking-wider mb-2 mr-2"
+            className="h-8 border-emerald-500/20 bg-emerald-500/5 text-emerald-400 hover:bg-emerald-500/10 hover:text-emerald-300 text-xs font-bold uppercase tracking-wider mb-2 mr-2"
             onClick={() => onAction?.(comp.action)}
           >
             {comp.label}
@@ -295,7 +295,7 @@ export const A2UIRenderer: React.FC<A2UIRendererProps> = ({ payload, onAction })
           <Card key={index} className="bg-bg-surface/50 border-border/60 mb-4 overflow-hidden">
             {comp.label && (
               <CardHeader className="py-3 px-4 border-b border-border/60">
-                <CardTitle className="text-[11px] font-bold text-text-primary uppercase tracking-widest">
+                <CardTitle className="text-xs font-bold text-text-primary uppercase tracking-widest">
                   {comp.label}
                 </CardTitle>
               </CardHeader>

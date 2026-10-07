@@ -81,7 +81,10 @@ export function ThinkingBlock({
   }
 
   // Extract the latest active line for 1-line trail preview
-  const lines = content.split("\n").map((l) => l.trim()).filter(Boolean);
+  const lines = content
+    .split("\n")
+    .map((l) => l.trim())
+    .filter(Boolean);
   const latestThoughtLine = lines.length > 0 ? lines[lines.length - 1] : "";
 
   return (
@@ -101,7 +104,7 @@ export function ThinkingBlock({
           </span>
           <span
             className={cn(
-              "text-[13px] font-medium text-[#a1a1aa] group-hover:text-[#d4d4d8] transition-colors lowercase flex items-center gap-2",
+              "text-sm font-medium text-[#a1a1aa] group-hover:text-[#d4d4d8] transition-colors lowercase flex items-center gap-2",
               isStreaming && "text-amber-400/90",
             )}
           >
@@ -136,12 +139,12 @@ export function ThinkingBlock({
             role="button"
             tabIndex={0}
             className={cn(
-              "text-[12px] font-mono text-text-muted/70 pl-6 pr-3 py-1 rounded-md bg-bg-surface-subtle/40 border border-border-subtle/30 truncate max-w-full cursor-pointer hover:text-text-secondary hover:border-border-subtle transition-all select-none flex items-center gap-2",
+              "text-xs font-mono text-text-muted/70 pl-6 pr-3 py-1 rounded-md bg-bg-surface-subtle/40 border border-border-subtle/30 truncate max-w-full cursor-pointer hover:text-text-secondary hover:border-border-subtle transition-all select-none flex items-center gap-2",
               isStreaming && "border-amber-500/20 text-amber-200/70 bg-amber-500/5",
             )}
             title="Click to expand reasoning trail"
           >
-            <span className="text-[10px] uppercase font-semibold text-text-muted/50 tracking-wider">
+            <span className="text-xs uppercase font-semibold text-text-muted/50 tracking-wider">
               trail:
             </span>
             <span className="truncate">{latestThoughtLine}</span>
@@ -164,15 +167,15 @@ export function ThinkingBlock({
       >
         <div ref={contentRef} className="pl-6 pr-2 py-3 border-l-2 border-[#27272a] ml-1.5 mt-1">
           {/* Subtle internal header */}
-          <div className="text-[11px] font-bold tracking-wider text-[#a1a1aa]/40 uppercase mb-3 select-none flex items-center justify-between">
+          <div className="text-xs font-bold tracking-wider text-[#a1a1aa]/40 uppercase mb-3 select-none flex items-center justify-between">
             <span>reasoning chain</span>
             {isStreaming && (
-              <span className="text-[10px] text-amber-400 font-normal lowercase animate-pulse">
+              <span className="text-xs text-amber-400 font-normal lowercase animate-pulse">
                 streaming live…
               </span>
             )}
           </div>
-          <div className="text-[14px] text-[#d4d4d8]/80 whitespace-pre-wrap font-sans leading-relaxed break-words">
+          <div className="text-sm text-[#d4d4d8]/80 whitespace-pre-wrap font-sans leading-relaxed break-words">
             {content}
           </div>
         </div>

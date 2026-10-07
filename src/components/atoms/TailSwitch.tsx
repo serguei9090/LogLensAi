@@ -158,11 +158,11 @@ export function TailSwitch({
               <span>{badge.tooltipTitle}</span>
             </div>
             {sourceName && (
-              <p className="text-[10px] text-text-muted font-mono truncate max-w-[220px]">
+              <p className="text-xs text-text-muted font-mono truncate max-w-[220px]">
                 Source: {sourceName}
               </p>
             )}
-            <p className="text-[11px] text-text-secondary leading-snug">{badge.tooltipDesc}</p>
+            <p className="text-xs text-text-secondary leading-snug">{badge.tooltipDesc}</p>
           </div>
         </TooltipContent>
       </Tooltip>

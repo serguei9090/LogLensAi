@@ -38,7 +38,7 @@ export function IngestionProgressBadge({
     return (
       <span
         className={cn(
-          "inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[9px] font-bold leading-none",
+          "inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-xs font-mono font-bold leading-none",
           "bg-amber-500/15 text-amber-400 border border-amber-500/30",
           "animate-in fade-in duration-300",
           className,
@@ -55,7 +55,7 @@ export function IngestionProgressBadge({
     return (
       <span
         className={cn(
-          "inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[9px] font-bold leading-none",
+          "inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-xs font-mono font-bold leading-none",
           "bg-red-500/15 text-red-400 border border-red-500/30",
           className,
         )}
@@ -71,7 +71,7 @@ export function IngestionProgressBadge({
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9px] font-bold leading-none",
+        "inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-xs font-mono font-bold leading-none",
         "bg-primary/15 text-primary border border-primary/30",
         className,
       )}

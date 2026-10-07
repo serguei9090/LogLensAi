@@ -30,7 +30,7 @@ function CodeBlockWithCopy({
 
   return (
     <div className="relative group/code my-2 rounded-xl overflow-hidden border border-zinc-800/80 bg-zinc-950/90 shadow-sm">
-      <div className="flex items-center justify-between px-3 py-1.5 bg-zinc-900/60 border-b border-zinc-800/60 text-[10px] text-zinc-400 font-mono">
+      <div className="flex items-center justify-between px-3 py-1.5 bg-zinc-900/60 border-b border-zinc-800/60 text-xs text-zinc-400 font-mono">
         <span>{language || "code"}</span>
         <button
           type="button"
@@ -41,7 +41,7 @@ function CodeBlockWithCopy({
           {copied ? (
             <>
               <Check className="size-3 text-emerald-400" />
-              <span className="text-emerald-400 text-[10px]">Copied!</span>
+              <span className="text-emerald-400 text-xs">Copied!</span>
             </>
           ) : (
             <>
@@ -52,7 +52,7 @@ function CodeBlockWithCopy({
         </button>
       </div>
       <pre className="px-3.5 py-3 overflow-x-auto custom-scrollbar">
-        <code className="text-[11px] font-mono text-emerald-300/90 leading-relaxed whitespace-pre">
+        <code className="text-xs font-mono text-emerald-300/90 leading-relaxed whitespace-pre">
           {code}
         </code>
       </pre>
@@ -84,7 +84,7 @@ export function MarkdownContent({ content, className, isStreaming = false }: Mar
           },
           thead({ children }) {
             return (
-              <thead className="bg-bg-surface-bright/70 border-b border-border-subtle text-text-secondary font-semibold uppercase tracking-wider text-[10px]">
+              <thead className="bg-bg-surface-bright/70 border-b border-border-subtle text-text-secondary font-semibold uppercase tracking-wider text-xs">
                 {children}
               </thead>
             );
@@ -116,14 +116,14 @@ export function MarkdownContent({ content, className, isStreaming = false }: Mar
             );
           },
           li({ children }) {
-            return <li className="text-[13px] leading-relaxed text-text-primary">{children}</li>;
+            return <li className="text-sm leading-relaxed text-text-primary">{children}</li>;
           },
           p({ children }) {
-            return <p className="text-[13px] leading-relaxed my-1.5">{children}</p>;
+            return <p className="text-sm leading-relaxed my-1.5">{children}</p>;
           },
           blockquote({ children }) {
             return (
-              <blockquote className="border-l-2 border-emerald-500/40 pl-3 my-2 text-text-muted italic text-[12px] bg-emerald-500/[0.03] py-1 rounded-r">
+              <blockquote className="border-l-2 border-emerald-500/40 pl-3 my-2 text-text-muted italic text-xs bg-emerald-500/[0.03] py-1 rounded-r">
                 {children}
               </blockquote>
             );
@@ -143,7 +143,7 @@ export function MarkdownContent({ content, className, isStreaming = false }: Mar
             // Inline code
             return (
               <code
-                className="px-1.5 py-0.5 rounded bg-zinc-800/80 text-emerald-400/90 text-[11px] font-mono border border-zinc-700/40"
+                className="px-1.5 py-0.5 rounded bg-zinc-800/80 text-emerald-400/90 text-xs font-mono border border-zinc-700/40"
                 {...props}
               >
                 {children}
