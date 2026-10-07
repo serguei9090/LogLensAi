@@ -423,7 +423,7 @@ export function DashboardCharts({
         );
       }
       return (
-        <div className="h-full flex items-center justify-center text-[10px] font-mono text-text-muted uppercase tracking-widest">
+        <div className="h-full flex items-center justify-center text-xs font-mono text-text-muted uppercase tracking-widest">
           No Time Data Available
         </div>
       );
@@ -457,7 +457,7 @@ export function DashboardCharts({
               Severity Over Time
             </h2>
 
-            <span className="text-[9px] font-mono text-text-muted/50 ml-1 border border-border/30 rounded px-1 py-px">
+            <span className="text-xs font-mono text-text-muted/50 ml-1 border border-border/30 rounded px-1 py-px">
               {bucketInterval}/bar
             </span>
 
@@ -465,7 +465,7 @@ export function DashboardCharts({
               <button
                 type="button"
                 onClick={onReset}
-                className="ml-2 flex items-center gap-1 px-2 py-0.5 text-[10px] font-semibold text-primary hover:text-text-inverse bg-primary/10 hover:bg-primary border border-primary/20 rounded transition-all cursor-pointer"
+                className="ml-2 flex items-center gap-1 px-2 py-0.5 text-xs font-semibold text-primary hover:text-text-inverse bg-primary/10 hover:bg-primary border border-primary/20 rounded transition-all cursor-pointer"
               >
                 <ZoomIn className="size-2.5" />
                 Reset Zoom
@@ -473,7 +473,7 @@ export function DashboardCharts({
             )}
           </div>
 
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[11px] font-mono">
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs font-mono">
             {DISPLAY_LEVELS.map((lvl) => {
               const count = aggregatedCounts[lvl.key as keyof typeof aggregatedCounts] || 0;
               const pct = totalLogs > 0 ? ((count / totalLogs) * 100).toFixed(1) : "0.0";
@@ -488,14 +488,14 @@ export function DashboardCharts({
                   />
                   <span className="font-semibold text-text-primary">{lvl.label}</span>
                   <span className="text-text-primary/95">{count.toLocaleString()}</span>
-                  <span className="text-[10px] opacity-60">({pct}%)</span>
+                  <span className="text-xs opacity-60">({pct}%)</span>
                 </div>
               );
             })}
           </div>
         </div>
 
-        <p className="text-[9px] font-mono text-text-muted/40 mb-2 -mt-3">
+        <p className="text-xs font-mono text-text-muted/40 mb-2 -mt-3">
           Click a bar to drill down · Drag to select a range
         </p>
 

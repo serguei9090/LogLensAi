@@ -116,7 +116,7 @@ export function LoadTemplateModal({
           <p className="text-sm font-bold text-text-primary group-hover:text-primary transition-colors">
             {template.name}
           </p>
-          <p className="text-[10px] text-text-muted font-mono opacity-60">
+          <p className="text-xs text-text-muted font-mono opacity-60">
             {new Date(template.created_at).toLocaleString()}
           </p>
         </div>

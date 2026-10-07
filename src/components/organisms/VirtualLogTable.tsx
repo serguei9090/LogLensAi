@@ -570,7 +570,7 @@ export function VirtualLogTable({
                         <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden border border-white/5 relative">
                           <div className="h-full w-full bg-gradient-to-r from-transparent via-amber-500/60 to-transparent animate-shimmer absolute inset-0" />
                         </div>
-                        <p className="text-[10px] text-amber-400/60 font-bold uppercase tracking-widest text-center">
+                        <p className="text-xs text-amber-400/60 font-bold uppercase tracking-widest text-center">
                           {activeJob.total_lines > 0
                             ? `${activeJob.total_lines.toLocaleString()} lines ready to index`
                             : "Counting lines..."}
@@ -599,7 +599,7 @@ export function VirtualLogTable({
                         <div className="w-full space-y-3">
                           {activeJob ? (
                             <>
-                              <div className="flex justify-between text-[10px] font-bold uppercase tracking-widest text-text-muted">
+                              <div className="flex justify-between text-xs font-bold uppercase tracking-widest text-text-muted">
                                 <span>
                                   {activeJob.processed_lines.toLocaleString()} /{" "}
                                   {activeJob.total_lines.toLocaleString()} lines
@@ -622,7 +622,7 @@ export function VirtualLogTable({
                             </>
                           ) : (
                             <>
-                              <div className="flex justify-between text-[10px] font-bold uppercase tracking-widest text-text-muted">
+                              <div className="flex justify-between text-xs font-bold uppercase tracking-widest text-text-muted">
                                 <span>Preparing Ingestion...</span>
                               </div>
                               <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden border border-white/5 relative">
@@ -636,7 +636,7 @@ export function VirtualLogTable({
                   )}
                 </div>
                 {(isQueued || isIndexing) && (
-                  <div className="mt-12 flex items-center gap-6 text-[10px] font-bold uppercase tracking-widest text-text-muted/30">
+                  <div className="mt-12 flex items-center gap-6 text-xs font-bold uppercase tracking-widest text-text-muted/30">
                     <div className="flex items-center gap-1.5">
                       <Download className="size-3" /> local files
                     </div>
@@ -711,7 +711,7 @@ export function VirtualLogTable({
                   <Rocket className="size-5 mr-2 group-hover:-translate-y-0.5 transition-transform duration-200 ease-out" />
                   Import First Log
                 </Button>
-                <div className="mt-12 flex items-center gap-6 text-[10px] font-bold uppercase tracking-widest text-text-muted/30 z-10">
+                <div className="mt-12 flex items-center gap-6 text-xs font-bold uppercase tracking-widest text-text-muted/30 z-10">
                   <div className="flex items-center gap-1.5">
                     <Download className="size-3" /> local files
                   </div>
@@ -738,7 +738,7 @@ export function VirtualLogTable({
                 }}
               >
                 <table className="w-full text-left text-sm border-separate border-spacing-0 block">
-                  <thead className="sticky top-0 bg-bg-surface border-b border-border z-10 text-text-muted text-[10px] font-bold uppercase tracking-widest h-10 select-none block">
+                  <thead className="sticky top-0 bg-bg-surface border-b border-border z-10 text-text-muted text-xs font-bold uppercase tracking-widest h-10 select-none block">
                     <tr className="grid w-full items-center" style={{ gridTemplateColumns }}>
                       <th
                         className="p-0 transition-colors group/select-all"
@@ -789,14 +789,14 @@ export function VirtualLogTable({
                             {isSortable ? (
                               <Button
                                 variant="ghost"
-                                className="w-full h-10 px-3 flex items-center justify-start gap-1.5 hover:text-text-primary transition-colors focus-visible:bg-primary/5 outline-none rounded-none border-none font-bold uppercase tracking-widest text-[10px] min-w-0"
+                                className="w-full h-10 px-3 flex items-center justify-start gap-1.5 hover:text-text-primary transition-colors focus-visible:bg-primary/5 outline-none rounded-none border-none font-bold uppercase tracking-widest text-xs min-w-0"
                                 onClick={() => onSort(colId)}
                               >
                                 <span className="truncate">{label}</span>
                                 {renderSortIcon(colId)}
                               </Button>
                             ) : (
-                              <div className="w-full h-10 px-3 flex items-center justify-start gap-1.5 font-bold uppercase tracking-widest text-[10px] text-text-muted min-w-0">
+                              <div className="w-full h-10 px-3 flex items-center justify-start gap-1.5 font-bold uppercase tracking-widest text-xs text-text-muted min-w-0">
                                 <span className="truncate">{label}</span>
                               </div>
                             )}
@@ -815,7 +815,7 @@ export function VirtualLogTable({
                       })}
                     </tr>
                   </thead>
-                  <tbody className="font-mono text-[12px] relative z-0 block">
+                  <tbody className="font-mono text-xs relative z-0 block">
                     {rowVirtualizer.getVirtualItems().map((virtualRow) => {
                       const isLoaderRow = virtualRow.index === logs.length;
                       if (isLoaderRow) {
@@ -884,7 +884,7 @@ export function VirtualLogTable({
                   <StickyNote className="h-4 w-4 text-primary" />
                 </div>
                 Log Entry Annotation
-                <span className="text-text-muted font-mono text-[10px] ml-2 opacity-50 bg-white/5 px-2 py-0.5 rounded-full">
+                <span className="text-text-muted font-mono text-xs ml-2 opacity-50 bg-white/5 px-2 py-0.5 rounded-full">
                   Line: {(logs.find((l) => l.id === expandedRow)?.line_id ?? -1) + 1 || expandedRow}
                 </span>
               </h3>
@@ -893,7 +893,7 @@ export function VirtualLogTable({
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="h-9 px-4 text-[11px] font-bold text-red-400 hover:text-red-300 hover:bg-red-500/10 transition-colors uppercase tracking-widest"
+                    className="h-9 px-4 text-xs font-bold text-red-400 hover:text-red-300 hover:bg-red-500/10 transition-colors uppercase tracking-widest"
                     onClick={() => {
                       if (expandedRow !== null) {
                         onAddComment(expandedRow, "");
@@ -908,7 +908,7 @@ export function VirtualLogTable({
                 <Button
                   variant="outline"
                   size="sm"
-                  className="h-9 px-6 text-[11px] font-bold uppercase tracking-widest border-primary/20 bg-primary/5 hover:bg-primary/10 hover:text-primary transition-all rounded-lg"
+                  className="h-9 px-6 text-xs font-bold uppercase tracking-widest border-primary/20 bg-primary/5 hover:bg-primary/10 hover:text-primary transition-all rounded-lg"
                   onClick={() => {
                     if (expandedRow !== null) {
                       onAddComment(expandedRow, commentText);
@@ -932,7 +932,7 @@ export function VirtualLogTable({
               <div className="absolute -inset-1 bg-gradient-to-r from-primary/10 via-transparent to-primary/10 rounded-2xl blur-lg opacity-20 group-hover:opacity-40 transition-opacity duration-1000" />
               <textarea
                 id={`note-editor-${expandedRow}`}
-                className="relative w-full h-[180px] text-[13px] font-sans leading-relaxed text-text-primary bg-bg-base/60 p-6 rounded-2xl border border-white/10 focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all resize-none placeholder:text-text-muted/20 scrollbar-thin"
+                className="relative w-full h-[180px] text-sm font-sans leading-relaxed text-text-primary bg-bg-base/60 p-6 rounded-2xl border border-white/10 focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all resize-none placeholder:text-text-muted/20 scrollbar-thin"
                 placeholder="Add investigation details, identified causes, or diagnostic insights for this log entry..."
                 value={commentText}
                 onChange={(e) => setCommentText(e.target.value)}
@@ -1211,7 +1211,7 @@ function ClusterCell({ log, anomalousClusters, onAnalyzeCluster }: ClusterCellPr
           <Button
             variant="ghost"
             className={cn(
-              "inline-flex items-center justify-center border h-5 px-1.5 rounded-md text-[9px] font-bold transition-colors outline-none focus-visible:ring-1 focus-visible:ring-primary p-0 min-w-0",
+              "inline-flex items-center justify-center border h-5 px-1.5 rounded-md text-xs font-bold transition-colors outline-none focus-visible:ring-1 focus-visible:ring-primary p-0 min-w-0",
               getClusterStyles(log.cluster_id, anomalousClusters),
             )}
             title={log.cluster_template || "Click to analyze with AI"}
@@ -1225,7 +1225,7 @@ function ClusterCell({ log, anomalousClusters, onAnalyzeCluster }: ClusterCellPr
             #{log.cluster_id}
           </Button>
           {log.cluster_percent !== undefined && (
-            <span className="text-[8px] text-text-muted/60 font-medium whitespace-nowrap">
+            <span className="text-xs text-text-muted/60 font-medium whitespace-nowrap">
               {Number(log.cluster_percent).toFixed(1)}%
             </span>
           )}
@@ -1343,7 +1343,7 @@ function CustomFacetCell({ log, custom }: CustomFacetCellProps) {
   return (
     <td
       key={custom.id}
-      className="px-3 py-2 align-top whitespace-nowrap overflow-hidden text-ellipsis text-[11px]"
+      className="px-3 py-2 align-top whitespace-nowrap overflow-hidden text-ellipsis text-xs"
     >
       {cellValue === null ? (
         <span className="text-text-muted/30">—</span>
@@ -1402,7 +1402,7 @@ function LogTableCell({
       return (
         <td
           key="message"
-          className="px-3 py-2 text-text-primary/90 align-top whitespace-pre-wrap font-mono text-[11px] break-words leading-normal min-w-0"
+          className="px-3 py-2 text-text-primary/90 align-top whitespace-pre-wrap font-mono text-xs break-words leading-normal min-w-0"
         >
           <div className="max-w-full overflow-hidden">{content}</div>
         </td>

@@ -106,8 +106,8 @@ export function TimeShiftModal({
                   Time Alignment
                 </DialogTitle>
                 <div className="flex items-center gap-1.5 mt-0.5">
-                  <span className="text-[11px] text-white/40">Target:</span>
-                  <span className="text-[11px] text-white/70 font-mono bg-white/5 px-1.5 py-0.5 rounded border border-white/10">
+                  <span className="text-xs text-white/40">Target:</span>
+                  <span className="text-xs text-white/70 font-mono bg-white/5 px-1.5 py-0.5 rounded border border-white/10">
                     {sourceLabel}
                   </span>
                 </div>
@@ -121,19 +121,19 @@ export function TimeShiftModal({
             className="w-full flex flex-col"
           >
             <div className="space-y-1.5 mb-6">
-              <Label className="text-[10px] text-white/50 font-medium px-0.5 uppercase">
+              <Label className="text-xs text-white/50 font-medium px-0.5 uppercase tracking-wider">
                 Alignment Mode
               </Label>
               <TabsList className="grid grid-cols-2 bg-white/5 border border-white/10 p-1 rounded-lg">
                 <TabsTrigger
                   value="relative"
-                  className="py-1.5 rounded-md transition-all text-[11px] font-medium text-white/40 hover:text-white/60 data-active:bg-white/10 data-active:text-white data-active:shadow-sm data-[state=active]:bg-white/10 data-[state=active]:text-white data-[state=active]:shadow-sm"
+                  className="py-1.5 rounded-md transition-all text-xs font-medium text-white/40 hover:text-white/60 data-active:bg-white/10 data-active:text-white data-active:shadow-sm data-[state=active]:bg-white/10 data-[state=active]:text-white data-[state=active]:shadow-sm"
                 >
                   Manual Offset
                 </TabsTrigger>
                 <TabsTrigger
                   value="sample"
-                  className="py-1.5 rounded-md transition-all text-[11px] font-medium text-white/40 hover:text-white/60 data-active:bg-white/10 data-active:text-white data-active:shadow-sm data-[state=active]:bg-white/10 data-[state=active]:text-white data-[state=active]:shadow-sm"
+                  className="py-1.5 rounded-md transition-all text-xs font-medium text-white/40 hover:text-white/60 data-active:bg-white/10 data-active:text-white data-active:shadow-sm data-[state=active]:bg-white/10 data-[state=active]:text-white data-[state=active]:shadow-sm"
                 >
                   Visual Sync
                 </TabsTrigger>
@@ -149,7 +149,7 @@ export function TimeShiftModal({
                   { label: "Secs", value: secs, set: setSecs },
                 ].map((unit) => (
                   <div key={unit.label} className="space-y-1.5">
-                    <Label className="text-[10px] text-white/50 font-medium px-0.5 uppercase">
+                    <Label className="text-xs text-white/50 font-medium px-0.5 uppercase tracking-wider">
                       {unit.label}
                     </Label>
                     <Input
@@ -167,7 +167,7 @@ export function TimeShiftModal({
 
               <div className="space-y-6 pt-2">
                 <div className="space-y-1.5">
-                  <Label className="text-[10px] text-white/50 font-medium px-0.5 uppercase">
+                  <Label className="text-xs text-white/50 font-medium px-0.5 uppercase tracking-wider">
                     Shift Direction
                   </Label>
                   <div className="grid grid-cols-2 bg-white/5 p-1 rounded-lg border border-white/10">
@@ -175,7 +175,7 @@ export function TimeShiftModal({
                       type="button"
                       onClick={() => setIsNegative(false)}
                       className={cn(
-                        "py-1.5 rounded-md transition-all text-[11px] font-medium",
+                        "py-1.5 rounded-md transition-all text-xs font-medium",
                         isNegative
                           ? "text-white/40 hover:text-white/60"
                           : "bg-white/10 text-white shadow-sm",
@@ -187,7 +187,7 @@ export function TimeShiftModal({
                       type="button"
                       onClick={() => setIsNegative(true)}
                       className={cn(
-                        "py-1.5 rounded-md transition-all text-[11px] font-medium",
+                        "py-1.5 rounded-md transition-all text-xs font-medium",
                         isNegative
                           ? "bg-white/10 text-white shadow-sm"
                           : "text-white/40 hover:text-white/60",
@@ -199,7 +199,7 @@ export function TimeShiftModal({
                 </div>
 
                 <div className="flex justify-between items-center px-1 pt-4 border-t border-white/10">
-                  <span className="text-[10px] uppercase text-white/40 font-medium">
+                  <span className="text-xs uppercase tracking-wider text-white/40 font-medium">
                     Calculated Shift
                   </span>
                   <span className="font-mono text-sm font-medium text-white/90">
@@ -212,7 +212,7 @@ export function TimeShiftModal({
             <TabsContent value="sample" className="space-y-5 pt-1 outline-none">
               <div className="p-3 rounded-lg bg-white/5 border border-white/10 flex gap-3">
                 <HelpCircle className="size-4 text-white/40 shrink-0 mt-0.5" />
-                <p className="text-[11px] text-white/60 leading-relaxed font-medium">
+                <p className="text-xs text-white/60 leading-relaxed font-medium">
                   Paste a timestamp and specify the desired target time. We'll calculate the offset
                   automatically.
                 </p>
@@ -221,10 +221,10 @@ export function TimeShiftModal({
               <div className="space-y-4">
                 <div className="space-y-1.5">
                   <div className="flex justify-between items-center">
-                    <Label className="text-[10px] text-white/50 font-medium px-0.5 uppercase">
+                    <Label className="text-xs text-white/50 font-medium px-0.5 uppercase tracking-wider">
                       Inbound Time
                     </Label>
-                    <span className="text-[9px] text-white/30 font-mono">YYYY-MM-DD HH:MM:SS</span>
+                    <span className="text-xs text-white/30 font-mono">YYYY-MM-DD HH:MM:SS</span>
                   </div>
                   <Input
                     placeholder="2024-05-25 00:00:21"
@@ -235,7 +235,7 @@ export function TimeShiftModal({
                 </div>
 
                 <div className="space-y-1.5">
-                  <Label className="text-[10px] text-white/50 font-medium px-0.5 uppercase">
+                  <Label className="text-xs text-white/50 font-medium px-0.5 uppercase tracking-wider">
                     Target Synchronized Time
                   </Label>
                   <Input

@@ -85,7 +85,7 @@ export function SaveTemplateModal({
           <div className="space-y-3">
             <label
               htmlFor="template-name"
-              className="text-[10px] font-bold text-text-muted uppercase tracking-widest"
+              className="text-xs font-bold text-text-muted uppercase tracking-widest"
             >
               Template Name
             </label>
@@ -100,7 +100,7 @@ export function SaveTemplateModal({
           </div>
 
           <div className="p-4 rounded-xl bg-white/5 border border-white/5 space-y-4">
-            <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-widest text-text-muted">
+            <div className="flex items-center justify-between text-xs font-bold uppercase tracking-widest text-text-muted">
               <span>Configuration Summary</span>
             </div>
 

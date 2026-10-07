@@ -147,12 +147,12 @@ function DashboardFilters({
   return (
     <div className="flex flex-wrap items-center gap-3 bg-bg-surface/30 p-2 rounded-xl border border-border/50 backdrop-blur-sm">
       <div className="flex items-center gap-2">
-        <span className="text-[10px] font-bold uppercase tracking-widest text-text-muted ml-2">
+        <span className="text-xs font-bold uppercase tracking-widest text-text-muted ml-2">
           Context:
         </span>
 
         <Select value={selectedWorkspaceId} onValueChange={(val) => val && onWorkspaceChange(val)}>
-          <SelectTrigger className="w-[180px] h-8 text-[11px] bg-bg-base/40 border-white/5 hover:border-white/10 transition-all font-medium">
+          <SelectTrigger className="w-[180px] h-8 text-xs bg-bg-base/40 border-white/5 hover:border-white/10 transition-all font-medium">
             <SelectValue placeholder="Select Workspace">{selectedWorkspace?.name}</SelectValue>
           </SelectTrigger>
           <SelectContent>
@@ -169,7 +169,7 @@ function DashboardFilters({
           onValueChange={(val) => val && onSourceChange(val)}
           disabled={selectedWorkspaceId === "all"}
         >
-          <SelectTrigger className="w-[180px] h-8 text-[11px] bg-bg-base/40 border-white/5 hover:border-white/10 transition-all font-medium">
+          <SelectTrigger className="w-[180px] h-8 text-xs bg-bg-base/40 border-white/5 hover:border-white/10 transition-all font-medium">
             <SelectValue placeholder="Log Source">
               {selectedSourceId === "all" ? "Entire Workspace" : selectedSource?.name}
             </SelectValue>
@@ -188,14 +188,14 @@ function DashboardFilters({
       <div className="h-4 w-px bg-border/50 mx-1" />
 
       <div className="flex items-center gap-2">
-        <span className="text-[10px] font-bold uppercase tracking-widest text-text-muted">
+        <span className="text-xs font-bold uppercase tracking-widest text-text-muted">
           Time:
         </span>
         {isFiltered && (
           <button
             type="button"
             onClick={onResetTime}
-            className="text-[10px] h-7 px-2 border border-primary/20 bg-primary/5 text-primary hover:bg-primary hover:text-text-inverse transition-all rounded font-semibold cursor-pointer"
+            className="text-xs h-7 px-2 border border-primary/20 bg-primary/5 text-primary hover:bg-primary hover:text-text-inverse transition-all rounded font-semibold cursor-pointer"
           >
             All Time
           </button>
@@ -237,7 +237,7 @@ function SourceHeatmap({ stats }: Readonly<{ stats: DashboardStats | null }>) {
 
   if (stats.source_heatmap.length === 0) {
     return (
-      <div className="py-20 text-center text-[10px] font-mono text-text-muted uppercase tracking-widest">
+      <div className="py-20 text-center text-xs font-mono text-text-muted uppercase tracking-widest">
         Insufficient Source Data
       </div>
     );
@@ -254,7 +254,7 @@ function SourceHeatmap({ stats }: Readonly<{ stats: DashboardStats | null }>) {
 
           return (
             <div key={sourceName} className="flex items-center gap-4">
-              <span className="text-[10px] font-mono text-text-muted w-32 truncate">
+              <span className="text-xs font-mono text-text-muted w-32 truncate">
                 {sourceName}
               </span>
               <div className="flex-1 grid grid-cols-[repeat(50,minmax(0,1fr))] gap-1 h-4">
@@ -452,7 +452,7 @@ function AIObservationCard({
         <div className="flex-1">
           <div className="flex items-center gap-2 mb-3">
             <Sparkles className="size-4 text-primary animate-pulse" />
-            <span className="text-[10px] font-bold uppercase tracking-widest text-primary">
+            <span className="text-xs font-bold uppercase tracking-widest text-primary">
               Latest AI Observation
             </span>
           </div>
@@ -469,7 +469,7 @@ function AIObservationCard({
         </div>
         <Button
           onClick={() => setMode("ai")}
-          className="shrink-0 text-[10px] uppercase tracking-widest shadow-[0_0_15px_var(--primary-glow)] hover:scale-105"
+          className="shrink-0 text-xs uppercase tracking-widest shadow-[0_0_15px_var(--primary-glow)] hover:scale-105"
         >
           Deep Dive
         </Button>
@@ -522,7 +522,7 @@ function ErrorClustersSection({ stats, selectedWorkspaceId }: ClustersSectionPro
     ));
   } else {
     content = (
-      <div className="py-20 text-center text-[10px] font-mono text-text-muted uppercase tracking-widest">
+      <div className="py-20 text-center text-xs font-mono text-text-muted uppercase tracking-widest">
         No Errors Detected
       </div>
     );
@@ -577,7 +577,7 @@ function NoiseClustersSection({ stats, selectedWorkspaceId }: ClustersSectionPro
     ));
   } else {
     content = (
-      <div className="py-20 text-center text-[10px] font-mono text-text-muted uppercase tracking-widest">
+      <div className="py-20 text-center text-xs font-mono text-text-muted uppercase tracking-widest">
         No Clusters
       </div>
     );
@@ -609,7 +609,7 @@ function LazyCanvasWidget({ widget }: { readonly widget: any }) {
       {inView ? (
         <A2UIRenderer payload={widget} />
       ) : (
-        <div className="h-[140px] bg-bg-surface/20 border border-border/40 rounded-xl p-4 flex flex-col items-center justify-center text-[10px] text-text-muted uppercase tracking-wider font-mono animate-pulse">
+        <div className="h-[140px] bg-bg-surface/20 border border-border/40 rounded-xl p-4 flex flex-col items-center justify-center text-xs text-text-muted uppercase tracking-wider font-mono animate-pulse">
           Paused (Out of View)
         </div>
       )}

@@ -38,7 +38,7 @@ function PageLoader() {
           <h3 className="text-xs font-bold font-mono tracking-widest text-primary uppercase animate-pulse-slow">
             Initializing Module
           </h3>
-          <p className="text-[11px] text-text-muted">Loading dependencies...</p>
+          <p className="text-xs text-text-muted">Loading dependencies...</p>
         </div>
       </div>
     </div>

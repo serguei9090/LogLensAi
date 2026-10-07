@@ -32,7 +32,7 @@ export function AIHistorySearchModal({ open, onOpenChange }: AIHistorySearchModa
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-2xl w-full bg-bg-surface-bright/95 border-border/60 backdrop-blur-xl p-0 overflow-hidden outline-none shadow-2xl">
         <DialogHeader className="p-4 border-b border-zinc-800/40">
-          <DialogTitle className="text-text-muted text-[10px] font-bold uppercase tracking-widest flex items-center gap-2">
+          <DialogTitle className="text-text-muted text-xs font-bold uppercase tracking-widest flex items-center gap-2">
             <Search className="size-3" />
             Search Investigations
           </DialogTitle>
@@ -78,7 +78,7 @@ export function AIHistorySearchModal({ open, onOpenChange }: AIHistorySearchModa
                       >
                         {session.name}
                       </span>
-                      <div className="flex items-center gap-3 text-[10px] text-text-muted">
+                      <div className="flex items-center gap-3 text-xs text-text-muted">
                         <span className="flex items-center gap-1">
                           <Calendar className="size-3" />
                           {new Date(session.last_modified).toLocaleDateString()}
@@ -113,14 +113,14 @@ export function AIHistorySearchModal({ open, onOpenChange }: AIHistorySearchModa
         </ScrollArea>
 
         <div className="p-3 border-t border-border/40 bg-bg-surface/50 flex justify-between items-center">
-          <span className="text-[10px] text-text-muted font-medium uppercase tracking-wider">
+          <span className="text-xs text-text-muted font-medium uppercase tracking-wider">
             {filteredSessions.length} sessions found
           </span>
           <div className="flex items-center gap-2">
-            <kbd className="px-1.5 py-0.5 rounded bg-bg-surface-bright border border-border text-[10px] text-text-primary font-mono">
+            <kbd className="px-1.5 py-0.5 rounded bg-bg-surface-bright border border-border text-xs text-text-primary font-mono">
               ESC
             </kbd>
-            <span className="text-[10px] text-text-muted">to close</span>
+            <span className="text-xs text-text-muted">to close</span>
           </div>
         </div>
       </DialogContent>

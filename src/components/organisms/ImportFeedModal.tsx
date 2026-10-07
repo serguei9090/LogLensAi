@@ -47,7 +47,7 @@ const TABS: { id: TabId; icon: typeof FolderOpen; label: string }[] = [
 const inputCls =
   "w-full h-10 px-4 rounded-xl text-sm bg-bg-surface border border-border text-text-primary placeholder:text-text-muted/30 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all font-sans";
 
-const labelCls = "text-[11px] font-bold uppercase tracking-wider text-text-muted mb-2 ml-1 block";
+const labelCls = "text-xs font-bold uppercase tracking-wider text-text-muted mb-2 ml-1 block";
 
 // ─── Sub-Components ─────────────────────────────────────────────────────────
 
@@ -91,7 +91,7 @@ function LocalTab({
                 <span className="text-xs font-bold text-text-primary truncate">
                   {localPath.split(/[/\\]/).pop() || localPath}
                 </span>
-                <span className="text-[10px] text-text-muted/60 truncate font-mono">
+                <span className="text-xs text-text-muted/60 truncate font-mono">
                   {localPath}
                 </span>
               </div>
@@ -131,7 +131,7 @@ function LocalTab({
               <p className="text-xs font-semibold text-text-primary">
                 {isDragOver ? "Drop your file here!" : "Drag & Drop log file here"}
               </p>
-              <p className="text-[10px] text-text-muted/60 mt-1">
+              <p className="text-xs text-text-muted/60 mt-1">
                 {isDragOver ? "Release to select" : "or click to browse local files"}
               </p>
             </div>
@@ -326,7 +326,7 @@ function ManualTab({ manualLogs, setManualLogs, onIngestManual }: ManualTabProps
               "[2024-03-27 10:00:00] INFO Engine started...\n[2024-03-27 10:00:01] ERROR Connection refused"
             }
             rows={8}
-            className="relative w-full px-5 py-4 rounded-2xl text-[11px] font-mono bg-bg-surface border border-border text-text-primary placeholder:text-text-muted/20 focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/10 resize-none transition-all"
+            className="relative w-full px-5 py-4 rounded-2xl text-xs font-mono bg-bg-surface border border-border text-text-primary placeholder:text-text-muted/20 focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/10 resize-none transition-all"
             value={manualLogs}
             onChange={(e) => setManualLogs(e.target.value)}
           />
@@ -420,7 +420,7 @@ function LiveTab({
             >
               Syslog (UDP)
             </span>
-            <span className="text-[10px] text-text-muted/60">Passive listening on port 514</span>
+            <span className="text-xs text-text-muted/60">Passive listening on port 514</span>
           </Button>
 
           <Button
@@ -448,17 +448,17 @@ function LiveTab({
             >
               HTTP API
             </span>
-            <span className="text-[10px] text-text-muted/60">POST endpoint on port 5002</span>
+            <span className="text-xs text-text-muted/60">POST endpoint on port 5002</span>
           </Button>
         </div>
 
         <div className="flex items-start gap-3 border border-orange-500/20 bg-orange-500/5 rounded-2xl p-4">
           <Info className="h-5 w-5 shrink-0 mt-0.5 text-orange-500" />
           <div className="space-y-1">
-            <p className="text-[10px] font-bold text-orange-500 uppercase tracking-tight">
+            <p className="text-xs font-bold text-orange-500 uppercase tracking-tight">
               Configuration Note
             </p>
-            <p className="text-[11px] text-text-muted leading-relaxed opacity-80">
+            <p className="text-xs text-text-muted leading-relaxed opacity-80">
               Ports are managed globally in **Settings**. All traffic matching the selected
               protocols will be routed to this workspace using the label above.
             </p>
@@ -467,17 +467,17 @@ function LiveTab({
 
         {(liveHttp || liveSyslog) && (
           <div className="bg-bg-dark/50 border border-border/50 rounded-2xl p-5 space-y-4">
-            <p className="text-[10px] font-bold text-text-muted uppercase tracking-widest ml-1">
+            <p className="text-xs font-bold text-text-muted uppercase tracking-widest ml-1">
               Ready to Ingest
             </p>
 
             <div className="space-y-4">
               {liveHttp && (
                 <div className="space-y-2">
-                  <span className="text-[10px] font-semibold text-text-muted/60 ml-1">
+                  <span className="text-xs font-semibold text-text-muted/60 ml-1">
                     HTTP ENDPOINT
                   </span>
-                  <div className="bg-bg-surface/50 border border-border p-3 rounded-xl font-mono text-[10px] text-primary break-all">
+                  <div className="bg-bg-surface/50 border border-border p-3 rounded-xl font-mono text-xs text-primary break-all">
                     POST http://localhost:{settings.ingestion_http_port}/ingest/{activeWorkspaceId}/
                     {liveName || "my-collection"}
                   </div>
@@ -486,10 +486,10 @@ function LiveTab({
 
               {liveSyslog && (
                 <div className="space-y-2">
-                  <span className="text-[10px] font-semibold text-text-muted/60 ml-1">
+                  <span className="text-xs font-semibold text-text-muted/60 ml-1">
                     SYSLOG TARGET (UDP)
                   </span>
-                  <div className="bg-bg-surface/50 border border-border p-3 rounded-xl font-mono text-[10px] text-primary">
+                  <div className="bg-bg-surface/50 border border-border p-3 rounded-xl font-mono text-xs text-primary">
                     127.0.0.1:{settings.ingestion_syslog_port}
                   </div>
                 </div>

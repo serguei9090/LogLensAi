@@ -300,7 +300,7 @@ export function CustomParserModal({
                     Log Translation Engine
                   </p>
                   <div className="h-1 w-1 rounded-full bg-white/20" />
-                  <span className="text-[10px] text-primary font-mono">
+                  <span className="text-xs text-primary font-mono">
                     {mapping.timestamp ? "Sync Active" : "Unmapped"}
                   </span>
                 </div>
@@ -319,18 +319,18 @@ export function CustomParserModal({
           <div className="flex-1 flex min-h-0 divide-x divide-border/40">
             <div className="flex-[1.5] flex flex-col min-w-0 bg-black/20">
               <div className="p-4 border-b border-border/20 flex items-center justify-between">
-                <span className="text-[10px] font-bold text-text-muted uppercase tracking-widest flex items-center gap-2">
+                <span className="text-xs font-bold text-text-muted uppercase tracking-widest flex items-center gap-2">
                   <Search className="size-3" /> Raw Source Samples
                 </span>
                 <Tooltip>
                   <TooltipTrigger>
-                    <span className="text-[9px] text-primary bg-primary/10 px-2 py-0.5 rounded border border-primary/20 animate-pulse cursor-help">
+                    <span className="text-xs text-primary bg-primary/10 px-2 py-0.5 rounded border border-primary/20 animate-pulse cursor-help">
                       Highlight text to define capture group
                     </span>
                   </TooltipTrigger>
                   <TooltipContent
                     side="bottom"
-                    className="bg-[#111613] border-white/20 text-white p-2 text-[11px] max-w-[240px]"
+                    className="bg-[#111613] border-white/20 text-white p-2 text-xs max-w-[240px]"
                   >
                     Select a range to map it to a field.
                   </TooltipContent>
@@ -349,7 +349,7 @@ export function CustomParserModal({
                       data-sample-line="true"
                       className="group flex hover:bg-primary/5 transition-colors min-w-fit"
                     >
-                      <div className="w-12 shrink-0 flex items-center justify-center bg-black/40 text-[9px] text-text-muted border-r border-white/5 select-none group-hover:text-primary transition-colors">
+                      <div className="w-12 shrink-0 flex items-center justify-center bg-black/40 text-xs text-text-muted border-r border-white/5 select-none group-hover:text-primary transition-colors">
                         {(idx + 1).toString().padStart(3, "0")}
                       </div>
                       <div className="p-3 px-4 whitespace-nowrap text-text-secondary leading-relaxed cursor-crosshair group-hover:text-text-primary transition-colors">
@@ -370,13 +370,13 @@ export function CustomParserModal({
                 <div className="space-y-3">
                   <label
                     htmlFor={textareaId}
-                    className="text-[10px] font-bold text-text-muted uppercase tracking-widest flex items-center justify-between"
+                    className="text-xs font-bold text-text-muted uppercase tracking-widest flex items-center justify-between"
                   >
                     <div className="flex items-center gap-2">
                       <Wand2 className="size-3" /> Extraction Logic
                     </div>
                     {regexPattern && (
-                      <span className="text-[9px] text-primary/60 lowercase italic">
+                      <span className="text-xs text-primary/60 lowercase italic">
                         Python Sync Standard
                       </span>
                     )}
@@ -435,11 +435,11 @@ export function CustomParserModal({
                         </TooltipTrigger>
                         <TooltipContent
                           side="left"
-                          className="bg-bg-surface border-border-subtle text-text-primary p-3 text-[11px] max-w-[280px] space-y-2 text-wrap"
+                          className="bg-bg-surface border-border-subtle text-text-primary p-3 text-xs max-w-[280px] space-y-2 text-wrap"
                         >
                           <p className="font-bold text-primary">Python Regex Protocol</p>
                           <p>LogLens uses Python-style named groups:</p>
-                          <div className="space-y-1.5 font-mono text-[10px]">
+                          <div className="space-y-1.5 font-mono text-xs">
                             <code className="block bg-black/40 p-1.5 rounded border border-white/5 text-primary-hover">
                               (?P&lt;timestamp&gt;...)
                             </code>
@@ -456,7 +456,7 @@ export function CustomParserModal({
                 <div className="space-y-4">
                   <label
                     htmlFor={previewId}
-                    className="text-[10px] font-bold text-text-muted uppercase tracking-widest"
+                    className="text-xs font-bold text-text-muted uppercase tracking-widest"
                   >
                     Extraction Preview
                   </label>
@@ -468,14 +468,14 @@ export function CustomParserModal({
                       previewResults.slice(0, 5).map((res, i) => (
                         <div
                           key={`preview-${res.timestamp}-${i}`}
-                          className="p-3 flex items-center justify-between text-[11px]"
+                          className="p-3 flex items-center justify-between text-xs"
                         >
                           <span className="text-text-muted font-mono">
                             {res.timestamp || "---"}
                           </span>
                           <span
                             className={cn(
-                              "px-1.5 py-0.5 rounded text-[9px] font-bold uppercase",
+                              "px-1.5 py-0.5 rounded text-xs font-bold uppercase",
                               res.level === "ERROR"
                                 ? "bg-red-500/20 text-red-400"
                                 : "bg-primary/20 text-primary",
@@ -486,7 +486,7 @@ export function CustomParserModal({
                         </div>
                       ))
                     ) : (
-                      <div className="p-8 text-center text-text-muted/40 italic text-[11px]">
+                      <div className="p-8 text-center text-text-muted/40 italic text-xs">
                         Enter regex to see preview
                       </div>
                     )}
@@ -496,10 +496,10 @@ export function CustomParserModal({
 
               <div className="px-6 pb-2">
                 <div className="p-4 rounded-xl bg-primary/5 border border-primary/10 space-y-2">
-                  <p className="text-[10px] font-bold text-primary uppercase tracking-widest flex items-center gap-2">
+                  <p className="text-xs font-bold text-primary uppercase tracking-widest flex items-center gap-2">
                     <Wand2 className="size-3" /> Pattern Protocol
                   </p>
-                  <ul className="text-[10px] text-text-secondary space-y-1.5 list-disc list-inside">
+                  <ul className="text-xs text-text-secondary space-y-1.5 list-disc list-inside">
                     <li>Highlight text in the log to open the Map Menu.</li>
                     <li>The regex engine will sync automatically.</li>
                     <li>
@@ -513,7 +513,7 @@ export function CustomParserModal({
               <div className="mt-auto p-6 border-t border-border/40 bg-white/5 space-y-4">
                 <div className="p-4 rounded-xl bg-orange-500/10 border border-orange-500/20 flex gap-3 items-start">
                   <Info className="size-4 text-orange-400 shrink-0 mt-0.5" />
-                  <p className="text-[10px] text-orange-200/70 leading-relaxed italic text-wrap">
+                  <p className="text-xs text-orange-200/70 leading-relaxed italic text-wrap">
                     Normalized timestamps are critical for Fusion mode.
                   </p>
                 </div>
@@ -563,7 +563,7 @@ export function CustomParserModal({
               setActiveSelection(null);
               toast.success("Timestamp mapped");
             }}
-            className="px-2 py-1.5 rounded-md hover:bg-primary/20 text-primary text-[10px] font-bold transition-colors flex items-center gap-1.5"
+            className="px-2 py-1.5 rounded-md hover:bg-primary/20 text-primary text-xs font-bold transition-colors flex items-center gap-1.5"
           >
             <Clock className="size-3" /> Map Timestamp
           </Button>
@@ -579,7 +579,7 @@ export function CustomParserModal({
               setActiveSelection(null);
               toast.success("Severity mapped");
             }}
-            className="px-2 py-1.5 rounded-md hover:bg-cyan-500/20 text-cyan-400 text-[10px] font-bold transition-colors flex items-center gap-1.5"
+            className="px-2 py-1.5 rounded-md hover:bg-cyan-500/20 text-cyan-400 text-xs font-bold transition-colors flex items-center gap-1.5"
           >
             <Info className="size-3" /> Map Level
           </Button>
