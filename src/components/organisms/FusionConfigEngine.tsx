@@ -128,7 +128,7 @@ function TimezoneSelect({
                 setOpen(false);
               }}
               className={cn(
-                "w-full justify-start px-3 h-9 text-[11px] font-mono",
+                "w-full justify-start px-3 h-9 text-xs font-mono",
                 opt.value === value
                   ? "bg-primary/20 text-primary font-bold"
                   : "text-text-muted hover:bg-bg-hover hover:text-text-primary",
@@ -150,7 +150,7 @@ function TimezoneSelect({
         size="sm"
         onClick={handleOpen}
         className={cn(
-          "flex items-center gap-2 h-8 px-3 rounded-md text-[11px] font-mono font-semibold",
+          "flex items-center gap-2 h-8 px-3 rounded-md text-xs font-mono font-semibold",
           "bg-bg-surface border border-border-subtle text-text-primary",
           open
             ? "border-primary ring-1 ring-primary/40 text-primary"
@@ -312,14 +312,14 @@ export function FusionConfigEngine({
                   <span className="block text-sm font-semibold text-text-secondary truncate">
                     {label}
                   </span>
-                  <span className="block text-[10px] text-text-muted truncate lowercase font-mono">
+                  <span className="block text-xs text-text-muted truncate lowercase font-mono">
                     {config.source_id}
                   </span>
                 </div>
 
                 {/* Timezone selector */}
                 <div className="flex flex-col gap-1 items-end">
-                  <span className="text-[9px] text-text-muted font-bold uppercase tracking-widest">
+                  <span className="text-xs text-text-muted font-bold uppercase tracking-widest">
                     Sync Drift
                   </span>
                   <TimezoneSelect
@@ -363,7 +363,7 @@ export function FusionConfigEngine({
         {/* Action Footer */}
         <div className="flex items-center justify-between pt-6 border-t border-border/40">
           <div className="flex flex-col">
-            <span className="text-[11px] text-text-muted font-medium uppercase tracking-wider">
+            <span className="text-xs text-text-muted font-medium uppercase tracking-wider">
               Sync Strategy
             </span>
             <span className="text-sm font-bold text-primary italic font-mono">
@@ -388,7 +388,7 @@ export function FusionConfigEngine({
 
       {/* Help Note */}
       <div className="max-w-md text-center">
-        <p className="text-[11px] text-text-muted leading-relaxed">
+        <p className="text-xs text-text-muted leading-relaxed">
           Fusion Mode merges all enabled sources into a single stream. Use{" "}
           <span className="text-text-secondary font-bold">Sync Drift</span> to align logs living in
           different timezones.

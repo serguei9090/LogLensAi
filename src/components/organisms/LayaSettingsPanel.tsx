@@ -310,7 +310,7 @@ export function LayaSettingsPanel() {
             <h3 className="text-base font-semibold text-text-primary tracking-tight">
               Laya System 1 Decision Engine
             </h3>
-            <span className="text-[10px] uppercase font-mono px-2 py-0.5 rounded-full bg-primary/15 text-primary border border-primary/20">
+            <span className="text-xs uppercase font-mono px-2 py-0.5 rounded-full bg-primary/15 text-primary border border-primary/20">
               ModernBERT 8-bit
             </span>
             <HelpTooltip content="Non-autoregressive decision engine that performs ultra-fast tool routing, log severity scoring, and cluster triage in ~30ms before touching costly generative LLMs." />
@@ -363,19 +363,19 @@ export function LayaSettingsPanel() {
             <div className="flex items-center justify-between mb-2">
               <div className="flex items-center gap-2">
                 <span className="text-sm font-semibold text-text-primary">CPU Mode</span>
-                <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-bg-base border border-border text-text-muted">
+                <span className="text-xs font-mono px-1.5 py-0.5 rounded bg-bg-base border border-border text-text-muted">
                   Zero VRAM
                 </span>
                 <HelpTooltip content="Uses ONNX Runtime OpenMP threads. Leaves 100% of your GPU memory free for local LLMs in Ollama." />
               </div>
               {settings.device === "cpu" && (
-                <span className="flex items-center gap-1 text-[11px] font-mono text-primary bg-primary/10 px-2 py-0.5 rounded-md font-medium">
+                <span className="flex items-center gap-1 text-xs font-mono text-primary bg-primary/10 px-2 py-0.5 rounded-md font-medium">
                   <Check className="h-3 w-3" /> Selected
                 </span>
               )}
             </div>
 
-            <div className="flex items-center gap-2 text-[11px] font-mono flex-wrap pt-1">
+            <div className="flex items-center gap-2 text-xs font-mono flex-wrap pt-1">
               <span className="px-2 py-0.5 rounded bg-bg-base/80 border border-border/60 text-text-muted">
                 RAM: ~520 MB
               </span>
@@ -402,19 +402,19 @@ export function LayaSettingsPanel() {
             <div className="flex items-center justify-between mb-2">
               <div className="flex items-center gap-2">
                 <span className="text-sm font-semibold text-text-primary">GPU Acceleration</span>
-                <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-bg-base border border-border text-text-muted">
+                <span className="text-xs font-mono px-1.5 py-0.5 rounded bg-bg-base border border-border text-text-muted">
                   DirectML / CUDA
                 </span>
                 <HelpTooltip content="Leverages DirectML or NVIDIA CUDA for maximum inference speed and lowest latency (~3x faster)." />
               </div>
               {settings.device === "gpu" && (
-                <span className="flex items-center gap-1 text-[11px] font-mono text-primary bg-primary/10 px-2 py-0.5 rounded-md font-medium">
+                <span className="flex items-center gap-1 text-xs font-mono text-primary bg-primary/10 px-2 py-0.5 rounded-md font-medium">
                   <Check className="h-3 w-3" /> Selected
                 </span>
               )}
             </div>
 
-            <div className="flex items-center gap-2 text-[11px] font-mono flex-wrap pt-1">
+            <div className="flex items-center gap-2 text-xs font-mono flex-wrap pt-1">
               <span className="px-2 py-0.5 rounded bg-bg-base/80 border border-border/60 text-text-muted">
                 RAM: ~120 MB
               </span>
@@ -437,7 +437,7 @@ export function LayaSettingsPanel() {
             <h4 className="text-xs font-semibold uppercase tracking-wider text-text-muted font-mono">
               Model Weights & Local Cache
             </h4>
-            <span className="text-[10px] font-mono text-text-muted hidden sm:inline">
+            <span className="text-xs font-mono text-text-muted hidden sm:inline">
               nvkudva/laya-web-q8 (524 MB)
             </span>
             <HelpTooltip content="Quantized 8-bit ModernBERT ONNX weights cached locally to accelerate non-autoregressive log routing and triage." />
@@ -495,7 +495,7 @@ export function LayaSettingsPanel() {
                 style={{ width: `${Math.max(2, modelStatus.progress)}%` }}
               />
             </div>
-            <div className="flex items-center justify-between text-[11px] font-mono text-text-muted">
+            <div className="flex items-center justify-between text-xs font-mono text-text-muted">
               <span>Downloading encoder_q8.onnx and head_q8.onnx...</span>
               <span>
                 {(modelStatus.downloaded_bytes / (1024 * 1024)).toFixed(1)} MB /{" "}
@@ -508,7 +508,7 @@ export function LayaSettingsPanel() {
         {modelStatus?.state === "error" && modelStatus.error_message && (
           <div className="mt-3 p-2.5 rounded-lg bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs flex items-center gap-2">
             <AlertCircle className="h-4 w-4 shrink-0 text-rose-400" />
-            <span className="font-mono text-[11px]">{modelStatus.error_message}</span>
+            <span className="font-mono text-xs">{modelStatus.error_message}</span>
           </div>
         )}
       </div>
@@ -620,7 +620,7 @@ export function LayaSettingsPanel() {
                     <span className="text-xs font-mono font-bold text-text-primary">{q.name}</span>
                     <span
                       className={cn(
-                        "text-[10px] uppercase font-mono px-2 py-0.5 rounded-md font-semibold",
+                        "text-xs uppercase font-mono px-2 py-0.5 rounded-md font-semibold",
                         q.type === "choice" &&
                           "bg-blue-500/10 text-blue-400 border border-blue-500/20",
                         q.type === "score" &&
@@ -644,13 +644,13 @@ export function LayaSettingsPanel() {
                         {q.options.slice(0, 3).map((opt) => (
                           <span
                             key={opt}
-                            className="text-[10px] font-mono bg-bg-surface-active px-1.5 py-0.5 rounded border border-border/50 text-text-muted truncate max-w-[100px]"
+                            className="text-xs font-mono bg-bg-surface-active px-1.5 py-0.5 rounded border border-border/50 text-text-muted truncate max-w-[100px]"
                           >
                             {opt}
                           </span>
                         ))}
                         {q.options.length > 3 && (
-                          <span className="text-[10px] font-mono text-text-muted/60">
+                          <span className="text-xs font-mono text-text-muted/60">
                             +{q.options.length - 3}
                           </span>
                         )}
@@ -659,11 +659,11 @@ export function LayaSettingsPanel() {
 
                     {q.type === "score" && q.rubric && (
                       <div className="hidden lg:flex items-center gap-1 shrink-0">
-                        <span className="text-[10px] font-mono text-text-muted">Scale:</span>
+                        <span className="text-xs font-mono text-text-muted">Scale:</span>
                         {q.rubric.map((lvl) => (
                           <span
                             key={lvl}
-                            className="text-[10px] font-mono font-semibold px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20"
+                            className="text-xs font-mono font-semibold px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20"
                           >
                             {lvl}
                           </span>
@@ -672,7 +672,7 @@ export function LayaSettingsPanel() {
                     )}
 
                     {q.type === "noul" && (
-                      <span className="hidden lg:inline text-[10px] font-mono text-purple-400/80 shrink-0">
+                      <span className="hidden lg:inline text-xs font-mono text-purple-400/80 shrink-0">
                         True / False Probability
                       </span>
                     )}
@@ -762,21 +762,21 @@ export function LayaSettingsPanel() {
                           {cp.id}
                         </span>
                         {isActive && (
-                          <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-primary/20 text-primary font-semibold">
+                          <span className="text-xs font-mono px-2 py-0.5 rounded-full bg-primary/20 text-primary font-semibold">
                             ACTIVE
                           </span>
                         )}
-                        <span className="text-[11px] font-mono text-text-muted">
+                        <span className="text-xs font-mono text-text-muted">
                           by <span className="text-text-primary font-medium">{cp.author}</span>
                         </span>
-                        <span className="text-[11px] font-mono text-text-muted/60">
+                        <span className="text-xs font-mono text-text-muted/60">
                           {new Date(cp.timestamp).toLocaleString()}
                         </span>
                       </div>
                       <p className="text-xs text-text-muted">
                         {cp.description || "No description provided"}
                       </p>
-                      <div className="text-[11px] font-mono text-text-muted/80">
+                      <div className="text-xs font-mono text-text-muted/80">
                         {Object.keys(cp.questions || {}).length} rules defined (
                         {Object.keys(cp.questions || {}).join(", ")})
                       </div>
@@ -873,7 +873,7 @@ export function LayaSettingsPanel() {
 
                 {/* Probability Distribution Bar */}
                 <div className="space-y-2 pt-2 border-t border-border/40">
-                  <span className="text-[11px] font-mono text-text-muted">
+                  <span className="text-xs font-mono text-text-muted">
                     Calibrated Probability Distribution:
                   </span>
                   <div className="space-y-1.5">
@@ -883,7 +883,7 @@ export function LayaSettingsPanel() {
                       const isTop = lbl === testResult.selected_label;
                       return (
                         <div key={lbl} className="space-y-1">
-                          <div className="flex items-center justify-between text-[11px] font-mono">
+                          <div className="flex items-center justify-between text-xs font-mono">
                             <span
                               className={cn(isTop ? "text-primary font-bold" : "text-text-muted")}
                             >
@@ -1138,7 +1138,7 @@ export function LayaSettingsPanel() {
                 discovers or updates log template patterns, Laya evaluates the template in ~30ms and
                 saves structured triage tags directly into DuckDB:
               </p>
-              <ul className="list-disc pl-4 space-y-1 text-text-muted font-mono text-[11px]">
+              <ul className="list-disc pl-4 space-y-1 text-text-muted font-mono text-xs">
                 <li>
                   <strong className="text-text-primary">category</strong>: application, database,
                   network, auth, disk_io, third_party
@@ -1155,18 +1155,18 @@ export function LayaSettingsPanel() {
             </div>
 
             <div className="space-y-2.5">
-              <h4 className="font-semibold text-text-primary uppercase tracking-wider text-[11px] font-mono">
+              <h4 className="font-semibold text-text-primary uppercase tracking-wider text-xs font-mono">
                 The 3 Decision Primitives
               </h4>
               <div className="grid grid-cols-1 gap-2.5">
                 <div className="p-3 rounded-xl border border-blue-500/20 bg-blue-500/5 space-y-1">
                   <div className="flex items-center justify-between">
                     <span className="font-mono font-bold text-blue-400">1. Choice</span>
-                    <span className="text-[10px] font-mono uppercase bg-blue-500/10 text-blue-400 px-1.5 py-0.5 rounded">
+                    <span className="text-xs font-mono uppercase bg-blue-500/10 text-blue-400 px-1.5 py-0.5 rounded">
                       Categorical
                     </span>
                   </div>
-                  <p className="text-text-muted text-[11px]">
+                  <p className="text-text-muted text-xs">
                     Selects exactly one label from a closed set of options (e.g. subsystem routing,
                     error classification).
                   </p>
@@ -1175,11 +1175,11 @@ export function LayaSettingsPanel() {
                 <div className="p-3 rounded-xl border border-amber-500/20 bg-amber-500/5 space-y-1">
                   <div className="flex items-center justify-between">
                     <span className="font-mono font-bold text-amber-400">2. Score</span>
-                    <span className="text-[10px] font-mono uppercase bg-amber-500/10 text-amber-400 px-1.5 py-0.5 rounded">
+                    <span className="text-xs font-mono uppercase bg-amber-500/10 text-amber-400 px-1.5 py-0.5 rounded">
                       Ordinal Rubric
                     </span>
                   </div>
-                  <p className="text-text-muted text-[11px]">
+                  <p className="text-text-muted text-xs">
                     Rates severity or confidence against an integer rubric scale (e.g. 1 to 5),
                     computing an expected value.
                   </p>
@@ -1188,11 +1188,11 @@ export function LayaSettingsPanel() {
                 <div className="p-3 rounded-xl border border-purple-500/20 bg-purple-500/5 space-y-1">
                   <div className="flex items-center justify-between">
                     <span className="font-mono font-bold text-purple-400">3. Noul</span>
-                    <span className="text-[10px] font-mono uppercase bg-purple-500/10 text-purple-400 px-1.5 py-0.5 rounded">
+                    <span className="text-xs font-mono uppercase bg-purple-500/10 text-purple-400 px-1.5 py-0.5 rounded">
                       Calibrated Boolean
                     </span>
                   </div>
-                  <p className="text-text-muted text-[11px]">
+                  <p className="text-text-muted text-xs">
                     Produces a calibrated True / False probability (e.g. "Does this template
                     represent an outage?").
                   </p>
@@ -1205,11 +1205,11 @@ export function LayaSettingsPanel() {
                 <Info className="h-3.5 w-3.5" />
                 How the LLM Uses Laya Tags
               </div>
-              <p className="text-text-muted text-[11px]">
+              <p className="text-text-muted text-xs">
                 Chat queries go directly to your configured LLM (Claude, GPT-4o, Ollama, etc.). The
                 LLM receives Laya's cluster triage tags in its grounded context and through the{" "}
-                <code className="text-primary font-mono text-[10px]">get_clusters</code> tool,
-                allowing it to instantly identify failing subsystems without extra API tokens.
+                <code className="text-primary font-mono text-xs">get_clusters</code> tool, allowing
+                it to instantly identify failing subsystems without extra API tokens.
               </p>
             </div>
           </div>

@@ -246,7 +246,7 @@ function MessageContentBubble({
   return (
     <div
       className={cn(
-        "px-4 py-3 rounded-2xl text-[13px] leading-relaxed shadow-sm overflow-hidden w-full break-words transition-all duration-300 relative group/bubble",
+        "px-4 py-3 rounded-2xl text-sm leading-relaxed shadow-sm overflow-hidden w-full break-words transition-all duration-300 relative group/bubble",
         isUser
           ? "bg-bg-surface text-text-primary border border-border-subtle rounded-tr-none"
           : "bg-bg-app text-text-secondary border border-border-subtle rounded-tl-none",
@@ -268,18 +268,18 @@ function MessageContentBubble({
         <div className="flex flex-col gap-2.5">
           <div className="flex items-center gap-3">
             <TypingIndicator />
-            <span className="text-[11px] font-medium text-zinc-500 animate-pulse lowercase">
+            <span className="text-xs font-medium text-zinc-500 animate-pulse lowercase">
               {steps && steps.length > 0 ? "investigating…" : "thinking…"}
             </span>
           </div>
           {evaluationNotice && (
-            <div className="flex items-center gap-1.5 text-[10px] text-amber-400/90 bg-amber-500/10 px-2 py-0.5 rounded-full border border-amber-500/20 w-fit animate-in fade-in">
+            <div className="flex items-center gap-1.5 text-xs text-amber-400/90 bg-amber-500/10 px-2 py-0.5 rounded-full border border-amber-500/20 w-fit animate-in fade-in">
               <Sparkles className="size-2.5 text-amber-400 animate-spin" />
               <span>{evaluationNotice}</span>
             </div>
           )}
           {steps && steps.length > 0 && (
-            <div className="flex flex-col gap-1.5 p-2 rounded-xl bg-bg-surface/50 border border-border-subtle/80 text-[11px]">
+            <div className="flex flex-col gap-1.5 p-2 rounded-xl bg-bg-surface/50 border border-border-subtle/80 text-xs">
               <div className="flex items-center gap-1.5 font-medium text-text-muted mb-0.5 px-1">
                 <Wrench className="size-3 text-emerald-400" />
                 <span>
@@ -312,7 +312,7 @@ function MessageContentBubble({
       ) : (
         <>
           {evaluationNotice && !isUser && (
-            <div className="mb-2 flex items-center gap-1.5 text-[10px] text-amber-400/90 bg-amber-500/10 px-2.5 py-1 rounded-lg border border-amber-500/20 w-fit">
+            <div className="mb-2 flex items-center gap-1.5 text-xs text-amber-400/90 bg-amber-500/10 px-2.5 py-1 rounded-lg border border-amber-500/20 w-fit">
               <Sparkles className="size-2.5 text-amber-400" />
               <span>{evaluationNotice}</span>
             </div>
@@ -322,7 +322,7 @@ function MessageContentBubble({
           )}
           {/* Step-by-step progress cards (Antigravity-style) */}
           {!isUser && steps && steps.length > 0 && (
-            <div className="mb-3 flex flex-col gap-1.5 p-2 rounded-xl bg-bg-surface/50 border border-border-subtle/80 text-[11px]">
+            <div className="mb-3 flex flex-col gap-1.5 p-2 rounded-xl bg-bg-surface/50 border border-border-subtle/80 text-xs">
               <div className="flex items-center gap-1.5 font-medium text-text-muted mb-0.5 px-1">
                 <Wrench className="size-3 text-emerald-400" />
                 <span>
@@ -429,7 +429,7 @@ function AIMessageRow({
       >
         {message.context_logs && message.context_logs.length > 0 && (
           <div className="flex flex-wrap gap-1 mb-1">
-            <span className="bg-primary/10 px-2 py-0.5 rounded text-[9px] text-primary border border-primary/20 font-medium">
+            <span className="bg-primary/10 px-2 py-0.5 rounded text-xs text-primary border border-primary/20 font-medium">
               {message.context_logs.length} logs attached
             </span>
           </div>
@@ -449,14 +449,14 @@ function AIMessageRow({
         />
         {/* Active streaming / multi-step investigation indicator */}
         {!isUser && isLoading && isLastMessage && !showTypingIndicator && (
-          <div className="flex items-center gap-2 px-2 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[11px] font-medium animate-pulse">
+          <div className="flex items-center gap-2 px-2 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-medium animate-pulse">
             <span className="size-1.5 rounded-full bg-emerald-400 animate-ping" />
             <span>Investigating and executing steps…</span>
           </div>
         )}
         {!isSameRoleAsPrev && (
           <div className="flex items-center gap-1.5 px-1">
-            <span className="text-[9px] text-text-muted font-medium tracking-tight">
+            <span className="text-xs text-text-muted font-medium tracking-tight">
               {(() => {
                 const tsStr = String(message.timestamp);
                 const safeTs =
@@ -809,7 +809,7 @@ export function AIInvestigationSidebar({
           <div className="min-w-0">
             {isEditingTitle ? (
               <input
-                className="bg-bg-surface border border-primary/30 rounded px-2 py-0.5 text-[13px] font-bold text-text-primary focus:outline-none w-full"
+                className="bg-bg-surface border border-primary/30 rounded px-2 py-0.5 text-sm font-bold text-text-primary focus:outline-none w-full"
                 value={editedTitle}
                 onChange={(e) => setEditedTitle(e.target.value)}
                 onBlur={handleRename}
@@ -834,7 +834,7 @@ export function AIInvestigationSidebar({
                 <Pencil className="h-3 w-3 text-text-muted opacity-0 group-hover/title:opacity-100 transition-opacity hover:text-primary" />
               </Button>
             )}
-            <p className="text-[10px] text-text-muted uppercase tracking-widest opacity-60 font-medium">
+            <p className="text-xs text-text-muted uppercase tracking-widest opacity-60 font-medium">
               {currentSessionId ? "Active Session" : "New Investigation"}
             </p>
           </div>
@@ -881,7 +881,7 @@ export function AIInvestigationSidebar({
               {sessions.length > 0 && (
                 <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-700">
                   <div className="flex items-center justify-between px-1">
-                    <h3 className="text-[10px] font-bold text-text-muted uppercase tracking-widest">
+                    <h3 className="text-xs font-bold text-text-muted uppercase tracking-widest">
                       Recent Investigations
                     </h3>
                   </div>
@@ -896,7 +896,7 @@ export function AIInvestigationSidebar({
                         <span className="text-xs font-bold text-text-primary group-hover:text-primary transition-colors mb-1 truncate w-full">
                           {s.name}
                         </span>
-                        <div className="flex items-center gap-2 text-[10px] text-zinc-500">
+                        <div className="flex items-center gap-2 text-xs text-zinc-500">
                           <Clock className="w-3 h-3" />
                           <span>{new Date(s.last_modified).toLocaleDateString()}</span>
                           <span>•</span>
@@ -911,7 +911,7 @@ export function AIInvestigationSidebar({
                       variant="ghost"
                       size="sm"
                       onClick={() => setIsSearchModalOpen(true)}
-                      className="w-full mt-2 text-[10px] font-bold text-text-muted uppercase tracking-widest hover:text-primary hover:bg-primary/5 rounded-lg transition-all"
+                      className="w-full mt-2 text-xs font-bold text-text-muted uppercase tracking-widest hover:text-primary hover:bg-primary/5 rounded-lg transition-all"
                     >
                       Show {sessions.length - 4} more...
                     </Button>
@@ -955,7 +955,7 @@ export function AIInvestigationSidebar({
                       <span className="text-xs font-bold text-emerald-400 font-mono">
                         {cmd.cmd}
                       </span>
-                      <span className="text-[10px] text-text-muted group-hover:text-text-secondary mt-0.5">
+                      <span className="text-xs text-text-muted group-hover:text-text-secondary mt-0.5">
                         {cmd.desc}
                       </span>
                     </Button>
@@ -973,7 +973,7 @@ export function AIInvestigationSidebar({
                   <TooltipTrigger className="cursor-default">
                     <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-bg-surface border border-border-subtle text-text-primary text-xs font-medium shadow-sm group/tag select-none hover:border-primary/40 transition-colors">
                       <FileText className="size-3 text-primary shrink-0" />
-                      <span className="text-[11px] font-semibold tracking-tight">
+                      <span className="text-xs font-semibold tracking-tight">
                         {selectedLogIds.length} {selectedLogIds.length === 1 ? "log" : "logs"}
                       </span>
                       <button
@@ -1039,7 +1039,7 @@ export function AIInvestigationSidebar({
                   className="h-7 px-2 gap-1.5 text-xs text-text-secondary hover:text-text-primary bg-bg-surface/50 hover:bg-bg-surface border border-border-subtle/60 rounded-lg max-w-[210px] flex items-center justify-between font-normal shrink-0 cursor-pointer outline-none transition-colors"
                   title={`Provider: ${settings.ai_provider} | Model: ${settings.ai_model}`}
                 >
-                  <span className="truncate text-[11px] font-medium font-mono text-text-primary">
+                  <span className="truncate text-xs font-medium font-mono text-text-primary">
                     {settings.ai_model || "Select Model"}
                   </span>
                   {isFetchingModels ? (
@@ -1054,13 +1054,13 @@ export function AIInvestigationSidebar({
                   className="w-56 p-1.5 bg-bg-surface border border-border-subtle shadow-xl rounded-xl z-[120]"
                 >
                   <div className="flex items-center justify-between px-2 py-1 select-none">
-                    <span className="text-[10px] uppercase font-bold text-text-muted tracking-wider">
+                    <span className="text-xs uppercase font-bold text-text-muted tracking-wider">
                       AI Providers
                     </span>
                     <button
                       type="button"
                       onClick={() => fetchModels(true)}
-                      className="text-[10px] text-primary hover:underline cursor-pointer disabled:opacity-50"
+                      className="text-xs text-primary hover:underline cursor-pointer disabled:opacity-50"
                       disabled={isFetchingModels}
                     >
                       {isFetchingModels ? "Refreshing..." : "Refresh"}
@@ -1122,7 +1122,7 @@ export function AIInvestigationSidebar({
                             title="Configure API key / host in Settings to enable this provider"
                           >
                             <span className="truncate">{provider.name}</span>
-                            <span className="text-[10px] text-amber-500/60 font-medium">
+                            <span className="text-xs text-amber-500/60 font-medium">
                               Not configured
                             </span>
                           </div>
@@ -1155,12 +1155,10 @@ export function AIInvestigationSidebar({
                           </DropdownMenuSubTrigger>
                           <DropdownMenuSubContent className="w-64 p-1.5 bg-bg-surface border border-border-subtle shadow-2xl rounded-xl z-[130]">
                             <div className="flex items-center justify-between px-2 py-1 select-none border-b border-border-subtle/50 mb-1">
-                              <span className="text-[10px] uppercase font-bold text-text-muted tracking-wider">
+                              <span className="text-xs uppercase font-bold text-text-muted tracking-wider">
                                 {provider.name} Models
                               </span>
-                              <span className="text-[10px] text-text-muted/60">
-                                {rawModels.length}
-                              </span>
+                              <span className="text-xs text-text-muted/60">{rawModels.length}</span>
                             </div>
 
                             {/* Search bar displayed if there are more than 7 models */}
@@ -1194,7 +1192,7 @@ export function AIInvestigationSidebar({
                             <div className="max-h-60 overflow-y-auto space-y-0.5">
                               {rawModels.length === 0 ? (
                                 <div className="px-3 py-3 text-center text-xs text-text-muted space-y-2">
-                                  <p className="text-[11px] leading-relaxed">
+                                  <p className="text-xs leading-relaxed">
                                     No models loaded yet. Confirm connection and fetch available
                                     models.
                                   </p>
@@ -1208,7 +1206,7 @@ export function AIInvestigationSidebar({
                                       fetchModels(true, provider.id);
                                     }}
                                     disabled={isFetchingModels}
-                                    className="px-2.5 py-1 text-[11px] font-medium rounded-md bg-primary/10 hover:bg-primary/20 text-primary border border-primary/20 cursor-pointer disabled:opacity-50 transition-colors inline-block"
+                                    className="px-2.5 py-1 text-xs font-medium rounded-md bg-primary/10 hover:bg-primary/20 text-primary border border-primary/20 cursor-pointer disabled:opacity-50 transition-colors inline-block"
                                   >
                                     {isFetchingModels ? "Fetching..." : "Fetch Models"}
                                   </button>

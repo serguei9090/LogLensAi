@@ -67,10 +67,10 @@ function StrategyCard({
         {icon}
       </div>
       <div className="space-y-0.5 flex-1 min-w-0">
-        <p className="text-[13px] font-medium text-white/90 group-hover:text-white transition-colors truncate">
+        <p className="text-sm font-medium text-white/90 group-hover:text-white transition-colors truncate">
           {name}
         </p>
-        <p className="text-[11px] text-white/40 leading-relaxed truncate">{description}</p>
+        <p className="text-xs text-white/40 leading-relaxed truncate">{description}</p>
       </div>
     </Button>
   );
@@ -257,10 +257,8 @@ export function OrchestratorHub({
               <Cpu className="size-5" />
             </div>
             <div>
-              <h2 className="text-[15px] font-semibold text-white/90 tracking-tight">
-                Orchestrator
-              </h2>
-              <p className="text-[10px] text-white/40 uppercase tracking-widest mt-0.5">
+              <h2 className="text-base font-semibold text-white/90 tracking-tight">Orchestrator</h2>
+              <p className="text-xs text-white/40 uppercase tracking-widest mt-0.5">
                 {
                   {
                     picker: "Command Center",
@@ -286,7 +284,7 @@ export function OrchestratorHub({
           {view === "picker" && (
             <div className="space-y-8 animate-in fade-in slide-in-from-right-2 duration-300">
               <div className="space-y-3">
-                <p className="text-[11px] text-white/40 font-medium px-0.5 uppercase tracking-widest">
+                <p className="text-xs text-white/40 font-medium px-0.5 uppercase tracking-widest">
                   Visualizers
                 </p>
                 <div className="grid gap-2">
@@ -315,10 +313,10 @@ export function OrchestratorHub({
                           {layer.icon}
                         </div>
                         <div className="space-y-0.5">
-                          <span className="block text-[13px] font-medium text-white/90 group-hover:text-white transition-colors">
+                          <span className="block text-sm font-medium text-white/90 group-hover:text-white transition-colors">
                             {layer.label}
                           </span>
-                          <span className="block text-[11px] text-white/40">{layer.desc}</span>
+                          <span className="block text-xs text-white/40">{layer.desc}</span>
                         </div>
                       </div>
                       <Switch checked={layer.checked} onCheckedChange={layer.set} />
@@ -328,7 +326,7 @@ export function OrchestratorHub({
               </div>
 
               <div className="space-y-3">
-                <p className="text-[11px] text-white/40 font-medium px-0.5 uppercase tracking-widest">
+                <p className="text-xs text-white/40 font-medium px-0.5 uppercase tracking-widest">
                   Intelligence
                 </p>
                 <div className="flex items-center justify-between p-3 rounded-lg border border-white/5 bg-white/[0.02] hover:bg-white/[0.04] transition-all group">
@@ -342,10 +340,10 @@ export function OrchestratorHub({
                       />
                     </div>
                     <div className="space-y-0.5">
-                      <span className="block text-[13px] font-medium text-white/90 group-hover:text-white transition-colors">
+                      <span className="block text-sm font-medium text-white/90 group-hover:text-white transition-colors">
                         Knowledge Base
                       </span>
-                      <span className="block text-[11px] text-white/40 max-w-[140px] truncate">
+                      <span className="block text-xs text-white/40 max-w-[140px] truncate">
                         {workspaceGlobalContext ? "Context active" : "Inject structure"}
                       </span>
                     </div>
@@ -356,7 +354,7 @@ export function OrchestratorHub({
                       setTempContext(workspaceGlobalContext ?? "");
                       setView("ai-context-form");
                     }}
-                    className="px-3 py-1.5 rounded-md text-[11px] font-medium transition-all bg-white/5 text-white/60 hover:text-white hover:bg-white/10"
+                    className="px-3 py-1.5 rounded-md text-xs font-medium transition-all bg-white/5 text-white/60 hover:text-white hover:bg-white/10"
                   >
                     {workspaceGlobalContext ? "Edit" : "Set"}
                   </button>
@@ -364,7 +362,7 @@ export function OrchestratorHub({
               </div>
 
               <div className="space-y-3">
-                <p className="text-[11px] text-white/40 font-medium px-0.5 uppercase tracking-widest">
+                <p className="text-xs text-white/40 font-medium px-0.5 uppercase tracking-widest">
                   Engine Performance
                 </p>
                 <div className="grid gap-2">
@@ -374,10 +372,10 @@ export function OrchestratorHub({
                         <Cpu className="size-4" />
                       </div>
                       <div className="space-y-0.5">
-                        <span className="block text-[13px] font-medium text-white/90 group-hover:text-white transition-colors">
+                        <span className="block text-sm font-medium text-white/90 group-hover:text-white transition-colors">
                           Enable Clustering
                         </span>
-                        <span className="block text-[11px] text-white/40 truncate">
+                        <span className="block text-xs text-white/40 truncate">
                           Drain3 Pattern Mining
                         </span>
                       </div>
@@ -391,7 +389,7 @@ export function OrchestratorHub({
               </div>
 
               <div className="space-y-3">
-                <p className="text-[11px] text-white/40 font-medium px-0.5 uppercase tracking-widest">
+                <p className="text-xs text-white/40 font-medium px-0.5 uppercase tracking-widest">
                   Engine
                 </p>
                 <div className="flex items-center justify-between p-3 rounded-lg border border-white/5 bg-white/[0.02] hover:bg-white/[0.04] transition-all group">
@@ -400,10 +398,10 @@ export function OrchestratorHub({
                       <Layers className="size-4" />
                     </div>
                     <div className="space-y-0.5">
-                      <span className="block text-[13px] font-medium text-white/90 group-hover:text-white transition-colors">
+                      <span className="block text-sm font-medium text-white/90 group-hover:text-white transition-colors">
                         Core Parser
                       </span>
-                      <span className="block text-[11px] text-white/40 truncate">
+                      <span className="block text-xs text-white/40 truncate">
                         Drain3 Configuration
                       </span>
                     </div>
@@ -414,7 +412,7 @@ export function OrchestratorHub({
                       onClose();
                       onEngineSettingsOpen?.();
                     }}
-                    className="px-3 py-1.5 rounded-md text-[11px] font-medium transition-all bg-white/5 text-white/60 hover:text-white hover:bg-white/10"
+                    className="px-3 py-1.5 rounded-md text-xs font-medium transition-all bg-white/5 text-white/60 hover:text-white hover:bg-white/10"
                   >
                     Configure
                   </button>
@@ -422,7 +420,7 @@ export function OrchestratorHub({
               </div>
 
               <div className="space-y-3">
-                <p className="text-[11px] text-white/40 font-medium px-0.5 uppercase tracking-widest">
+                <p className="text-xs text-white/40 font-medium px-0.5 uppercase tracking-widest">
                   Operations
                 </p>
                 <div className="grid gap-2">
@@ -448,7 +446,7 @@ export function OrchestratorHub({
               <button
                 type="button"
                 onClick={() => setView("picker")}
-                className="text-[11px] text-white/50 hover:text-white transition-all flex items-center gap-1.5"
+                className="text-xs text-white/50 hover:text-white transition-all flex items-center gap-1.5"
               >
                 ← Back
               </button>
@@ -457,7 +455,7 @@ export function OrchestratorHub({
                 <div className="space-y-1.5">
                   <label
                     htmlFor="fusion-name-input"
-                    className="text-[11px] font-medium text-white/40 px-0.5 uppercase tracking-wider"
+                    className="text-xs font-medium text-white/40 px-0.5 uppercase tracking-wider"
                   >
                     Name
                   </label>
@@ -472,13 +470,13 @@ export function OrchestratorHub({
                 </div>
 
                 <div className="space-y-3">
-                  <p className="text-[11px] font-medium text-white/40 px-0.5 uppercase tracking-wider">
+                  <p className="text-xs font-medium text-white/40 px-0.5 uppercase tracking-wider">
                     Sources
                   </p>
                   {isLoadingConfig ? (
                     <div className="py-10 flex flex-col items-center gap-3">
                       <div className="size-5 rounded-full border-2 border-white/5 border-t-white/50 animate-spin" />
-                      <p className="text-[11px] text-white/40">Loading</p>
+                      <p className="text-xs text-white/40">Loading</p>
                     </div>
                   ) : (
                     <div className="space-y-2 max-h-[340px] overflow-y-auto pr-1 custom-scrollbar">
@@ -513,7 +511,7 @@ export function OrchestratorHub({
                             <div className="flex-1 min-w-0">
                               <p
                                 className={cn(
-                                  "text-[13px] font-medium truncate",
+                                  "text-sm font-medium truncate",
                                   config.enabled ? "text-white/90" : "text-white/60",
                                 )}
                               >
@@ -521,7 +519,7 @@ export function OrchestratorHub({
                               </p>
                               {config.enabled && templates.length > 0 && (
                                 <select
-                                  className="mt-1 w-full bg-transparent text-[10px] text-white/40 outline-none cursor-pointer hover:text-white/60 transition-colors"
+                                  className="mt-1 w-full bg-transparent text-xs text-white/40 outline-none cursor-pointer hover:text-white/60 transition-colors"
                                   onChange={(e) =>
                                     applyTemplateToSource(config.source_id, e.target.value)
                                   }
@@ -567,7 +565,7 @@ export function OrchestratorHub({
               <button
                 type="button"
                 onClick={() => setView("picker")}
-                className="text-[11px] text-white/50 hover:text-white transition-all flex items-center gap-1.5"
+                className="text-xs text-white/50 hover:text-white transition-all flex items-center gap-1.5"
               >
                 ← Back
               </button>
@@ -586,12 +584,12 @@ export function OrchestratorHub({
                         className="group flex flex-row items-center justify-between p-3 rounded-lg bg-white/[0.02] border border-white/5 hover:bg-white/[0.04] transition-all"
                       >
                         <div className="min-w-0 pr-3">
-                          <p className="text-[13px] font-medium text-white/90 truncate">
+                          <p className="text-sm font-medium text-white/90 truncate">
                             {source.name}
                           </p>
                           <div className="flex items-center gap-1.5 mt-0.5">
                             <Clock className="size-3 text-white/30" />
-                            <p className="text-[11px] font-mono text-white/50">
+                            <p className="text-xs font-mono text-white/50">
                               {(() => {
                                 if (offset === 0) {
                                   return "0s";
@@ -605,7 +603,7 @@ export function OrchestratorHub({
                         <button
                           type="button"
                           onClick={() => setActiveTimeShiftSource(source.path)}
-                          className="px-3 py-1.5 rounded-md bg-white/5 border border-white/10 text-[11px] font-medium text-white/60 hover:text-white hover:bg-white/10 transition-all"
+                          className="px-3 py-1.5 rounded-md bg-white/5 border border-white/10 text-xs font-medium text-white/60 hover:text-white hover:bg-white/10 transition-all"
                         >
                           Sync
                         </button>
@@ -622,20 +620,20 @@ export function OrchestratorHub({
               <button
                 type="button"
                 onClick={() => setView("picker")}
-                className="text-[11px] text-white/50 hover:text-white transition-all flex items-center gap-1.5"
+                className="text-xs text-white/50 hover:text-white transition-all flex items-center gap-1.5"
               >
                 ← Back
               </button>
 
               <div className="flex-1 flex flex-col space-y-3">
-                <p className="text-[11px] text-white/50 font-medium">
+                <p className="text-xs text-white/50 font-medium">
                   Add architecture constraints for AI to know.
                 </p>
                 <textarea
                   value={tempContext}
                   onChange={(e) => setTempContext(e.target.value)}
                   placeholder="Define schemas or domains..."
-                  className="w-full min-h-[300px] bg-white/[0.02] border border-white/10 rounded-lg p-4 text-[13px] text-white/80 outline-none focus:border-white/30 transition-all placeholder:text-white/20 custom-scrollbar font-mono resize-none"
+                  className="w-full min-h-[300px] bg-white/[0.02] border border-white/10 rounded-lg p-4 text-sm text-white/80 outline-none focus:border-white/30 transition-all placeholder:text-white/20 custom-scrollbar font-mono resize-none"
                 />
               </div>
             </div>
