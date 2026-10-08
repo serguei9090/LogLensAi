@@ -1,25 +1,12 @@
 // Assume Role: Frontend Engineer (@frontend)
 
+import { Activity, Database, Layers, TrendingUp } from "lucide-react";
+import { lazy, Suspense, useMemo, useState } from "react";
 import { StatCard } from "@/components/atoms/StatCard";
-import {
-  type DashboardMode,
-  DashboardModeToggle,
-} from "@/components/molecules/DashboardModeToggle";
+import type { DashboardMode } from "@/components/molecules/DashboardModeToggle";
 import { useInView } from "@/lib/hooks/useInView";
 import { cn } from "@/lib/utils";
 import { selectActiveWorkspace, useWorkspaceStore } from "@/store/workspaceStore";
-import {
-  Activity,
-  Database,
-  Layers,
-  TrendingUp,
-} from "lucide-react";
-import {
-  Suspense,
-  lazy,
-  useMemo,
-  useState,
-} from "react";
 import { AIInsightsStudio } from "./components/AIInsightsStudio";
 import { AIObservationCard } from "./components/AIObservationCard";
 import { ErrorClustersSection, NoiseClustersSection } from "./components/ClustersSections";
@@ -86,7 +73,12 @@ export function DashboardPage() {
           )}
         >
           <header className={cn(mode === "ai" ? "mb-4 shrink-0" : "mb-10")}>
-            <DashboardHeader mode={mode} loading={loading} onRefresh={fetchStats} />
+            <DashboardHeader
+              mode={mode}
+              loading={loading}
+              onRefresh={fetchStats}
+              onModeChange={handleModeChange}
+            />
             <DashboardFilters
               selectedWorkspaceId={selectedWorkspaceId}
               onWorkspaceChange={(v) => {
@@ -219,7 +211,6 @@ export function DashboardPage() {
                 )}
                 <Activity className="absolute -bottom-4 -right-4 size-32 text-text-muted/5 opacity-5 pointer-events-none" />
               </section>
-              <div className="h-20" />
             </div>
           ) : (
             <div key="ai" className="flex flex-1 min-h-[600px] h-full w-full animate-fade-in-up">
@@ -228,7 +219,6 @@ export function DashboardPage() {
           )}
         </div>
       </div>
-      <DashboardModeToggle mode={mode} onModeChange={handleModeChange} />
     </div>
   );
 }

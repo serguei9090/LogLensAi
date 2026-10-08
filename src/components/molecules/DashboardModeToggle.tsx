@@ -1,6 +1,6 @@
-import { cn } from "@/lib/utils";
 import { motion } from "framer-motion";
 import { BarChart3, Sparkles } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 export type DashboardMode = "static" | "ai";
 
@@ -22,9 +22,9 @@ export function DashboardModeToggle({
   return (
     <div
       className={cn(
-        "absolute bottom-8 left-1/2 -translate-x-1/2 z-50",
-        "bg-bg-surface/80 backdrop-blur-md border border-border/50 rounded-full p-1.5",
-        "shadow-[0_8px_32px_rgba(0,0,0,0.4)] flex items-center gap-1",
+        "inline-flex items-center gap-1",
+        "bg-bg-surface/80 backdrop-blur-md border border-border/50 rounded-full p-1",
+        "shadow-lg",
         className,
       )}
     >

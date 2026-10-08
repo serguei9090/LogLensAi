@@ -1,7 +1,8 @@
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { CommandPalette } from "@/components/organisms/CommandPalette";
+import { SidecarStartupGateway } from "@/components/organisms/SidecarStartupGateway";
 import { SystemDiagnosticConsole } from "@/components/organisms/SystemDiagnosticConsole";
 import { AppLayout } from "@/components/templates/AppLayout";
-import { Suspense, lazy, useCallback, useEffect, useRef, useState } from "react";
 
 const DashboardPage = lazy(() => import("@/components/pages/DashboardPage"));
 const InvestigationPage = lazy(() =>
@@ -191,30 +192,32 @@ export default function App() {
         onNavSelect={handleNavSelect}
       />
       <SystemDiagnosticConsole />
-      <AppLayout
-        workspaces={workspaces}
-        activeWorkspaceId={activeWorkspaceId}
-        activeFolderId={activeWorkspace?.activeFolderId}
-        onWorkspaceSelect={(id) => {
-          setActive(id);
-          setActiveNav("investigation");
-        }}
-        onWorkspaceCreate={(name) => addWorkspace({ id: `ws-${Date.now()}`, name })}
-        onWorkspaceRename={renameWorkspace}
-        onWorkspaceDelete={removeWorkspace}
-        activeNav={activeNav}
-        onNavSelect={handleNavSelect}
-        diagnosticOpen={false}
-        onDiagnosticClose={() => {}}
-        diagnosticData={null}
-        diagnosticLoading={false}
-      >
-        <Suspense fallback={<PageLoader />}>
-          {activeNav === "dashboard" && <DashboardPage />}
-          {activeNav === "investigation" && <InvestigationPage />}
-          {activeNav === "settings" && <SettingsPage />}
-        </Suspense>
-      </AppLayout>
+      <SidecarStartupGateway>
+        <AppLayout
+          workspaces={workspaces}
+          activeWorkspaceId={activeWorkspaceId}
+          activeFolderId={activeWorkspace?.activeFolderId}
+          onWorkspaceSelect={(id) => {
+            setActive(id);
+            setActiveNav("investigation");
+          }}
+          onWorkspaceCreate={(name) => addWorkspace({ id: `ws-${Date.now()}`, name })}
+          onWorkspaceRename={renameWorkspace}
+          onWorkspaceDelete={removeWorkspace}
+          activeNav={activeNav}
+          onNavSelect={handleNavSelect}
+          diagnosticOpen={false}
+          onDiagnosticClose={() => {}}
+          diagnosticData={null}
+          diagnosticLoading={false}
+        >
+          <Suspense fallback={<PageLoader />}>
+            {activeNav === "dashboard" && <DashboardPage />}
+            {activeNav === "investigation" && <InvestigationPage />}
+            {activeNav === "settings" && <SettingsPage />}
+          </Suspense>
+        </AppLayout>
+      </SidecarStartupGateway>
     </>
   );
 }

@@ -39,8 +39,14 @@ export function initGlobalErrorHandlers() {
 
     const message = event.reason instanceof Error ? event.reason.message : String(event.reason);
 
-    // Avoid double toasting for already handled sidecar errors
-    if (message.includes("Sidecar Error") || message.includes("Connection Error")) {
+    // Avoid double toasting for already handled sidecar or network bootstrap errors
+    if (
+      message.includes("Sidecar Error") ||
+      message.includes("Connection Error") ||
+      message.includes("Failed to fetch") ||
+      message.includes("NetworkError") ||
+      message.includes("Load failed")
+    ) {
       return;
     }
 
