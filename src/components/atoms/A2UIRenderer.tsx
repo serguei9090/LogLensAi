@@ -1,9 +1,11 @@
+import type * as echarts from "echarts";
 import type React from "react";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { callSidecar } from "@/lib/hooks/useSidecarBridge";
 import { useWorkspaceStore } from "@/store/workspaceStore";
+import { ReactECharts } from "./ReactECharts";
 
 interface A2UIComponent {
   type: string;
@@ -129,6 +131,151 @@ const LiveDataTable = ({ title, query }: { title: string; query: string }) => {
     </Card>
   );
 };
+
+const LiveChartArea = ({ title, query }: { title: string; query: string }) => {
+  const [distribution, setDistribution] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const activeWorkspaceId = useWorkspaceStore((state) => state.activeWorkspaceId);
+
+  useEffect(() => {
+    let active = true;
+    const fetchTimeline = async () => {
+      try {
+        const res = await callSidecar<{ buckets: any[] }>({
+          method: "get_log_distribution",
+          params: {
+            workspace_id: activeWorkspaceId || "default",
+            query: query || undefined,
+          },
+        });
+        if (active) {
+          setDistribution(res.buckets || []);
+          setLoading(false);
+        }
+      } catch (e) {
+        console.error("LiveChartArea fetch failed:", e);
+        if (active) {
+          setLoading(false);
+        }
+      }
+    };
+
+    fetchTimeline();
+    const interval = setInterval(fetchTimeline, 10000);
+    return () => {
+      active = false;
+      clearInterval(interval);
+    };
+  }, [query, activeWorkspaceId]);
+
+  const chartOption: echarts.EChartsOption = useMemo(() => {
+    const xLabels = distribution.map((b) => b.bucket);
+    const errorData = distribution.map((b) => b.ERROR || 0);
+    const warnData = distribution.map((b) => b.WARN || 0);
+    const infoData = distribution.map((b) => b.INFO || 0);
+    const debugData = distribution.map((b) => b.DEBUG || 0);
+
+    return {
+      tooltip: {
+        trigger: "axis",
+        axisPointer: { type: "shadow" },
+        backgroundColor: "#161917",
+        borderColor: "#27272a",
+        textStyle: { color: "#f4f4f5", fontSize: 11, fontFamily: "monospace" },
+      },
+      legend: {
+        data: ["ERROR", "WARN", "INFO", "DEBUG"],
+        top: 4,
+        right: 8,
+        textStyle: { color: "#a1a1aa", fontSize: 10 },
+      },
+      grid: {
+        top: 32,
+        left: 40,
+        right: 16,
+        bottom: 24,
+      },
+      xAxis: {
+        type: "category",
+        data: xLabels,
+        axisLine: { lineStyle: { color: "#27272a" } },
+        axisLabel: {
+          color: "#71717a",
+          fontSize: 9,
+          fontFamily: "monospace",
+          formatter: (val: string) => {
+            const parts = val.split(" ");
+            return parts[1] || val;
+          },
+        },
+      },
+      yAxis: {
+        type: "value",
+        splitLine: { lineStyle: { color: "rgba(39, 39, 42, 0.4)" } },
+        axisLabel: { color: "#71717a", fontSize: 9, fontFamily: "monospace" },
+      },
+      series: [
+        {
+          name: "ERROR",
+          type: "bar",
+          stack: "total",
+          color: "#ef4444",
+          data: errorData,
+        },
+        {
+          name: "WARN",
+          type: "bar",
+          stack: "total",
+          color: "#f59e0b",
+          data: warnData,
+        },
+        {
+          name: "INFO",
+          type: "bar",
+          stack: "total",
+          color: "#22c55e",
+          data: infoData,
+        },
+        {
+          name: "DEBUG",
+          type: "bar",
+          stack: "total",
+          color: "#a78bfa",
+          data: debugData,
+        },
+      ],
+    };
+  }, [distribution]);
+
+  return (
+    <Card className="bg-bg-surface/50 border-border/60 mb-4 overflow-hidden">
+      <CardHeader className="py-2.5 px-4 border-b border-border/60 flex flex-row items-center justify-between">
+        <CardTitle className="text-xs font-bold text-text-primary uppercase tracking-widest">
+          {title}
+        </CardTitle>
+        <span className="text-[10px] font-mono text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
+          Live Timeline
+        </span>
+      </CardHeader>
+      <CardContent className="p-2">
+        {loading && distribution.length === 0 ? (
+          <div className="h-44 flex items-center justify-center text-xs text-text-muted font-mono animate-pulse">
+            Loading histogram distribution...
+          </div>
+        ) : distribution.length === 0 ? (
+          <div className="h-44 flex items-center justify-center text-xs text-text-muted font-mono">
+            No events found for query: {query || "*"}
+          </div>
+        ) : (
+          <div className="h-44 w-full">
+            <ReactECharts option={chartOption} className="w-full h-full" />
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+};
+
 function parseSingleTag(statement: string): A2UIComponent | null {
   const trimmed = statement.trim();
   if (!trimmed) {
@@ -311,11 +458,10 @@ export const A2UIRenderer: React.FC<A2UIRendererProps> = ({ payload, onAction })
         );
 
       case "chart_area":
-        // Fallback to metric if backend doesn't support query-based stats yet
         return (
-          <LiveMetric
+          <LiveChartArea
             key={index}
-            label={comp.label || "Chart Data"}
+            title={comp.label || "Traffic History"}
             query={(comp.props?.query as string) || ""}
           />
         );

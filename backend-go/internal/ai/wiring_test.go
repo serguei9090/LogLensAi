@@ -42,8 +42,8 @@ func TestWire_Defaults(t *testing.T) {
 	if w.Memory == nil {
 		t.Error("expected a non-nil Memory searcher")
 	}
-	if len(w.Tools.Schemas()) != 8 {
-		t.Errorf("expected all 8 builtin tools registered, got %d", len(w.Tools.Schemas()))
+	if len(w.Tools.Schemas()) != 9 {
+		t.Errorf("expected all 9 builtin tools registered, got %d", len(w.Tools.Schemas()))
 	}
 }
 

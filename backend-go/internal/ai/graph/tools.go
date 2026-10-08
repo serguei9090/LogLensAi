@@ -100,6 +100,25 @@ func (r *ToolRegistry) registerBuiltins() {
 		},
 	}, r.searchLogs)
 
+	r.Register("get_log_timeline", ToolSchema{
+		Type: "function",
+		Function: ToolFunctionSchema{
+			Name:        "get_log_timeline",
+			Description: "Get time-series histogram buckets and log volume trends grouped by time interval and log level across any LLQL query or time window.",
+			Parameters: rawSchema(`{
+				"type": "object",
+				"properties": {
+					"workspace_id": {"type": "string", "description": "The workspace ID to query"},
+					"query": {"type": ["string", "null"], "description": "Optional LLQL query filter (e.g. 'level:ERROR', 'status:500')"},
+					"start_time": {"type": ["string", "null"], "description": "Optional start timestamp (e.g. '2026-09-16 10:00:00')"},
+					"end_time": {"type": ["string", "null"], "description": "Optional end timestamp (e.g. '2026-09-16 11:00:00')"},
+					"source_ids": {"type": ["array", "null"], "items": {"type": "string"}, "description": "Optional list of source IDs"}
+				},
+				"required": ["workspace_id"]
+			}`),
+		},
+	}, r.getLogTimeline)
+
 	r.Register("get_clusters", ToolSchema{
 		Type: "function",
 		Function: ToolFunctionSchema{

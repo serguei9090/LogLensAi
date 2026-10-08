@@ -51,6 +51,35 @@ func (r *ToolRegistry) searchLogs(_ context.Context, args json.RawMessage) (any,
 	return result, nil
 }
 
+// --- get_log_timeline ---
+
+type getLogTimelineParams struct {
+	WorkspaceID string   `json:"workspace_id"`
+	Query       *string  `json:"query,omitempty"`
+	StartTime   *string  `json:"start_time,omitempty"`
+	EndTime     *string  `json:"end_time,omitempty"`
+	SourceIDs   []string `json:"source_ids,omitempty"`
+}
+
+func (r *ToolRegistry) getLogTimeline(_ context.Context, args json.RawMessage) (any, error) {
+	var p getLogTimelineParams
+	if err := json.Unmarshal(args, &p); err != nil {
+		return map[string]any{"error": err.Error()}, nil
+	}
+
+	result, rpcErr := r.app.GetLogDistribution(models.GetLogDistributionRequest{
+		WorkspaceID: p.WorkspaceID,
+		Query:       p.Query,
+		StartTime:   p.StartTime,
+		EndTime:     p.EndTime,
+		SourceIDs:   p.SourceIDs,
+	})
+	if rpcErr != nil {
+		return map[string]any{"error": rpcErr.Message}, nil
+	}
+	return result, nil
+}
+
 // --- get_clusters ---
 
 type getClustersParams struct {

@@ -101,21 +101,26 @@ func Run(ctx context.Context, provider Provider, tools *ToolRegistry, initialSta
 						state.Messages = append([]ChatMessage{{Role: "system", Content: actionDirective}}, state.Messages...)
 					}
 
-					// A2UI Protocol Directive: Teach the model to output interactive UI blueprints
-					a2uiDirective := `You are equipped with the A2UI (Agent-to-UI) protocol. Whenever you provide findings that include metric summaries, error distributions, or actionable drill-downs, you MUST append an interactive A2UI block at the very end of your response inside [[A2UI]] ... [[/A2UI]].
+					// A2UI Protocol Directive: Teach the model to output interactive UI blueprints organically
+					a2uiDirective := `You are equipped with the A2UI (Agent-to-UI) protocol and interactive telemetry tools:
+- When the user asks about log volume, history, timeline, trends, or asks to see a graph/chart, you MUST first call 'get_log_timeline' to inspect time-series distribution buckets.
+- Whenever your response provides findings, answers about amounts/counts, analyzes history/trends, or the user mentions terms like "graph", "chart", "history", "timeline", "amount", "metrics", "show errors", you MUST append an interactive A2UI block at the very end of your response inside [[A2UI]] ... [[/A2UI]].
 
 Supported A2UI Tag Syntax:
-1. Live Metrics:
-[[A2UI]] metric label="Total Errors" query="level:ERROR" [[/A2UI]]
-2. Drill-down Action Buttons:
-[[A2UI]] button label="Filter 522 Errors" action={"type": "filter", "level": "ERROR"} [[/A2UI]]
-3. Live Data Tables:
-[[A2UI]] data_table title="Top Errors" query="level:ERROR" [[/A2UI]]
+1. Time-Series Charts & Histograms:
+[[A2UI]] chart_area title="Traffic History" query="*" [[/A2UI]]
+(Use query="level:ERROR" or any LLQL filter to display specific levels or error trends)
 
-Example ending for an error analysis:
-Here is the error distribution breakdown.
-[[A2UI]] metric label="Errors Detected" query="level:ERROR" [[/A2UI]]
-[[A2UI]] button label="Filter Error Logs" action={"type": "filter", "level": "ERROR"} [[/A2UI]]`
+2. Live Real-Time Metric Counters:
+[[A2UI]] metric label="Total Errors" query="level:ERROR" [[/A2UI]]
+
+3. Interactive Drill-down Action Buttons:
+[[A2UI]] button label="Filter 522 Errors" action={"type": "filter", "level": "ERROR"} [[/A2UI]]
+
+4. Live Data Tables:
+[[A2UI]] data_table title="Top Error Logs" query="level:ERROR" [[/A2UI]]
+
+You can combine multiple tags sequentially (e.g. chart_area + metric + button). They will render as a unified interactive surface in the user's interface.`
 					state.Messages = append([]ChatMessage{{Role: "system", Content: a2uiDirective}}, state.Messages...)
 				}
 			}
