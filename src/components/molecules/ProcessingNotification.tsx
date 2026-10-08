@@ -1,4 +1,4 @@
-import { type IngestionJob, useIngestionStore } from "@/store/ingestionStore";
+import { type IngestionJob, useIngestionStore } from "@/store/ingestion";
 import { AnimatePresence, motion } from "framer-motion";
 import { RefreshCcw, Sparkles } from "lucide-react";
 

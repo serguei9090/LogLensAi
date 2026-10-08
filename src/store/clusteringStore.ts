@@ -3,7 +3,7 @@ import { callSidecar } from "../lib/hooks/useSidecarBridge";
 
 export type ClusteringMode = "auto" | "burst";
 
-interface ClusteringStatus {
+export interface ClusteringStatus {
   mode: ClusteringMode;
   running: boolean;
   paused: boolean;

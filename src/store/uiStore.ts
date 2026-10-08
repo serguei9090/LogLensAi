@@ -45,6 +45,8 @@ interface UIStore {
   setColumnOrder: (order: string[]) => void;
   columnWidths: Record<string, string>;
   setColumnWidth: (id: string, width: string) => void;
+  activeNav: "investigation" | "settings" | "dashboard";
+  setActiveNav: (nav: "investigation" | "settings" | "dashboard") => void;
 }
 
 // ─── Store ────────────────────────────────────────────────────────────────────
@@ -52,6 +54,8 @@ interface UIStore {
 export const useUIStore = create<UIStore>()(
   persist(
     (set) => ({
+      activeNav: "investigation",
+      setActiveNav: (nav) => set({ activeNav: nav }),
       sidebarCollapsed: false,
       facetSidebarCollapsed: true,
       columnManagerCollapsed: true,

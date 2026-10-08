@@ -5,41 +5,11 @@ package laya
 import (
 	"context"
 	"fmt"
-	"math"
 	"os"
 	"path/filepath"
 	"runtime"
-	"strconv"
-	"strings"
 	"sync"
 )
-
-// DecisionResult represents the calculated outcome of evaluating a question against state text.
-type DecisionResult struct {
-	QuestionType  QuestionType `json:"question_type"`
-	Labels        []string     `json:"labels"`
-	Probabilities []float32    `json:"probabilities"`
-	SelectedLabel string       `json:"selected_label"`
-	SelectedScore float32      `json:"selected_score"`
-	Confidence    float32      `json:"confidence"`
-}
-
-// Clone creates a deep copy of DecisionResult.
-func (r *DecisionResult) Clone() *DecisionResult {
-	if r == nil {
-		return nil
-	}
-	cp := *r
-	if r.Labels != nil {
-		cp.Labels = make([]string, len(r.Labels))
-		copy(cp.Labels, r.Labels)
-	}
-	if r.Probabilities != nil {
-		cp.Probabilities = make([]float32, len(r.Probabilities))
-		copy(cp.Probabilities, r.Probabilities)
-	}
-	return &cp
-}
 
 // Engine defines the evaluation interface for the Laya System 1 decision engine.
 type Engine interface {
@@ -48,382 +18,6 @@ type Engine interface {
 	SetDevice(device string) error // "cpu" or "gpu"
 	Close() error
 }
-
-// Softmax computes numerically stable softmax probabilities with max subtraction.
-// Temperature scales the logits before exponentiation:
-//   - T > 1.0 yields a smoother, more uniform distribution.
-//   - 0 < T < 1.0 yields a peakier distribution.
-//   - T <= 0 defaults to T = 1.0.
-func Softmax(logits []float32, temperature float32) []float32 {
-	if len(logits) == 0 {
-		return nil
-	}
-	if temperature <= 0 {
-		temperature = 1.0
-	}
-
-	// 1. Scale logits and compute maximum for numerical stability
-	maxVal := logits[0] / temperature
-	scaled := make([]float32, len(logits))
-	scaled[0] = maxVal
-	for i := 1; i < len(logits); i++ {
-		s := logits[i] / temperature
-		scaled[i] = s
-		if s > maxVal {
-			maxVal = s
-		}
-	}
-
-	// 2. Exponentiate with max subtraction and sum
-	var sum float64
-	exps := make([]float64, len(logits))
-	for i, s := range scaled {
-		e := math.Exp(float64(s - maxVal))
-		exps[i] = e
-		sum += e
-	}
-
-	// 3. Normalize into probabilities
-	probs := make([]float32, len(logits))
-	if sum <= 0 || math.IsNaN(sum) {
-		uniform := float32(1.0 / float64(len(logits)))
-		for i := range probs {
-			probs[i] = uniform
-		}
-		return probs
-	}
-
-	for i, e := range exps {
-		probs[i] = float32(e / sum)
-	}
-	return probs
-}
-
-// ComputeDecisionResult calculates labels, scores, and confidence based on question type:
-//   - QuestionTypeChoice: SelectedLabel is the option with max probability; Confidence is max(probabilities).
-//   - QuestionTypeScore: SelectedScore is the mathematical expectation sum(rubric[i] * p[i]);
-//     SelectedLabel is string representation of top scoring rubric.
-//   - QuestionTypeNoul: Confidence is probabilities[0] (p_true); SelectedLabel is "true" if p >= 0.5 else "false".
-func ComputeDecisionResult(qType QuestionType, labels []string, probs []float32, rubric []int) *DecisionResult {
-	res := &DecisionResult{
-		QuestionType:  qType,
-		Labels:        labels,
-		Probabilities: probs,
-	}
-	if len(probs) == 0 {
-		return res
-	}
-
-	topIdx := 0
-	maxProb := probs[0]
-	for i := 1; i < len(probs); i++ {
-		if probs[i] > maxProb {
-			maxProb = probs[i]
-			topIdx = i
-		}
-	}
-
-	switch qType {
-	case QuestionTypeChoice:
-		if topIdx < len(labels) {
-			res.SelectedLabel = labels[topIdx]
-		}
-		res.Confidence = maxProb
-		res.SelectedScore = maxProb
-
-	case QuestionTypeScore:
-		var expectedScore float32
-		for i, p := range probs {
-			val := float32(i + 1)
-			if i < len(rubric) {
-				val = float32(rubric[i])
-			}
-			expectedScore += val * p
-		}
-		res.SelectedScore = expectedScore
-		if topIdx < len(rubric) {
-			res.SelectedLabel = strconv.Itoa(rubric[topIdx])
-		} else if topIdx < len(labels) {
-			res.SelectedLabel = labels[topIdx]
-		}
-		res.Confidence = maxProb
-
-	case QuestionTypeNoul:
-		probTrue := probs[0]
-		res.Confidence = probTrue
-		res.SelectedScore = probTrue
-		if probTrue >= 0.5 {
-			res.SelectedLabel = "true"
-		} else {
-			res.SelectedLabel = "false"
-		}
-
-	default:
-		if topIdx < len(labels) {
-			res.SelectedLabel = labels[topIdx]
-		}
-		res.Confidence = maxProb
-		res.SelectedScore = maxProb
-	}
-
-	return res
-}
-
-// ComputeDecision wraps ComputeDecisionResult extracting rubric and options from Question.
-func ComputeDecision(q Question, labels []string, probs []float32) *DecisionResult {
-	return ComputeDecisionResult(q.Type, labels, probs, q.Rubric)
-}
-
-// -------------------------------------------------------------------------
-// MockEngine: In-Memory Engine for Fast Testing, Dry Runs, and Fallbacks
-// -------------------------------------------------------------------------
-
-// MockEngine provides deterministic, keyword-based decisions without requiring ONNX models on disk.
-type MockEngine struct {
-	mu            sync.RWMutex
-	device        string
-	mockResponses map[string]*DecisionResult
-	closed        bool
-}
-
-// NewMockEngine constructs an in-memory MockEngine initialized to "cpu" device mode.
-func NewMockEngine() *MockEngine {
-	return &MockEngine{
-		device:        "cpu",
-		mockResponses: make(map[string]*DecisionResult),
-	}
-}
-
-// SetMockResponse registers an explicit mock result for a given question instruction or identifier.
-func (m *MockEngine) SetMockResponse(key string, res *DecisionResult) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	m.mockResponses[key] = res
-}
-
-// ClearMockResponses removes all custom mock responses.
-func (m *MockEngine) ClearMockResponses() {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	m.mockResponses = make(map[string]*DecisionResult)
-}
-
-// Device returns the currently configured hardware device ("cpu" or "gpu").
-func (m *MockEngine) Device() string {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
-	return m.device
-}
-
-// SetDevice updates the execution device setting.
-func (m *MockEngine) SetDevice(device string) error {
-	if device != "cpu" && device != "gpu" {
-		return fmt.Errorf("invalid device %q: must be 'cpu' or 'gpu'", device)
-	}
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	m.device = device
-	return nil
-}
-
-// Predict evaluates a single question against stateText using registered mock responses or rule heuristics.
-func (m *MockEngine) Predict(ctx context.Context, q Question, stateText string) (*DecisionResult, error) {
-	m.mu.RLock()
-	if m.closed {
-		m.mu.RUnlock()
-		return nil, fmt.Errorf("laya: mock engine is closed")
-	}
-	if res, ok := m.mockResponses[q.Instructions]; ok {
-		m.mu.RUnlock()
-		return res.Clone(), nil
-	}
-	m.mu.RUnlock()
-
-	return mockPredictQuestion(q, stateText), nil
-}
-
-// PredictBatch evaluates a batch of questions against stateText.
-func (m *MockEngine) PredictBatch(ctx context.Context, questions map[string]Question, stateText string) (map[string]*DecisionResult, error) {
-	m.mu.RLock()
-	if m.closed {
-		m.mu.RUnlock()
-		return nil, fmt.Errorf("laya: mock engine is closed")
-	}
-	m.mu.RUnlock()
-
-	results := make(map[string]*DecisionResult, len(questions))
-	for name, q := range questions {
-		res, err := m.Predict(ctx, q, stateText)
-		if err != nil {
-			return nil, fmt.Errorf("predicting question %q: %w", name, err)
-		}
-		results[name] = res
-	}
-	return results, nil
-}
-
-// Close marks the mock engine as closed.
-func (m *MockEngine) Close() error {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	m.closed = true
-	return nil
-}
-
-// mockPredictQuestion implements deterministic keyword-based heuristics for log triage.
-func mockPredictQuestion(q Question, stateText string) *DecisionResult {
-	lowerState := strings.ToLower(stateText)
-	lowerInstructions := strings.ToLower(q.Instructions)
-
-	switch q.Type {
-	case QuestionTypeChoice:
-		options := q.Options
-		if len(options) == 0 {
-			return &DecisionResult{QuestionType: QuestionTypeChoice}
-		}
-
-		scores := make([]float32, len(options))
-		for i := range scores {
-			scores[i] = 1.0
-		}
-
-		if strings.Contains(lowerInstructions, "intent") || strings.Contains(lowerInstructions, "tool") {
-			switch {
-			case containsAny(lowerState, "cluster", "clustering", "template", "templates", "group"):
-				boostOption(options, scores, "get_clusters", 5.0)
-			case containsAny(lowerState, "memory", "rag", "historical", "previous", "remember", "context"):
-				boostOption(options, scores, "search_memory", 5.0)
-			case containsAny(lowerState, "facet", "field", "distribution", "breakdown", "count", "stats"):
-				boostOption(options, scores, "get_facets", 5.0)
-			case containsAny(lowerState, "why", "what is", "how do", "explain", "help", "hello", "hi"):
-				boostOption(options, scores, "conversational_qa", 5.0)
-			default:
-				boostOption(options, scores, "search_logs", 4.0)
-			}
-		} else if strings.Contains(lowerInstructions, "category") || strings.Contains(lowerInstructions, "subsystem") {
-			switch {
-			case containsAny(lowerState, "db", "database", "sql", "postgres", "mysql", "duckdb", "redis", "query", "table"):
-				boostOption(options, scores, "database", 5.0)
-			case containsAny(lowerState, "network", "socket", "dns", "connection", "port", "http", "tcp", "udp", "ip", "connect", "refused"):
-				boostOption(options, scores, "network", 5.0)
-			case containsAny(lowerState, "auth", "jwt", "token", "login", "password", "permission", "denied", "unauthorized", "oauth"):
-				boostOption(options, scores, "auth", 5.0)
-			case containsAny(lowerState, "disk", "io", "filesystem", "file", "storage", "inode", "enospc"):
-				boostOption(options, scores, "disk_io", 5.0)
-			case containsAny(lowerState, "stripe", "aws", "gcp", "azure", "webhook", "vendor", "third_party"):
-				boostOption(options, scores, "third_party", 5.0)
-			default:
-				boostOption(options, scores, "application", 3.0)
-			}
-		} else {
-			for i, opt := range options {
-				optLower := strings.ToLower(opt)
-				if strings.Contains(lowerState, optLower) {
-					scores[i] += 4.0
-				}
-				parts := strings.FieldsFunc(optLower, func(r rune) bool { return r == '_' || r == '-' || r == ' ' })
-				for _, p := range parts {
-					if len(p) > 2 && strings.Contains(lowerState, p) {
-						scores[i] += 1.5
-					}
-				}
-			}
-		}
-
-		probs := Softmax(scores, 1.0)
-		return ComputeDecisionResult(q.Type, options, probs, q.Rubric)
-
-	case QuestionTypeScore:
-		rubric := q.Rubric
-		if len(rubric) == 0 {
-			rubric = []int{1, 2, 3, 4, 5}
-		}
-		labels := make([]string, len(rubric))
-		for i, r := range rubric {
-			labels[i] = strconv.Itoa(r)
-		}
-
-		targetLevel := 2
-		if containsAny(lowerState, "fatal", "panic", "emergency", "catastrophic", "data loss", "deadlock", "segfault") {
-			targetLevel = 5
-		} else if containsAny(lowerState, "error", "failed", "refused", "timeout", "exception", "broken", "unavailable", "500", "503") {
-			targetLevel = 4
-		} else if containsAny(lowerState, "warn", "warning", "slow", "retry", "degraded", "404", "401") {
-			targetLevel = 3
-		} else if containsAny(lowerState, "info", "notice", "start", "complete", "connected", "ready", "received", "success", "ok") {
-			targetLevel = 2
-		} else if containsAny(lowerState, "debug", "trace", "verbose", "heartbeat", "ping") {
-			targetLevel = 1
-		}
-
-		bestIdx := 0
-		minDiff := 999
-		for i, r := range rubric {
-			diff := absInt(r - targetLevel)
-			if diff < minDiff {
-				minDiff = diff
-				bestIdx = i
-			}
-		}
-
-		scores := make([]float32, len(rubric))
-		for i := range scores {
-			dist := absInt(i - bestIdx)
-			val := float32(5 - dist)
-			if val < 0.5 {
-				val = 0.5
-			}
-			scores[i] = val
-		}
-
-		probs := Softmax(scores, 1.0)
-		return ComputeDecisionResult(q.Type, labels, probs, rubric)
-
-	case QuestionTypeNoul:
-		labels := []string{"true", "false"}
-		isTrue := containsAny(lowerState, "outage", "down", "crash", "fatal", "dead", "unreachable", "panic", "blackout", "incident", "emergency", "unavailable")
-
-		var probs []float32
-		if isTrue {
-			probs = []float32{0.88, 0.12}
-		} else {
-			probs = []float32{0.12, 0.88}
-		}
-		return ComputeDecisionResult(q.Type, labels, probs, nil)
-
-	default:
-		return &DecisionResult{QuestionType: q.Type}
-	}
-}
-
-func containsAny(s string, keywords ...string) bool {
-	for _, kw := range keywords {
-		if strings.Contains(s, kw) {
-			return true
-		}
-	}
-	return false
-}
-
-func boostOption(options []string, scores []float32, targetOpt string, boost float32) {
-	for i, opt := range options {
-		if opt == targetOpt {
-			scores[i] += boost
-			return
-		}
-	}
-}
-
-func absInt(x int) int {
-	if x < 0 {
-		return -x
-	}
-	return x
-}
-
-// -------------------------------------------------------------------------
-// ONNXEngine: Production ONNX Runtime Engine with Fallback Support
-// -------------------------------------------------------------------------
 
 // onnxSessionRunner abstracts raw ONNX Runtime sessions to isolate cgo dependencies.
 type onnxSessionRunner interface {
@@ -460,8 +54,6 @@ type ONNXEngine struct {
 }
 
 // NewONNXEngine initializes an ONNXEngine with the specified configuration.
-// If model files cannot be found or initialized, and FallbackToMock is true,
-// it logs and switches to simulated fallback mode without requiring model weights.
 func NewONNXEngine(cfg ONNXEngineConfig) (*ONNXEngine, error) {
 	if cfg.Device == "" {
 		cfg.Device = "cpu"
@@ -476,7 +68,6 @@ func NewONNXEngine(cfg ONNXEngineConfig) (*ONNXEngine, error) {
 		cfg.HiddenDim = 1024
 	}
 
-	// 1. Resolve Tokenizer & SequenceBuilder
 	seqBuilder := cfg.SequenceBuilder
 	if seqBuilder == nil {
 		tok := cfg.Tokenizer
@@ -493,7 +84,6 @@ func NewONNXEngine(cfg ONNXEngineConfig) (*ONNXEngine, error) {
 		seqBuilder = NewSequenceBuilder(tok, 8192)
 	}
 
-	// 2. Resolve Model Paths
 	encoderPath := cfg.EncoderPath
 	if encoderPath == "" {
 		encoderPath = os.Getenv("LOGLENS_LAYA_ENCODER_PATH")
@@ -505,7 +95,6 @@ func NewONNXEngine(cfg ONNXEngineConfig) (*ONNXEngine, error) {
 
 	modelsAvailable := fileExists(encoderPath) && fileExists(headPath)
 
-	// Fallback path when models are not available
 	if !modelsAvailable {
 		if cfg.FallbackToMock {
 			return &ONNXEngine{
@@ -520,7 +109,6 @@ func NewONNXEngine(cfg ONNXEngineConfig) (*ONNXEngine, error) {
 		return nil, fmt.Errorf("laya: ONNX model files not found (encoder: %q, head: %q); enable FallbackToMock or provide valid paths", encoderPath, headPath)
 	}
 
-	// 3. Try to initialize real ONNX runner
 	runner, err := newONNXSessionRunner(cfg, encoderPath, headPath)
 	if err != nil {
 		if cfg.FallbackToMock {
@@ -586,7 +174,6 @@ func (e *ONNXEngine) Predict(ctx context.Context, q Question, stateText string) 
 		return e.mockFallback.Predict(ctx, q, stateText)
 	}
 
-	// 1. Build sequence
 	seq, err := e.seqBuilder.BuildSequence(q, stateText)
 	if err != nil {
 		return nil, fmt.Errorf("laya: building input sequence: %w", err)
@@ -598,13 +185,11 @@ func (e *ONNXEngine) Predict(ctx context.Context, q Question, stateText string) 
 		return nil, fmt.Errorf("laya: no mask tokens present in sequence")
 	}
 
-	// 2. Encoder forward pass
 	hiddenData, err := e.runner.RunEncoder(seq.InputIDs, seq.AttentionMask, seqLen, e.hiddenDim)
 	if err != nil {
 		return nil, fmt.Errorf("running encoder: %w", err)
 	}
 
-	// 3. Extract hidden states at MaskIndices
 	maskEmbeddings := make([]float32, int64(numMasks)*e.hiddenDim)
 	for i, maskIdx := range seq.MaskIndices {
 		start := maskIdx * e.hiddenDim
@@ -615,13 +200,11 @@ func (e *ONNXEngine) Predict(ctx context.Context, q Question, stateText string) 
 		copy(maskEmbeddings[int64(i)*e.hiddenDim:], hiddenData[start:end])
 	}
 
-	// 4. Head forward pass
 	logits, err := e.runner.RunHead(maskEmbeddings, numMasks, e.hiddenDim)
 	if err != nil {
 		return nil, fmt.Errorf("running head session: %w", err)
 	}
 
-	// 5. Softmax & Decision
 	probs := Softmax(logits, e.temperature)
 
 	return ComputeDecisionResult(q.Type, seq.OptionLabels, probs, q.Rubric), nil
@@ -661,10 +244,6 @@ func (e *ONNXEngine) Close() error {
 	return err
 }
 
-// -------------------------------------------------------------------------
-// Helpers: File Resolution & Fallback Vocab
-// -------------------------------------------------------------------------
-
 func fileExists(path string) bool {
 	if path == "" {
 		return false
@@ -693,7 +272,6 @@ func resolveSharedLibPath() string {
 		}
 	}
 
-	// Check python venv directory if present
 	cwd, err := os.Getwd()
 	if err == nil {
 		curr := cwd

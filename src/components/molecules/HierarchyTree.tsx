@@ -1,9 +1,9 @@
 import type { NavTab } from "@/App";
 import { Button } from "@/components/ui/button";
 import { DraggableItem, DroppableArea } from "@/lib/dnd-wrappers";
-import { useLogIngestion } from "@/lib/hooks/useLogIngestion";
+import { useLogIngestion } from "@/lib/hooks/ingestion";
 import { cn } from "@/lib/utils";
-import { useIngestionStore } from "@/store/ingestionStore";
+import { useIngestionStore } from "@/store/ingestion";
 import { type HierarchyNode, useWorkspaceStore } from "@/store/workspaceStore";
 import { ChevronDown, ChevronRight, Folder, FolderPlus, Pencil, Trash2 } from "lucide-react";
 import { memo, useState } from "react";

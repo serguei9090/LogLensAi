@@ -6,7 +6,7 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { toast } from "sonner";
 import { Button } from "../ui/button";
-import { CustomParserModal } from "./CustomParserModal";
+import { CustomParserModal } from "./custom-parser";
 
 /** UTC offset entry for the custom timezone picker. */
 interface TimezoneOption {

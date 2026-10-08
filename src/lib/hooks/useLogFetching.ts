@@ -1,4 +1,4 @@
-import { useIngestionStore } from "@/store/ingestionStore";
+import { useIngestionStore } from "@/store/ingestion";
 import { useInvestigationStore } from "@/store/investigationStore";
 import { type LogSource, selectActiveWorkspace, useWorkspaceStore } from "@/store/workspaceStore";
 import type { LogEntry } from "@/types/log";

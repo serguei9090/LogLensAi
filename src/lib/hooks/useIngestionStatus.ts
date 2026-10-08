@@ -1,8 +1,8 @@
-import { useIngestionStore } from "@/store/ingestionStore";
+import { useIngestionStore } from "@/store/ingestion";
 import { useMemo } from "react";
 import { useShallow } from "zustand/react/shallow";
 
-export type { IngestionJob } from "@/store/ingestionStore";
+export type { IngestionJob } from "@/store/ingestion";
 
 /**
  * Read-only hook to observe ingestion job state.

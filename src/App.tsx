@@ -55,10 +55,9 @@ export default function App() {
     removeWorkspace,
     fetchHierarchy,
   } = useWorkspaceStore();
-  const { toggleSidebar, toggleFacetSidebar } = useUIStore();
+  const { toggleSidebar, toggleFacetSidebar, activeNav, setActiveNav } = useUIStore();
   const { setSidebarOpen: setAiSidebarOpen } = useAiStore();
   const { settings, fetchSettings } = useSettingsStore();
-  const [activeNav, setActiveNav] = useState<NavTab>("dashboard");
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
 
   // Global Health Monitoring
@@ -109,9 +108,12 @@ export default function App() {
     }
   }, [activeWorkspaceId, fetchHierarchy]);
 
-  const handleNavSelect = useCallback((nav: NavTab) => {
-    setActiveNav(nav);
-  }, []);
+  const handleNavSelect = useCallback(
+    (nav: NavTab) => {
+      setActiveNav(nav);
+    },
+    [setActiveNav],
+  );
 
   // Register Global Shortcuts
   useKeyboardShortcuts([

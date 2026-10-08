@@ -6,17 +6,18 @@
     "useIgnoreFile": true
   },
   "files": {
-    "ignore": [
-      "**/.vscode/**",
-      "**/.agents/**",
-      "**/.git/**",
-      "**/.kilo/**",
-      "**/node_modules/**",
-      "**/dist/**",
-      "**/src-tauri/target/**"
+    "includes": [
+      "**",
+      "!**/.vscode/**",
+      "!**/.agents/**",
+      "!**/.git/**",
+      "!**/.kilo/**",
+      "!**/node_modules/**",
+      "!**/dist/**",
+      "!**/src-tauri/target/**"
     ]
   },
-  "organizeImports": { "enabled": true },
+  "assist": { "actions": { "source": { "organizeImports": "on" } } },
   "linter": {
     "enabled": true,
     "rules": {
@@ -49,7 +50,7 @@
   },
   "overrides": [
     {
-      "include": ["**/src/styles/globals.css"],
+      "includes": ["**/src/styles/globals.css"],
       "css": {
         "parser": {
           "allowWrongLineComments": true

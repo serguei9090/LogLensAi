@@ -4,7 +4,7 @@ import type { NavTab } from "@/App";
 import { type DiagnosticData, DiagnosticSidebar } from "@/components/organisms/DiagnosticSidebar";
 import { Sidebar } from "@/components/organisms/Sidebar";
 import { callSidecar } from "@/lib/hooks/useSidecarBridge";
-import { type IngestionJob, useIngestionStore } from "@/store/ingestionStore";
+import { type IngestionJob, useIngestionStore } from "@/store/ingestion";
 import type { Workspace } from "@/store/workspaceStore";
 import { useWorkspaceStore } from "@/store/workspaceStore";
 import {

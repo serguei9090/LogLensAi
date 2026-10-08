@@ -2,6 +2,8 @@ import { SIDECAR_BASE_URL, callSidecar } from "@/lib/hooks/useSidecarBridge";
 import { toast } from "sonner";
 import { create } from "zustand";
 
+export type SessionType = "investigation" | "dashboard";
+
 export interface AiMessage {
   id: number;
   session_id: string;
@@ -21,29 +23,41 @@ export interface AiSession {
   created_at: string;
   last_modified: string;
   provider_session_id?: string;
+  session_type?: SessionType;
 }
 
 interface AiStore {
+  // Investigation Page State
   currentSessionId: string | null;
   sessions: AiSession[];
   messages: AiMessage[];
+
+  // Dashboard AI Insights State (Isolated Session)
+  dashboardSessionId: string | null;
+  dashboardSessions: AiSession[];
+  dashboardMessages: AiMessage[];
+  isDashboardLoading: boolean;
+
   isLoading: boolean;
   isSidebarOpen: boolean;
   sidebarWidth: number;
   error: string | null;
   logSessionMap: Record<number, string>; // log_id -> session_id
-  dashboardWidgets: Record<string, unknown>[]; // Array of A2UI payloads pinned to the dashboard
+  dashboardWidgets: Record<string, unknown>[]; // Retained for compatibility
   abortController: AbortController | null;
 
   // Actions
   setSidebarOpen: (open: boolean) => void;
   setSidebarWidth: (width: number) => void;
   setSession: (sessionId: string | null) => void;
+  setDashboardSession: (sessionId: string | null) => void;
+
   fetchSessions: (workspaceId: string) => Promise<void>;
-  fetchMessages: (sessionId: string) => Promise<void>;
+  fetchMessages: (sessionId: string, target?: "investigation" | "dashboard") => Promise<void>;
   fetchMapping: (workspaceId: string) => Promise<void>;
   renameSession: (sessionId: string, name: string, workspaceId: string) => Promise<void>;
   deleteSession: (sessionId: string, workspaceId: string) => Promise<void>;
+
   sendMessage: (params: {
     workspace_id: string;
     message: string;
@@ -51,7 +65,9 @@ interface AiStore {
     model?: string;
     session_name?: string;
     reasoning?: boolean;
+    session_type?: SessionType;
   }) => Promise<void>;
+
   stopStream: () => void;
   clearError: () => void;
   addDashboardWidget: (widget: Record<string, unknown>) => void;
@@ -62,6 +78,12 @@ export const useAiStore = create<AiStore>((set, get) => ({
   currentSessionId: null,
   sessions: [],
   messages: [],
+
+  dashboardSessionId: null,
+  dashboardSessions: [],
+  dashboardMessages: [],
+  isDashboardLoading: false,
+
   isLoading: false,
   isSidebarOpen: false,
   sidebarWidth: 450,
@@ -76,19 +98,47 @@ export const useAiStore = create<AiStore>((set, get) => ({
   setSession: (sessionId) => {
     set({ currentSessionId: sessionId });
     if (sessionId) {
-      get().fetchMessages(sessionId);
+      get().fetchMessages(sessionId, "investigation");
     } else {
       set({ messages: [] });
     }
   },
 
+  setDashboardSession: (sessionId) => {
+    set({ dashboardSessionId: sessionId });
+    if (sessionId) {
+      get().fetchMessages(sessionId, "dashboard");
+    } else {
+      set({ dashboardMessages: [] });
+    }
+  },
+
   fetchSessions: async (workspaceId) => {
     try {
-      const sessions = await callSidecar<AiSession[]>({
+      const rawSessions = await callSidecar<AiSession[]>({
         method: "get_ai_sessions",
         params: { workspace_id: workspaceId },
       });
-      set({ sessions });
+
+      // Filter sessions by tag/prefix:
+      // Sessions with name or ID starting with "Dashboard" or "DASH-" are dashboard sessions
+      const dashboardSessions = rawSessions.filter(
+        (s) =>
+          s.name?.toLowerCase().includes("dashboard") ||
+          s.session_id.startsWith("dash-") ||
+          s.session_type === "dashboard",
+      );
+      const investigationSessions = rawSessions.filter(
+        (s) =>
+          !s.name?.toLowerCase().includes("dashboard") &&
+          !s.session_id.startsWith("dash-") &&
+          s.session_type !== "dashboard",
+      );
+
+      set({
+        sessions: investigationSessions,
+        dashboardSessions: dashboardSessions,
+      });
     } catch (err) {
       const msg = (err as Error).message;
       set({ error: msg });
@@ -131,6 +181,9 @@ export const useAiStore = create<AiStore>((set, get) => ({
       if (get().currentSessionId === sessionId) {
         set({ currentSessionId: null, messages: [] });
       }
+      if (get().dashboardSessionId === sessionId) {
+        set({ dashboardSessionId: null, dashboardMessages: [] });
+      }
       await get().fetchSessions(workspaceId);
       await get().fetchMapping(workspaceId);
     } catch (err) {
@@ -140,22 +193,26 @@ export const useAiStore = create<AiStore>((set, get) => ({
     }
   },
 
-  fetchMessages: async (sessionId) => {
-    set({ isLoading: true });
+  fetchMessages: async (sessionId, target = "investigation") => {
+    if (target === "dashboard") {
+      set({ isDashboardLoading: true });
+    } else {
+      set({ isLoading: true });
+    }
+
     try {
       const messages = await callSidecar<AiMessage[]>({
         method: "get_ai_messages",
         params: { session_id: sessionId },
       });
-      // Preserve any in-memory transient data (e.g. steps, evaluation_notice) on the latest messages
-      const existing = get().messages;
+
+      const existing = target === "dashboard" ? get().dashboardMessages : get().messages;
       const merged = messages.map((m, idx) => {
         const prev = existing.find(
           (e) => e.id === m.id || (idx === messages.length - 1 && e.role === m.role),
         );
         if (prev) {
           const rawSteps = prev.steps ?? m.steps;
-          // Completed assistant messages stored in DB should have all their steps marked as done
           const steps = rawSteps?.map((s) => ({ ...s, done: true }));
           return {
             ...m,
@@ -166,21 +223,36 @@ export const useAiStore = create<AiStore>((set, get) => ({
         }
         return m;
       });
-      set({ messages: merged, isLoading: false });
+
+      if (target === "dashboard") {
+        set({ dashboardMessages: merged, isDashboardLoading: false });
+      } else {
+        set({ messages: merged, isLoading: false });
+      }
     } catch (err) {
       const msg = (err as Error).message;
-      set({ error: msg, isLoading: false });
+      if (target === "dashboard") {
+        set({ error: msg, isDashboardLoading: false });
+      } else {
+        set({ error: msg, isLoading: false });
+      }
       toast.error("Error", { description: msg });
     }
   },
 
   sendMessage: async (params) => {
-    let { currentSessionId } = get();
-    set({ isLoading: true, error: null });
+    const isDashboard = params.session_type === "dashboard";
+    let activeSessionId = isDashboard ? get().dashboardSessionId : get().currentSessionId;
+
+    if (isDashboard) {
+      set({ isDashboardLoading: true, error: null });
+    } else {
+      set({ isLoading: true, error: null });
+    }
 
     const tempUserMsg: AiMessage = {
       id: Date.now(),
-      session_id: currentSessionId || "temp",
+      session_id: activeSessionId || "temp",
       role: "user",
       content: params.message,
       context_logs: params.context_logs,
@@ -189,22 +261,30 @@ export const useAiStore = create<AiStore>((set, get) => ({
 
     const tempAssistantMsg: AiMessage = {
       id: Date.now() + 1,
-      session_id: currentSessionId || "temp",
+      session_id: activeSessionId || "temp",
       role: "assistant",
       content: "",
       timestamp: new Date().toISOString(),
     };
 
-    set((state) => ({
-      messages: [...state.messages, tempUserMsg, tempAssistantMsg],
-    }));
+    if (isDashboard) {
+      set((state) => ({
+        dashboardMessages: [...state.dashboardMessages, tempUserMsg, tempAssistantMsg],
+      }));
+    } else {
+      set((state) => ({
+        messages: [...state.messages, tempUserMsg, tempAssistantMsg],
+      }));
+    }
 
-    // Initialize AbortController for cancelable streaming
     const controller = new AbortController();
     set({ abortController: controller });
 
     try {
-      // Connect to SSE Endpoint
+      const defaultName = isDashboard
+        ? `Dashboard Insight ${new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`
+        : undefined;
+
       const response = await fetch(`${SIDECAR_BASE_URL}/api/stream_chat`, {
         method: "POST",
         headers: {
@@ -214,7 +294,8 @@ export const useAiStore = create<AiStore>((set, get) => ({
         signal: controller.signal,
         body: JSON.stringify({
           ...params,
-          session_id: currentSessionId,
+          session_id: activeSessionId,
+          session_name: params.session_name || defaultName,
         }),
       });
 
@@ -233,9 +314,8 @@ export const useAiStore = create<AiStore>((set, get) => ({
         done = readerDone;
         if (value) {
           buffer += decoder.decode(value, { stream: true });
-
           const lines = buffer.split("\n\n");
-          buffer = lines.pop() || ""; // Keep the incomplete line in the buffer
+          buffer = lines.pop() || "";
 
           for (const line of lines) {
             if (line.startsWith("data: ")) {
@@ -247,35 +327,38 @@ export const useAiStore = create<AiStore>((set, get) => ({
 
               try {
                 const parsed = JSON.parse(dataStr);
-
                 if (parsed.error) {
                   throw new Error(parsed.error);
                 }
 
-                if (parsed.session_id && !currentSessionId) {
-                  currentSessionId = parsed.session_id;
-                  set({ currentSessionId });
+                if (parsed.session_id && !activeSessionId) {
+                  activeSessionId = parsed.session_id;
+                  if (isDashboard) {
+                    set({ dashboardSessionId: activeSessionId });
+                  } else {
+                    set({ currentSessionId: activeSessionId });
+                  }
                 }
 
                 if (parsed.evaluation_notice) {
                   set((state) => {
-                    const messages = [...state.messages];
-                    const lastMsg = messages.at(-1);
+                    const targetList = isDashboard ? state.dashboardMessages : state.messages;
+                    const nextList = [...targetList];
+                    const lastMsg = nextList.at(-1);
                     if (lastMsg) {
                       lastMsg.evaluation_notice = parsed.evaluation_notice;
                     }
-                    return { messages };
+                    return isDashboard ? { dashboardMessages: nextList } : { messages: nextList };
                   });
                 }
 
                 if (parsed.step) {
                   set((state) => {
-                    const messages = [...state.messages];
-                    const lastMsg = messages.at(-1);
+                    const targetList = isDashboard ? state.dashboardMessages : state.messages;
+                    const nextList = [...targetList];
+                    const lastMsg = nextList.at(-1);
                     if (lastMsg) {
-                      if (!lastMsg.steps) {
-                        lastMsg.steps = [];
-                      }
+                      if (!lastMsg.steps) lastMsg.steps = [];
                       const existingIdx = lastMsg.steps.findIndex((s) => s.title === parsed.step);
                       if (existingIdx !== -1) {
                         if (parsed.step_done !== undefined) {
@@ -288,46 +371,27 @@ export const useAiStore = create<AiStore>((set, get) => ({
                         });
                       }
                     }
-                    return { messages };
+                    return isDashboard ? { dashboardMessages: nextList } : { messages: nextList };
                   });
                 }
 
                 if (parsed.a2ui_payload) {
                   set((state) => {
-                    const messages = [...state.messages];
-                    const lastMsg = messages.at(-1);
+                    const targetList = isDashboard ? state.dashboardMessages : state.messages;
+                    const nextList = [...targetList];
+                    const lastMsg = nextList.at(-1);
                     if (lastMsg) {
                       lastMsg.a2ui_payload = parsed.a2ui_payload;
                     }
-
-                    // Auto-pin specific widgets to dashboard
-                    const payload = parsed.a2ui_payload as any;
-                    if (
-                      payload &&
-                      typeof payload.raw === "string" &&
-                      (payload.raw.startsWith("metric") ||
-                        payload.raw.startsWith("chart_area") ||
-                        payload.raw.startsWith("data_table"))
-                    ) {
-                      const isAlreadyPinned = state.dashboardWidgets.some(
-                        (w) => (w as any).raw === payload.raw,
-                      );
-                      if (!isAlreadyPinned) {
-                        return {
-                          messages,
-                          dashboardWidgets: [...state.dashboardWidgets, payload],
-                        };
-                      }
-                    }
-
-                    return { messages };
+                    return isDashboard ? { dashboardMessages: nextList } : { messages: nextList };
                   });
                 }
 
                 if (parsed.chunk) {
                   set((state) => {
-                    const messages = [...state.messages];
-                    const lastMsg = messages.at(-1);
+                    const targetList = isDashboard ? state.dashboardMessages : state.messages;
+                    const nextList = [...targetList];
+                    const lastMsg = nextList.at(-1);
                     if (lastMsg) {
                       let rawChunk = parsed.chunk;
                       if (rawChunk.includes("[[EVAL_NOTICE]]")) {
@@ -344,21 +408,17 @@ export const useAiStore = create<AiStore>((set, get) => ({
                       }
                       if (rawChunk) {
                         lastMsg.content += rawChunk;
-                        // Once the final answer begins arriving, mark synthesizing and any prior steps as done
                         if (lastMsg.steps && lastMsg.steps.length > 0) {
                           lastMsg.steps = lastMsg.steps.map((s) => ({ ...s, done: true }));
                         }
                       }
                     }
-                    // Update temp session id if resolving dynamically
-                    if (currentSessionId && lastMsg && lastMsg.session_id === "temp") {
-                      lastMsg.session_id = currentSessionId;
-                      const prevMsg = messages.at(-2);
-                      if (prevMsg) {
-                        prevMsg.session_id = currentSessionId;
-                      }
+                    if (activeSessionId && lastMsg && lastMsg.session_id === "temp") {
+                      lastMsg.session_id = activeSessionId;
+                      const prevMsg = nextList.at(-2);
+                      if (prevMsg) prevMsg.session_id = activeSessionId;
                     }
-                    return { messages };
+                    return isDashboard ? { dashboardMessages: nextList } : { messages: nextList };
                   });
                 }
               } catch (e) {
@@ -369,28 +429,37 @@ export const useAiStore = create<AiStore>((set, get) => ({
         }
       }
 
-      // Ensure all recorded steps are marked as done upon stream completion
       set((state) => {
-        const messages = [...state.messages];
-        const lastMsg = messages.at(-1);
+        const targetList = isDashboard ? state.dashboardMessages : state.messages;
+        const nextList = [...targetList];
+        const lastMsg = nextList.at(-1);
         if (lastMsg?.steps && lastMsg.steps.length > 0) {
           lastMsg.steps = lastMsg.steps.map((s) => ({ ...s, done: true }));
         }
-        return { messages, isLoading: false, abortController: null };
+        return isDashboard
+          ? { dashboardMessages: nextList, isDashboardLoading: false, abortController: null }
+          : { messages: nextList, isLoading: false, abortController: null };
       });
 
-      if (currentSessionId) {
+      if (activeSessionId) {
         await get().fetchSessions(params.workspace_id);
-        await get().fetchMapping(params.workspace_id);
-        // Wait for backend transactions to commit by introducing a tiny delay
-        setTimeout(() => get().fetchMessages(currentSessionId as string), 200);
+        if (!isDashboard) {
+          await get().fetchMapping(params.workspace_id);
+        }
+        const sid = activeSessionId;
+        setTimeout(() => get().fetchMessages(sid, isDashboard ? "dashboard" : "investigation"), 200);
       }
-    } catch (err: any) {
-      if (err?.name === "AbortError") {
-        set({ isLoading: false, abortController: null });
+    } catch (err: unknown) {
+      if ((err as Error)?.name === "AbortError") {
+        set({ isLoading: false, isDashboardLoading: false, abortController: null });
         return;
       }
-      set({ error: (err as Error).message, isLoading: false, abortController: null });
+      set({
+        error: (err as Error).message,
+        isLoading: false,
+        isDashboardLoading: false,
+        abortController: null,
+      });
     }
   },
 
@@ -398,7 +467,7 @@ export const useAiStore = create<AiStore>((set, get) => ({
     const { abortController } = get();
     if (abortController) {
       abortController.abort();
-      set({ isLoading: false, abortController: null });
+      set({ isLoading: false, isDashboardLoading: false, abortController: null });
     }
   },
 
