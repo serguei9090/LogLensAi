@@ -433,8 +433,28 @@ export const useAiStore = create<AiStore>((set, get) => ({
         const targetList = isDashboard ? state.dashboardMessages : state.messages;
         const nextList = [...targetList];
         const lastMsg = nextList.at(-1);
-        if (lastMsg?.steps && lastMsg.steps.length > 0) {
-          lastMsg.steps = lastMsg.steps.map((s) => ({ ...s, done: true }));
+        if (lastMsg) {
+          if (lastMsg.steps && lastMsg.steps.length > 0) {
+            lastMsg.steps = lastMsg.steps.map((s) => ({ ...s, done: true }));
+          }
+
+          // Strip any raw [[A2UI]]...[[/A2UI]] block from content text
+          if (lastMsg.content.includes("[[A2UI]]")) {
+            const match = lastMsg.content.match(/\[\[A2UI\]\]([\s\S]*?)\[\[\/A2UI\]\]/);
+            if (match) {
+              const rawA2UI = match[1].trim();
+              lastMsg.content = lastMsg.content
+                .replace(/\[\[A2UI\]\][\s\S]*?\[\[\/A2UI\]\]/, "")
+                .trim();
+              if (!lastMsg.a2ui_payload) {
+                try {
+                  lastMsg.a2ui_payload = JSON.parse(rawA2UI);
+                } catch {
+                  lastMsg.a2ui_payload = { type: "markup", raw: rawA2UI };
+                }
+              }
+            }
+          }
         }
         return isDashboard
           ? { dashboardMessages: nextList, isDashboardLoading: false, abortController: null }

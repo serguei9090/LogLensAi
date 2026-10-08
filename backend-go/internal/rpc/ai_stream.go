@@ -140,6 +140,11 @@ func streamChatHandler(a *app.App, provider graph.Provider, tools *graph.ToolReg
 			log.Printf("rpc: stream_chat: failed to finalize session %s: %v", sessionID, finalizeErr)
 		}
 
+		if extracted != nil {
+			writeSSE(w, map[string]any{"a2ui_payload": extracted})
+			flush()
+		}
+
 		if streamErr != nil && !errors.Is(streamErr, context.Canceled) {
 			writeSSE(w, map[string]any{"error": streamErr.Error()})
 			flush()

@@ -100,6 +100,23 @@ func Run(ctx context.Context, provider Provider, tools *ToolRegistry, initialSta
 						actionDirective := "IMPORTANT: When asked to investigate, find, or analyze logs/errors, you MUST emit tool calls (such as search_logs or get_clusters) to inspect the data rather than merely stating that you will do so."
 						state.Messages = append([]ChatMessage{{Role: "system", Content: actionDirective}}, state.Messages...)
 					}
+
+					// A2UI Protocol Directive: Teach the model to output interactive UI blueprints
+					a2uiDirective := `You are equipped with the A2UI (Agent-to-UI) protocol. Whenever you provide findings that include metric summaries, error distributions, or actionable drill-downs, you MUST append an interactive A2UI block at the very end of your response inside [[A2UI]] ... [[/A2UI]].
+
+Supported A2UI Tag Syntax:
+1. Live Metrics:
+[[A2UI]] metric label="Total Errors" query="level:ERROR" [[/A2UI]]
+2. Drill-down Action Buttons:
+[[A2UI]] button label="Filter 522 Errors" action={"type": "filter", "level": "ERROR"} [[/A2UI]]
+3. Live Data Tables:
+[[A2UI]] data_table title="Top Errors" query="level:ERROR" [[/A2UI]]
+
+Example ending for an error analysis:
+Here is the error distribution breakdown.
+[[A2UI]] metric label="Errors Detected" query="level:ERROR" [[/A2UI]]
+[[A2UI]] button label="Filter Error Logs" action={"type": "filter", "level": "ERROR"} [[/A2UI]]`
+					state.Messages = append([]ChatMessage{{Role: "system", Content: a2uiDirective}}, state.Messages...)
 				}
 			}
 
