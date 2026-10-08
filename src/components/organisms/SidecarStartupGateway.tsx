@@ -3,10 +3,10 @@
 import { AlertCircle, CheckCircle2, Loader2, RefreshCw, Terminal } from "lucide-react";
 import { type ReactNode, useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { callSidecar } from "@/lib/hooks/useSidecarBridge";
+import { callSidecar, setBridgeInitialized } from "@/lib/hooks/useSidecarBridge";
 
-const MAX_PROBES = 3;
-const PROBE_DELAY_MS = 1400;
+const MAX_PROBES = 5;
+const PROBE_DELAY_MS = 1500;
 
 interface SidecarStartupGatewayProps {
   children: ReactNode;
@@ -33,6 +33,7 @@ export function SidecarStartupGateway({ children }: Readonly<SidecarStartupGatew
 
       if (res?.status) {
         // Successfully connected to backend
+        setBridgeInitialized(true);
         setIsReady(true);
         setIsRetrying(false);
         return;

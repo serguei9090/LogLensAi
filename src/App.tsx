@@ -46,7 +46,7 @@ function PageLoader() {
   );
 }
 
-export default function App() {
+function MainAppShell() {
   const {
     workspaces,
     activeWorkspaceId,
@@ -61,7 +61,7 @@ export default function App() {
   const { settings, fetchSettings } = useSettingsStore();
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
 
-  // Global Health Monitoring
+  // Global Health Monitoring (runs only when sidecar is confirmed ready)
   useHealthStatus();
 
   // Load settings on mount
@@ -185,38 +185,46 @@ export default function App() {
 
   return (
     <>
-      <Toaster theme="dark" position="top-center" />
       <CommandPalette
         open={commandPaletteOpen}
         onOpenChange={setCommandPaletteOpen}
         onNavSelect={handleNavSelect}
       />
+      <AppLayout
+        workspaces={workspaces}
+        activeWorkspaceId={activeWorkspaceId}
+        activeFolderId={activeWorkspace?.activeFolderId}
+        onWorkspaceSelect={(id) => {
+          setActive(id);
+          setActiveNav("investigation");
+        }}
+        onWorkspaceCreate={(name) => addWorkspace({ id: `ws-${Date.now()}`, name })}
+        onWorkspaceRename={renameWorkspace}
+        onWorkspaceDelete={removeWorkspace}
+        activeNav={activeNav}
+        onNavSelect={handleNavSelect}
+        diagnosticOpen={false}
+        onDiagnosticClose={() => {}}
+        diagnosticData={null}
+        diagnosticLoading={false}
+      >
+        <Suspense fallback={<PageLoader />}>
+          {activeNav === "dashboard" && <DashboardPage />}
+          {activeNav === "investigation" && <InvestigationPage />}
+          {activeNav === "settings" && <SettingsPage />}
+        </Suspense>
+      </AppLayout>
+    </>
+  );
+}
+
+export default function App() {
+  return (
+    <>
+      <Toaster theme="dark" position="top-center" />
       <SystemDiagnosticConsole />
       <SidecarStartupGateway>
-        <AppLayout
-          workspaces={workspaces}
-          activeWorkspaceId={activeWorkspaceId}
-          activeFolderId={activeWorkspace?.activeFolderId}
-          onWorkspaceSelect={(id) => {
-            setActive(id);
-            setActiveNav("investigation");
-          }}
-          onWorkspaceCreate={(name) => addWorkspace({ id: `ws-${Date.now()}`, name })}
-          onWorkspaceRename={renameWorkspace}
-          onWorkspaceDelete={removeWorkspace}
-          activeNav={activeNav}
-          onNavSelect={handleNavSelect}
-          diagnosticOpen={false}
-          onDiagnosticClose={() => {}}
-          diagnosticData={null}
-          diagnosticLoading={false}
-        >
-          <Suspense fallback={<PageLoader />}>
-            {activeNav === "dashboard" && <DashboardPage />}
-            {activeNav === "investigation" && <InvestigationPage />}
-            {activeNav === "settings" && <SettingsPage />}
-          </Suspense>
-        </AppLayout>
+        <MainAppShell />
       </SidecarStartupGateway>
     </>
   );

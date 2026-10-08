@@ -35,6 +35,17 @@ export const SIDECAR_URL = `${SIDECAR_BASE_URL}/rpc`;
 import { useDebugStore } from "@/store/debugStore";
 import { toast } from "sonner";
 
+/** Global tracking for whether sidecar communication has been proven alive */
+let isBridgeInitialized = false;
+
+export function setBridgeInitialized(initialized: boolean) {
+  isBridgeInitialized = initialized;
+}
+
+export function getBridgeInitialized(): boolean {
+  return isBridgeInitialized;
+}
+
 /**
  * Dispatches a JSON-RPC request to the Python sidecar.
  *
@@ -120,11 +131,15 @@ export async function callSidecar<T>(
       throw new Error(errorMsg);
     }
 
+    // Mark that bridge has successfully communicated with the sidecar
+    isBridgeInitialized = true;
+
     return response.result as T;
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
 
-    if (!silent) {
+    // Suppress connection error toasts during cold-boot / before sidecar is verified alive
+    if (!silent && isBridgeInitialized) {
       // Only toast if it's a transport error (JSON-RPC errors are handled above)
       if (!message.includes("JSON-RPC Error") && !message.includes("Sidecar Error")) {
         toast.error("Connection Error", {
