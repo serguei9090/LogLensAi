@@ -1,9 +1,9 @@
+import type React from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { callSidecar } from "@/lib/hooks/useSidecarBridge";
 import { useWorkspaceStore } from "@/store/workspaceStore";
-import type React from "react";
-import { useEffect, useState } from "react";
 
 interface A2UIComponent {
   type: string;
@@ -129,12 +129,11 @@ const LiveDataTable = ({ title, query }: { title: string; query: string }) => {
     </Card>
   );
 };
-/**
- * Simple parser for A2UI Markup format (e.g. button label="Text" action={...})
- * Returns a JSON object compatible with the standard renderer.
- */
-function parseA2UIMarkup(raw: string): A2UIComponent | null {
-  const trimmed = raw.trim();
+function parseSingleTag(statement: string): A2UIComponent | null {
+  const trimmed = statement.trim();
+  if (!trimmed) {
+    return null;
+  }
 
   // Handle Button Tag: button label="Text" action={...}
   if (trimmed.startsWith("button")) {
@@ -211,6 +210,46 @@ function parseA2UIMarkup(raw: string): A2UIComponent | null {
   }
 
   return null;
+}
+
+/**
+ * Parses A2UI Markup format (e.g. button label="Text" action={...})
+ * Supports multiple tag occurrences or newline-separated tags and returns
+ * a JSON object compatible with the standard renderer.
+ */
+function parseA2UIMarkup(raw: string): A2UIComponent | null {
+  const clean = raw.replaceAll("[[A2UI]]", "").replaceAll("[[/A2UI]]", "").trim();
+
+  if (!clean) {
+    return null;
+  }
+
+  // Match all potential markup tag chunks
+  const tagRegex = /(?:metric|button|text|chart_area|data_table)\s+[^[\]\n\r]+/g;
+  const matches = clean.match(tagRegex);
+
+  if (matches && matches.length > 0) {
+    const components: A2UIComponent[] = [];
+    for (const chunk of matches) {
+      const parsed = parseSingleTag(chunk);
+      if (parsed) {
+        components.push(parsed);
+      }
+    }
+
+    if (components.length === 1) {
+      return components[0];
+    }
+    if (components.length > 1) {
+      return {
+        type: "surface",
+        children: components,
+      };
+    }
+  }
+
+  // Fallback to parsing entire cleaned string as single tag
+  return parseSingleTag(clean);
 }
 
 /**

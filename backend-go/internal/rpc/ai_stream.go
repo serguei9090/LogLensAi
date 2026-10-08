@@ -136,7 +136,8 @@ func streamChatHandler(a *app.App, provider graph.Provider, tools *graph.ToolReg
 		// _finalize_ai_session with the partial/complete text.
 		finalText := full.String()
 		extracted := extractA2UIPayload(finalText, false)
-		if finalizeErr := finalizeAISession(a, sessionID, finalText, providerSessionID, extracted); finalizeErr != nil {
+		cleanText := stripA2UITags(finalText)
+		if finalizeErr := finalizeAISession(a, sessionID, cleanText, providerSessionID, extracted); finalizeErr != nil {
 			log.Printf("rpc: stream_chat: failed to finalize session %s: %v", sessionID, finalizeErr)
 		}
 

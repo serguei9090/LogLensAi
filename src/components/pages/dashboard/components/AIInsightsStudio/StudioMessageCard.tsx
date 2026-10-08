@@ -4,6 +4,7 @@ import { A2UIRenderer } from "@/components/atoms/A2UIRenderer";
 import { MarkdownContent } from "@/components/atoms/MarkdownContent";
 import { ThinkingBlock } from "@/components/atoms/ThinkingBlock";
 import { TypingIndicator } from "@/components/atoms/TypingIndicator";
+import { stripA2UITags } from "@/components/organisms/ai-sidebar/utils/parseThinking";
 import { cn } from "@/lib/utils";
 
 export interface StudioMessageCardProps {
@@ -33,10 +34,11 @@ export function StudioMessageCard({
   steps,
   onA2UIAction,
 }: Readonly<StudioMessageCardProps>) {
+  const cleanResponse = stripA2UITags(response || "");
   const [copied, setCopied] = useState(false);
 
   const handleCopy = () => {
-    navigator.clipboard.writeText(isUser ? content : response);
+    navigator.clipboard.writeText(isUser ? content : cleanResponse);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
@@ -130,7 +132,7 @@ export function StudioMessageCard({
             ) : (
               <>
                 <MarkdownContent
-                  content={response || "Analysis complete."}
+                  content={cleanResponse || "Analysis complete."}
                   className="text-text-primary text-sm leading-relaxed"
                   isStreaming={isStreaming}
                 />

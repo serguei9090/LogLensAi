@@ -1,6 +1,6 @@
-import { SIDECAR_BASE_URL, callSidecar } from "@/lib/hooks/useSidecarBridge";
 import { toast } from "sonner";
 import { create } from "zustand";
+import { callSidecar, SIDECAR_BASE_URL } from "@/lib/hooks/useSidecarBridge";
 
 export type SessionType = "investigation" | "dashboard";
 
@@ -208,6 +208,25 @@ export const useAiStore = create<AiStore>((set, get) => ({
 
       const existing = target === "dashboard" ? get().dashboardMessages : get().messages;
       const merged = messages.map((m, idx) => {
+        let content = m.content || "";
+        let a2uiPayload = m.a2ui_payload;
+
+        if (content.includes("[[A2UI]]")) {
+          if (!a2uiPayload) {
+            const allBlocks = [...content.matchAll(/\[\[A2UI\]\]([\s\S]*?)\[\[\/A2UI\]\]/g)]
+              .map((b) => b[1].trim())
+              .join("\n");
+            if (allBlocks) {
+              try {
+                a2uiPayload = JSON.parse(allBlocks);
+              } catch {
+                a2uiPayload = { type: "markup", raw: allBlocks };
+              }
+            }
+          }
+          content = content.replaceAll(/\[\[A2UI\]\][\s\S]*?(\[\[\/A2UI\]\]|$)/g, "").trim();
+        }
+
         const prev = existing.find(
           (e) => e.id === m.id || (idx === messages.length - 1 && e.role === m.role),
         );
@@ -216,12 +235,17 @@ export const useAiStore = create<AiStore>((set, get) => ({
           const steps = rawSteps?.map((s) => ({ ...s, done: true }));
           return {
             ...m,
+            content,
             steps,
             evaluation_notice: prev.evaluation_notice ?? m.evaluation_notice,
-            a2ui_payload: prev.a2ui_payload ?? m.a2ui_payload,
+            a2ui_payload: prev.a2ui_payload ?? a2uiPayload,
           };
         }
-        return m;
+        return {
+          ...m,
+          content,
+          a2ui_payload: a2uiPayload,
+        };
       });
 
       if (target === "dashboard") {
@@ -358,7 +382,9 @@ export const useAiStore = create<AiStore>((set, get) => ({
                     const nextList = [...targetList];
                     const lastMsg = nextList.at(-1);
                     if (lastMsg) {
-                      if (!lastMsg.steps) lastMsg.steps = [];
+                      if (!lastMsg.steps) {
+                        lastMsg.steps = [];
+                      }
                       const existingIdx = lastMsg.steps.findIndex((s) => s.title === parsed.step);
                       if (existingIdx !== -1) {
                         if (parsed.step_done !== undefined) {
@@ -416,7 +442,9 @@ export const useAiStore = create<AiStore>((set, get) => ({
                     if (activeSessionId && lastMsg && lastMsg.session_id === "temp") {
                       lastMsg.session_id = activeSessionId;
                       const prevMsg = nextList.at(-2);
-                      if (prevMsg) prevMsg.session_id = activeSessionId;
+                      if (prevMsg) {
+                        prevMsg.session_id = activeSessionId;
+                      }
                     }
                     return isDashboard ? { dashboardMessages: nextList } : { messages: nextList };
                   });
@@ -438,22 +466,25 @@ export const useAiStore = create<AiStore>((set, get) => ({
             lastMsg.steps = lastMsg.steps.map((s) => ({ ...s, done: true }));
           }
 
-          // Strip any raw [[A2UI]]...[[/A2UI]] block from content text
+          // Extract and strip any raw [[A2UI]]...[[/A2UI]] blocks from content text
           if (lastMsg.content.includes("[[A2UI]]")) {
-            const match = lastMsg.content.match(/\[\[A2UI\]\]([\s\S]*?)\[\[\/A2UI\]\]/);
-            if (match) {
-              const rawA2UI = match[1].trim();
-              lastMsg.content = lastMsg.content
-                .replace(/\[\[A2UI\]\][\s\S]*?\[\[\/A2UI\]\]/, "")
-                .trim();
-              if (!lastMsg.a2ui_payload) {
+            if (!lastMsg.a2ui_payload) {
+              const allBlocks = [
+                ...lastMsg.content.matchAll(/\[\[A2UI\]\]([\s\S]*?)\[\[\/A2UI\]\]/g),
+              ]
+                .map((m) => m[1].trim())
+                .join("\n");
+              if (allBlocks) {
                 try {
-                  lastMsg.a2ui_payload = JSON.parse(rawA2UI);
+                  lastMsg.a2ui_payload = JSON.parse(allBlocks);
                 } catch {
-                  lastMsg.a2ui_payload = { type: "markup", raw: rawA2UI };
+                  lastMsg.a2ui_payload = { type: "markup", raw: allBlocks };
                 }
               }
             }
+            lastMsg.content = lastMsg.content
+              .replaceAll(/\[\[A2UI\]\][\s\S]*?(\[\[\/A2UI\]\]|$)/g, "")
+              .trim();
           }
         }
         return isDashboard
@@ -467,7 +498,10 @@ export const useAiStore = create<AiStore>((set, get) => ({
           await get().fetchMapping(params.workspace_id);
         }
         const sid = activeSessionId;
-        setTimeout(() => get().fetchMessages(sid, isDashboard ? "dashboard" : "investigation"), 200);
+        setTimeout(
+          () => get().fetchMessages(sid, isDashboard ? "dashboard" : "investigation"),
+          200,
+        );
       }
     } catch (err: unknown) {
       if ((err as Error)?.name === "AbortError") {

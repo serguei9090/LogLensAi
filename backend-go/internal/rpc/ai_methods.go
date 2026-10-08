@@ -95,11 +95,12 @@ func sendAIMessage(ctx context.Context, a *app.App, provider graph.Provider, too
 	// parse error) -- reproduced via strict:true below.
 	a2uiPayload := extractA2UIPayload(fullResponse, true)
 
-	if err := finalizeAISession(a, sessionID, fullResponse, providerSessionID, a2uiPayload); err != nil {
+	cleanResponse := stripA2UITags(fullResponse)
+	if err := finalizeAISession(a, sessionID, cleanResponse, providerSessionID, a2uiPayload); err != nil {
 		return nil, &models.RPCError{Code: CodeInternalError, Message: err.Error()}
 	}
 
-	return map[string]any{"session_id": sessionID, "response": fullResponse}, nil
+	return map[string]any{"session_id": sessionID, "response": cleanResponse}, nil
 }
 
 // runInvestigation builds the graph's initial state and starts Run,
@@ -338,30 +339,64 @@ func finalizeAISession(a *app.App, sessionID, responseContent, providerSessionID
 	return nil
 }
 
-// extractA2UIPayload parses an [[A2UI]]...[[/A2UI]] block out of text,
+// stripA2UITags removes all [[A2UI]]...[[/A2UI]] blocks from text so that
+// raw blueprint markup is not stored in user-facing message text.
+func stripA2UITags(text string) string {
+	result := text
+	for {
+		start := strings.Index(result, a2uiStart)
+		if start == -1 {
+			break
+		}
+		end := strings.Index(result[start:], a2uiEnd)
+		if end == -1 {
+			result = result[:start]
+			break
+		}
+		result = result[:start] + result[start+end+len(a2uiEnd):]
+	}
+	return strings.TrimSpace(result)
+}
+
+// extractA2UIPayload parses [[A2UI]]...[[/A2UI]] block(s) out of text,
 // porting api.py's _extract_a2ui_payload. When strict is true, a JSON parse
-// failure yields nil (matching method_send_ai_message's inline
-// try/except-discard variant); when false, a parse failure falls back to
-// {"type": "markup", "raw": <block text>} (matching _extract_a2ui_payload
-// itself, used by the streaming path).
+// failure yields nil; when false, a parse failure falls back to
+// {"type": "markup", "raw": <block text>}. Supports multiple blocks concatenated.
 func extractA2UIPayload(text string, strict bool) map[string]any {
 	if !strings.Contains(text, a2uiStart) {
 		return nil
 	}
-	afterStart := strings.SplitN(text, a2uiStart, 2)
-	if len(afterStart) < 2 {
+
+	var blocks []string
+	curr := text
+	for {
+		start := strings.Index(curr, a2uiStart)
+		if start == -1 {
+			break
+		}
+		curr = curr[start+len(a2uiStart):]
+		end := strings.Index(curr, a2uiEnd)
+		if end == -1 {
+			blocks = append(blocks, strings.TrimSpace(curr))
+			break
+		}
+		blocks = append(blocks, strings.TrimSpace(curr[:end]))
+		curr = curr[end+len(a2uiEnd):]
+	}
+
+	if len(blocks) == 0 {
 		return nil
 	}
-	raw := strings.TrimSpace(strings.SplitN(afterStart[1], a2uiEnd, 2)[0])
 
+	combined := strings.Join(blocks, "\n")
 	var payload map[string]any
-	if err := json.Unmarshal([]byte(raw), &payload); err == nil {
+	if err := json.Unmarshal([]byte(combined), &payload); err == nil {
 		return payload
 	}
 	if strict {
 		return nil
 	}
-	return map[string]any{"type": "markup", "raw": raw}
+	return map[string]any{"type": "markup", "raw": combined}
 }
 
 func dropLast(msgs []graph.ChatMessage) []graph.ChatMessage {
