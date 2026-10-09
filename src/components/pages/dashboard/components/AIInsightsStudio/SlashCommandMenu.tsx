@@ -1,8 +1,8 @@
 // Assume Role: Frontend Engineer (@frontend)
 
-import { Check, Database, FileText, Layers, Slash } from "lucide-react";
+import { Check, Database, FileText, Layers, Search, Slash } from "lucide-react";
 import { useEffect, useRef } from "react";
-import type { LogSource, Workspace } from "@/store/workspaceStore";
+import type { Workspace } from "@/store/workspaceStore";
 import { cn } from "@/lib/utils";
 
 export interface SlashCommandItem {
@@ -10,6 +10,7 @@ export interface SlashCommandItem {
   type: "catalog" | "workspace" | "action";
   title: string;
   subtitle: string;
+  workspaceName?: string;
   badge?: string;
   data: {
     sourceId?: string;
@@ -22,7 +23,6 @@ export interface SlashCommandItem {
 interface SlashCommandMenuProps {
   readonly query: string;
   readonly selectedIndex: number;
-  readonly catalogs: LogSource[];
   readonly workspaces: Workspace[];
   readonly currentWorkspaceId: string;
   readonly onSelect: (item: SlashCommandItem) => void;
@@ -32,7 +32,6 @@ interface SlashCommandMenuProps {
 export function SlashCommandMenu({
   query,
   selectedIndex,
-  catalogs,
   workspaces,
   currentWorkspaceId,
   onSelect,
@@ -40,49 +39,86 @@ export function SlashCommandMenu({
   const listRef = useRef<HTMLDivElement>(null);
   const filter = query.toLowerCase().trim();
 
-  // Build command suggestions
-  const catalogItems: SlashCommandItem[] = catalogs
-    .filter((c) => c.name.toLowerCase().includes(filter) || "catalog".includes(filter) || "file".includes(filter))
-    .map((c) => ({
-      id: `cat-${c.id}`,
-      type: "catalog",
-      title: c.name,
-      subtitle: `Target catalog (${c.type})`,
-      badge: "Catalog",
-      data: { sourceId: c.id, sourceName: c.name },
-    }));
+  // 1. Gather all catalogs across ALL workspaces, tagging each catalog with its workspace
+  const allCatalogItems: SlashCommandItem[] = [];
+  for (const ws of workspaces) {
+    const isCurrent = ws.id === currentWorkspaceId;
+    for (const src of ws.sources || []) {
+      const matchesFilter =
+        filter === "" ||
+        src.name.toLowerCase().includes(filter) ||
+        ws.name.toLowerCase().includes(filter) ||
+        "catalog".includes(filter) ||
+        "file".includes(filter);
 
+      if (matchesFilter) {
+        allCatalogItems.push({
+          id: `cat-${ws.id}-${src.id}`,
+          type: "catalog",
+          title: src.name,
+          subtitle: `${ws.name} • ${src.type}`,
+          workspaceName: ws.name,
+          badge: isCurrent ? "Current WS" : ws.name,
+          data: {
+            sourceId: src.id,
+            sourceName: src.name,
+            workspaceId: ws.id,
+          },
+        });
+      }
+    }
+  }
+
+  // 2. Full Workspace search items
   const workspaceItems: SlashCommandItem[] = workspaces
-    .filter((w) => w.id !== currentWorkspaceId && (w.name.toLowerCase().includes(filter) || "workspace".includes(filter)))
-    .map((w) => ({
-      id: `ws-${w.id}`,
-      type: "workspace",
-      title: w.name,
-      subtitle: `Switch focus workspace`,
-      badge: "Workspace",
-      data: { workspaceId: w.id },
-    }));
+    .filter(
+      (w) =>
+        filter === "" ||
+        w.name.toLowerCase().includes(filter) ||
+        "workspace".includes(filter) ||
+        "scope".includes(filter),
+    )
+    .map((w) => {
+      const isCurrent = w.id === currentWorkspaceId;
+      const count = w.sources?.length ?? 0;
+      return {
+        id: `ws-${w.id}`,
+        type: "workspace",
+        title: w.name,
+        subtitle: isCurrent
+          ? `Current workspace (${count} catalog${count === 1 ? "" : "s"})`
+          : `Switch workspace focus (${count} catalog${count === 1 ? "" : "s"})`,
+        badge: isCurrent ? "Active" : "Workspace",
+        data: { workspaceId: w.id },
+      };
+    });
 
+  // 3. Global quick action items
   const actionItems: SlashCommandItem[] = ([
     {
       id: "act-all",
       type: "action" as const,
-      title: "All Catalogs",
-      subtitle: "Remove scope & search across the full workspace",
-      badge: "Scope",
+      title: "All Catalogs (Full Workspace)",
+      subtitle: "Clear catalog filters & analyze across all sources",
+      badge: "Reset",
       data: { actionType: "clear_scope" },
     },
     {
       id: "act-errors",
       type: "action" as const,
       title: "Errors Only",
-      subtitle: "Filter specifically for ERROR / FATAL levels",
+      subtitle: "Filter specifically for ERROR, FATAL and severe warnings",
       badge: "Filter",
       data: { actionType: "errors_only" },
     },
-  ] as SlashCommandItem[]).filter((a) => a.title.toLowerCase().includes(filter) || filter === "");
+  ] as SlashCommandItem[]).filter(
+    (a) =>
+      filter === "" ||
+      a.title.toLowerCase().includes(filter) ||
+      a.subtitle.toLowerCase().includes(filter),
+  );
 
-  const items: SlashCommandItem[] = [...catalogItems, ...actionItems, ...workspaceItems];
+  const items: SlashCommandItem[] = [...allCatalogItems, ...workspaceItems, ...actionItems];
 
   useEffect(() => {
     if (listRef.current) {
@@ -94,20 +130,31 @@ export function SlashCommandMenu({
   }, [selectedIndex]);
 
   if (items.length === 0) {
-    return null;
+    return (
+      <div className="absolute bottom-full mb-3 left-0 right-0 z-50 rounded-xl border border-border/80 bg-bg-surface/95 backdrop-blur-2xl shadow-2xl p-4 text-center text-xs font-mono text-text-muted animate-in fade-in slide-in-from-bottom-2 duration-150">
+        <div className="flex items-center justify-center gap-2 mb-1">
+          <Search className="size-4 text-text-muted/60" />
+          <span>No catalogs or workspaces matching &ldquo;{query}&rdquo;</span>
+        </div>
+        <p className="text-[11px] text-text-muted/60">Type a filename or workspace name to search</p>
+      </div>
+    );
   }
 
   return (
-    <div className="absolute bottom-full mb-2 left-0 right-0 z-50 max-h-72 overflow-y-auto custom-scrollbar rounded-xl border border-border/80 bg-bg-surface/95 backdrop-blur-xl shadow-2xl p-1.5 animate-in fade-in slide-in-from-bottom-2 duration-150">
-      <div className="flex items-center justify-between px-3 py-1.5 text-[10px] font-mono font-bold uppercase tracking-wider text-text-muted border-b border-border-subtle/40 mb-1">
-        <span className="flex items-center gap-1.5">
-          <Slash className="size-3 text-primary" />
-          <span>Quick Context & Commands</span>
+    <div className="absolute bottom-full mb-3 left-0 right-0 z-50 max-h-80 overflow-y-auto custom-scrollbar rounded-2xl border border-white/10 bg-[#141715]/95 backdrop-blur-2xl shadow-[0_20px_50px_rgba(0,0,0,0.6)] p-2 animate-in fade-in slide-in-from-bottom-2 duration-150">
+      {/* Top Header */}
+      <div className="flex items-center justify-between px-3 py-2 text-[10px] font-mono font-bold uppercase tracking-wider text-text-muted border-b border-white/5 mb-1.5">
+        <span className="flex items-center gap-1.5 text-primary">
+          <Slash className="size-3" />
+          <span className="text-text-secondary">Scope Context</span>
         </span>
-        <span>↑↓ Navigate • Enter to select</span>
+        <span className="text-[10px] text-text-muted/70">
+          {items.length} options • ↑↓ Navigate • Enter
+        </span>
       </div>
 
-      <div ref={listRef} className="space-y-0.5">
+      <div ref={listRef} className="space-y-1">
         {items.map((item, idx) => {
           const isSelected = idx === selectedIndex;
           return (
@@ -116,46 +163,54 @@ export function SlashCommandMenu({
               type="button"
               onClick={() => onSelect(item)}
               className={cn(
-                "w-full flex items-center justify-between px-3 py-2 rounded-lg text-left transition-colors font-mono text-xs select-none",
+                "w-full flex items-center justify-between px-3 py-2 rounded-xl text-left transition-all font-mono text-xs select-none group",
                 isSelected
-                  ? "bg-primary/15 text-text-primary border border-primary/30"
-                  : "hover:bg-white/5 text-text-secondary border border-transparent",
+                  ? "bg-white/10 text-text-primary shadow-sm ring-1 ring-white/15"
+                  : "hover:bg-white/5 text-text-secondary",
               )}
             >
-              <div className="flex items-center gap-2.5 min-w-0">
+              <div className="flex items-center gap-3 min-w-0">
                 <div
                   className={cn(
-                    "p-1.5 rounded-md",
+                    "p-2 rounded-lg shrink-0 transition-transform group-hover:scale-105",
                     item.type === "catalog"
-                      ? "bg-cyan-500/10 text-cyan-400"
+                      ? "bg-cyan-500/10 text-cyan-400 border border-cyan-500/20"
                       : item.type === "workspace"
-                        ? "bg-amber-500/10 text-amber-400"
-                        : "bg-emerald-500/10 text-emerald-400",
+                        ? "bg-amber-500/10 text-amber-400 border border-amber-500/20"
+                        : "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20",
                   )}
                 >
                   {item.type === "catalog" ? (
-                    <FileText className="size-3.5" />
+                    <FileText className="size-4" />
                   ) : item.type === "workspace" ? (
-                    <Database className="size-3.5" />
+                    <Database className="size-4" />
                   ) : (
-                    <Layers className="size-3.5" />
+                    <Layers className="size-4" />
                   )}
                 </div>
 
-                <div className="flex flex-col min-w-0">
-                  <div className="flex items-center gap-1.5">
-                    <span className="font-bold truncate text-text-primary">{item.title}</span>
+                <div className="flex flex-col min-w-0 gap-0.5">
+                  <div className="flex items-center gap-2">
+                    <span className="font-semibold truncate text-text-primary text-[13px]">
+                      {item.title}
+                    </span>
                     {item.badge && (
-                      <span className="text-[10px] px-1.5 py-0.2 rounded bg-white/5 border border-white/10 text-text-muted">
+                      <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-md bg-white/5 border border-white/10 text-text-muted shrink-0">
                         {item.badge}
                       </span>
                     )}
                   </div>
-                  <span className="text-[11px] text-text-muted truncate">{item.subtitle}</span>
+                  <span className="text-[11px] text-text-muted truncate">
+                    {item.subtitle}
+                  </span>
                 </div>
               </div>
 
-              {isSelected && <Check className="size-3.5 text-primary shrink-0 ml-2" />}
+              {isSelected && (
+                <div className="shrink-0 ml-2 p-1 rounded-md bg-primary/20 text-primary">
+                  <Check className="size-3.5" />
+                </div>
+              )}
             </button>
           );
         })}

@@ -124,26 +124,28 @@ export function StudioMessageCard({
             </div>
           )}
 
-          <div className={cn("prose prose-invert max-w-none", isUser && "text-right")}>
-            {isUser ? (
+          {isUser ? (
+            <div className="prose prose-invert max-w-none text-right">
               <p className="whitespace-pre-wrap font-sans text-sm text-text-primary leading-relaxed">
                 {content}
               </p>
-            ) : (
-              <>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div className="prose prose-invert max-w-none">
                 <MarkdownContent
                   content={cleanResponse || "Analysis complete."}
                   className="text-text-primary text-sm leading-relaxed"
                   isStreaming={isStreaming}
                 />
-                {a2uiPayload && (
-                  <div className="mt-4 pt-2 border-t border-border-subtle/40">
-                    <A2UIRenderer payload={a2uiPayload} onAction={onA2UIAction} />
-                  </div>
-                )}
-              </>
-            )}
-          </div>
+              </div>
+              {a2uiPayload && (
+                <div className="pt-2 border-t border-border-subtle/40">
+                  <A2UIRenderer payload={a2uiPayload} onAction={onA2UIAction} />
+                </div>
+              )}
+            </div>
+          )}
         </>
       )}
     </div>

@@ -5,12 +5,14 @@ import { type KeyboardEvent, useRef, useState } from "react";
 import { ModelDropdownMenu } from "@/components/organisms/ai-sidebar/components/ModelDropdownMenu";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import type { LogSource, Workspace } from "@/store/workspaceStore";
+import type { Workspace } from "@/store/workspaceStore";
 import { SlashCommandItem, SlashCommandMenu } from "./SlashCommandMenu";
 
 export interface TargetCatalogScope {
   id: string;
   name: string;
+  workspaceId?: string;
+  workspaceName?: string;
 }
 
 interface StudioPromptInputProps {
@@ -30,7 +32,6 @@ interface StudioPromptInputProps {
     readonly lmstudioHost?: string;
   };
   readonly isReasoningEnabled: boolean;
-  readonly catalogs: LogSource[];
   readonly workspaces: Workspace[];
   readonly currentWorkspaceId: string;
   readonly activeCatalogScope: TargetCatalogScope | null;
@@ -53,7 +54,6 @@ export function StudioPromptInput({
   providerModelsCache,
   providerConfigs,
   isReasoningEnabled,
-  catalogs,
   workspaces,
   currentWorkspaceId,
   activeCatalogScope,
@@ -107,9 +107,18 @@ export function StudioPromptInput({
     setIsSlashMenuOpen(false);
 
     if (item.type === "catalog" && item.data.sourceId && item.data.sourceName) {
-      onSetCatalogScope({ id: item.data.sourceId, name: item.data.sourceName });
+      if (item.data.workspaceId && item.data.workspaceId !== currentWorkspaceId) {
+        onSwitchWorkspace(item.data.workspaceId);
+      }
+      onSetCatalogScope({
+        id: item.data.sourceId,
+        name: item.data.sourceName,
+        workspaceId: item.data.workspaceId,
+        workspaceName: item.workspaceName,
+      });
     } else if (item.type === "workspace" && item.data.workspaceId) {
       onSwitchWorkspace(item.data.workspaceId);
+      onSetCatalogScope(null);
     } else if (item.type === "action") {
       if (item.data.actionType === "clear_scope") {
         onSetCatalogScope(null);
@@ -169,14 +178,19 @@ export function StudioPromptInput({
       <div className="max-w-4xl mx-auto flex flex-col gap-2.5">
         {/* Active Target Catalog Scope Pill */}
         {activeCatalogScope && (
-          <div className="flex items-center gap-2 px-3 py-1 rounded-lg bg-cyan-500/10 border border-cyan-500/20 text-xs font-mono text-cyan-300 w-fit animate-in fade-in slide-in-from-bottom-1">
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-cyan-500/10 border border-cyan-500/25 text-xs font-mono text-cyan-300 w-fit animate-in fade-in slide-in-from-bottom-1 shadow-sm">
             <FileText className="size-3.5 text-cyan-400" />
             <span className="text-text-muted">Target Catalog:</span>
-            <span className="font-bold text-cyan-300">{activeCatalogScope.name}</span>
+            <span className="font-bold text-cyan-200">{activeCatalogScope.name}</span>
+            {activeCatalogScope.workspaceName && (
+              <span className="text-[10px] px-1.5 py-0.5 rounded bg-cyan-500/15 border border-cyan-500/20 text-cyan-300">
+                {activeCatalogScope.workspaceName}
+              </span>
+            )}
             <button
               type="button"
               onClick={() => onSetCatalogScope(null)}
-              className="ml-1 p-0.5 rounded hover:bg-cyan-500/20 text-cyan-400 hover:text-white transition-colors"
+              className="ml-1 p-0.5 rounded-md hover:bg-cyan-500/20 text-cyan-400 hover:text-white transition-colors"
               title="Remove catalog scope"
             >
               <X className="size-3" />
@@ -190,7 +204,6 @@ export function StudioPromptInput({
             <SlashCommandMenu
               query={slashQuery}
               selectedIndex={slashSelectedIndex}
-              catalogs={catalogs}
               workspaces={workspaces}
               currentWorkspaceId={currentWorkspaceId}
               onSelect={handleSelectSlashItem}

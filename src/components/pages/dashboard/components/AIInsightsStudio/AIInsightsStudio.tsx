@@ -46,7 +46,6 @@ export function AIInsightsStudio() {
 
   const workspaces = useWorkspaceStore((state) => state.workspaces);
   const setActiveWorkspace = useWorkspaceStore((state) => state.setActive);
-  const catalogs = activeWorkspace?.sources || [];
 
   // Auto-scroll on incoming stream chunks
   // biome-ignore lint/correctness/useExhaustiveDependencies: Scroll triggers on messages or loading state change
@@ -211,7 +210,6 @@ export function AIInsightsStudio() {
           lmstudioHost: settings.ai_lmstudio_host,
         }}
         isReasoningEnabled={isReasoningEnabled}
-        catalogs={catalogs}
         workspaces={workspaces}
         currentWorkspaceId={activeWorkspaceId}
         activeCatalogScope={activeCatalogScope}
