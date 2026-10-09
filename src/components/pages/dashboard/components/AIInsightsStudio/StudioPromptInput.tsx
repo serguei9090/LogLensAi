@@ -34,8 +34,8 @@ interface StudioPromptInputProps {
   readonly isReasoningEnabled: boolean;
   readonly workspaces: Workspace[];
   readonly currentWorkspaceId: string;
-  readonly activeCatalogScope: TargetCatalogScope | null;
-  readonly onSetCatalogScope: (scope: TargetCatalogScope | null) => void;
+  readonly activeCatalogScopes: TargetCatalogScope[];
+  readonly onSetCatalogScopes: (scopes: TargetCatalogScope[]) => void;
   readonly onSwitchWorkspace: (workspaceId: string) => void;
   readonly onToggleReasoning: () => void;
   readonly onFetchModels: (forceRefresh?: boolean, targetProvider?: string) => void;
@@ -56,8 +56,8 @@ export function StudioPromptInput({
   isReasoningEnabled,
   workspaces,
   currentWorkspaceId,
-  activeCatalogScope,
-  onSetCatalogScope,
+  activeCatalogScopes,
+  onSetCatalogScopes,
   onSwitchWorkspace,
   onToggleReasoning,
   onFetchModels,
@@ -110,24 +110,32 @@ export function StudioPromptInput({
       if (item.data.workspaceId && item.data.workspaceId !== currentWorkspaceId) {
         onSwitchWorkspace(item.data.workspaceId);
       }
-      onSetCatalogScope({
+      const newScope: TargetCatalogScope = {
         id: item.data.sourceId,
         name: item.data.sourceName,
         workspaceId: item.data.workspaceId,
         workspaceName: item.workspaceName,
-      });
+      };
+      // Prevent duplicates, append to active scopes list
+      const alreadyExists = activeCatalogScopes.some((s) => s.id === newScope.id);
+      if (!alreadyExists) {
+        onSetCatalogScopes([...activeCatalogScopes, newScope]);
+      }
     } else if (item.type === "workspace" && item.data.workspaceId) {
       onSwitchWorkspace(item.data.workspaceId);
-      onSetCatalogScope(null);
     } else if (item.type === "action") {
       if (item.data.actionType === "clear_scope") {
-        onSetCatalogScope(null);
+        onSetCatalogScopes([]);
       } else if (item.data.actionType === "errors_only") {
         setInput((prev) => (prev ? `${prev} (only error logs)` : "Analyze errors only"));
       }
     }
 
     textareaRef.current?.focus();
+  };
+
+  const handleRemoveScope = (idToRemove: string) => {
+    onSetCatalogScopes(activeCatalogScopes.filter((s) => s.id !== idToRemove));
   };
 
   const handleSend = () => {
@@ -176,29 +184,7 @@ export function StudioPromptInput({
   return (
     <div className="absolute bottom-4 inset-x-0 z-30 pointer-events-none px-4 md:px-6">
       <div className="max-w-4xl mx-auto flex flex-col gap-2 pointer-events-auto">
-        {/* Active Target Catalog Scope Pill */}
-        {activeCatalogScope && (
-          <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-[#141715]/95 border border-cyan-500/30 text-xs font-mono text-cyan-300 w-fit backdrop-blur-2xl shadow-xl animate-in fade-in slide-in-from-bottom-1">
-            <FileText className="size-3.5 text-cyan-400" />
-            <span className="text-text-muted">Target Catalog:</span>
-            <span className="font-bold text-cyan-200">{activeCatalogScope.name}</span>
-            {activeCatalogScope.workspaceName && (
-              <span className="text-[10px] px-1.5 py-0.5 rounded bg-cyan-500/15 border border-cyan-500/20 text-cyan-300">
-                {activeCatalogScope.workspaceName}
-              </span>
-            )}
-            <button
-              type="button"
-              onClick={() => onSetCatalogScope(null)}
-              className="ml-1 p-0.5 rounded-md hover:bg-cyan-500/20 text-cyan-400 hover:text-white transition-colors"
-              title="Remove catalog scope"
-            >
-              <X className="size-3" />
-            </button>
-          </div>
-        )}
-
-        <div className="relative rounded-2xl border border-white/10 bg-[#141715]/90 backdrop-blur-2xl shadow-2xl focus-within:border-primary/50 focus-within:ring-1 focus-within:ring-primary/20 transition-all">
+        <div className="relative rounded-2xl border border-white/10 bg-[#141715]/90 backdrop-blur-2xl shadow-2xl focus-within:border-primary/50 focus-within:ring-1 focus-within:ring-primary/20 transition-all p-2.5">
           {/* Autocomplete Slash Menu */}
           {isSlashMenuOpen && (
             <SlashCommandMenu
@@ -211,14 +197,53 @@ export function StudioPromptInput({
             />
           )}
 
+          {/* Active Target Catalog Scope Chips (Rendered inside the prompt box) */}
+          {activeCatalogScopes.length > 0 && (
+            <div className="flex flex-wrap items-center gap-1.5 px-2 pt-1 pb-2 border-b border-white/5 mb-1 animate-in fade-in slide-in-from-bottom-1">
+              {activeCatalogScopes.map((scope) => (
+                <div
+                  key={scope.id}
+                  className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-cyan-500/10 border border-cyan-500/30 text-xs font-mono text-cyan-300 hover:bg-cyan-500/15 transition-colors group shadow-sm"
+                >
+                  <FileText className="size-3 text-cyan-400 shrink-0" />
+                  <span className="font-semibold text-cyan-200 truncate max-w-[150px]">{scope.name}</span>
+                  {scope.workspaceName && (
+                    <span className="text-[10px] text-cyan-400/70 border-l border-cyan-500/20 pl-1.5">
+                      {scope.workspaceName}
+                    </span>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveScope(scope.id)}
+                    className="ml-0.5 p-0.5 rounded hover:bg-cyan-500/25 text-cyan-400 hover:text-white transition-colors"
+                    title={`Remove ${scope.name}`}
+                  >
+                    <X className="size-3" />
+                  </button>
+                </div>
+              ))}
+
+              {activeCatalogScopes.length > 1 && (
+                <button
+                  type="button"
+                  onClick={() => onSetCatalogScopes([])}
+                  className="text-[11px] font-mono text-text-muted hover:text-rose-400 px-1.5 py-0.5 rounded transition-colors"
+                  title="Clear all attached catalogs"
+                >
+                  Clear all
+                </button>
+              )}
+            </div>
+          )}
+
           <Textarea
             ref={textareaRef}
             value={input}
             onChange={handleInputChange}
             onKeyDown={handleKeyDown}
-            placeholder="Type / to scope a catalog or workspace, ask telemetry questions, or request charts..."
+            placeholder="Type / to attach catalogs or workspaces for comparison, ask telemetry questions..."
             disabled={isLoading}
-            className="min-h-[72px] max-h-48 border-0 bg-transparent resize-none text-sm text-text-primary placeholder:text-text-muted/60 focus-visible:ring-0 p-4 leading-relaxed font-sans"
+            className="min-h-[64px] max-h-48 border-0 bg-transparent resize-none text-sm text-text-primary placeholder:text-text-muted/60 focus-visible:ring-0 px-2 py-1 leading-relaxed font-sans"
           />
 
           <div className="flex items-center justify-between px-3.5 pb-3 pt-1 border-t border-border-subtle/30">

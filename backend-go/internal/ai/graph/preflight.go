@@ -258,7 +258,10 @@ func (inv *WorkspaceInventory) FormatGroundedSystemPromptContext() string {
 	}
 	sb.WriteString("Grounding & Catalog Scoping Rules:\n")
 	sb.WriteString("1. The above facts represent the active workspace state. When the user asks you to investigate, search, explain, or diagnose errors, you MUST immediately call the appropriate tools (such as search_logs, get_log_timeline, or get_clusters) in this turn. Never merely say 'Let me look at the logs' or 'I will search' without emitting a tool call.\n")
-	sb.WriteString("2. If the user mentions or asks about a specific file or catalog (e.g. 'server.log' or selects a catalog scope), you MUST use the matching source_id from 'Attached Catalogs/Files' above! Pass source_id=<source_id> into search_logs, or pass source_ids=[<source_id>] into get_log_timeline. Never perform an un-scoped workspace search when the user explicitly specified a catalog.\n")
-	sb.WriteString("3. If you already have the required log data from tools, synthesize your findings into a comprehensive diagnosis with actionable next steps.")
+	sb.WriteString("2. If the user mentions or scopes one or more catalogs (e.g. '[TARGET CATALOGS: fileA.log (source_id: \"id1\"), fileB.log (source_id: \"id2\")]'):\n")
+	sb.WriteString("   - For comparative histograms / timeline volume trends: pass the list of source_ids to get_log_timeline (e.g. source_ids=[\"id1\", \"id2\"]) or query each individually to compare side-by-side volume.\n")
+	sb.WriteString("   - For log search: restrict queries to the requested source_ids using source_id or LLQL source filtering.\n")
+	sb.WriteString("3. If you already have the required log data from tools, synthesize your findings into a comprehensive diagnosis, comparative breakdown, or histogram chart with actionable next steps.")
 	return sb.String()
 }
+

@@ -41,7 +41,7 @@ export function AIInsightsStudio() {
 
   const [isReasoningEnabled, setIsReasoningEnabled] = useState(true);
   const [isFetchingModels, setIsFetchingModels] = useState(false);
-  const [activeCatalogScope, setActiveCatalogScope] = useState<{ id: string; name: string } | null>(null);
+  const [activeCatalogScopes, setActiveCatalogScopes] = useState<{ id: string; name: string; workspaceName?: string }[]>([]);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const workspaces = useWorkspaceStore((state) => state.workspaces);
@@ -101,8 +101,11 @@ export function AIInsightsStudio() {
 
   const handleSendMessage = (text: string) => {
     let finalMessage = text;
-    if (activeCatalogScope) {
-      finalMessage = `[TARGET CATALOG: ${activeCatalogScope.name} (source_id: "${activeCatalogScope.id}")] ${text}`;
+    if (activeCatalogScopes.length > 0) {
+      const scopesDesc = activeCatalogScopes
+        .map((s) => `${s.name} (source_id: "${s.id}")`)
+        .join(", ");
+      finalMessage = `[TARGET CATALOGS: ${scopesDesc}] ${text}`;
     }
 
     sendMessage({
@@ -212,8 +215,8 @@ export function AIInsightsStudio() {
         isReasoningEnabled={isReasoningEnabled}
         workspaces={workspaces}
         currentWorkspaceId={activeWorkspaceId}
-        activeCatalogScope={activeCatalogScope}
-        onSetCatalogScope={setActiveCatalogScope}
+        activeCatalogScopes={activeCatalogScopes}
+        onSetCatalogScopes={setActiveCatalogScopes}
         onSwitchWorkspace={setActiveWorkspace}
         onToggleReasoning={() => setIsReasoningEnabled(!isReasoningEnabled)}
         onFetchModels={fetchModels}
