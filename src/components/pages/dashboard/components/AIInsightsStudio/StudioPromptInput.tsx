@@ -174,11 +174,11 @@ export function StudioPromptInput({
   };
 
   return (
-    <div className="p-4 border-t border-border/50 bg-bg-surface/40 backdrop-blur-md">
-      <div className="max-w-4xl mx-auto flex flex-col gap-2.5">
+    <div className="absolute bottom-4 inset-x-0 z-30 pointer-events-none px-4 md:px-6">
+      <div className="max-w-4xl mx-auto flex flex-col gap-2 pointer-events-auto">
         {/* Active Target Catalog Scope Pill */}
         {activeCatalogScope && (
-          <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-cyan-500/10 border border-cyan-500/25 text-xs font-mono text-cyan-300 w-fit animate-in fade-in slide-in-from-bottom-1 shadow-sm">
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-[#141715]/95 border border-cyan-500/30 text-xs font-mono text-cyan-300 w-fit backdrop-blur-2xl shadow-xl animate-in fade-in slide-in-from-bottom-1">
             <FileText className="size-3.5 text-cyan-400" />
             <span className="text-text-muted">Target Catalog:</span>
             <span className="font-bold text-cyan-200">{activeCatalogScope.name}</span>
@@ -198,7 +198,7 @@ export function StudioPromptInput({
           </div>
         )}
 
-        <div className="relative rounded-2xl border border-border-subtle bg-bg-app shadow-inner focus-within:border-primary/50 focus-within:ring-1 focus-within:ring-primary/20 transition-all">
+        <div className="relative rounded-2xl border border-white/10 bg-[#141715]/90 backdrop-blur-2xl shadow-2xl focus-within:border-primary/50 focus-within:ring-1 focus-within:ring-primary/20 transition-all">
           {/* Autocomplete Slash Menu */}
           {isSlashMenuOpen && (
             <SlashCommandMenu
