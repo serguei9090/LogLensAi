@@ -80,7 +80,12 @@ const LiveMetric = ({
       }
     };
     fetchIt();
-    const interval = setInterval(fetchIt, 5000);
+    const interval = setInterval(() => {
+      if (typeof document !== "undefined" && document.visibilityState === "hidden") {
+        return;
+      }
+      fetchIt();
+    }, 5000);
     return () => {
       active = false;
       clearInterval(interval);
@@ -124,7 +129,12 @@ const LiveDataTable = ({ title, query, sourceIds }: { title: string; query: stri
       }
     };
     fetchIt();
-    const interval = setInterval(fetchIt, 5000);
+    const interval = setInterval(() => {
+      if (typeof document !== "undefined" && document.visibilityState === "hidden") {
+        return;
+      }
+      fetchIt();
+    }, 5000);
     return () => {
       active = false;
       clearInterval(interval);
@@ -201,7 +211,12 @@ const LiveChartArea = ({ title, query, sourceIds }: { title: string; query: stri
     };
 
     fetchTimeline();
-    const interval = setInterval(fetchTimeline, 10000);
+    const interval = setInterval(() => {
+      if (typeof document !== "undefined" && document.visibilityState === "hidden") {
+        return;
+      }
+      fetchTimeline();
+    }, 10000);
     return () => {
       active = false;
       clearInterval(interval);
@@ -414,7 +429,12 @@ function parseSingleTag(statement: string): A2UIComponent | null {
     const sourceMatch = /source_ids?=["']([^"']+)["']/.exec(trimmed);
     const colorMatch = /color=["']([^"']+)["']/.exec(trimmed);
     if (labelMatch && queryMatch) {
-      const sourceIds = sourceMatch ? sourceMatch[1].split(",").map((s) => s.trim()).filter(Boolean) : undefined;
+      const sourceIds = sourceMatch
+        ? sourceMatch[1]
+            .split(",")
+            .map((s) => s.replace(/['"]/g, "").trim())
+            .filter(Boolean)
+        : undefined;
       return {
         type: "metric",
         label: labelMatch[1],
@@ -433,7 +453,12 @@ function parseSingleTag(statement: string): A2UIComponent | null {
     const queryMatch = /query=["']([^"']+)["']/.exec(trimmed);
     const sourceMatch = /source_ids?=["']([^"']+)["']/.exec(trimmed);
     if (titleMatch && queryMatch) {
-      const sourceIds = sourceMatch ? sourceMatch[1].split(",").map((s) => s.trim()).filter(Boolean) : undefined;
+      const sourceIds = sourceMatch
+        ? sourceMatch[1]
+            .split(",")
+            .map((s) => s.replace(/['"]/g, "").trim())
+            .filter(Boolean)
+        : undefined;
       return {
         type: "chart_area",
         label: titleMatch[1],
@@ -448,7 +473,12 @@ function parseSingleTag(statement: string): A2UIComponent | null {
     const queryMatch = /query=["']([^"']+)["']/.exec(trimmed);
     const sourceMatch = /source_ids?=["']([^"']+)["']/.exec(trimmed);
     if (titleMatch && queryMatch) {
-      const sourceIds = sourceMatch ? sourceMatch[1].split(",").map((s) => s.trim()).filter(Boolean) : undefined;
+      const sourceIds = sourceMatch
+        ? sourceMatch[1]
+            .split(",")
+            .map((s) => s.replace(/['"]/g, "").trim())
+            .filter(Boolean)
+        : undefined;
       return {
         type: "data_table",
         label: titleMatch[1],
@@ -542,6 +572,7 @@ export const A2UIRenderer: React.FC<A2UIRendererProps> = ({ payload, onAction })
             key={index}
             variant="outline"
             size="sm"
+            aria-label={comp.label ? `Action: ${comp.label}` : "Interactive Action"}
             className="h-8 border-emerald-500/20 bg-emerald-500/5 text-emerald-400 hover:bg-emerald-500/10 hover:text-emerald-300 text-xs font-bold uppercase tracking-wider mb-2 mr-2"
             onClick={() => onAction?.(comp.action)}
           >
