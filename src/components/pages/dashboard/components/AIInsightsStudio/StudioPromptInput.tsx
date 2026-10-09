@@ -205,7 +205,7 @@ export function StudioPromptInput({
   return (
     <div className="absolute bottom-4 inset-x-0 z-30 pointer-events-none px-4 md:px-6">
       <div className="max-w-4xl mx-auto flex flex-col gap-2 pointer-events-auto">
-        <div className="relative rounded-2xl border border-white/10 bg-[#141715]/90 backdrop-blur-2xl shadow-2xl focus-within:border-primary/50 focus-within:ring-1 focus-within:ring-primary/20 transition-all p-2.5">
+        <div className="relative rounded-2xl border border-white/10 bg-[#141715]/90 backdrop-blur-2xl shadow-2xl focus-within:border-primary/50 focus-within:ring-1 focus-within:ring-primary/20 transition-all p-2.5 pb-2">
           {/* Autocomplete Slash Menu */}
           {isSlashMenuOpen && (
             <SlashCommandMenu
@@ -267,8 +267,8 @@ export function StudioPromptInput({
             className="min-h-[64px] max-h-48 border-0 bg-transparent resize-none text-sm text-text-primary placeholder:text-text-muted/60 focus-visible:ring-0 px-2 py-1 leading-relaxed font-sans"
           />
 
-          <div className="flex items-center justify-between px-3.5 pb-3 pt-1 border-t border-border-subtle/30">
-            <div className="flex items-center gap-2">
+          <div className="flex items-center justify-between px-2 pt-1 pb-0.5 border-t border-border-subtle/30">
+            <div className="flex items-center gap-1.5">
               <ModelDropdownMenu
                 currentProvider={currentProvider}
                 currentModel={currentModel}
@@ -285,7 +285,7 @@ export function StudioPromptInput({
                 variant="ghost"
                 size="sm"
                 onClick={onToggleReasoning}
-                className="h-8 gap-1.5 text-xs font-mono text-text-muted hover:text-text-primary"
+                className="h-7.5 px-2.5 gap-1.5 text-xs font-mono text-text-muted hover:text-text-primary"
                 title={isReasoningEnabled ? "Deep Reasoning On" : "Deep Reasoning Off"}
               >
                 {isReasoningEnabled ? (
@@ -306,7 +306,7 @@ export function StudioPromptInput({
                   setSlashQuery("");
                   textareaRef.current?.focus();
                 }}
-                className="h-8 gap-1 text-xs font-mono text-text-muted hover:text-primary hover:bg-primary/5"
+                className="h-7.5 px-2.5 gap-1 text-xs font-mono text-text-muted hover:text-primary hover:bg-primary/5"
                 title="Target catalog or workspace (/)"
               >
                 <Slash className="size-3 text-primary" />
@@ -320,7 +320,7 @@ export function StudioPromptInput({
                   variant="outline"
                   size="sm"
                   onClick={onStopStream}
-                  className="h-8 border-rose-500/30 text-rose-400 hover:bg-rose-500/10 gap-1.5 text-xs font-mono"
+                  className="h-7.5 px-3 border-rose-500/30 text-rose-400 hover:bg-rose-500/10 gap-1.5 text-xs font-mono"
                 >
                   <Square className="size-3 fill-rose-400" />
                   <span>Stop</span>
@@ -330,7 +330,7 @@ export function StudioPromptInput({
                   size="sm"
                   onClick={handleSend}
                   disabled={!input.trim()}
-                  className="h-8 bg-primary hover:bg-primary-hover text-black font-bold px-3.5 gap-1.5 text-xs rounded-lg transition-transform active:scale-95 disabled:opacity-40"
+                  className="h-7.5 bg-primary hover:bg-primary-hover text-black font-bold px-3.5 gap-1.5 text-xs rounded-lg transition-transform active:scale-95 disabled:opacity-40"
                 >
                   <span>Send</span>
                   <Send className="size-3" />
