@@ -6,7 +6,7 @@ import { useSettingsStore } from "@/store/settingsStore";
 import { useUIStore } from "@/store/uiStore";
 import { selectActiveWorkspace, useWorkspaceStore } from "@/store/workspaceStore";
 import { QuickPromptStarters } from "./QuickPromptStarters";
-import { StudioHeaderBar } from "./StudioHeaderBar";
+import { StudioFloatingControls } from "./StudioFloatingControls";
 import { StudioMessageCard } from "./StudioMessageCard";
 import { StudioPromptInput } from "./StudioPromptInput";
 
@@ -152,9 +152,9 @@ export function AIInsightsStudio() {
   );
 
   return (
-    <div className="flex flex-col h-full w-full bg-bg-app border border-border/50 rounded-2xl overflow-hidden shadow-2xl animate-fade-in-up">
-      {/* Studio Header */}
-      <StudioHeaderBar
+    <div className="flex flex-col h-full w-full bg-bg-app border border-border/50 rounded-2xl overflow-hidden relative shadow-2xl animate-fade-in-up">
+      {/* Studio Floating Top Controls (History + New Chat) */}
+      <StudioFloatingControls
         sessions={dashboardSessions}
         currentSessionId={dashboardSessionId}
         onSelectSession={setDashboardSession}
@@ -163,7 +163,7 @@ export function AIInsightsStudio() {
       />
 
       {/* Studio Conversational Stream */}
-      <div ref={scrollRef} className="flex-1 overflow-y-auto custom-scrollbar p-6">
+      <div ref={scrollRef} className="flex-1 overflow-y-auto custom-scrollbar p-6 pt-16">
         <div className="max-w-4xl mx-auto flex flex-col gap-6">
           {dashboardMessages.length === 0 ? (
             <QuickPromptStarters onSelectPrompt={handleSendMessage} />
