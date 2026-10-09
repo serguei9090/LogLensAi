@@ -6,6 +6,7 @@ import { useSettingsStore } from "@/store/settingsStore";
 import { useUIStore } from "@/store/uiStore";
 import { selectActiveWorkspace, useWorkspaceStore } from "@/store/workspaceStore";
 import { QuickPromptStarters } from "./QuickPromptStarters";
+import { StudioDiagramHelperModal } from "./StudioDiagramHelperModal";
 import { StudioFloatingControls } from "./StudioFloatingControls";
 import { StudioMessageCard } from "./StudioMessageCard";
 import { StudioPromptInput } from "./StudioPromptInput";
@@ -106,6 +107,8 @@ export function AIInsightsStudio() {
         .map((s) => `${s.name} (source_id: "${s.id}")`)
         .join(", ");
       finalMessage = `[TARGET CATALOGS: ${scopesDesc}] ${text}`;
+      // Auto-unselect context after sending so subsequent messages start fresh
+      setActiveCatalogScopes([]);
     }
 
     sendMessage({
@@ -156,6 +159,9 @@ export function AIInsightsStudio() {
 
   return (
     <div className="flex flex-col h-full w-full bg-bg-app border border-border/50 rounded-2xl overflow-hidden relative shadow-2xl animate-fade-in-up">
+      {/* Studio Top-Left Floating Diagrams / Visuals Blueprint Button */}
+      <StudioDiagramHelperModal onSelectPrompt={handleSendMessage} />
+
       {/* Studio Floating Top Controls (History + New Chat) */}
       <StudioFloatingControls
         sessions={dashboardSessions}

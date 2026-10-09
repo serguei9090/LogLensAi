@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { callSidecar } from "@/lib/hooks/useSidecarBridge";
+import { cn } from "@/lib/utils";
 import { useWorkspaceStore } from "@/store/workspaceStore";
 import { ReactECharts } from "./ReactECharts";
 
@@ -24,7 +25,37 @@ interface A2UIRendererProps {
   onAction?: (action: unknown) => void;
 }
 
-const LiveMetric = ({ label, query }: { label: string; query: string }) => {
+const getMetricColor = (label: string, query: string, explicitColor?: string) => {
+  if (explicitColor) {
+    if (explicitColor === "error" || explicitColor === "red") return "text-rose-500";
+    if (explicitColor === "warn" || explicitColor === "warning" || explicitColor === "amber") return "text-amber-500";
+    if (explicitColor === "info" || explicitColor === "green") return "text-emerald-500";
+    if (explicitColor === "debug" || explicitColor === "purple") return "text-purple-400";
+  }
+  const target = `${label} ${query}`.toUpperCase();
+  if (target.includes("ERROR") || target.includes("FATAL") || target.includes("CRITICAL")) {
+    return "text-rose-500";
+  }
+  if (target.includes("WARN")) {
+    return "text-amber-500";
+  }
+  if (target.includes("DEBUG") || target.includes("TRACE")) {
+    return "text-purple-400";
+  }
+  return "text-primary";
+};
+
+const LiveMetric = ({
+  label,
+  query,
+  sourceIds,
+  color,
+}: {
+  label: string;
+  query: string;
+  sourceIds?: string[];
+  color?: string;
+}) => {
   const [total, setTotal] = useState<number | null>(null);
   const activeWorkspaceId = useWorkspaceStore((state) => state.activeWorkspaceId);
 
@@ -37,6 +68,7 @@ const LiveMetric = ({ label, query }: { label: string; query: string }) => {
           params: {
             workspace_id: activeWorkspaceId || "default",
             query,
+            source_ids: sourceIds && sourceIds.length > 0 ? sourceIds : undefined,
             limit: 1,
           },
         });
@@ -53,19 +85,21 @@ const LiveMetric = ({ label, query }: { label: string; query: string }) => {
       active = false;
       clearInterval(interval);
     };
-  }, [query, activeWorkspaceId]);
+  }, [query, activeWorkspaceId, sourceIds]);
+
+  const valueColorClass = getMetricColor(label, query, color);
 
   return (
     <Card className="bg-bg-surface/50 border-border/60 mb-4 overflow-hidden p-4 flex flex-col items-center justify-center">
       <h3 className="text-xs font-bold text-text-muted uppercase tracking-widest">{label}</h3>
-      <div className="text-4xl font-black text-primary mt-2">
+      <div className={cn("text-4xl font-black mt-2 font-mono tracking-tight", valueColorClass)}>
         {total !== null ? total.toLocaleString() : "..."}
       </div>
     </Card>
   );
 };
 
-const LiveDataTable = ({ title, query }: { title: string; query: string }) => {
+const LiveDataTable = ({ title, query, sourceIds }: { title: string; query: string; sourceIds?: string[] }) => {
   const [logs, setLogs] = useState<any[]>([]);
   const activeWorkspaceId = useWorkspaceStore((state) => state.activeWorkspaceId);
 
@@ -78,6 +112,7 @@ const LiveDataTable = ({ title, query }: { title: string; query: string }) => {
           params: {
             workspace_id: activeWorkspaceId || "default",
             query,
+            source_ids: sourceIds && sourceIds.length > 0 ? sourceIds : undefined,
             limit: 5,
           },
         });
@@ -94,7 +129,7 @@ const LiveDataTable = ({ title, query }: { title: string; query: string }) => {
       active = false;
       clearInterval(interval);
     };
-  }, [query, activeWorkspaceId]);
+  }, [query, activeWorkspaceId, sourceIds]);
 
   return (
     <Card className="bg-bg-surface/50 border-border/60 mb-4 overflow-hidden">
@@ -132,8 +167,9 @@ const LiveDataTable = ({ title, query }: { title: string; query: string }) => {
   );
 };
 
-const LiveChartArea = ({ title, query }: { title: string; query: string }) => {
+const LiveChartArea = ({ title, query, sourceIds }: { title: string; query: string; sourceIds?: string[] }) => {
   const [distribution, setDistribution] = useState<any[]>([]);
+  const [bucketInterval, setBucketInterval] = useState<string>("auto");
   const [loading, setLoading] = useState(true);
   const activeWorkspaceId = useWorkspaceStore((state) => state.activeWorkspaceId);
 
@@ -141,15 +177,19 @@ const LiveChartArea = ({ title, query }: { title: string; query: string }) => {
     let active = true;
     const fetchTimeline = async () => {
       try {
-        const res = await callSidecar<{ buckets: any[] }>({
+        const res = await callSidecar<{ buckets: any[]; bucket_interval?: string }>({
           method: "get_log_distribution",
           params: {
             workspace_id: activeWorkspaceId || "default",
             query: query || undefined,
+            source_ids: sourceIds && sourceIds.length > 0 ? sourceIds : undefined,
           },
         });
         if (active) {
           setDistribution(res.buckets || []);
+          if (res.bucket_interval) {
+            setBucketInterval(res.bucket_interval);
+          }
           setLoading(false);
         }
       } catch (e) {
@@ -166,7 +206,12 @@ const LiveChartArea = ({ title, query }: { title: string; query: string }) => {
       active = false;
       clearInterval(interval);
     };
-  }, [query, activeWorkspaceId]);
+  }, [query, activeWorkspaceId, sourceIds]);
+
+  const cleanTitle = useMemo(() => {
+    // Strip hallucinated static bucket mentions from model titles like "(15-MIN BUCKETS)" or "(1-hour buckets)"
+    return title.replace(/\s*\(\s*\d+[\s-]*(?:min|minute|sec|second|hr|hour|day)s?\s*buckets?\s*\)/gi, "").trim();
+  }, [title]);
 
   const chartOption: echarts.EChartsOption = useMemo(() => {
     const xLabels = distribution.map((b) => b.bucket);
@@ -178,10 +223,48 @@ const LiveChartArea = ({ title, query }: { title: string; query: string }) => {
     return {
       tooltip: {
         trigger: "axis",
-        axisPointer: { type: "shadow" },
-        backgroundColor: "#161917",
-        borderColor: "#27272a",
+        axisPointer: { type: "shadow", shadowStyle: { color: "rgba(255,255,255,0.03)" } },
+        backgroundColor: "#111412",
+        borderColor: "#262f29",
+        borderWidth: 1,
+        borderRadius: 8,
         textStyle: { color: "#f4f4f5", fontSize: 11, fontFamily: "monospace" },
+        formatter: (params: any) => {
+          if (!params || !Array.isArray(params) || params.length === 0) return "";
+          const bucketName = params[0].name || "";
+          let totalCount = 0;
+          let rowsHtml = "";
+
+          for (const p of params) {
+            const val = Number(p.value || 0);
+            totalCount += val;
+            let levelColor = p.color;
+            if (p.seriesName === "ERROR") levelColor = "#ef4444";
+            else if (p.seriesName === "WARN") levelColor = "#f59e0b";
+            else if (p.seriesName === "INFO") levelColor = "#22c55e";
+            else if (p.seriesName === "DEBUG") levelColor = "#a78bfa";
+
+            rowsHtml += `
+              <div style="display:flex;align-items:center;justify-content:space-between;gap:16px;padding:2px 0;">
+                <span style="display:inline-flex;align-items:center;gap:6px;">
+                  <span style="width:8px;height:8px;border-radius:2px;background-color:${levelColor};display:inline-block;"></span>
+                  <span style="color:${val > 0 ? '#f4f4f5' : '#71717a'};font-weight:${val > 0 ? '600' : '400'};">${p.seriesName}</span>
+                </span>
+                <span style="font-weight:700;color:${val > 0 ? levelColor : '#52525b'};font-family:monospace;">${val.toLocaleString()}</span>
+              </div>
+            `;
+          }
+
+          return `
+            <div style="padding:2px 4px;min-width:140px;font-family:monospace;">
+              <div style="font-size:10px;color:#a1a1aa;margin-bottom:6px;border-bottom:1px solid #27272a;padding-bottom:4px;display:flex;justify-content:space-between;">
+                <span>${bucketName}</span>
+                <span style="color:#22c55e;font-weight:700;">Total: ${totalCount}</span>
+              </div>
+              ${rowsHtml}
+            </div>
+          `;
+        },
       },
       legend: {
         data: ["ERROR", "WARN", "INFO", "DEBUG"],
@@ -250,11 +333,18 @@ const LiveChartArea = ({ title, query }: { title: string; query: string }) => {
   return (
     <Card className="bg-bg-surface/50 border-border/60 mb-4 overflow-hidden">
       <CardHeader className="py-2.5 px-4 border-b border-border/60 flex flex-row items-center justify-between">
-        <CardTitle className="text-xs font-bold text-text-primary uppercase tracking-widest">
-          {title}
-        </CardTitle>
-        <span className="text-[10px] font-mono text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
-          Live Timeline
+        <div className="flex items-center gap-2">
+          <CardTitle className="text-xs font-bold text-text-primary uppercase tracking-widest">
+            {cleanTitle}
+          </CardTitle>
+          {bucketInterval && bucketInterval !== "auto" && (
+            <span className="text-[10px] font-mono text-text-muted bg-white/5 px-1.5 py-0.2 rounded border border-white/10">
+              {bucketInterval} buckets
+            </span>
+          )}
+        </div>
+        <span className="text-[10px] font-mono text-cyan-400 bg-cyan-500/10 px-2 py-0.5 rounded border border-cyan-500/20">
+          Distribution Histogram
         </span>
       </CardHeader>
       <CardContent className="p-2">
@@ -317,41 +407,52 @@ function parseSingleTag(statement: string): A2UIComponent | null {
     }
   }
 
-  // Handle Metric Tag: metric label="..." query="..."
+  // Handle Metric Tag: metric label="..." query="..." source_id="..." color="..."
   if (trimmed.startsWith("metric")) {
     const labelMatch = /label=["']([^"']+)["']/.exec(trimmed);
     const queryMatch = /query=["']([^"']+)["']/.exec(trimmed);
+    const sourceMatch = /source_ids?=["']([^"']+)["']/.exec(trimmed);
+    const colorMatch = /color=["']([^"']+)["']/.exec(trimmed);
     if (labelMatch && queryMatch) {
+      const sourceIds = sourceMatch ? sourceMatch[1].split(",").map((s) => s.trim()).filter(Boolean) : undefined;
       return {
         type: "metric",
         label: labelMatch[1],
-        props: { query: queryMatch[1] },
+        props: {
+          query: queryMatch[1],
+          source_ids: sourceIds,
+          color: colorMatch ? colorMatch[1] : undefined,
+        },
       };
     }
   }
 
-  // Handle Chart Area Tag: chart_area title="..." query="..."
+  // Handle Chart Area Tag: chart_area title="..." query="..." source_id="..."
   if (trimmed.startsWith("chart_area")) {
     const titleMatch = /title=["']([^"']+)["']/.exec(trimmed);
     const queryMatch = /query=["']([^"']+)["']/.exec(trimmed);
+    const sourceMatch = /source_ids?=["']([^"']+)["']/.exec(trimmed);
     if (titleMatch && queryMatch) {
+      const sourceIds = sourceMatch ? sourceMatch[1].split(",").map((s) => s.trim()).filter(Boolean) : undefined;
       return {
         type: "chart_area",
         label: titleMatch[1],
-        props: { query: queryMatch[1] },
+        props: { query: queryMatch[1], source_ids: sourceIds },
       };
     }
   }
 
-  // Handle Data Table Tag: data_table title="..." query="..."
+  // Handle Data Table Tag: data_table title="..." query="..." source_id="..."
   if (trimmed.startsWith("data_table")) {
     const titleMatch = /title=["']([^"']+)["']/.exec(trimmed);
     const queryMatch = /query=["']([^"']+)["']/.exec(trimmed);
+    const sourceMatch = /source_ids?=["']([^"']+)["']/.exec(trimmed);
     if (titleMatch && queryMatch) {
+      const sourceIds = sourceMatch ? sourceMatch[1].split(",").map((s) => s.trim()).filter(Boolean) : undefined;
       return {
         type: "data_table",
         label: titleMatch[1],
-        props: { query: queryMatch[1] },
+        props: { query: queryMatch[1], source_ids: sourceIds },
       };
     }
   }
@@ -454,6 +555,8 @@ export const A2UIRenderer: React.FC<A2UIRendererProps> = ({ payload, onAction })
             key={index}
             label={comp.label || "Metric"}
             query={(comp.props?.query as string) || ""}
+            sourceIds={comp.props?.source_ids as string[] | undefined}
+            color={comp.props?.color as string | undefined}
           />
         );
 
@@ -463,6 +566,7 @@ export const A2UIRenderer: React.FC<A2UIRendererProps> = ({ payload, onAction })
             key={index}
             title={comp.label || "Traffic History"}
             query={(comp.props?.query as string) || ""}
+            sourceIds={comp.props?.source_ids as string[] | undefined}
           />
         );
 
@@ -472,6 +576,7 @@ export const A2UIRenderer: React.FC<A2UIRendererProps> = ({ payload, onAction })
             key={index}
             title={comp.label || "Data Table"}
             query={(comp.props?.query as string) || ""}
+            sourceIds={comp.props?.source_ids as string[] | undefined}
           />
         );
 

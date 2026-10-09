@@ -103,24 +103,30 @@ func Run(ctx context.Context, provider Provider, tools *ToolRegistry, initialSta
 
 					// A2UI Protocol Directive: Teach the model to output interactive UI blueprints organically
 					a2uiDirective := `You are equipped with the A2UI (Agent-to-UI) protocol and interactive telemetry tools:
-- When the user asks about log volume, history, timeline, trends, or asks to see a graph/chart, you MUST first call 'get_log_timeline' to inspect time-series distribution buckets.
+- When the user asks about log volume, history, timeline, trends, or asks to see a graph/chart, you MUST first call 'get_log_timeline' to inspect time-series distribution buckets. If target catalogs are specified in the prompt (e.g. [TARGET CATALOGS: ... (source_id: "xyz")]), you MUST pass their source_ids into get_log_timeline's source_ids array.
 - Whenever your response provides findings, answers about amounts/counts, analyzes history/trends, or the user mentions terms like "graph", "chart", "history", "timeline", "amount", "metrics", "show errors", you MUST append an interactive A2UI block at the very end of your response inside [[A2UI]] ... [[/A2UI]].
 
 Supported A2UI Tag Syntax:
 1. Time-Series Charts & Histograms:
 [[A2UI]] chart_area title="Traffic History" query="*" [[/A2UI]]
+If the user or conversation has specific target catalogs attached, specify source_id:
+[[A2UI]] chart_area title="Server.log Volume" query="*" source_id="<source_id>" [[/A2UI]]
 (Use query="level:ERROR" or any LLQL filter to display specific levels or error trends)
+IMPORTANT: Do NOT invent or hardcode time bucket intervals in chart titles (e.g., do NOT write "15-min buckets" or "5s buckets"). Titles must name the entity or stream only (e.g., "Server Log Volume", "Error Rate Timeline"). The engine automatically computes and displays dynamic bucket resolutions.
 
 2. Live Real-Time Metric Counters:
-[[A2UI]] metric label="Total Errors" query="level:ERROR" [[/A2UI]]
+[[A2UI]] metric label="Total Errors" query="level:ERROR" color="error" [[/A2UI]]
+(Supported color tags: color="error", color="warn", color="info", color="debug". Add source_id="<source_id>" to scope to a single file).
 
 3. Interactive Drill-down Action Buttons:
 [[A2UI]] button label="Filter 522 Errors" action={"type": "filter", "level": "ERROR"} [[/A2UI]]
 
 4. Live Data Tables:
 [[A2UI]] data_table title="Top Error Logs" query="level:ERROR" [[/A2UI]]
+(Add source_id="<source_id>" to scope to a single file)
 
-You can combine multiple tags sequentially (e.g. chart_area + metric + button). They will render as a unified interactive surface in the user's interface.`
+You can combine multiple tags sequentially (e.g. chart_area + metric + button). They will render as a unified interactive surface in the user's interface.
+If the user query is ambiguous, missing desired time windows or drill-down scope, provide the best immediate high-level telemetry and ask a concise clarifying question.`
 					state.Messages = append([]ChatMessage{{Role: "system", Content: a2uiDirective}}, state.Messages...)
 				}
 			}

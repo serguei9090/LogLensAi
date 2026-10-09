@@ -1,12 +1,13 @@
 // Assume Role: Frontend Engineer (@frontend)
 
-import { FileText, Lightbulb, LightbulbOff, Send, Slash, Square, X } from "lucide-react";
+import { AtSign, FileText, Lightbulb, LightbulbOff, Send, Slash, Square, X } from "lucide-react";
 import { type KeyboardEvent, useRef, useState } from "react";
 import { ModelDropdownMenu } from "@/components/organisms/ai-sidebar/components/ModelDropdownMenu";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import type { Workspace } from "@/store/workspaceStore";
-import { SlashCommandItem, SlashCommandMenu } from "./SlashCommandMenu";
+import { AtMentionItem, AtMentionMenu } from "./AtMentionMenu";
+import { SkillCommandItem, SlashCommandMenu } from "./SlashCommandMenu";
 
 export interface TargetCatalogScope {
   id: string;
@@ -67,44 +68,66 @@ export function StudioPromptInput({
   onStopStream,
 }: Readonly<StudioPromptInputProps>) {
   const [input, setInput] = useState("");
+  const [isAtMenuOpen, setIsAtMenuOpen] = useState(false);
+  const [atQuery, setAtQuery] = useState("");
+  const [atSelectedIndex, setAtSelectedIndex] = useState(0);
+
   const [isSlashMenuOpen, setIsSlashMenuOpen] = useState(false);
   const [slashQuery, setSlashQuery] = useState("");
   const [slashSelectedIndex, setSlashSelectedIndex] = useState(0);
+
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  // Watch for slash typing
+  // Watch for @ (mention scopes) and / (skills / blueprints)
   const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const val = e.target.value;
     setInput(val);
 
     const cursor = e.target.selectionStart || val.length;
     const textBeforeCursor = val.slice(0, cursor);
+
+    const lastAtIdx = textBeforeCursor.lastIndexOf("@");
     const lastSlashIdx = textBeforeCursor.lastIndexOf("/");
 
-    if (lastSlashIdx !== -1) {
+    // 1. Check for @ mention
+    if (lastAtIdx !== -1 && (lastSlashIdx === -1 || lastAtIdx > lastSlashIdx)) {
+      const queryPart = textBeforeCursor.slice(lastAtIdx + 1);
+      const isWordBoundary = lastAtIdx === 0 || /\s/.test(val[lastAtIdx - 1]);
+      if (isWordBoundary && !queryPart.includes(" ")) {
+        setIsAtMenuOpen(true);
+        setAtQuery(queryPart);
+        setAtSelectedIndex(0);
+        setIsSlashMenuOpen(false);
+        return;
+      }
+    }
+
+    // 2. Check for / skill command
+    if (lastSlashIdx !== -1 && (lastAtIdx === -1 || lastSlashIdx > lastAtIdx)) {
       const queryPart = textBeforeCursor.slice(lastSlashIdx + 1);
-      // Only open if slash is at start of string or preceded by whitespace
       const isWordBoundary = lastSlashIdx === 0 || /\s/.test(val[lastSlashIdx - 1]);
       if (isWordBoundary && !queryPart.includes(" ")) {
         setIsSlashMenuOpen(true);
         setSlashQuery(queryPart);
         setSlashSelectedIndex(0);
+        setIsAtMenuOpen(false);
         return;
       }
     }
 
+    setIsAtMenuOpen(false);
     setIsSlashMenuOpen(false);
   };
 
-  const handleSelectSlashItem = (item: SlashCommandItem) => {
-    // Clear the active slash query from input
+  const handleSelectAtItem = (item: AtMentionItem) => {
+    // Clear the active @ query from input
     const cursor = textareaRef.current?.selectionStart || input.length;
     const textBeforeCursor = input.slice(0, cursor);
-    const lastSlashIdx = textBeforeCursor.lastIndexOf("/");
-    const remainingText = lastSlashIdx !== -1 ? input.slice(0, lastSlashIdx) + input.slice(cursor) : input;
+    const lastAtIdx = textBeforeCursor.lastIndexOf("@");
+    const remainingText = lastAtIdx !== -1 ? input.slice(0, lastAtIdx) + input.slice(cursor) : input;
 
     setInput(remainingText.trim());
-    setIsSlashMenuOpen(false);
+    setIsAtMenuOpen(false);
 
     if (item.type === "catalog" && item.data.sourceId && item.data.sourceName) {
       if (item.data.workspaceId && item.data.workspaceId !== currentWorkspaceId) {
@@ -116,7 +139,7 @@ export function StudioPromptInput({
         workspaceId: item.data.workspaceId,
         workspaceName: item.workspaceName,
       };
-      // Prevent duplicates, append to active scopes list
+      // Prevent duplicates
       const alreadyExists = activeCatalogScopes.some((s) => s.id === newScope.id);
       if (!alreadyExists) {
         onSetCatalogScopes([...activeCatalogScopes, newScope]);
@@ -155,6 +178,20 @@ export function StudioPromptInput({
     textareaRef.current?.focus();
   };
 
+  const handleSelectSlashItem = (item: SkillCommandItem) => {
+    // Clear the active / query and insert the prompt template
+    const cursor = textareaRef.current?.selectionStart || input.length;
+    const textBeforeCursor = input.slice(0, cursor);
+    const lastSlashIdx = textBeforeCursor.lastIndexOf("/");
+    const remainingBefore = lastSlashIdx !== -1 ? input.slice(0, lastSlashIdx) : "";
+    const remainingAfter = input.slice(cursor);
+
+    const composed = `${remainingBefore} ${item.promptTemplate} ${remainingAfter}`.trim();
+    setInput(composed);
+    setIsSlashMenuOpen(false);
+    textareaRef.current?.focus();
+  };
+
   const handleRemoveScope = (idToRemove: string) => {
     onSetCatalogScopes(activeCatalogScopes.filter((s) => s.id !== idToRemove));
   };
@@ -165,10 +202,37 @@ export function StudioPromptInput({
     }
     onSendMessage(input.trim());
     setInput("");
+    setIsAtMenuOpen(false);
     setIsSlashMenuOpen(false);
   };
 
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
+    if (isAtMenuOpen) {
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        setAtSelectedIndex((prev) => prev + 1);
+        return;
+      }
+      if (e.key === "ArrowUp") {
+        e.preventDefault();
+        setAtSelectedIndex((prev) => Math.max(0, prev - 1));
+        return;
+      }
+      if (e.key === "Escape") {
+        e.preventDefault();
+        setIsAtMenuOpen(false);
+        return;
+      }
+      if (e.key === "Enter" || e.key === "Tab") {
+        e.preventDefault();
+        const menuEl = document.querySelector(".custom-scrollbar button") as HTMLButtonElement | null;
+        if (menuEl) {
+          menuEl.click();
+        }
+        return;
+      }
+    }
+
     if (isSlashMenuOpen) {
       if (e.key === "ArrowDown") {
         e.preventDefault();
@@ -187,7 +251,6 @@ export function StudioPromptInput({
       }
       if (e.key === "Enter" || e.key === "Tab") {
         e.preventDefault();
-        // Trigger selection on current highlighted item
         const menuEl = document.querySelector(".custom-scrollbar button") as HTMLButtonElement | null;
         if (menuEl) {
           menuEl.click();
@@ -206,13 +269,23 @@ export function StudioPromptInput({
     <div className="absolute bottom-4 inset-x-0 z-30 pointer-events-none px-4 md:px-6">
       <div className="max-w-4xl mx-auto flex flex-col gap-2 pointer-events-auto">
         <div className="relative rounded-2xl border border-white/10 bg-[#141715]/90 backdrop-blur-2xl shadow-2xl focus-within:border-primary/50 focus-within:ring-1 focus-within:ring-primary/20 transition-all px-2.5 pt-2 pb-1.5">
-          {/* Autocomplete Slash Menu */}
+          {/* Autocomplete @ Mentions Menu (Catalogs & Workspaces) */}
+          {isAtMenuOpen && (
+            <AtMentionMenu
+              query={atQuery}
+              selectedIndex={atSelectedIndex}
+              workspaces={workspaces}
+              currentWorkspaceId={currentWorkspaceId}
+              onSelect={handleSelectAtItem}
+              onClose={() => setIsAtMenuOpen(false)}
+            />
+          )}
+
+          {/* Autocomplete / Slash Skills Menu (A2UI Blueprints) */}
           {isSlashMenuOpen && (
             <SlashCommandMenu
               query={slashQuery}
               selectedIndex={slashSelectedIndex}
-              workspaces={workspaces}
-              currentWorkspaceId={currentWorkspaceId}
               onSelect={handleSelectSlashItem}
               onClose={() => setIsSlashMenuOpen(false)}
             />
@@ -262,7 +335,7 @@ export function StudioPromptInput({
             value={input}
             onChange={handleInputChange}
             onKeyDown={handleKeyDown}
-            placeholder="Type / to attach catalogs or workspaces for comparison, ask telemetry questions..."
+            placeholder="Type @ to attach catalogs or workspaces, / for visual skills, or ask telemetry questions..."
             disabled={isLoading}
             className="min-h-[58px] max-h-48 border-0 bg-transparent resize-none text-sm text-text-primary placeholder:text-text-muted/60 focus-visible:ring-0 px-2 py-1 leading-relaxed font-sans"
           />
@@ -296,7 +369,25 @@ export function StudioPromptInput({
                 <span>{isReasoningEnabled ? "Reasoning" : "Direct"}</span>
               </Button>
 
-              {/* Slash Quick Button */}
+              {/* @ Scope Button */}
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setInput((prev) => (prev ? `${prev} @` : "@"));
+                  setIsAtMenuOpen(true);
+                  setAtQuery("");
+                  setIsSlashMenuOpen(false);
+                  textareaRef.current?.focus();
+                }}
+                className="h-7.5 px-2.5 gap-1 text-xs font-mono text-text-muted hover:text-cyan-400 hover:bg-cyan-500/10"
+                title="Target catalog or workspace scope (@)"
+              >
+                <AtSign className="size-3 text-cyan-400" />
+                <span>Scope</span>
+              </Button>
+
+              {/* / Skills Button */}
               <Button
                 variant="ghost"
                 size="sm"
@@ -304,13 +395,14 @@ export function StudioPromptInput({
                   setInput((prev) => (prev ? `${prev} /` : "/"));
                   setIsSlashMenuOpen(true);
                   setSlashQuery("");
+                  setIsAtMenuOpen(false);
                   textareaRef.current?.focus();
                 }}
                 className="h-7.5 px-2.5 gap-1 text-xs font-mono text-text-muted hover:text-primary hover:bg-primary/5"
-                title="Target catalog or workspace (/)"
+                title="A2UI visual skills & blueprints (/)"
               >
                 <Slash className="size-3 text-primary" />
-                <span>Scope</span>
+                <span>Skills</span>
               </Button>
             </div>
 
