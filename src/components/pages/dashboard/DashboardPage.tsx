@@ -79,30 +79,32 @@ export function DashboardPage() {
               onRefresh={fetchStats}
               onModeChange={handleModeChange}
             />
-            <DashboardFilters
-              selectedWorkspaceId={selectedWorkspaceId}
-              onWorkspaceChange={(v) => {
-                setSelectedWorkspaceId(v || "all");
-                setSelectedSourceId("all");
-                setIsFirstLoad(true);
-              }}
-              workspaces={workspaces}
-              selectedSourceId={selectedSourceId}
-              onSourceChange={(v) => setSelectedSourceId(v || "all")}
-              sources={sources}
-              timeRange={timeRange}
-              onTimeRangeChange={setTimeRange}
-              timeBounds={timeBounds}
-              onResetTime={() => {
-                if (timeBounds) {
-                  setTimeRange({ start: timeBounds.min, end: timeBounds.max, label: "All Time" });
-                } else {
-                  setTimeRange({ start: "", end: "" });
-                }
-              }}
-              loading={loading}
-              onRefresh={fetchStats}
-            />
+            {mode === "static" && (
+              <DashboardFilters
+                selectedWorkspaceId={selectedWorkspaceId}
+                onWorkspaceChange={(v) => {
+                  setSelectedWorkspaceId(v || "all");
+                  setSelectedSourceId("all");
+                  setIsFirstLoad(true);
+                }}
+                workspaces={workspaces}
+                selectedSourceId={selectedSourceId}
+                onSourceChange={(v) => setSelectedSourceId(v || "all")}
+                sources={sources}
+                timeRange={timeRange}
+                onTimeRangeChange={setTimeRange}
+                timeBounds={timeBounds}
+                onResetTime={() => {
+                  if (timeBounds) {
+                    setTimeRange({ start: timeBounds.min, end: timeBounds.max, label: "All Time" });
+                  } else {
+                    setTimeRange({ start: "", end: "" });
+                  }
+                }}
+                loading={loading}
+                onRefresh={fetchStats}
+              />
+            )}
           </header>
 
           {mode === "static" ? (

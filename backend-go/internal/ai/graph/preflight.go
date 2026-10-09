@@ -244,7 +244,7 @@ func (inv *WorkspaceInventory) FormatGroundedSystemPromptContext() string {
 	}
 	sb.WriteString("Attached Catalogs/Files:\n")
 	for _, c := range inv.Catalogs {
-		sb.WriteString(fmt.Sprintf(" - %s (%d lines)\n", c.Name, c.LogCount))
+		sb.WriteString(fmt.Sprintf(" - %s (source_id: %q, lines: %d)\n", c.Name, c.ID, c.LogCount))
 	}
 	if len(inv.ClusterTriages) > 0 {
 		sb.WriteString("Known Cluster Categories (from Laya Triage):\n")
@@ -256,6 +256,9 @@ func (inv *WorkspaceInventory) FormatGroundedSystemPromptContext() string {
 			sb.WriteString(fmt.Sprintf(" - Cluster #%s [%s, Sev: %.1f%s]: %s\n", ct.ClusterID, ct.Category, ct.Severity, outageTag, ct.Template))
 		}
 	}
-	sb.WriteString("Grounding Rule: The above facts represent the active workspace state. When the user asks you to investigate, search, explain, or diagnose errors, you MUST immediately call the appropriate tools (such as search_logs, get_clusters, or search_memory) in this turn. Never merely say 'Let me look at the logs' or 'I will search' without emitting a tool call. If you already have the required log data from tools, synthesize your findings into a comprehensive diagnosis with actionable next steps.")
+	sb.WriteString("Grounding & Catalog Scoping Rules:\n")
+	sb.WriteString("1. The above facts represent the active workspace state. When the user asks you to investigate, search, explain, or diagnose errors, you MUST immediately call the appropriate tools (such as search_logs, get_log_timeline, or get_clusters) in this turn. Never merely say 'Let me look at the logs' or 'I will search' without emitting a tool call.\n")
+	sb.WriteString("2. If the user mentions or asks about a specific file or catalog (e.g. 'server.log' or selects a catalog scope), you MUST use the matching source_id from 'Attached Catalogs/Files' above! Pass source_id=<source_id> into search_logs, or pass source_ids=[<source_id>] into get_log_timeline. Never perform an un-scoped workspace search when the user explicitly specified a catalog.\n")
+	sb.WriteString("3. If you already have the required log data from tools, synthesize your findings into a comprehensive diagnosis with actionable next steps.")
 	return sb.String()
 }

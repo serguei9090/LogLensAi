@@ -41,7 +41,12 @@ export function AIInsightsStudio() {
 
   const [isReasoningEnabled, setIsReasoningEnabled] = useState(true);
   const [isFetchingModels, setIsFetchingModels] = useState(false);
+  const [activeCatalogScope, setActiveCatalogScope] = useState<{ id: string; name: string } | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  const workspaces = useWorkspaceStore((state) => state.workspaces);
+  const setActiveWorkspace = useWorkspaceStore((state) => state.setActive);
+  const catalogs = activeWorkspace?.sources || [];
 
   // Auto-scroll on incoming stream chunks
   // biome-ignore lint/correctness/useExhaustiveDependencies: Scroll triggers on messages or loading state change
@@ -96,9 +101,14 @@ export function AIInsightsStudio() {
   };
 
   const handleSendMessage = (text: string) => {
+    let finalMessage = text;
+    if (activeCatalogScope) {
+      finalMessage = `[TARGET CATALOG: ${activeCatalogScope.name} (source_id: "${activeCatalogScope.id}")] ${text}`;
+    }
+
     sendMessage({
       workspace_id: activeWorkspaceId,
-      message: text,
+      message: finalMessage,
       model: settings.ai_model || undefined,
       reasoning: isReasoningEnabled,
       session_type: "dashboard",
@@ -201,6 +211,12 @@ export function AIInsightsStudio() {
           lmstudioHost: settings.ai_lmstudio_host,
         }}
         isReasoningEnabled={isReasoningEnabled}
+        catalogs={catalogs}
+        workspaces={workspaces}
+        currentWorkspaceId={activeWorkspaceId}
+        activeCatalogScope={activeCatalogScope}
+        onSetCatalogScope={setActiveCatalogScope}
+        onSwitchWorkspace={setActiveWorkspace}
         onToggleReasoning={() => setIsReasoningEnabled(!isReasoningEnabled)}
         onFetchModels={fetchModels}
         onProviderChange={handleProviderChange}
