@@ -123,8 +123,29 @@ export function StudioPromptInput({
       }
     } else if (item.type === "workspace" && item.data.workspaceId) {
       onSwitchWorkspace(item.data.workspaceId);
+      const wsName = item.title;
+      const wsScope: TargetCatalogScope = {
+        id: `ws-${item.data.workspaceId}`,
+        name: `Workspace: ${wsName}`,
+        workspaceId: item.data.workspaceId,
+        workspaceName: wsName,
+      };
+      const alreadyExists = activeCatalogScopes.some((s) => s.id === wsScope.id);
+      if (!alreadyExists) {
+        onSetCatalogScopes([...activeCatalogScopes, wsScope]);
+      }
     } else if (item.type === "action") {
-      if (item.data.actionType === "clear_scope") {
+      if (item.data.actionType === "all_catalogs") {
+        const allScope: TargetCatalogScope = {
+          id: `all-${currentWorkspaceId}`,
+          name: "All Catalogs",
+          workspaceId: currentWorkspaceId,
+        };
+        const alreadyExists = activeCatalogScopes.some((s) => s.id === allScope.id);
+        if (!alreadyExists) {
+          onSetCatalogScopes([...activeCatalogScopes, allScope]);
+        }
+      } else if (item.data.actionType === "clear_scope") {
         onSetCatalogScopes([]);
       } else if (item.data.actionType === "errors_only") {
         setInput((prev) => (prev ? `${prev} (only error logs)` : "Analyze errors only"));

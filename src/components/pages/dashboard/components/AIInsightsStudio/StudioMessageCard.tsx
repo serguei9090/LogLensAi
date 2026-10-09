@@ -138,23 +138,19 @@ export function StudioMessageCard({
               });
 
               return (
-                <div className="flex flex-col items-end gap-2.5">
-                  <div className="flex flex-wrap items-center justify-end gap-1.5">
-                    {scopeItems.map((name, i) => (
-                      <span
-                        key={`${name}-${i}`}
-                        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-cyan-500/15 border border-cyan-500/30 text-xs font-mono text-cyan-300 shadow-sm"
-                      >
-                        <span className="size-1.5 rounded-full bg-cyan-400" />
-                        <span className="font-semibold">{name}</span>
-                      </span>
-                    ))}
-                  </div>
-                  <div className="prose prose-invert max-w-none text-right">
-                    <p className="whitespace-pre-wrap font-sans text-sm text-text-primary leading-relaxed">
-                      {userQuestion}
-                    </p>
-                  </div>
+                <div className="prose prose-invert max-w-none text-right flex flex-wrap items-center justify-end gap-2">
+                  <span className="whitespace-pre-wrap font-sans text-sm text-text-primary leading-relaxed">
+                    {userQuestion}
+                  </span>
+                  {scopeItems.map((name, i) => (
+                    <span
+                      key={`${name}-${i}`}
+                      className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-lg bg-cyan-500/15 border border-cyan-500/30 text-xs font-mono text-cyan-300 shadow-sm align-middle select-none"
+                    >
+                      <span className="text-cyan-400 font-bold">∞</span>
+                      <span className="font-semibold">{name}</span>
+                    </span>
+                  ))}
                 </div>
               );
             }

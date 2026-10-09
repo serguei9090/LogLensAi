@@ -99,9 +99,9 @@ export function SlashCommandMenu({
       id: "act-all",
       type: "action" as const,
       title: "All Catalogs (Full Workspace)",
-      subtitle: "Clear catalog filters & analyze across all sources",
-      badge: "Reset",
-      data: { actionType: "clear_scope" },
+      subtitle: "Scope across all log catalogs in this workspace",
+      badge: "All",
+      data: { actionType: "all_catalogs" },
     },
     {
       id: "act-errors",
