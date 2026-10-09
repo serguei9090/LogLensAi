@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"loglensai/backend-go/internal/ai/laya"
 	"loglensai/backend-go/internal/app"
 )
 
@@ -215,43 +214,4 @@ func (r *ToolRegistry) registerBuiltins() {
 			}`),
 		},
 	}, r.createFacet)
-
-	r.Register("update_laya_rules", ToolSchema{
-		Type: "function",
-		Function: ToolFunctionSchema{
-			Name:        "update_laya_rules",
-			Description: "Auto-improves or updates Laya System 1 decision rules to resolve misclassified log patterns, adjust severity rubrics, or add new infrastructure categories.",
-			Parameters: rawSchema(`{
-				"type": "object",
-				"properties": {
-					"rationale": {"type": "string", "description": "Clear reason for updating the rule (e.g. 'Added k8s OOM killed category to resolve ambiguity in pod evictions')"},
-					"question_name": {"type": "string", "description": "The key of the question to add or update (e.g. 'category', 'severity', 'is_outage', or a custom question)"},
-					"type": {"type": "string", "enum": ["choice", "score", "noul"], "description": "Decision primitive type"},
-					"instructions": {"type": "string", "description": "The precise prompt/instruction for the question"},
-					"options": {"type": "array", "items": {"type": "string"}, "description": "For choice: list of category options. For noul: optional true/false labels"},
-					"rubric": {"type": "array", "items": {"type": "integer"}, "description": "For score: ordinal rubric levels (e.g. [1, 2, 3, 4, 5])"}
-				},
-				"required": ["rationale", "question_name", "type", "instructions"]
-			}`),
-		},
-	}, r.updateLayaRules)
-}
-
-// RouteWithLaya evaluates user query intent against Laya's active tool_intent rule.
-func RouteWithLaya(ctx context.Context, reg *ToolRegistry, query string) (*laya.DecisionResult, error) {
-	if reg == nil || reg.app == nil || reg.app.LayaManager == nil || reg.app.LayaEngine == nil {
-		return nil, nil
-	}
-
-	settings := reg.app.LayaManager.GetSettings()
-	if !settings.Enabled {
-		return nil, nil
-	}
-
-	q, ok := settings.Questions["tool_intent"]
-	if !ok {
-		return nil, nil
-	}
-
-	return reg.app.LayaEngine.Predict(ctx, q, query)
 }

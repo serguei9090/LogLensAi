@@ -253,8 +253,6 @@ func formatStepLabel(name string, rawArgs string) string {
 		return "Configuring custom log view column"
 	case "create_facet":
 		return "Creating regex log extraction rule"
-	case "update_laya_rules":
-		return "Refining Laya System 1 decision rules"
 	default:
 		return fmt.Sprintf("Executing tool: %s", name)
 	}

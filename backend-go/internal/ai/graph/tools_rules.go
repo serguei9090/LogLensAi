@@ -6,8 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
-
-	"loglensai/backend-go/internal/ai/laya"
 )
 
 // --- search_memory ---
@@ -173,66 +171,4 @@ func (r *ToolRegistry) writeDrainMasksSetting(conn *sql.DB, workspaceID, value s
 		value,
 	)
 	return err
-}
-
-// --- update_laya_rules ---
-
-type updateLayaRulesParams struct {
-	Rationale    string   `json:"rationale"`
-	QuestionName string   `json:"question_name"`
-	Type         string   `json:"type"`
-	Instructions string   `json:"instructions"`
-	Options      []string `json:"options,omitempty"`
-	Rubric       []int    `json:"rubric,omitempty"`
-}
-
-func (r *ToolRegistry) updateLayaRules(_ context.Context, args json.RawMessage) (any, error) {
-	if r.app == nil || r.app.LayaManager == nil {
-		return map[string]any{"error": "Laya rule manager is not initialized on backend"}, nil
-	}
-
-	var p updateLayaRulesParams
-	if err := json.Unmarshal(args, &p); err != nil {
-		return map[string]any{"error": fmt.Sprintf("invalid arguments: %v", err)}, nil
-	}
-
-	rationale := strings.TrimSpace(p.Rationale)
-	if rationale == "" {
-		return map[string]any{"error": "rationale is required for auto-improving Laya rules"}, nil
-	}
-	qName := strings.TrimSpace(p.QuestionName)
-	if qName == "" {
-		return map[string]any{"error": "question_name is required"}, nil
-	}
-
-	qType := laya.QuestionType(strings.ToLower(strings.TrimSpace(p.Type)))
-	if qType != laya.QuestionTypeChoice && qType != laya.QuestionTypeScore && qType != laya.QuestionTypeNoul {
-		return map[string]any{"error": fmt.Sprintf("invalid question type %q; must be 'choice', 'score', or 'noul'", p.Type)}, nil
-	}
-
-	q := laya.Question{
-		Type:         qType,
-		Instructions: strings.TrimSpace(p.Instructions),
-		Options:      p.Options,
-		Rubric:       p.Rubric,
-	}
-
-	activeQuestions := r.app.LayaManager.GetActiveQuestions()
-	if activeQuestions == nil {
-		activeQuestions = make(map[string]laya.Question)
-	}
-	activeQuestions[qName] = q
-
-	chk, err := r.app.LayaManager.SaveCheckpoint("AI System 2 (Auto-Improvement)", rationale, activeQuestions)
-	if err != nil {
-		return map[string]any{"error": fmt.Sprintf("failed to save checkpoint: %v", err)}, nil
-	}
-
-	return map[string]any{
-		"status":        "checkpoint_created",
-		"checkpoint_id": chk.ID,
-		"question_name": qName,
-		"timestamp":     chk.Timestamp,
-		"message":       fmt.Sprintf("Successfully created checkpoint %s with updated rule '%s'", chk.ID, qName),
-	}, nil
 }

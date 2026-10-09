@@ -16,7 +16,7 @@ LogLensAi is built on a high-throughput **Sidecar Architecture**:
 - **Desktop Shell**: [Tauri v2](https://v2.tauri.app/) (Rust) providing native window controls, hardware isolation, and desktop bridge.
 - **Backend Sidecar**: [Go](https://go.dev) `1.26+`, high-performance columnar [DuckDB](https://duckdb.org) (`marcboeker/go-duckdb`), and an in-memory Drain3 template mining engine processing **>81,000 lines/second**.
 - **Dual-Engine AI Intelligence**:
-  - **System 1 (Laya AI Decision Engine)**: Sub-30ms reactive classification & triage via ONNX ModernBERT (`nvkudva/laya-web-q8`, 524 MB quantized). Runs on **CPU OpenMP (0 MB VRAM)** or **GPU DirectML/CUDA**. Provides instant intent routing, live cluster triage (category, severity 1–5, outage indicators), automated Hugging Face model downloading, and checkpointed prompt/rubric evolution with 1-click rollback.
+  - **System 1 (Laya AI Decision Engine)**: Sub-30ms reactive classification & triage via ONNX ModernBERT (`nvkudva/laya-web-q8`, 524 MB quantized). Runs on **CPU OpenMP (0 MB VRAM)** or **GPU DirectML/CUDA**. Dedicated to real-time cluster triage (category, severity 1–5, outage indicators), automated Hugging Face model downloading, and checkpointed prompt/rubric evolution with 1-click rollback.
   - **System 2 (Generative LLM Engine)**: Multi-step reasoning state machine (`internal/ai/graph/`) with DuckDB-VSS vector memory retrieval and tool execution supporting **Ollama**, **Gemini**, and **OpenAI**.
 - **Communication Protocol**: JSON-RPC 2.0 over standard IO (`stdin`/`stdout`) in production desktop mode, and HTTP port `5000` in dev mode.
 
@@ -45,7 +45,6 @@ flowchart TD
         subgraph System1 ["System 1: Laya Fast Decision Engine (<30ms)"]
             ONNX["ONNX ModernBERT Q8 (Zero-VRAM CPU / DirectML)"]
             Triage["Asynchronous Cluster Triage (Bounded Concurrency x4)"]
-            IntentRouter["Fast User Intent Classifier"]
             RuleStore["Rule Manager & Checkpoint Store (laya_rules.json)"]
             HFDownloader["Hugging Face Model Auto-Downloader"]
         end
@@ -53,7 +52,7 @@ flowchart TD
         subgraph System2 ["System 2: Generative Reasoning Engine (Deep)"]
             LangGraph["State Machine (Reasoning -> Tool -> Final)"]
             VSS[("DuckDB-VSS Vector Memory")]
-            Tools["Tool Registry (get_logs, analyze_cluster, update_laya_rules)"]
+            Tools["Tool Registry (get_logs, analyze_cluster, search_memory, etc.)"]
         end
     end
 
@@ -253,3 +252,16 @@ go test -v ./internal/app/...
 # Frontend linting & type checks
 bun run lint
 ```
+
+---
+
+## 🗺️ Roadmap & Research Exploration
+
+- [x] **Sub-30ms Laya Log Triage**: Zero-VRAM local ModernBERT Q8 cluster classification and live anomaly scoring.
+- [x] **A2UI Declarative Protocol**: Interactive chart histograms, telemetry counters, and data tables generated on-the-fly by AI agent responses.
+- [ ] **EmbeddingGemma-2 Local Knowledge Base & Resolution RAG**:
+  - Dual-driver local embedding support: native ONNX Runtime (CPU/DirectML) and Ollama (`embeddinggemma-2`).
+  - Markdown-backed resolution persistence: saving memories to `<knowledge_path>/Memory/*.md` with YAML frontmatter + DuckDB vector indexing.
+  - Automatic `fsnotify` directory watcher & on-demand "Re-index" for runbooks, PDFs, and error diagrams.
+- [ ] **Laya Fast Chat Router Benchmarking**:
+  - Evaluating Laya's zero-VRAM choice/score heuristics as a pre-selection filter for chat agent tool routing and intent steering.
