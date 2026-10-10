@@ -130,6 +130,10 @@ func initializeDefaultSettings(conn *sql.DB) error {
 		{"ingestion_http_port", "5002"},
 		{"facet_extractions", "[]"},
 		{"ui_command_palette_shortcut", string(shortcutJSON)},
+		{"rag_embedder_type", "onnx"},
+		{"rag_device", "cpu"},
+		{"rag_knowledge_path", ""},
+		{"rag_ollama_host", "http://localhost:11434"},
 	}
 
 	for _, d := range defaults {

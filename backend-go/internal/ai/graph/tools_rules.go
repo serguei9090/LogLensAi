@@ -32,6 +32,30 @@ func (r *ToolRegistry) searchMemory(ctx context.Context, args json.RawMessage) (
 	return results, nil
 }
 
+// --- search_knowledge ---
+
+type searchKnowledgeParams struct {
+	WorkspaceID string `json:"workspace_id"`
+	Query       string `json:"query"`
+}
+
+func (r *ToolRegistry) searchKnowledge(ctx context.Context, args json.RawMessage) (any, error) {
+	var p searchKnowledgeParams
+	if err := json.Unmarshal(args, &p); err != nil {
+		return []map[string]any{{"error": err.Error()}}, nil
+	}
+
+	if r.memory == nil {
+		return []map[string]any{{"error": "knowledge base search is not configured"}}, nil
+	}
+
+	results, err := r.memory.SearchKnowledge(ctx, p.WorkspaceID, p.Query, 5)
+	if err != nil {
+		return []map[string]any{{"error": err.Error()}}, nil
+	}
+	return results, nil
+}
+
 // --- create_column ---
 
 type createColumnParams struct {

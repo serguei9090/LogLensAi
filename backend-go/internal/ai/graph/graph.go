@@ -245,6 +245,8 @@ func formatStepLabel(name string, rawArgs string) string {
 		return "Inspecting log clusters and patterns"
 	case "search_memory":
 		return "Searching collective incident memory"
+	case "search_knowledge":
+		return "Searching runbooks and architecture docs"
 	case "get_facets":
 		return "Extracting metadata facets (IPs, users)"
 	case "get_hierarchy":

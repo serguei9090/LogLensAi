@@ -359,3 +359,9 @@ type DeleteWorkspaceRequest struct {
 type LogTraceRequest struct {
 	Message string `json:"message"`
 }
+
+// SyncKnowledgeBaseRequest represents the parameters for sync_knowledge_base RPC.
+type SyncKnowledgeBaseRequest struct {
+	WorkspaceID   string  `json:"workspace_id"`
+	KnowledgePath *string `json:"knowledge_path,omitempty"`
+}

@@ -155,6 +155,16 @@ var tableStatements = []string{
         is_uploaded  BOOLEAN DEFAULT FALSE,
         created_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );`,
+	`CREATE TABLE IF NOT EXISTS knowledge_documents (
+        id           TEXT PRIMARY KEY,
+        workspace_id TEXT,
+        file_path    TEXT,
+        file_type    TEXT,
+        chunk_index  INTEGER DEFAULT 0,
+        content      TEXT,
+        embedding    FLOAT[768],
+        updated_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );`,
 }
 
 // indexStatements are the "Performance Indexes" from db.py:338-343.
@@ -185,6 +195,7 @@ var AllTables = []string{
 	"anomalies",
 	"folders",
 	"log_sources",
+	"knowledge_documents",
 	"hourly_cluster_counts", // created by migrateHourlyStats, see migrations.go
 }
 

@@ -11,13 +11,10 @@ import { callSidecar } from "@/lib/hooks/useSidecarBridge";
 import { cn } from "@/lib/utils";
 import { useIngestionStore } from "@/store/ingestion";
 import { useInvestigationStore } from "@/store/investigationStore";
-import {
-  type AppSettings,
-  defaultSettings,
-  useSettingsStore,
-} from "@/store/settingsStore";
+import { type AppSettings, defaultSettings, useSettingsStore } from "@/store/settingsStore";
 import { useWorkspaceStore } from "@/store/workspaceStore";
 import {
+  BookOpen,
   Bot,
   Check,
   Cpu,
@@ -37,9 +34,10 @@ import { AISettingsSection } from "./sections/AISettingsSection";
 import { DrainSettingsSection } from "./sections/DrainSettingsSection";
 import { IngestionSettingsSection } from "./sections/IngestionSettingsSection";
 import { LayaSettingsSection } from "./sections/LayaSettingsSection";
+import { RAGSettingsSection } from "./sections/RAGSettingsSection";
 import { parseRemote } from "./utils/settingsSerialization";
 
-export type SectionId = "ai" | "laya" | "drain" | "ingestion";
+export type SectionId = "ai" | "rag" | "laya" | "drain" | "ingestion";
 
 const SECTIONS: {
   id: SectionId;
@@ -48,16 +46,13 @@ const SECTIONS: {
   desc: string;
 }[] = [
   { id: "ai", icon: Bot, label: "AI Intelligence", desc: "Model & analyze logic" },
+  { id: "rag", icon: BookOpen, label: "Knowledge RAG", desc: "Runbooks & memories" },
   { id: "laya", icon: Zap, label: "Laya AI", desc: "Fast router & rules engine" },
   { id: "drain", icon: Cpu, label: "Engine Core", desc: "Clustering parameters" },
   { id: "ingestion", icon: Network, label: "Ingestion", desc: "Live stream listeners" },
 ];
 
-export function SettingsPanel({
-  onSave,
-}: {
-  readonly onSave: (settings: AppSettings) => void;
-}) {
+export function SettingsPanel({ onSave }: { readonly onSave: (settings: AppSettings) => void }) {
   const [settings, setSettings] = useState<AppSettings>(defaultSettings);
   const [activeSection, setActiveSection] = useState<SectionId>("ai");
   const [saved, setSaved] = useState(false);
@@ -84,11 +79,7 @@ export function SettingsPanel({
 
   const availableModels = providerModelsCache[settings.ai_provider] || [];
 
-  const update = <K extends keyof AppSettings>(
-    key: K,
-    value: AppSettings[K],
-    immediate = true,
-  ) => {
+  const update = <K extends keyof AppSettings>(key: K, value: AppSettings[K], immediate = true) => {
     const newSettings = { ...settings, [key]: value };
     setSettings(newSettings);
 
@@ -135,8 +126,7 @@ export function SettingsPanel({
       await callSidecar({
         method: "reset_templates",
         params: {
-          workspace_id:
-            settings.drain_template_scope === "global" ? undefined : activeWorkspaceId,
+          workspace_id: settings.drain_template_scope === "global" ? undefined : activeWorkspaceId,
         },
       });
       toast.success("Pattern cache cleared successfully");
@@ -324,6 +314,10 @@ export function SettingsPanel({
             />
           )}
 
+          {activeSection === "rag" && (
+            <RAGSettingsSection settings={settings} update={update} onSave={onSave} />
+          )}
+
           {activeSection === "drain" && (
             <DrainSettingsSection
               settings={settings}
@@ -335,11 +329,7 @@ export function SettingsPanel({
           )}
 
           {activeSection === "ingestion" && (
-            <IngestionSettingsSection
-              settings={settings}
-              update={update}
-              onSave={onSave}
-            />
+            <IngestionSettingsSection settings={settings} update={update} onSave={onSave} />
           )}
 
           {activeSection === "laya" && <LayaSettingsSection />}

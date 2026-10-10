@@ -24,8 +24,8 @@ func TestOpen_CreatesAllTables(t *testing.T) {
 		}
 	}
 
-	if len(AllTables) != 16 {
-		t.Errorf("expected 16 tables, AllTables has %d", len(AllTables))
+	if len(AllTables) != 17 {
+		t.Errorf("expected 17 tables, AllTables has %d", len(AllTables))
 	}
 }
 

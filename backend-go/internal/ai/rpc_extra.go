@@ -272,6 +272,36 @@ func (e *Extra) SearchMemory(ctx context.Context, req models.SearchMemoryRequest
 	return out, nil
 }
 
+// SyncKnowledgeBase scans the knowledge directory and updates vector embeddings.
+func (e *Extra) SyncKnowledgeBase(ctx context.Context, req models.SyncKnowledgeBaseRequest) (any, *models.RPCError) {
+	svc, err := e.memory.get()
+	if err != nil {
+		return nil, &models.RPCError{Code: extraErrInternal, Message: err.Error()}
+	}
+
+	folder := "knowledge"
+	if req.KnowledgePath != nil && *req.KnowledgePath != "" {
+		folder = *req.KnowledgePath
+	}
+
+	watcher, err := rag.NewKnowledgeWatcher(req.WorkspaceID, folder, svc)
+	if err != nil {
+		return nil, &models.RPCError{Code: extraErrInternal, Message: fmt.Sprintf("failed to init knowledge scanner: %v", err)}
+	}
+	defer watcher.Stop()
+
+	totalFiles, totalChunks, err := watcher.ScanAll(ctx)
+	if err != nil {
+		return nil, &models.RPCError{Code: extraErrInternal, Message: fmt.Sprintf("scan failed: %v", err)}
+	}
+
+	return map[string]any{
+		"status":       "ok",
+		"total_files":  totalFiles,
+		"total_chunks": totalChunks,
+	}, nil
+}
+
 // --- lazy rag.Service handle -----------------------------------------------
 
 // lazyMemoryService is a second, independent lazy-initialized rag.Service

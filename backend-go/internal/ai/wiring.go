@@ -373,3 +373,27 @@ func (l *lazyMemorySearcher) SearchMemory(ctx context.Context, workspaceID, quer
 	}
 	return out, nil
 }
+
+// SearchKnowledge implements graph.MemorySearcher, retrieving documentation chunks from knowledge_documents.
+func (l *lazyMemorySearcher) SearchKnowledge(ctx context.Context, workspaceID, query string, limit int) ([]graph.KnowledgeHit, error) {
+	l.init()
+	if l.err != nil {
+		return nil, l.err
+	}
+
+	results, err := l.svc.SearchKnowledge(ctx, workspaceID, query, limit)
+	if err != nil {
+		return nil, err
+	}
+
+	out := make([]graph.KnowledgeHit, len(results))
+	for i, r := range results {
+		out[i] = graph.KnowledgeHit{
+			FilePath: r.FilePath,
+			FileType: r.FileType,
+			Content:  r.Content,
+			Score:    r.Score,
+		}
+	}
+	return out, nil
+}

@@ -42,6 +42,10 @@ export interface AppSettings {
   timestamp_auto_detect: boolean;
   timestamp_custom_regex: string;
   timestamp_custom_format: string;
+  rag_embedder_type: "onnx" | "ollama";
+  rag_device: "cpu" | "gpu";
+  rag_knowledge_path: string;
+  rag_ollama_host: string;
 }
 
 export const defaultSettings: AppSettings = {
@@ -163,6 +167,10 @@ export const defaultSettings: AppSettings = {
   timestamp_auto_detect: true,
   timestamp_custom_regex: "",
   timestamp_custom_format: "",
+  rag_embedder_type: "onnx",
+  rag_device: "cpu",
+  rag_knowledge_path: "",
+  rag_ollama_host: "http://localhost:11434",
 };
 
 interface SettingsStore {

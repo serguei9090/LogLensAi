@@ -54,6 +54,12 @@ type Service struct {
 	conn      *sql.DB
 	embedder  *Embedder
 	vssStatus db.VSSStatus
+	exporter  *MemoryMarkdownExporter
+}
+
+// SetExporter sets an optional Markdown exporter for writing resolutions to disk.
+func (s *Service) SetExporter(exporter *MemoryMarkdownExporter) {
+	s.exporter = exporter
 }
 
 // NewService prepares the ai_memory table for vector search (idempotent --
@@ -131,6 +137,14 @@ func (s *Service) SaveMemory(ctx context.Context, workspaceID, issueSignature, r
 	if _, err := s.conn.ExecContext(ctx, insertSQL, args...); err != nil {
 		return fmt.Errorf("rag: inserting memory row: %w", err)
 	}
+
+	if s.exporter != nil {
+		if _, err := s.exporter.ExportResolution(workspaceID, issueSignature, resolution); err != nil {
+			// Log error but don't fail the primary save
+			fmt.Printf("rag: warning: failed to export resolution markdown: %v\n", err)
+		}
+	}
+
 	return nil
 }
 

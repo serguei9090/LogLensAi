@@ -149,6 +149,22 @@ func (r *ToolRegistry) registerBuiltins() {
 		},
 	}, r.searchMemory)
 
+	r.Register("search_knowledge", ToolSchema{
+		Type: "function",
+		Function: ToolFunctionSchema{
+			Name:        "search_knowledge",
+			Description: "Search team knowledge base, runbooks, documentation, and architecture diagrams.",
+			Parameters: rawSchema(`{
+				"type": "object",
+				"properties": {
+					"workspace_id": {"type": "string", "description": "The workspace ID"},
+					"query": {"type": "string", "description": "Search query string"}
+				},
+				"required": ["workspace_id", "query"]
+			}`),
+		},
+	}, r.searchKnowledge)
+
 	r.Register("get_facets", ToolSchema{
 		Type: "function",
 		Function: ToolFunctionSchema{

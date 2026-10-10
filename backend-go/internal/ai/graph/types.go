@@ -97,10 +97,18 @@ type Provider interface {
 	Chat(ctx context.Context, messages []ChatMessage, sessionID, model string, reasoning bool, tools []ToolSchema) (ChatMessage, error)
 }
 
+type KnowledgeHit struct {
+	FilePath string  `json:"file_path"`
+	FileType string  `json:"file_type"`
+	Content  string  `json:"content"`
+	Score    float64 `json:"score"`
+}
+
 // MemorySearcher is the minimal surface this package needs from the RAG
 // memory index (sidecar/src/api.py's App.method_search_memory, backed by
 // LanceDB in Python and DuckDB-VSS in internal/ai/rag, built concurrently
 // and not yet available -- see the package doc comment).
 type MemorySearcher interface {
 	SearchMemory(ctx context.Context, workspaceID, query string, limit int) ([]MemoryResult, error)
+	SearchKnowledge(ctx context.Context, workspaceID, query string, limit int) ([]KnowledgeHit, error)
 }

@@ -126,4 +126,11 @@ func RegisterAIExtraMethods(r *Registry, a *app.App, extra *ai.Extra) {
 		}
 		return extra.SearchMemory(context.Background(), req)
 	})
+	r.RegisterWithModel("sync_knowledge_base", paramModels["sync_knowledge_base"], func(params json.RawMessage) (any, *models.RPCError) {
+		var req models.SyncKnowledgeBaseRequest
+		if err := json.Unmarshal(params, &req); err != nil {
+			return nil, invalidParamsErr(err)
+		}
+		return extra.SyncKnowledgeBase(context.Background(), req)
+	})
 }
