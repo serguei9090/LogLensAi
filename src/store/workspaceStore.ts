@@ -320,7 +320,9 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
           }));
 
           // Clean up any pending jobs for this source via custom event to avoid circular store import
-          globalThis.dispatchEvent(new CustomEvent("loglens:remove-source-jobs", { detail: { sourceId } }));
+          globalThis.dispatchEvent(
+            new CustomEvent("loglens:remove-source-jobs", { detail: { sourceId } }),
+          );
 
           // Refresh hierarchy
           const get = useWorkspaceStore.getState as any;
@@ -474,10 +476,11 @@ export const selectActiveSource = (state: WorkspaceStore): LogSource | null => {
 
 // Listen for cross-store hierarchy refresh requests without circular imports
 if (typeof globalThis !== "undefined" && globalThis.addEventListener) {
-  globalThis.addEventListener("loglens:refresh-hierarchy", ((e: CustomEvent<{ workspaceId: string }>) => {
+  globalThis.addEventListener("loglens:refresh-hierarchy", ((
+    e: CustomEvent<{ workspaceId: string }>,
+  ) => {
     if (e.detail?.workspaceId) {
       useWorkspaceStore.getState().fetchHierarchy(e.detail.workspaceId);
     }
   }) as EventListener);
 }
-

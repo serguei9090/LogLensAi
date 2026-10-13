@@ -14,10 +14,7 @@ export interface LayaGuideModalProps {
   readonly onOpenChange: (open: boolean) => void;
 }
 
-export function LayaGuideModal({
-  isOpen,
-  onOpenChange,
-}: Readonly<LayaGuideModalProps>) {
+export function LayaGuideModal({ isOpen, onOpenChange }: Readonly<LayaGuideModalProps>) {
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[620px] bg-bg-surface border-border max-h-[85vh] overflow-y-auto">
@@ -101,8 +98,8 @@ export function LayaGuideModal({
                   </span>
                 </div>
                 <p className="text-text-muted text-xs">
-                  Produces a calibrated True / False probability (e.g. "Does this template
-                  represent an outage?").
+                  Produces a calibrated True / False probability (e.g. "Does this template represent
+                  an outage?").
                 </p>
               </div>
             </div>

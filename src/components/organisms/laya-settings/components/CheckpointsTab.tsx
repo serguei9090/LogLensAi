@@ -51,7 +51,9 @@ export function CheckpointsTab({
                   {new Date(cp.timestamp).toLocaleString()}
                 </span>
               </div>
-              <p className="text-xs text-text-muted">{cp.description || "No description provided"}</p>
+              <p className="text-xs text-text-muted">
+                {cp.description || "No description provided"}
+              </p>
               <div className="text-xs font-mono text-text-muted/80">
                 {Object.keys(cp.questions || {}).length} rules defined (
                 {Object.keys(cp.questions || {}).join(", ")})

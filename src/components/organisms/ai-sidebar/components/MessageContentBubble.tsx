@@ -1,6 +1,6 @@
+import { A2UIRenderer } from "@/components/atoms/A2UIRenderer";
 import { MarkdownContent } from "@/components/atoms/MarkdownContent";
 import { ThinkingBlock } from "@/components/atoms/ThinkingBlock";
-import { A2UIRenderer } from "@/components/atoms/A2UIRenderer";
 import { TypingIndicator } from "@/components/atoms/TypingIndicator";
 import { cn } from "@/lib/utils";
 import { Check, Copy, Loader2, Sparkles, Wrench } from "lucide-react";

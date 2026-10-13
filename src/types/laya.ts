@@ -44,4 +44,3 @@ export interface LayaModelStatus {
   head_path: string;
   tokenizer_path: string;
 }
-

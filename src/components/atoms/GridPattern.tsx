@@ -2,7 +2,8 @@
 "use client";
 
 import { cn } from "@/lib/utils";
-import React, { useId } from "react";
+import type React from "react";
+import { useId } from "react";
 
 interface GridPatternProps extends React.SVGProps<SVGSVGElement> {
   width?: number;
@@ -42,14 +43,7 @@ export function GridPattern({
       {...props}
     >
       <defs>
-        <pattern
-          id={id}
-          width={width}
-          height={height}
-          patternUnits="userSpaceOnUse"
-          x={x}
-          y={y}
-        >
+        <pattern id={id} width={width} height={height} patternUnits="userSpaceOnUse" x={x} y={y}>
           <circle cx={width / 2} cy={height / 2} r={dotSize} fill="currentColor" />
         </pattern>
       </defs>

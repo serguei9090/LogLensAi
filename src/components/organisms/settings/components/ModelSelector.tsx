@@ -32,14 +32,9 @@ export function ModelSelector({
       <div className="flex items-center justify-between">
         <SectionLabel htmlFor="ai_model_selector">Model</SectionLabel>
         {isVerified &&
-          [
-            "ollama",
-            "lmstudio",
-            "ai-studio",
-            "openai-compatible",
-            "openrouter",
-            "openai",
-          ].includes(provider) && (
+          ["ollama", "lmstudio", "ai-studio", "openai-compatible", "openrouter", "openai"].includes(
+            provider,
+          ) && (
             <Button
               variant="ghost"
               onClick={onRefresh}
@@ -70,16 +65,12 @@ export function ModelSelector({
           onChange={onChange}
           searchable={availableModels.length > 5 || provider === "openrouter"}
           searchPlaceholder={
-            provider === "openrouter"
-              ? "Search 300+ models or filter free..."
-              : "Search models..."
+            provider === "openrouter" ? "Search 300+ models or filter free..." : "Search models..."
           }
           showFreeBadge={provider === "openrouter"}
           showFreeFilter={provider === "openrouter"}
         >
-          {!availableModels.includes(value) && value && (
-            <option value={value}>{value}</option>
-          )}
+          {!availableModels.includes(value) && value && <option value={value}>{value}</option>}
           {availableModels.map((m) => (
             <option key={m} value={m}>
               {m}

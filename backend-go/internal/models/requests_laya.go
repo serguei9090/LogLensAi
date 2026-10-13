@@ -54,3 +54,7 @@ type DownloadLayaModelRequest struct {
 	WorkspaceID *string `json:"workspace_id,omitempty"`
 }
 
+// DeleteLayaModelRequest defines parameters for deleting local Laya model weights.
+type DeleteLayaModelRequest struct {
+	WorkspaceID *string `json:"workspace_id,omitempty"`
+}

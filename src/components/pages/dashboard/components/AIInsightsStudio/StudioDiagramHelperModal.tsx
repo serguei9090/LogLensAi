@@ -1,5 +1,7 @@
 // Assume Role: Frontend Engineer (@frontend)
 
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import {
   Activity,
   BarChart3,
@@ -12,8 +14,6 @@ import {
   X,
 } from "lucide-react";
 import { useState } from "react";
-import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
 
 export interface VisualPreset {
   id: string;
@@ -55,7 +55,8 @@ const VISUAL_PRESETS: VisualPreset[] = [
     category: "Metrics",
     badge: "Live Stat",
     color: "text-cyan-400 bg-cyan-500/10 border-cyan-500/20",
-    prompt: "Display live metric telemetry cards showing total volume, error count, and warning rates.",
+    prompt:
+      "Display live metric telemetry cards showing total volume, error count, and warning rates.",
   },
   {
     id: "preset-cluster-drift",
@@ -65,12 +66,14 @@ const VISUAL_PRESETS: VisualPreset[] = [
     category: "Drilldown",
     badge: "Clustering",
     color: "text-amber-400 bg-amber-500/10 border-amber-500/20",
-    prompt: "Analyze the top Drain3 log clusters and display their template signatures with frequency.",
+    prompt:
+      "Analyze the top Drain3 log clusters and display their template signatures with frequency.",
   },
   {
     id: "preset-live-table",
     title: "Interactive Log Data Table",
-    description: "Render a scrollable live log table with level badges, timestamps, and message search",
+    description:
+      "Render a scrollable live log table with level badges, timestamps, and message search",
     icon: TableIcon,
     category: "Tables",
     badge: "Data Grid",
@@ -80,7 +83,8 @@ const VISUAL_PRESETS: VisualPreset[] = [
   {
     id: "preset-deep-drilldown",
     title: "Cross-Catalog Root Cause",
-    description: "Correlate error chains and abnormal clusters across services into a synthesized verdict",
+    description:
+      "Correlate error chains and abnormal clusters across services into a synthesized verdict",
     icon: Database,
     category: "Drilldown",
     badge: "Synthesis",
@@ -97,7 +101,9 @@ export function StudioDiagramHelperModal({
   onSelectPrompt,
 }: Readonly<StudioDiagramHelperModalProps>) {
   const [isOpen, setIsOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<"All" | "Histograms" | "Metrics" | "Tables" | "Drilldown">("All");
+  const [activeTab, setActiveTab] = useState<
+    "All" | "Histograms" | "Metrics" | "Tables" | "Drilldown"
+  >("All");
 
   const filteredPresets = VISUAL_PRESETS.filter(
     (preset) => activeTab === "All" || preset.category === activeTab,
@@ -233,8 +239,13 @@ export function StudioDiagramHelperModal({
 
             {/* Footer */}
             <div className="px-4 py-2 border-t border-white/5 bg-white/[0.01] flex items-center justify-between text-[11px] font-mono text-text-muted">
-              <span>Tip: Attach specific catalogs with <strong className="text-cyan-400">@</strong> before generating</span>
-              <span className="text-[10px]">Type <strong className="text-primary">/</strong> in chat for skills</span>
+              <span>
+                Tip: Attach specific catalogs with <strong className="text-cyan-400">@</strong>{" "}
+                before generating
+              </span>
+              <span className="text-[10px]">
+                Type <strong className="text-primary">/</strong> in chat for skills
+              </span>
             </div>
           </div>
         </div>

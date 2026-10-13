@@ -1,12 +1,12 @@
 // Assume Role: Frontend Engineer (@frontend)
 
-import { Activity, Database, Layers, TrendingUp } from "lucide-react";
-import { lazy, Suspense, useMemo, useState } from "react";
 import { StatCard } from "@/components/atoms/StatCard";
 import type { DashboardMode } from "@/components/molecules/DashboardModeToggle";
 import { useInView } from "@/lib/hooks/useInView";
 import { cn } from "@/lib/utils";
 import { selectActiveWorkspace, useWorkspaceStore } from "@/store/workspaceStore";
+import { Activity, Database, Layers, TrendingUp } from "lucide-react";
+import { Suspense, lazy, useMemo, useState } from "react";
 import { AIInsightsStudio } from "./components/AIInsightsStudio";
 import { AIObservationCard } from "./components/AIObservationCard";
 import { ErrorClustersSection, NoiseClustersSection } from "./components/ClustersSections";

@@ -27,9 +27,7 @@ export function getHighlightedElements(text: string, highlights: HighlightEntry[
         const startPos = currentPos;
         currentPos += part.length;
 
-        const match = highlights.find(
-          (h) => h.term?.toLowerCase() === part.toLowerCase(),
-        );
+        const match = highlights.find((h) => h.term?.toLowerCase() === part.toLowerCase());
 
         if (match) {
           return (

@@ -264,4 +264,3 @@ func (inv *WorkspaceInventory) FormatGroundedSystemPromptContext() string {
 	sb.WriteString("3. If you already have the required log data from tools, synthesize your findings into a comprehensive diagnosis, comparative breakdown, or histogram chart with actionable next steps.")
 	return sb.String()
 }
-

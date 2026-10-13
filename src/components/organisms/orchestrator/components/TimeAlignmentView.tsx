@@ -25,9 +25,7 @@ export function TimeAlignmentView({
       </button>
 
       <div className="space-y-4">
-        <p className="text-xs text-white/50 font-medium">
-          Adjust time offsets out-of-sync lines.
-        </p>
+        <p className="text-xs text-white/50 font-medium">Adjust time offsets out-of-sync lines.</p>
 
         <div className="space-y-2 max-h-[440px] overflow-y-auto pr-1 custom-scrollbar">
           {availableSources.map((source) => {
@@ -38,9 +36,7 @@ export function TimeAlignmentView({
                 className="group flex flex-row items-center justify-between p-3 rounded-lg bg-white/[0.02] border border-white/5 hover:bg-white/[0.04] transition-all"
               >
                 <div className="min-w-0 pr-3">
-                  <p className="text-sm font-medium text-white/90 truncate">
-                    {source.name}
-                  </p>
+                  <p className="text-sm font-medium text-white/90 truncate">{source.name}</p>
                   <div className="flex items-center gap-1.5 mt-0.5">
                     <Clock className="size-3 text-white/30" />
                     <p className="text-xs font-mono text-white/50">

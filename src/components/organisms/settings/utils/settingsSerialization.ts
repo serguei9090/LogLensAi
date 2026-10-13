@@ -1,8 +1,4 @@
-import {
-  type AppSettings,
-  type KeyboardShortcut,
-  defaultSettings,
-} from "@/store/settingsStore";
+import { type AppSettings, type KeyboardShortcut, defaultSettings } from "@/store/settingsStore";
 
 /**
  * Safely parse a raw settings string value that may be JSON or a
@@ -85,9 +81,7 @@ export function parseRemote(
     }
   }
   if (Array.isArray(next.facet_extractions)) {
-    next.facet_extractions = next.facet_extractions.filter(
-      (f) => f.name.trim() || f.regex.trim(),
-    );
+    next.facet_extractions = next.facet_extractions.filter((f) => f.name.trim() || f.regex.trim());
   }
   return next;
 }

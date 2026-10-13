@@ -240,17 +240,23 @@ bun run dev   # or: npm run dev
 
 ## 🧪 Testing & Verification
 
-Run the verification suites for frontend and backend:
+Run the verification suites across all tiers:
 
 ```bash
-# Backend unit & integration tests (Go)
-cd backend-go
-go test -v ./internal/ai/laya/...
-go test -v ./internal/services/clustering/...
-go test -v ./internal/app/...
+# 1. Full E2E Playwright Suite (20 tests covering all UI controls & modals)
+bun run test:e2e
 
-# Frontend linting & type checks
+# 2. Frontend Unit & Contract Suite (Vitest)
+bun run test
+
+# 3. Backend Unit & Regression Suite (Go)
+cd backend-go
+go test -v ./internal/ai/... ./internal/db/... ./internal/rpc/...
+
+# 4. Static Analysis, Linting & Type Checks
 bun run lint
+bun run typecheck
+cd backend-go && go vet ./...
 ```
 
 ---

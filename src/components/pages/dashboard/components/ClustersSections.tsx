@@ -42,6 +42,8 @@ export function ErrorClustersSection({ stats, selectedWorkspaceId }: ClustersSec
         severity={(c as any).severity}
         isOutage={(c as any).is_outage}
         confidence={(c as any).confidence}
+        ragTag={(c as any).rag_tag}
+        isKnownIssue={(c as any).is_known_issue}
       />
     ));
   } else {
@@ -97,6 +99,8 @@ export function NoiseClustersSection({ stats, selectedWorkspaceId }: ClustersSec
         severity={(c as any).severity}
         isOutage={(c as any).is_outage}
         confidence={(c as any).confidence}
+        ragTag={(c as any).rag_tag}
+        isKnownIssue={(c as any).is_known_issue}
       />
     ));
   } else {

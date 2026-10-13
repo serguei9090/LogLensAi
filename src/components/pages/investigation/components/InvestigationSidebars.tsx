@@ -1,6 +1,6 @@
-import { AIInvestigationSidebar } from "@/components/organisms/ai-sidebar";
 import { ColumnManagerSidebar } from "@/components/organisms/ColumnManagerSidebar";
 import { FacetSidebar } from "@/components/organisms/FacetSidebar";
+import { AIInvestigationSidebar } from "@/components/organisms/ai-sidebar";
 
 interface InvestigationSidebarsProps {
   readonly isSourceLoading: boolean;

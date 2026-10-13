@@ -29,6 +29,8 @@ export function OrchestratorHeader({ view, onClose }: OrchestratorHeaderProps) {
       </div>
       <button
         type="button"
+        data-testid="close-orchestrator"
+        aria-label="Close Orchestrator"
         onClick={onClose}
         className="p-2 hover:bg-white/10 rounded-md transition-all text-white/40 hover:text-white"
       >

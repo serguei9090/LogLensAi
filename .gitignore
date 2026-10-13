@@ -17,6 +17,7 @@ __pycache__/
 .pyright_cache/
 .uv/
 .pytest_cache/
+.coverage
 
 # Tauri / Rust
 target/
@@ -64,6 +65,10 @@ final_debug*
 __pyrefly_virtual__/
 scratch/
 .antigravitycli/
+playwright-report/
+test-results/
+rag_model/
+backend-go/sidecar.exe
 
 # Build binaries & symbols
 *.exe

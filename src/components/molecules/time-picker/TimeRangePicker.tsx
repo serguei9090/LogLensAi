@@ -17,7 +17,7 @@ import { PresetsSidebar } from "./components/PresetsSidebar";
 import { SelectionPreview } from "./components/SelectionPreview";
 import { TimeControls } from "./components/TimeControls";
 import { YearGrid } from "./components/YearGrid";
-import { PRESETS } from "./constants";
+import type { PRESETS } from "./constants";
 import type { CalendarView, TimeRangePickerProps } from "./types";
 import { toNominalISO } from "./utils";
 

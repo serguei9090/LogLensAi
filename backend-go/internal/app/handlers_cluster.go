@@ -32,6 +32,13 @@ func (a *App) GetClusters(workspaceID string) (any, *models.RPCError) {
 			entry["severity"] = t.Severity
 			entry["is_outage"] = t.IsOutage
 			entry["confidence"] = t.Confidence
+			if t.RAGTag != "" {
+				entry["rag_tag"] = t.RAGTag
+				entry["is_known_issue"] = t.IsKnownIssue
+				entry["matched_signature"] = t.MatchedSignature
+				entry["known_resolution"] = t.KnownResolution
+				entry["match_score"] = t.MatchScore
+			}
 		}
 		out[i] = entry
 	}

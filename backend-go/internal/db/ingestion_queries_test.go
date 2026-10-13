@@ -132,10 +132,10 @@ func TestAppenderBehavior(t *testing.T) {
 			"2026-09-16 12:00:00",
 			"2026-09-16 12:00:01",
 			"INFO",
-			nil, // cluster_id
+			nil,   // cluster_id
 			false, // has_comment
-			nil, // comment
-			nil, // facets
+			nil,   // comment
+			nil,   // facets
 			false, // processed
 		); err != nil {
 			return err

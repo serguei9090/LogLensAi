@@ -6,7 +6,7 @@ import { useAiStore } from "@/store/aiStore";
 import { useInvestigationStore } from "@/store/investigationStore";
 import type { LogEntry } from "@/types/log";
 import { Sparkles, StickyNote } from "lucide-react";
-import * as React from "react";
+import type * as React from "react";
 import { getClusterStyles } from "../utils/styleUtils";
 
 interface ClusterCellProps {
@@ -15,11 +15,7 @@ interface ClusterCellProps {
   readonly onAnalyzeCluster?: (clusterId: string) => void;
 }
 
-export function ClusterCell({
-  log,
-  anomalousClusters,
-  onAnalyzeCluster,
-}: ClusterCellProps) {
+export function ClusterCell({ log, anomalousClusters, onAnalyzeCluster }: ClusterCellProps) {
   return (
     <td
       key="cluster_id"
@@ -62,11 +58,7 @@ interface ActionsCellProps {
   readonly onToggleView: (id: number) => void;
 }
 
-export function ActionsCell({
-  log,
-  logSessionMap,
-  onToggleView,
-}: ActionsCellProps) {
+export function ActionsCell({ log, logSessionMap, onToggleView }: ActionsCellProps) {
   const { setSidebarOpen, setSession } = useAiStore();
   const { clearSelection, setSelectedLogIds } = useInvestigationStore();
 
@@ -251,13 +243,7 @@ export function LogTableCell({
         />
       );
     case "actions":
-      return (
-        <ActionsCell
-          log={log}
-          logSessionMap={logSessionMap}
-          onToggleView={onToggleView}
-        />
-      );
+      return <ActionsCell log={log} logSessionMap={logSessionMap} onToggleView={onToggleView} />;
     default: {
       const custom = customColumns.find((c) => c.id === colId);
       if (custom) {

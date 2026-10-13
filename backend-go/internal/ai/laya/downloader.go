@@ -26,11 +26,11 @@ const (
 	TokenizerFileName   = "tokenizer.json"
 
 	// Approximate file sizes for progress estimation before header arrival
-	EncoderApproxSize     int64 = 3 * 1024 * 1024       // ~2.8 MB
-	EncoderDataApproxSize int64 = 468 * 1024 * 1024     // ~468 MB
-	HeadApproxSize        int64 = 250 * 1024            // ~205 KB
-	HeadDataApproxSize    int64 = 53 * 1024 * 1024      // ~53 MB
-	TokenizerApproxSize   int64 = 1500 * 1024           // ~1.5 MB
+	EncoderApproxSize     int64 = 3 * 1024 * 1024   // ~2.8 MB
+	EncoderDataApproxSize int64 = 468 * 1024 * 1024 // ~468 MB
+	HeadApproxSize        int64 = 250 * 1024        // ~205 KB
+	HeadDataApproxSize    int64 = 53 * 1024 * 1024  // ~53 MB
+	TokenizerApproxSize   int64 = 1500 * 1024       // ~1.5 MB
 	TotalApproxSize       int64 = EncoderApproxSize + EncoderDataApproxSize + HeadApproxSize + HeadDataApproxSize + TokenizerApproxSize
 )
 
@@ -223,6 +223,32 @@ func (m *ModelManager) StartDownload(onComplete func()) error {
 	m.mu.Unlock()
 
 	go m.downloadLoop(ctx, baseURL, onComplete)
+	return nil
+}
+
+// DeleteModel terminates any active download and deletes the local model files from disk.
+func (m *ModelManager) DeleteModel() error {
+	m.mu.Lock()
+	if m.cancelFunc != nil {
+		m.cancelFunc()
+		m.cancelFunc = nil
+	}
+	m.state = ModelStateIdle
+	m.progress = 0.0
+	m.downloadedBytes = 0
+	m.errorMessage = ""
+	modelDir := m.modelDir
+	m.mu.Unlock()
+
+	if err := os.RemoveAll(modelDir); err != nil && !os.IsNotExist(err) {
+		m.mu.Lock()
+		m.state = ModelStateError
+		m.errorMessage = fmt.Sprintf("failed deleting model dir: %v", err)
+		m.mu.Unlock()
+		return fmt.Errorf("deleting model dir: %w", err)
+	}
+
+	m.RefreshStatus()
 	return nil
 }
 

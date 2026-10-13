@@ -114,7 +114,7 @@ func streamChatHandler(a *app.App, provider graph.Provider, tools *graph.ToolReg
 				}
 				if chunk.StepNotice != "" {
 					writeSSE(w, map[string]any{
-						"step": chunk.StepNotice,
+						"step":      chunk.StepNotice,
 						"step_done": chunk.StepDone,
 					})
 					flush()

@@ -4,9 +4,11 @@ import (
 	"context"
 	"errors"
 	"regexp"
+	"strings"
 	"testing"
 
 	"loglensai/backend-go/internal/ai/providers"
+	"loglensai/backend-go/internal/ai/rag"
 	"loglensai/backend-go/internal/app"
 	"loglensai/backend-go/internal/models"
 )
@@ -84,12 +86,12 @@ func TestExtra_AnalyzeCluster_HydratesSamplesAndCallsProvider(t *testing.T) {
 	if rpcErr != nil {
 		t.Fatalf("AnalyzeCluster: %+v", rpcErr)
 	}
-	m, ok := result.(map[string]any)
+	resp, ok := result.(models.AnalyzeClusterResponse)
 	if !ok {
 		t.Fatalf("unexpected result type %T: %+v", result, result)
 	}
-	if m["summary"] != "Repeated logins" || m["root_cause"] != "normal traffic" {
-		t.Errorf("unexpected result: %+v", m)
+	if resp.Summary != "Repeated logins" || resp.RootCause != "normal traffic" {
+		t.Errorf("unexpected result: %+v", resp)
 	}
 
 	if len(fake.lastAnalyzeSamples) != 3 {
@@ -118,6 +120,342 @@ func TestExtra_AnalyzeCluster_DefaultsSampleSize(t *testing.T) {
 	}
 	if len(fake.lastAnalyzeSamples) != 0 {
 		t.Errorf("expected 0 samples, got %v", fake.lastAnalyzeSamples)
+	}
+}
+
+type fakeMemorySearcher struct {
+	results   []rag.MemoryResult
+	err       error
+	lastQuery string
+}
+
+func (f *fakeMemorySearcher) SearchMemory(_ context.Context, _, query string, _ int) ([]rag.MemoryResult, error) {
+	f.lastQuery = query
+	return f.results, f.err
+}
+
+func TestExtra_AnalyzeCluster_KnownIssue_WithMemoryMatch(t *testing.T) {
+	a := newTestApp(t)
+
+	lines := []string{"connection failed to auth-service: timeout"}
+	if _, err := a.LogStore.AppendBatch("src1", lines); err != nil {
+		t.Fatalf("AppendBatch: %v", err)
+	}
+	if _, err := a.DB.Conn.Exec(
+		`INSERT INTO logs (workspace_id, source_id, line_id, cluster_id, timestamp, level, processed) VALUES (?, ?, ?, ?, ?, ?, TRUE)`,
+		"ws1", "src1", 0, "42", "2024-01-01 00:00:00", "ERROR",
+	); err != nil {
+		t.Fatalf("insert log: %v", err)
+	}
+
+	fake := &fakeProvider{analyzeResult: providers.AnalysisResult{
+		Summary:            "Auth timeout issue",
+		RootCause:          "auth-service unreachable",
+		RecommendedActions: []string{"check service health"},
+	}}
+	extra := newTestExtra(a, fake)
+
+	// Injected memory match with high similarity (distance = 0.15 -> similarity = 0.85 >= 0.70 threshold)
+	memSearcher := &fakeMemorySearcher{
+		results: []rag.MemoryResult{
+			{
+				IssueSignature: "connection failed to auth-service",
+				Resolution:     "Restart auth-service pod and renew mTLS cert",
+				Distance:       0.15,
+			},
+		},
+	}
+	extra.SetMemorySearcher(memSearcher)
+
+	result, rpcErr := extra.AnalyzeCluster(context.Background(), models.AnalyzeClusterRequest{
+		WorkspaceID: "ws1",
+		ClusterID:   "42",
+		SampleSize:  10,
+	})
+	if rpcErr != nil {
+		t.Fatalf("AnalyzeCluster: %+v", rpcErr)
+	}
+	resp, ok := result.(models.AnalyzeClusterResponse)
+	if !ok {
+		t.Fatalf("unexpected result type %T: %+v", result, result)
+	}
+
+	// 1. Verify KNOWN ISSUE identification and tags
+	if resp.IsKnownIssue != true {
+		t.Errorf("expected is_known_issue true, got %v", resp.IsKnownIssue)
+	}
+	if resp.Classification != "KNOWN ISSUE" {
+		t.Errorf("expected classification 'KNOWN ISSUE', got %v", resp.Classification)
+	}
+	if resp.Tag != TagKnownIssue {
+		t.Errorf("expected tag %q, got %q", TagKnownIssue, resp.Tag)
+	}
+	if resp.MatchedSignature != "connection failed to auth-service" {
+		t.Errorf("expected matched signature, got %v", resp.MatchedSignature)
+	}
+	if resp.KnownResolution != "Restart auth-service pod and renew mTLS cert" {
+		t.Errorf("expected known resolution, got %v", resp.KnownResolution)
+	}
+	if resp.MatchScore < 0.84 || resp.MatchScore > 0.86 {
+		t.Errorf("expected match_score approx 0.85, got %v", resp.MatchScore)
+	}
+
+	// 2. Verify prior resolution was injected into AI prompt
+	if !strings.Contains(fake.lastAnalyzeTemplate, "[PRIOR KNOWN INCIDENT IN MEMORY]") {
+		t.Errorf("expected prompt template to contain prior incident memory, got: %q", fake.lastAnalyzeTemplate)
+	}
+	if !strings.Contains(fake.lastAnalyzeTemplate, "Restart auth-service pod and renew mTLS cert") {
+		t.Errorf("expected prompt template to contain prior resolution, got: %q", fake.lastAnalyzeTemplate)
+	}
+
+	// 3. Verify recommended actions includes proven resolution
+	hasProven := false
+	for _, act := range resp.RecommendedActions {
+		if strings.Contains(act, "Proven Resolution from Memory") && strings.Contains(act, "Restart auth-service pod") {
+			hasProven = true
+			break
+		}
+	}
+	if !hasProven {
+		t.Errorf("expected recommended_actions to contain proven resolution, got: %v", resp.RecommendedActions)
+	}
+
+	// 4. Verify DB persistence in cluster_triage
+	triage, tErr := a.DB.GetClusterTriage("ws1", "42")
+	if tErr != nil || triage == nil {
+		t.Fatalf("GetClusterTriage failed: %v", tErr)
+	}
+	if !triage.IsKnownIssue {
+		t.Errorf("expected triage.IsKnownIssue true in DB, got false")
+	}
+	if triage.RAGTag != TagKnownIssue {
+		t.Errorf("expected triage.RAGTag %q in DB, got %q", TagKnownIssue, triage.RAGTag)
+	}
+	if triage.KnownResolution != "Restart auth-service pod and renew mTLS cert" {
+		t.Errorf("expected triage.KnownResolution in DB, got %q", triage.KnownResolution)
+	}
+
+	// 5. Verify App.GetClusters includes RAG triage attributes
+	clustersResult, cErr := a.GetClusters("ws1")
+	if cErr != nil {
+		t.Fatalf("GetClusters failed: %+v", cErr)
+	}
+	clustersSlice, ok := clustersResult.([]map[string]any)
+	if !ok {
+		t.Fatalf("unexpected GetClusters type: %T", clustersResult)
+	}
+	found := false
+	for _, c := range clustersSlice {
+		if c["rag_tag"] == TagKnownIssue && c["is_known_issue"] == true {
+			found = true
+			if c["known_resolution"] != "Restart auth-service pod and renew mTLS cert" {
+				t.Errorf("expected cluster known_resolution, got %v", c["known_resolution"])
+			}
+			break
+		}
+	}
+	if !found {
+		// Clusters slice might be empty if miner had no clusters, but DB triage map exists
+		triageMap, _ := a.DB.GetClusterTriageMap("ws1")
+		if rec, exists := triageMap["42"]; !exists || !rec.IsKnownIssue {
+			t.Errorf("expected cluster 42 to be marked as known issue in triageMap: %+v", triageMap)
+		}
+	}
+}
+
+func TestExtra_AnalyzeCluster_NewAnomaly_WhenBelowThreshold(t *testing.T) {
+	a := newTestApp(t)
+
+	lines := []string{"disk quota exceeded for user 100"}
+	if _, err := a.LogStore.AppendBatch("src1", lines); err != nil {
+		t.Fatalf("AppendBatch: %v", err)
+	}
+	if _, err := a.DB.Conn.Exec(
+		`INSERT INTO logs (workspace_id, source_id, line_id, cluster_id, timestamp, level, processed) VALUES (?, ?, ?, ?, ?, ?, TRUE)`,
+		"ws1", "src1", 0, "99", "2024-01-01 00:00:00", "WARN",
+	); err != nil {
+		t.Fatalf("insert log: %v", err)
+	}
+
+	fake := &fakeProvider{analyzeResult: providers.AnalysisResult{
+		Summary:   "Disk quota warning",
+		RootCause: "User disk quota exceeded",
+	}}
+	extra := newTestExtra(a, fake)
+
+	// Distance 0.60 -> similarity = 0.40 < 0.70 threshold
+	memSearcher := &fakeMemorySearcher{
+		results: []rag.MemoryResult{
+			{
+				IssueSignature: "database connection timeout",
+				Resolution:     "reboot db",
+				Distance:       0.60,
+			},
+		},
+	}
+	extra.SetMemorySearcher(memSearcher)
+
+	result, rpcErr := extra.AnalyzeCluster(context.Background(), models.AnalyzeClusterRequest{
+		WorkspaceID: "ws1",
+		ClusterID:   "99",
+		SampleSize:  10,
+	})
+	if rpcErr != nil {
+		t.Fatalf("AnalyzeCluster: %+v", rpcErr)
+	}
+	resp, ok := result.(models.AnalyzeClusterResponse)
+	if !ok {
+		t.Fatalf("unexpected result type %T", result)
+	}
+
+	if resp.IsKnownIssue != false {
+		t.Errorf("expected is_known_issue false, got %v", resp.IsKnownIssue)
+	}
+	if resp.Classification != "NEW ANOMALY" {
+		t.Errorf("expected classification 'NEW ANOMALY', got %v", resp.Classification)
+	}
+	if resp.Tag != TagNewAnomaly {
+		t.Errorf("expected tag %q, got %q", TagNewAnomaly, resp.Tag)
+	}
+	if resp.MatchedSignature != "" {
+		t.Errorf("expected empty matched_signature, got %v", resp.MatchedSignature)
+	}
+
+	triage, tErr := a.DB.GetClusterTriage("ws1", "99")
+	if tErr != nil || triage == nil {
+		t.Fatalf("GetClusterTriage failed: %v", tErr)
+	}
+	if triage.IsKnownIssue != false {
+		t.Errorf("expected triage.IsKnownIssue false in DB, got true")
+	}
+	if triage.RAGTag != TagNewAnomaly {
+		t.Errorf("expected triage.RAGTag %q in DB, got %q", TagNewAnomaly, triage.RAGTag)
+	}
+}
+
+func TestExtra_AnalyzeCluster_CustomThreshold(t *testing.T) {
+	a := newTestApp(t)
+
+	lines := []string{"partial signature match in logs"}
+	if _, err := a.LogStore.AppendBatch("src1", lines); err != nil {
+		t.Fatalf("AppendBatch: %v", err)
+	}
+	if _, err := a.DB.Conn.Exec(
+		`INSERT INTO logs (workspace_id, source_id, line_id, cluster_id, timestamp, level, processed) VALUES (?, ?, ?, ?, ?, ?, TRUE)`,
+		"ws1", "src1", 0, "77", "2024-01-01 00:00:00", "INFO",
+	); err != nil {
+		t.Fatalf("insert log: %v", err)
+	}
+
+	fake := &fakeProvider{analyzeResult: providers.AnalysisResult{
+		Summary: "General log event",
+	}}
+	extra := newTestExtra(a, fake)
+
+	// Distance 0.60 -> similarity = 0.40. With custom threshold 0.35, this is a KNOWN ISSUE
+	memSearcher := &fakeMemorySearcher{
+		results: []rag.MemoryResult{
+			{
+				IssueSignature: "partial signature match",
+				Resolution:     "apply hotfix",
+				Distance:       0.60,
+			},
+		},
+	}
+	extra.SetMemorySearcher(memSearcher)
+
+	customThresh := 0.35
+	result, rpcErr := extra.AnalyzeCluster(context.Background(), models.AnalyzeClusterRequest{
+		WorkspaceID:         "ws1",
+		ClusterID:           "77",
+		SampleSize:          5,
+		SimilarityThreshold: &customThresh,
+	})
+	if rpcErr != nil {
+		t.Fatalf("AnalyzeCluster: %+v", rpcErr)
+	}
+	resp := result.(models.AnalyzeClusterResponse)
+	if resp.IsKnownIssue != true {
+		t.Errorf("expected custom threshold to classify as known issue, got %v", resp.IsKnownIssue)
+	}
+	if resp.Classification != "KNOWN ISSUE" {
+		t.Errorf("expected KNOWN ISSUE, got %v", resp.Classification)
+	}
+}
+
+func TestExtra_AnalyzeCluster_TemplateFromTriageFallback(t *testing.T) {
+	a := newTestApp(t)
+
+	// Seed cluster_triage with an existing template when miner has not yet processed
+	if err := a.DB.UpsertClusterRAGTag("ws1", "101", "Database connection pool exhausted", false, "", "", "", 0.0); err != nil {
+		t.Fatalf("UpsertClusterRAGTag: %v", err)
+	}
+
+	fake := &fakeProvider{analyzeResult: providers.AnalysisResult{
+		Summary:   "DB pool issue",
+		RootCause: "pool exhausted",
+	}}
+	extra := newTestExtra(a, fake)
+
+	memSearcher := &fakeMemorySearcher{
+		results: []rag.MemoryResult{
+			{
+				IssueSignature: "Database connection pool exhausted",
+				Resolution:     "Increase max_connections parameter in db.conf",
+				Distance:       0.05,
+			},
+		},
+	}
+	extra.SetMemorySearcher(memSearcher)
+
+	result, rpcErr := extra.AnalyzeCluster(context.Background(), models.AnalyzeClusterRequest{
+		WorkspaceID: "ws1",
+		ClusterID:   "101",
+		SampleSize:  5,
+	})
+	if rpcErr != nil {
+		t.Fatalf("AnalyzeCluster: %+v", rpcErr)
+	}
+	resp := result.(models.AnalyzeClusterResponse)
+	if !resp.IsKnownIssue {
+		t.Errorf("expected is_known_issue true from fallback template, got false")
+	}
+	if resp.KnownResolution != "Increase max_connections parameter in db.conf" {
+		t.Errorf("unexpected known resolution: %s", resp.KnownResolution)
+	}
+	if memSearcher.lastQuery != "Database connection pool exhausted" {
+		t.Errorf("expected query %q, got %q", "Database connection pool exhausted", memSearcher.lastQuery)
+	}
+}
+
+func TestExtra_AnalyzeCluster_MemoryErrorGracefulFallback(t *testing.T) {
+	a := newTestApp(t)
+
+	fake := &fakeProvider{analyzeResult: providers.AnalysisResult{
+		Summary: "Normal flow",
+	}}
+	extra := newTestExtra(a, fake)
+
+	// Memory searcher errors out
+	memSearcher := &fakeMemorySearcher{
+		err: errors.New("vss index locked"),
+	}
+	extra.SetMemorySearcher(memSearcher)
+
+	result, rpcErr := extra.AnalyzeCluster(context.Background(), models.AnalyzeClusterRequest{
+		WorkspaceID: "ws1",
+		ClusterID:   "88",
+		SampleSize:  5,
+	})
+	if rpcErr != nil {
+		t.Fatalf("AnalyzeCluster should succeed even if memory lookup fails, got: %+v", rpcErr)
+	}
+	resp := result.(models.AnalyzeClusterResponse)
+	if resp.IsKnownIssue != false {
+		t.Errorf("expected is_known_issue false on memory error fallback, got %v", resp.IsKnownIssue)
+	}
+	if resp.Tag != TagNewAnomaly {
+		t.Errorf("expected tag %q, got %q", TagNewAnomaly, resp.Tag)
 	}
 }
 

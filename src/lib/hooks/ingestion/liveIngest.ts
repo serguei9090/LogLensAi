@@ -48,11 +48,7 @@ export async function importLiveStream(
 
     await Promise.all(promises);
 
-    const newSource = await createSource(
-      workspaceId,
-      { name, type: "live", path: name },
-      folderId,
-    );
+    const newSource = await createSource(workspaceId, { name, type: "live", path: name }, folderId);
 
     setActiveSource(workspaceId, newSource.id);
 

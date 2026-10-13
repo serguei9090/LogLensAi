@@ -6,7 +6,7 @@ import { useSettingsStore } from "@/store/settingsStore";
 import { useWorkspaceStore } from "@/store/workspaceStore";
 import { X } from "lucide-react";
 import { useEffect, useState } from "react";
-import { isTauri, TABS } from "./constants";
+import { TABS, isTauri } from "./constants";
 import { LiveTab } from "./tabs/LiveTab";
 import { LocalTab } from "./tabs/LocalTab";
 import { ManualTab } from "./tabs/ManualTab";
@@ -191,6 +191,7 @@ export function ImportFeedModal({
           <Button
             variant="ghost"
             size="icon-sm"
+            data-testid="close-import-modal"
             disabled={isProcessing}
             onClick={() => {
               if (!isProcessing) {

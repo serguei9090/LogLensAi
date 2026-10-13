@@ -24,7 +24,9 @@ export function useLogIngestion(workspaceId: string | null): LogIngestionHookRes
 
   const handleImportLocal = useCallback(
     async (path: string, tail: boolean, folderId?: string | null) => {
-      if (!workspaceId) return;
+      if (!workspaceId) {
+        return;
+      }
       await importLocalFile(workspaceId, path, tail, folderId, setTailingSourceIds);
     },
     [workspaceId],
@@ -32,7 +34,9 @@ export function useLogIngestion(workspaceId: string | null): LogIngestionHookRes
 
   const handleStopTail = useCallback(
     async (sourceId: string, filepath: string) => {
-      if (!workspaceId) return;
+      if (!workspaceId) {
+        return;
+      }
       await stopTail(workspaceId, sourceId, filepath, setTailingSourceIds);
     },
     [workspaceId],
@@ -48,7 +52,9 @@ export function useLogIngestion(workspaceId: string | null): LogIngestionHookRes
       tail: boolean,
       folderId?: string | null,
     ) => {
-      if (!workspaceId) return;
+      if (!workspaceId) {
+        return;
+      }
       await importSshStream(
         workspaceId,
         host,
@@ -66,19 +72,19 @@ export function useLogIngestion(workspaceId: string | null): LogIngestionHookRes
 
   const handleIngestManual = useCallback(
     async (rawText: string, folderId?: string | null) => {
-      if (!workspaceId) return;
+      if (!workspaceId) {
+        return;
+      }
       await ingestManualLogs(workspaceId, rawText, folderId);
     },
     [workspaceId],
   );
 
   const handleImportLive = useCallback(
-    async (
-      name: string,
-      types: { syslog: boolean; http: boolean },
-      folderId?: string | null,
-    ) => {
-      if (!workspaceId) return;
+    async (name: string, types: { syslog: boolean; http: boolean }, folderId?: string | null) => {
+      if (!workspaceId) {
+        return;
+      }
       await importLiveStream(workspaceId, name, types, folderId);
     },
     [workspaceId],

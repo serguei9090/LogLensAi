@@ -1,3 +1,5 @@
+import type { DiagnosticData } from "@/components/organisms/DiagnosticSidebar";
+import { callSidecar } from "@/lib/hooks/useSidecarBridge";
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
@@ -47,6 +49,13 @@ interface UIStore {
   setColumnWidth: (id: string, width: string) => void;
   activeNav: "investigation" | "settings" | "dashboard";
   setActiveNav: (nav: "investigation" | "settings" | "dashboard") => void;
+
+  // AI Diagnostic Sidebar State
+  diagnosticOpen: boolean;
+  diagnosticLoading: boolean;
+  diagnosticData: DiagnosticData | null;
+  openDiagnostic: (clusterId: string, workspaceId: string) => Promise<void>;
+  closeDiagnostic: () => void;
 }
 
 // ─── Store ────────────────────────────────────────────────────────────────────
@@ -168,9 +177,47 @@ export const useUIStore = create<UIStore>()(
         set((state) => ({
           columnWidths: { ...state.columnWidths, [id]: width },
         })),
+
+      // Diagnostic Sidebar
+      diagnosticOpen: false,
+      diagnosticLoading: false,
+      diagnosticData: null,
+      openDiagnostic: async (clusterId: string, workspaceId: string) => {
+        set({ diagnosticOpen: true, diagnosticLoading: true, diagnosticData: null });
+        try {
+          const res = await callSidecar<DiagnosticData>("analyze_cluster", {
+            cluster_id: clusterId,
+            workspace_id: workspaceId,
+            sample_size: 20,
+          });
+          set({ diagnosticData: res, diagnosticLoading: false });
+        } catch (err: any) {
+          set({
+            diagnosticLoading: false,
+            diagnosticData: {
+              summary: "Failed to analyze cluster",
+              root_cause: err?.message || "Unknown error",
+              recommended_actions: ["Check sidecar connectivity and AI settings"],
+              tag: "🔴 NEW ANOMALY (First occurrence)",
+              is_known_issue: false,
+            },
+          });
+        }
+      },
+      closeDiagnostic: () => set({ diagnosticOpen: false }),
     }),
     {
       name: "loglensai-ui-state",
+      partialize: (state) => ({
+        sidebarCollapsed: state.sidebarCollapsed,
+        facetSidebarCollapsed: state.facetSidebarCollapsed,
+        columnManagerCollapsed: state.columnManagerCollapsed,
+        visibleColumns: state.visibleColumns,
+        customColumns: state.customColumns,
+        columnOrder: state.columnOrder,
+        columnWidths: state.columnWidths,
+        activeNav: state.activeNav,
+      }),
     },
   ),
 );

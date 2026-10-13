@@ -49,9 +49,9 @@ type FileTailer struct {
 	WorkspaceID string
 	SourceID    string
 
-	db       *db.DB
-	manager  *SharedSourceManager
-	queue    *microBatchQueue[pendingLogRow]
+	db      *db.DB
+	manager *SharedSourceManager
+	queue   *microBatchQueue[pendingLogRow]
 
 	mu     sync.Mutex
 	shared *SharedSource

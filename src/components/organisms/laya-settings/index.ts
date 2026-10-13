@@ -1,7 +1,7 @@
 export { LayaSettingsPanel } from "./LayaSettingsPanel";
 export { LayaHeaderBanner } from "./components/LayaHeaderBanner";
-export { HardwareAcceleration } from "./components/HardwareAcceleration";
-export { ModelWeightsStatus } from "./components/ModelWeightsStatus";
+export { HardwareAcceleration } from "@/components/molecules/HardwareAcceleration";
+export { ModelWeightsStatus } from "@/components/molecules/ModelWeightsStatus";
 export { VisualRulesTab } from "./components/VisualRulesTab";
 export { JsonEditorTab } from "./components/JsonEditorTab";
 export { CheckpointsTab } from "./components/CheckpointsTab";

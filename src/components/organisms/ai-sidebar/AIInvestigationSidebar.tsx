@@ -1,3 +1,4 @@
+import type { FilterEntry } from "@/components/molecules/FilterBuilder";
 import { AIHistorySearchModal } from "@/components/organisms/AIHistorySearchModal";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -9,7 +10,6 @@ import { useUIStore } from "@/store/uiStore";
 import { selectActiveWorkspace, useWorkspaceStore } from "@/store/workspaceStore";
 import { Clock, MessageSquare, Pencil, Plus, Sparkles, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { FilterEntry } from "@/components/molecules/FilterBuilder";
 import { AIMessageRow } from "./components/AIMessageRow";
 import { SidebarInputBar } from "./components/SidebarInputBar";
 
@@ -373,7 +373,8 @@ export function AIInvestigationSidebar({
                 <div>
                   <h4 className="font-bold text-sm text-text-primary">AI Investigator Ready</h4>
                   <p className="text-xs text-text-muted mt-2 px-10 leading-relaxed max-w-sm mx-auto">
-                    Select logs to start a context-aware analysis or resume a previous investigation.
+                    Select logs to start a context-aware analysis or resume a previous
+                    investigation.
                   </p>
                 </div>
               </div>

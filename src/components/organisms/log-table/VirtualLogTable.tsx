@@ -12,14 +12,14 @@ import { selectActiveWorkspace, useWorkspaceStore } from "@/store/workspaceStore
 import type { LogEntry } from "@/types/log";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { Sparkles, X } from "lucide-react";
-import * as React from "react";
+import type * as React from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { AnnotationDrawer } from "./components/AnnotationDrawer";
 import { LogTableRow } from "./components/LogTableRow";
+import { SelectionToolbar } from "./components/SelectionToolbar";
 import { TableHeader } from "./components/TableHeader";
 import { TableOverlays } from "./components/TableOverlays";
-import { SelectionToolbar } from "./components/SelectionToolbar";
 import { getHighlightedElements } from "./utils/highlightUtils";
 import { type SelectionDetails, getSelectionDetails } from "./utils/selectionUtils";
 
@@ -99,8 +99,7 @@ export function VirtualLogTable({
     );
   }, [activeWorkspace, ingestingSourceIds]);
 
-  const { visibleColumns, customColumns, columnOrder, columnWidths, setColumnWidth } =
-    useUIStore();
+  const { visibleColumns, customColumns, columnOrder, columnWidths, setColumnWidth } = useUIStore();
 
   const activeVisibleColumns = useMemo(() => {
     return columnOrder.filter((colId) => visibleColumns[colId] ?? false);
@@ -392,20 +391,16 @@ export function VirtualLogTable({
   };
 
   // Derive Overlay States
-  const source = activeWorkspace?.sources?.find(
-    (s) => s.id === activeWorkspace?.activeSourceId,
-  );
+  const source = activeWorkspace?.sources?.find((s) => s.id === activeWorkspace?.activeSourceId);
   const isIngesting = isCurrentlyIngesting || !!(activeJob && activeJob.status !== "queued");
   const isQueued = !!(
     activeJob &&
-    (activeJob.status === "queued" ||
-      (activeJob.status === "pending" && isAnyIngestionProcessing))
+    (activeJob.status === "queued" || (activeJob.status === "pending" && isAnyIngestionProcessing))
   );
   const showPreparing =
     !activeJob &&
     !!(
-      activeWorkspace?.activeSourceId &&
-      transitioningSourceIds.has(activeWorkspace.activeSourceId)
+      activeWorkspace?.activeSourceId && transitioningSourceIds.has(activeWorkspace.activeSourceId)
     ) &&
     logs.length === 0;
 

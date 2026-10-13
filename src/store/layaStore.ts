@@ -1,12 +1,7 @@
 // Assume Role: Frontend Engineer (@frontend)
 
 import { callSidecar } from "@/lib/hooks/useSidecarBridge";
-import type {
-  LayaCheckpoint,
-  LayaDecisionResult,
-  LayaQuestion,
-  LayaSettings,
-} from "@/types/laya";
+import type { LayaCheckpoint, LayaDecisionResult, LayaQuestion, LayaSettings } from "@/types/laya";
 import { create } from "zustand";
 
 interface LayaStore {
@@ -19,10 +14,15 @@ interface LayaStore {
 
   modelStatus: import("@/types/laya").LayaModelStatus | null;
   fetchSettings: (workspaceId?: string) => Promise<void>;
-  updateSettings: (params: { enabled?: boolean; device?: "cpu" | "gpu"; workspaceId?: string }) => Promise<void>;
+  updateSettings: (params: {
+    enabled?: boolean;
+    device?: "cpu" | "gpu";
+    workspaceId?: string;
+  }) => Promise<void>;
   fetchCheckpoints: (workspaceId?: string) => Promise<void>;
   fetchModelStatus: (workspaceId?: string) => Promise<void>;
   downloadModel: (workspaceId?: string) => Promise<void>;
+  deleteModel: (workspaceId?: string) => Promise<void>;
   rollbackCheckpoint: (checkpointId: string, workspaceId?: string) => Promise<void>;
   saveRules: (
     author: string,
@@ -46,14 +46,9 @@ const defaultLayaSettings: LayaSettings = {
   questions: {
     tool_intent: {
       type: "choice",
-      instructions: "Classify the user intent into the appropriate log analysis tool or conversation.",
-      options: [
-        "search_logs",
-        "get_clusters",
-        "search_memory",
-        "get_facets",
-        "conversational_qa",
-      ],
+      instructions:
+        "Classify the user intent into the appropriate log analysis tool or conversation.",
+      options: ["search_logs", "get_clusters", "search_memory", "get_facets", "conversational_qa"],
     },
     severity: {
       type: "score",
@@ -62,7 +57,8 @@ const defaultLayaSettings: LayaSettings = {
     },
     category: {
       type: "choice",
-      instructions: "Determine the infrastructure or application subsystem responsible for this log event.",
+      instructions:
+        "Determine the infrastructure or application subsystem responsible for this log event.",
       options: ["database", "network", "auth", "disk_io", "application", "third_party"],
     },
     is_outage: {
@@ -133,6 +129,20 @@ export const useLayaStore = create<LayaStore>((set, get) => ({
     }
   },
 
+  deleteModel: async (workspaceId?: string) => {
+    try {
+      const res = await callSidecar<import("@/types/laya").LayaModelStatus>({
+        method: "delete_laya_model",
+        params: { workspace_id: workspaceId },
+      });
+      if (res) {
+        set({ modelStatus: res });
+      }
+    } catch (err: unknown) {
+      set({ error: err instanceof Error ? err.message : String(err) });
+    }
+  },
+
   fetchSettings: async (workspaceId?: string) => {
     set({ isLoading: true, error: null });
     try {
@@ -151,7 +161,11 @@ export const useLayaStore = create<LayaStore>((set, get) => ({
     }
   },
 
-  updateSettings: async (params: { enabled?: boolean; device?: "cpu" | "gpu"; workspaceId?: string }) => {
+  updateSettings: async (params: {
+    enabled?: boolean;
+    device?: "cpu" | "gpu";
+    workspaceId?: string;
+  }) => {
     set({ isLoading: true, error: null });
     try {
       const res = await callSidecar<LayaSettings>({

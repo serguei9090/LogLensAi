@@ -133,4 +133,31 @@ func RegisterAIExtraMethods(r *Registry, a *app.App, extra *ai.Extra) {
 		}
 		return extra.SyncKnowledgeBase(context.Background(), req)
 	})
+	r.RegisterWithModel("get_rag_model_status", paramModels["get_rag_model_status"], func(params json.RawMessage) (any, *models.RPCError) {
+		var req models.GetRAGModelStatusRequest
+		if len(params) > 0 {
+			if err := json.Unmarshal(params, &req); err != nil {
+				return nil, invalidParamsErr(err)
+			}
+		}
+		return extra.GetRAGModelStatus(context.Background(), req)
+	})
+	r.RegisterWithModel("download_rag_model", paramModels["download_rag_model"], func(params json.RawMessage) (any, *models.RPCError) {
+		var req models.DownloadRAGModelRequest
+		if len(params) > 0 {
+			if err := json.Unmarshal(params, &req); err != nil {
+				return nil, invalidParamsErr(err)
+			}
+		}
+		return extra.DownloadRAGModel(context.Background(), req)
+	})
+	r.RegisterWithModel("delete_rag_model", paramModels["delete_rag_model"], func(params json.RawMessage) (any, *models.RPCError) {
+		var req models.DeleteRAGModelRequest
+		if len(params) > 0 {
+			if err := json.Unmarshal(params, &req); err != nil {
+				return nil, invalidParamsErr(err)
+			}
+		}
+		return extra.DeleteRAGModel(context.Background(), req)
+	})
 }

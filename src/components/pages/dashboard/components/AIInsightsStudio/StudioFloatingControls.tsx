@@ -1,6 +1,5 @@
 // Assume Role: Frontend Engineer (@frontend)
 
-import { Clock, MessageSquarePlus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -8,6 +7,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import type { AiSession } from "@/store/aiStore";
+import { Clock, MessageSquarePlus, Trash2 } from "lucide-react";
 
 interface StudioFloatingControlsProps {
   readonly sessions: AiSession[];
@@ -51,7 +51,10 @@ export function StudioFloatingControls({
               </Button>
             }
           />
-          <DropdownMenuContent align="end" className="w-68 max-h-80 overflow-y-auto p-1.5 rounded-xl bg-[#141715]/95 border-white/10 backdrop-blur-2xl shadow-2xl">
+          <DropdownMenuContent
+            align="end"
+            className="w-68 max-h-80 overflow-y-auto p-1.5 rounded-xl bg-[#141715]/95 border-white/10 backdrop-blur-2xl shadow-2xl"
+          >
             <div className="px-2.5 py-1.5 text-[10px] font-mono font-bold uppercase tracking-wider text-text-muted border-b border-white/5 mb-1">
               Previous Conversations
             </div>
@@ -61,7 +64,9 @@ export function StudioFloatingControls({
                 <div
                   key={s.session_id}
                   className={`flex items-center justify-between px-2.5 py-2 rounded-lg text-xs group transition-colors ${
-                    isActive ? "bg-primary/10 border border-primary/20 text-primary" : "hover:bg-white/5 text-text-secondary"
+                    isActive
+                      ? "bg-primary/10 border border-primary/20 text-primary"
+                      : "hover:bg-white/5 text-text-secondary"
                   }`}
                 >
                   <button

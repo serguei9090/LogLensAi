@@ -3,9 +3,7 @@ import { Check, ChevronDown, Search, X } from "lucide-react";
 import * as React from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
-function parseOptionChildren(
-  children: React.ReactNode,
-): Array<{ value: string; label: string }> {
+function parseOptionChildren(children: React.ReactNode): Array<{ value: string; label: string }> {
   const items: Array<{ value: string; label: string }> = [];
   React.Children.forEach(children, (child) => {
     if (React.isValidElement(child)) {
@@ -77,8 +75,7 @@ export function SettingSelect({
     const q = searchQuery.toLowerCase().trim();
     return options.filter((opt) => {
       const val = opt.value.toLowerCase();
-      const isFree =
-        val.endsWith(":free") || val.includes(":free") || val === "openrouter/free";
+      const isFree = val.endsWith(":free") || val.includes(":free") || val === "openrouter/free";
       if (onlyFree && !isFree) {
         return false;
       }
@@ -100,9 +97,7 @@ export function SettingSelect({
 
   useEffect(() => {
     if (isOpen && highlightedIndex >= 0 && optionsListRef.current) {
-      const optionEl = optionsListRef.current.children[highlightedIndex] as
-        | HTMLElement
-        | undefined;
+      const optionEl = optionsListRef.current.children[highlightedIndex] as HTMLElement | undefined;
       if (optionEl && typeof optionEl.scrollIntoView === "function") {
         optionEl.scrollIntoView({ block: "nearest" });
       }
@@ -171,9 +166,7 @@ export function SettingSelect({
         onClick={() => setIsOpen((prev) => !prev)}
         className={cn(
           "w-full h-10 pl-4 pr-10 rounded-xl text-sm bg-bg-surface border text-text-primary text-left transition-all cursor-pointer flex items-center justify-between select-none relative",
-          isOpen
-            ? "border-primary ring-2 ring-primary/20"
-            : "border-border hover:border-border/80",
+          isOpen ? "border-primary ring-2 ring-primary/20" : "border-border hover:border-border/80",
         )}
       >
         <span className="truncate">{displayLabel}</span>

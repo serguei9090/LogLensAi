@@ -2,7 +2,8 @@
 
 import { callSidecar } from "@/lib/hooks/useSidecarBridge";
 import { cn } from "@/lib/utils";
-import { RefreshCcw } from "lucide-react";
+import { useUIStore } from "@/store/uiStore";
+import { RefreshCcw, Sparkles } from "lucide-react";
 import { useState } from "react";
 
 interface ClusterRowProps {
@@ -17,6 +18,8 @@ interface ClusterRowProps {
   severity?: number;
   isOutage?: boolean;
   confidence?: number;
+  ragTag?: string;
+  isKnownIssue?: boolean;
 }
 
 /**
@@ -34,6 +37,8 @@ export function ClusterRow({
   category,
   severity,
   isOutage,
+  ragTag,
+  isKnownIssue,
 }: Readonly<ClusterRowProps>) {
   const [expanded, setExpanded] = useState(false);
   const [samples, setSamples] = useState<string[]>([]);
@@ -89,22 +94,30 @@ export function ClusterRow({
 
   return (
     <div className="group flex flex-col gap-3 p-3 rounded-lg hover:bg-bg-hover transition-[background-color,border-color] duration-200 border border-transparent hover:border-border/50 bg-bg-surface/30 text-left w-full">
-      <button
-        type="button"
-        onClick={toggleExpand}
-        className="flex items-start gap-4 text-left w-full cursor-pointer focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary/50"
-      >
-        <span className="text-xs font-mono text-text-muted py-1 w-6">#{index + 1}</span>
+      <div className="flex items-start gap-4 text-left w-full">
+        <button
+          type="button"
+          onClick={toggleExpand}
+          className="text-xs font-mono text-text-muted py-1 w-6 cursor-pointer hover:text-text-primary text-left focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary/50"
+        >
+          #{index + 1}
+        </button>
         <div className="flex-1 overflow-hidden">
           <div className="flex items-center gap-2 mb-1.5 flex-wrap">
-            <p
-              className={cn(
-                "text-xs font-mono text-text-primary truncate leading-relaxed group-hover:text-primary transition-colors flex-1 min-w-[200px]",
-                type === "error" && "text-error opacity-90",
-              )}
+            <button
+              type="button"
+              onClick={toggleExpand}
+              className="text-left flex-1 min-w-[200px] cursor-pointer focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary/50"
             >
-              {template}
-            </p>
+              <p
+                className={cn(
+                  "text-xs font-mono text-text-primary truncate leading-relaxed group-hover:text-primary transition-colors",
+                  type === "error" && "text-error opacity-90",
+                )}
+              >
+                {template}
+              </p>
+            </button>
             {category && (
               <span className="text-xs uppercase font-mono px-1.5 py-0.5 rounded bg-white/5 border border-white/10 text-text-muted">
                 {category}
@@ -120,8 +133,35 @@ export function ClusterRow({
                 OUTAGE
               </span>
             )}
+            {ragTag && (
+              <span
+                className={cn(
+                  "text-xs font-mono px-1.5 py-0.5 rounded border",
+                  isKnownIssue
+                    ? "bg-amber-500/10 text-amber-300 border-amber-500/30"
+                    : "bg-rose-500/10 text-rose-300 border-rose-500/30",
+                )}
+              >
+                {ragTag}
+              </span>
+            )}
+            {clusterId && workspaceId && (
+              <button
+                type="button"
+                onClick={() => useUIStore.getState().openDiagnostic(clusterId, workspaceId)}
+                className="text-xs flex items-center gap-1 px-2 py-0.5 rounded bg-primary/10 hover:bg-primary/20 text-primary border border-primary/20 transition-colors ml-auto cursor-pointer"
+                title="Diagnose cluster with AI & RAG Memory"
+              >
+                <Sparkles className="size-3" />
+                Diagnose
+              </button>
+            )}
           </div>
-          <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={toggleExpand}
+            className="flex items-center gap-3 w-full cursor-pointer text-left focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary/50"
+          >
             <div className="h-1 bg-bg-base/50 rounded-full flex-1 overflow-hidden border border-white/5">
               <div
                 style={{ width: `${(count / total) * 100}%` }}
@@ -135,9 +175,9 @@ export function ClusterRow({
             <span className="text-xs font-mono text-text-muted shrink-0 w-16 text-right">
               {count.toLocaleString()} hits
             </span>
-          </div>
+          </button>
         </div>
-      </button>
+      </div>
 
       {expanded && (
         <span className="mt-2 pl-10 pr-2 space-y-2 border-t border-border/20 pt-3 block w-full">

@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { ArrowDown, ArrowUp, ArrowUpDown } from "lucide-react";
-import * as React from "react";
+import type * as React from "react";
 
 interface TableHeaderProps {
   readonly gridTemplateColumns: string;
@@ -62,9 +62,7 @@ export function TableHeader({
             <div
               className={cn(
                 "w-1 h-4 rounded-full transition-all",
-                isAllSelected
-                  ? "bg-emerald-500"
-                  : "bg-white/10 group-hover/select-all:bg-white/30",
+                isAllSelected ? "bg-emerald-500" : "bg-white/10 group-hover/select-all:bg-white/30",
               )}
             />
           </Button>

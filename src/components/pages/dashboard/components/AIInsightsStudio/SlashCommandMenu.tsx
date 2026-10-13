@@ -1,5 +1,6 @@
 // Assume Role: Frontend Engineer (@frontend)
 
+import { cn } from "@/lib/utils";
 import {
   Activity,
   BarChart3,
@@ -12,7 +13,6 @@ import {
   TrendingUp,
 } from "lucide-react";
 import { useEffect, useRef } from "react";
-import { cn } from "@/lib/utils";
 
 export interface SkillCommandItem {
   id: string;
@@ -95,7 +95,8 @@ export const SKILL_COMMANDS: SkillCommandItem[] = [
     description: "Multi-point diagnostic breakdown isolating anomalies by service",
     badge: "Diagnosis",
     category: "Drilldown",
-    promptTemplate: "Perform an in-depth diagnostic drilldown comparing normal vs anomalous log patterns.",
+    promptTemplate:
+      "Perform an in-depth diagnostic drilldown comparing normal vs anomalous log patterns.",
   },
 ];
 
@@ -159,15 +160,16 @@ export function SlashCommandMenu({
       </div>
 
       {/* Skills list */}
-      <div
-        ref={listRef}
-        className="overflow-y-auto max-h-72 p-1.5 space-y-0.5 custom-scrollbar"
-      >
+      <div ref={listRef} className="overflow-y-auto max-h-72 p-1.5 space-y-0.5 custom-scrollbar">
         {filteredItems.length === 0 ? (
           <div className="py-8 px-4 text-center">
             <Search className="size-5 text-text-muted/40 mx-auto mb-2" />
-            <p className="text-xs text-text-muted font-mono">No matching skills or blueprints found</p>
-            <p className="text-[11px] text-text-muted/60 mt-1">Try /histogram, /timeline, /errors, /table</p>
+            <p className="text-xs text-text-muted font-mono">
+              No matching skills or blueprints found
+            </p>
+            <p className="text-[11px] text-text-muted/60 mt-1">
+              Try /histogram, /timeline, /errors, /table
+            </p>
           </div>
         ) : (
           filteredItems.map((item, index) => {
@@ -246,8 +248,15 @@ export function SlashCommandMenu({
       {/* Footer helper */}
       <div className="px-3 py-1.5 border-t border-white/5 bg-white/[0.01] flex items-center justify-between text-[10px] font-mono text-text-muted/70">
         <div className="flex items-center gap-2">
-          <span>Use <kbd className="px-1 py-0.5 rounded bg-white/5 border border-white/10">↑</kbd><kbd className="px-1 py-0.5 rounded bg-white/5 border border-white/10">↓</kbd> to navigate</span>
-          <span><kbd className="px-1 py-0.5 rounded bg-white/5 border border-white/10">Enter</kbd> to insert blueprint</span>
+          <span>
+            Use <kbd className="px-1 py-0.5 rounded bg-white/5 border border-white/10">↑</kbd>
+            <kbd className="px-1 py-0.5 rounded bg-white/5 border border-white/10">↓</kbd> to
+            navigate
+          </span>
+          <span>
+            <kbd className="px-1 py-0.5 rounded bg-white/5 border border-white/10">Enter</kbd> to
+            insert blueprint
+          </span>
         </div>
         <button
           type="button"

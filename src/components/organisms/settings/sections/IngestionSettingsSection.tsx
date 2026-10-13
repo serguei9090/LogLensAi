@@ -49,11 +49,7 @@ export function IngestionSettingsSection({
                 className="w-20 h-8 rounded-lg bg-bg-surface border border-border text-center text-xs text-text-primary focus:outline-none focus:border-primary transition-all"
                 value={settings.ingestion_syslog_port}
                 onChange={(e) =>
-                  update(
-                    "ingestion_syslog_port",
-                    Number.parseInt(e.target.value, 10),
-                    false,
-                  )
+                  update("ingestion_syslog_port", Number.parseInt(e.target.value, 10), false)
                 }
                 onBlur={() => onSave(settings)}
               />
@@ -86,11 +82,7 @@ export function IngestionSettingsSection({
                 className="w-20 h-8 rounded-lg bg-bg-surface border border-border text-center text-xs text-text-primary focus:outline-none focus:border-primary transition-all"
                 value={settings.ingestion_http_port}
                 onChange={(e) =>
-                  update(
-                    "ingestion_http_port",
-                    Number.parseInt(e.target.value, 10),
-                    false,
-                  )
+                  update("ingestion_http_port", Number.parseInt(e.target.value, 10), false)
                 }
                 onBlur={() => onSave(settings)}
               />

@@ -115,6 +115,9 @@ func RegisterApp(r *Registry, a *app.App) {
 	r.RegisterWithModel("download_laya_model", func() any { return &models.DownloadLayaModelRequest{} }, appHandler(func(req models.DownloadLayaModelRequest) (any, *models.RPCError) {
 		return a.DownloadLayaModel(req)
 	}))
+	r.RegisterWithModel("delete_laya_model", func() any { return &models.DeleteLayaModelRequest{} }, appHandler(func(req models.DeleteLayaModelRequest) (any, *models.RPCError) {
+		return a.DeleteLayaModel(req)
+	}))
 }
 
 // appHandler decodes params into a T and calls fn, converting a decode

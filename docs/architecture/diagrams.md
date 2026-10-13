@@ -104,6 +104,53 @@ flowchart TD
 
 ---
 
+## 🔍 2.1 Automatic RAG Cluster Memory Pre-Check (Sequence Diagram)
+
+When an engineer analyzes a log cluster (or clicks "Diagnose" in the UI), `AnalyzeCluster` performs an automatic semantic similarity query against DuckDB-VSS to distinguish recurring incidents from new anomalies.
+
+```mermaid
+sequenceDiagram
+  autonumber
+  participant UI as DiagnosticSidebar & VirtualLogTable (React 19)
+  participant Bridge as useSidecarBridge.ts
+  participant RPC as JSON-RPC Dispatcher (:5000 / Stdio)
+  participant Extra as Extra.AnalyzeCluster (Go)
+  participant Drain as Drain3 Parser / Triage Cache
+  participant RAG as RAG Memory Engine (DuckDB-VSS)
+  participant Provider as External LLM Provider (Ollama / Gemini / OpenAI)
+  participant DB as DuckDB (cluster_triage table)
+
+  UI->>Bridge: callSidecar("analyze_cluster", { cluster_id, workspace_id })
+  Bridge->>RPC: {"jsonrpc": "2.0", "method": "analyze_cluster", "params": {...}}
+  RPC->>Extra: AnalyzeCluster(ctx, req)
+  
+  Extra->>Drain: Resolve cluster template & fetch sample logs
+  Drain-->>Extra: Template string + Raw log samples
+  
+  Extra->>RAG: SearchMemory(ctx, workspace_id, template, topK=3)
+  Note over RAG: Cosine distance calculation (sim = 1.0 - distance)
+  RAG-->>Extra: Top memory matches & distance scores
+  
+  alt Cosine Similarity >= Threshold (Default 0.75)
+    Note over Extra: Classified as KNOWN ISSUE
+    Extra->>Extra: Set is_known_issue=true, tag="KNOWN ISSUE"<br/>Inject matched signature & prior resolution into prompt
+  else Cosine Similarity < Threshold
+    Note over Extra: Classified as NEW ANOMALY
+    Extra->>Extra: Set is_known_issue=false, tag="NEW ANOMALY"
+  end
+
+  Extra->>DB: UpsertClusterRAGTag(workspace_id, cluster_id, tag, matchScore, knownResolution)
+  
+  Extra->>Provider: AnalyzeLogs(samples, enrichedPromptTemplate)
+  Provider-->>Extra: Root cause analysis + recommended actions
+  
+  Extra-->>RPC: models.AnalyzeClusterResponse (with is_known_issue, tag, match_score, known_resolution)
+  RPC-->>Bridge: JSON-RPC 2.0 Result
+  Bridge-->>UI: Render DiagnosticSidebar with KNOWN ISSUE / NEW ANOMALY badges & prior fix
+```
+
+---
+
 ## 📐 3. Database Schema (Entity-Relationship Diagram)
 
 DuckDB acts as the local columnar analytics and metadata storage engine.

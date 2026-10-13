@@ -19,7 +19,10 @@ export function SettingsPage() {
     <div className="flex-1 overflow-auto bg-bg-app h-full">
       <Suspense
         fallback={
-          <div className="p-8 text-xs font-mono text-text-muted animate-pulse">
+          <div
+            data-testid="settings-loader"
+            className="p-8 text-xs font-mono text-text-muted animate-pulse"
+          >
             Loading settings...
           </div>
         }

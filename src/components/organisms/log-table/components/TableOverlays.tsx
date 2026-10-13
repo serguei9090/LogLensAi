@@ -1,13 +1,7 @@
 import { GridPattern } from "@/components/atoms/GridPattern";
 import { Button } from "@/components/ui/button";
 import type { IngestionJob } from "@/lib/hooks/useIngestionStatus";
-import {
-  Download,
-  FileUp,
-  Filter,
-  Rocket,
-  Sparkles,
-} from "lucide-react";
+import { Download, FileUp, Filter, Rocket, Sparkles } from "lucide-react";
 
 interface TableOverlaysProps {
   readonly showPreparing: boolean;
@@ -141,10 +135,7 @@ export function TableOverlays({
                           {activeJob.total_lines.toLocaleString()} lines
                         </span>
                         <span className="text-primary">
-                          {Math.round(
-                            (activeJob.processed_lines / activeJob.total_lines) * 100,
-                          )}
-                          %
+                          {Math.round((activeJob.processed_lines / activeJob.total_lines) * 100)}%
                         </span>
                       </div>
                       <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden border border-white/5">
@@ -205,9 +196,7 @@ export function TableOverlays({
               <Filter className="size-12 text-amber-400" />
             </div>
           </div>
-          <h3 className="text-xl font-bold text-text-primary z-10">
-            No logs match active filters
-          </h3>
+          <h3 className="text-xl font-bold text-text-primary z-10">No logs match active filters</h3>
           <p className="text-sm text-text-muted mt-2 max-w-[340px] leading-relaxed z-10">
             {searchQuery ? `No results found matching query "${searchQuery}". ` : ""}
             Adjust or clear your active filters to display matching log records.
@@ -234,7 +223,8 @@ export function TableOverlays({
         </div>
         <h3 className="text-xl font-bold text-text-primary z-10">No logs detected</h3>
         <p className="text-sm text-text-muted mt-2 max-w-[280px] leading-relaxed z-10">
-          This workspace is currently empty. Connect a data source or upload a log file to begin analysis.
+          This workspace is currently empty. Connect a data source or upload a log file to begin
+          analysis.
         </p>
         <Button
           onClick={onImport}

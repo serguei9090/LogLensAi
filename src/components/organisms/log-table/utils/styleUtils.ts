@@ -20,10 +20,7 @@ export function getRowLevelStyles(level: LogLevel): string {
   }
 }
 
-export function getClusterStyles(
-  clusterId: string,
-  anomalousClusters?: Set<string>,
-): string {
+export function getClusterStyles(clusterId: string, anomalousClusters?: Set<string>): string {
   if (clusterId === "unknown") {
     return "bg-zinc-800/50 border-zinc-700/30 text-zinc-500";
   }

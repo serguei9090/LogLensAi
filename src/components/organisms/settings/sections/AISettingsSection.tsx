@@ -2,24 +2,13 @@ import { HelpTooltip } from "@/components/atoms/HelpTooltip";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import type { AppSettings } from "@/store/settingsStore";
-import {
-  Bot,
-  ChevronDown,
-  ChevronRight,
-  Eye,
-  EyeOff,
-  Plus,
-  Terminal,
-} from "lucide-react";
+import { Bot, ChevronDown, ChevronRight, Eye, EyeOff, Plus, Terminal } from "lucide-react";
 import { useState } from "react";
 import { ModelSelector } from "../components/ModelSelector";
 import { SectionLabel } from "../components/SectionLabel";
 import { SettingInput } from "../components/SettingInput";
 import { SettingSelect } from "../components/SettingSelect";
-import {
-  getProviderDescription,
-  getProviderLabel,
-} from "../utils/providerMetadata";
+import { getProviderDescription, getProviderLabel } from "../utils/providerMetadata";
 
 interface AISettingsSectionProps {
   readonly settings: AppSettings;
@@ -207,11 +196,7 @@ export function AISettingsSection({
                     title={showApiKey ? "Hide API Key" : "Show API Key"}
                     aria-label={showApiKey ? "Hide API Key" : "Show API Key"}
                   >
-                    {showApiKey ? (
-                      <EyeOff className="size-4" />
-                    ) : (
-                      <Eye className="size-4" />
-                    )}
+                    {showApiKey ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
                   </button>
                 </div>
                 <p className="text-xs text-text-muted/50 px-1">
@@ -254,8 +239,7 @@ export function AISettingsSection({
               placeholder="http://localhost:1234/v1 or https://api.groq.com/openai/v1"
             />
             <p className="text-xs text-text-muted/50 px-1">
-              Protocol & host for the OpenAI-compatible endpoint (e.g., LM Studio, Groq,
-              vLLM).
+              Protocol & host for the OpenAI-compatible endpoint (e.g., LM Studio, Groq, vLLM).
             </p>
           </div>
         )}
@@ -287,9 +271,7 @@ export function AISettingsSection({
           <p className="text-xs font-bold text-primary uppercase tracking-wider">
             {getProviderLabel(settings.ai_provider)}
           </p>
-          <p className="text-xs text-text-muted">
-            {getProviderDescription(settings.ai_provider)}
-          </p>
+          <p className="text-xs text-text-muted">{getProviderDescription(settings.ai_provider)}</p>
         </div>
       </div>
 
@@ -329,9 +311,7 @@ export function AISettingsSection({
           <div className="mt-3 space-y-4 px-1">
             <div className="flex items-center justify-between bg-bg-surface/50 border border-border rounded-xl p-4 hover:bg-bg-surface transition-colors">
               <div>
-                <p className="text-sm font-bold text-text-primary">
-                  Enable Log Search Tool
-                </p>
+                <p className="text-sm font-bold text-text-primary">Enable Log Search Tool</p>
                 <p className="text-xs text-text-muted mt-0.5">
                   Allow AI to autonomously search the DuckDB storage for error contexts.
                 </p>
@@ -344,9 +324,7 @@ export function AISettingsSection({
 
             <div className="flex items-center justify-between bg-bg-surface/50 border border-border rounded-xl p-4 hover:bg-bg-surface transition-colors">
               <div>
-                <p className="text-sm font-bold text-text-primary">
-                  Enable Associative Memory
-                </p>
+                <p className="text-sm font-bold text-text-primary">Enable Associative Memory</p>
                 <p className="text-xs text-text-muted mt-0.5">
                   Allow AI to save and autonomously retrieve past issue resolutions.
                 </p>

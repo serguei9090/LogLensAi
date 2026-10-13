@@ -95,7 +95,6 @@ func (w *Worker) SetTriageHandler(h ClusterTriageHandler) {
 	w.triageHandler = h
 }
 
-
 // NewWorker constructs a Worker.
 //
 //   - database must be non-nil (an opened *db.DB, see internal/db.Open).

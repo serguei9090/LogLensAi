@@ -1,14 +1,14 @@
 // Assume Role: Frontend Engineer (@frontend)
 
 import { InvestigationLayout } from "@/components/templates/InvestigationLayout";
+import { useLogIngestion } from "@/lib/hooks/ingestion";
 import { useIngestionStatus } from "@/lib/hooks/useIngestionStatus";
 import { useLogFetching } from "@/lib/hooks/useLogFetching";
-import { useLogIngestion } from "@/lib/hooks/ingestion";
 import { callSidecar } from "@/lib/hooks/useSidecarBridge";
-import { useAiStore } from "@/store/aiStore";
 import { useIngestionStore } from "@/store/ingestion";
 import { useInvestigationStore } from "@/store/investigationStore";
 import { useSettingsStore } from "@/store/settingsStore";
+import { useUIStore } from "@/store/uiStore";
 import { type LogSource, selectActiveWorkspace, useWorkspaceStore } from "@/store/workspaceStore";
 import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
@@ -59,7 +59,6 @@ function InvestigationPageImpl() {
   } = useWorkspaceStore();
   const { fetchSettings } = useSettingsStore();
   const activeWorkspace = useWorkspaceStore(selectActiveWorkspace);
-  const { setSidebarOpen, sendMessage, setSession } = useAiStore();
 
   const sources: LogSource[] = activeWorkspace?.sources ?? [];
   const activeSourceId = activeWorkspace?.activeSourceId ?? null;
@@ -369,25 +368,13 @@ function InvestigationPageImpl() {
 
   const handleAnalyzeCluster = async (clusterId: string) => {
     const clusterLogs = logs.filter((l) => l.cluster_id === clusterId);
-    const logIds = clusterLogs.slice(0, 5).map((l) => l.id);
-    const template = clusterLogs[0]?.cluster_template || "N/A";
-
-    if (logIds.length === 0) {
+    if (clusterLogs.length === 0) {
       toast.warning(`No logs found for cluster #${clusterId}`);
       return;
     }
 
-    setSession(null);
-    setSidebarOpen(true);
-
-    const prompt = `Analyze log cluster #${clusterId} (${logIds.length} logs, template: "${template}"). What pattern do these logs represent? Are there any anomalies, errors, or performance concerns? Provide a root cause analysis and recommended actions.`;
-
-    await sendMessage({
-      workspace_id: activeWorkspaceId,
-      message: prompt,
-      context_logs: logIds,
-      session_name: `Cluster #${clusterId}`,
-    });
+    // Launch instant RAG diagnostic pre-check in DiagnosticSidebar
+    await useUIStore.getState().openDiagnostic(clusterId, activeWorkspaceId);
   };
 
   return (
@@ -425,9 +412,7 @@ function InvestigationPageImpl() {
           />
         }
         rightPanel={
-          <InvestigationRightSidebar
-            onEngineSettingsOpen={() => setIsEngineSettingsOpen(true)}
-          />
+          <InvestigationRightSidebar onEngineSettingsOpen={() => setIsEngineSettingsOpen(true)} />
         }
       >
         <InvestigationTableArea

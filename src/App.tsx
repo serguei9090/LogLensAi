@@ -1,8 +1,8 @@
-import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { CommandPalette } from "@/components/organisms/CommandPalette";
 import { SidecarStartupGateway } from "@/components/organisms/SidecarStartupGateway";
 import { SystemDiagnosticConsole } from "@/components/organisms/SystemDiagnosticConsole";
 import { AppLayout } from "@/components/templates/AppLayout";
+import { Suspense, lazy, useCallback, useEffect, useRef, useState } from "react";
 
 const DashboardPage = lazy(() => import("@/components/pages/DashboardPage"));
 const InvestigationPage = lazy(() =>
@@ -29,7 +29,10 @@ export type NavTab = "investigation" | "settings" | "dashboard";
 
 function PageLoader() {
   return (
-    <div className="flex-1 flex flex-col items-center justify-center min-h-[400px] h-full w-full bg-bg-base/20 backdrop-blur-sm select-none animate-in fade-in duration-500">
+    <div
+      data-testid="page-loader"
+      className="flex-1 flex flex-col items-center justify-center min-h-[400px] h-full w-full bg-bg-base/20 backdrop-blur-sm select-none animate-in fade-in duration-500"
+    >
       <div className="relative flex flex-col items-center gap-4 p-8 rounded-2xl bg-bg-surface/50 border border-border-muted/50 max-w-sm w-full shadow-2xl">
         <div className="relative">
           <div className="absolute -inset-2 bg-primary/20 rounded-full blur-xl animate-pulse" />
@@ -56,7 +59,16 @@ function MainAppShell() {
     removeWorkspace,
     fetchHierarchy,
   } = useWorkspaceStore();
-  const { toggleSidebar, toggleFacetSidebar, activeNav, setActiveNav } = useUIStore();
+  const {
+    toggleSidebar,
+    toggleFacetSidebar,
+    activeNav,
+    setActiveNav,
+    diagnosticOpen,
+    diagnosticLoading,
+    diagnosticData,
+    closeDiagnostic,
+  } = useUIStore();
   const { setSidebarOpen: setAiSidebarOpen } = useAiStore();
   const { settings, fetchSettings } = useSettingsStore();
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
@@ -203,10 +215,10 @@ function MainAppShell() {
         onWorkspaceDelete={removeWorkspace}
         activeNav={activeNav}
         onNavSelect={handleNavSelect}
-        diagnosticOpen={false}
-        onDiagnosticClose={() => {}}
-        diagnosticData={null}
-        diagnosticLoading={false}
+        diagnosticOpen={diagnosticOpen}
+        onDiagnosticClose={closeDiagnostic}
+        diagnosticData={diagnosticData}
+        diagnosticLoading={diagnosticLoading}
       >
         <Suspense fallback={<PageLoader />}>
           {activeNav === "dashboard" && <DashboardPage />}

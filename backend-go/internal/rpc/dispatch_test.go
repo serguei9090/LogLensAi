@@ -15,7 +15,7 @@ func newTestRegistry() *Registry {
 
 func TestRegisterStubsCoversAllMethods(t *testing.T) {
 	r := newTestRegistry()
-	if got, want := r.Len(), 68; got != want {
+	if got, want := r.Len(), 72; got != want {
 		t.Fatalf("registered method count = %d, want %d", got, want)
 	}
 	for _, m := range allMethods {

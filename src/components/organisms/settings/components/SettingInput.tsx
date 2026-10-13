@@ -1,9 +1,7 @@
 import { cn } from "@/lib/utils";
-import * as React from "react";
+import type * as React from "react";
 
-export function SettingInput(
-  props: Readonly<React.InputHTMLAttributes<HTMLInputElement>>,
-) {
+export function SettingInput(props: Readonly<React.InputHTMLAttributes<HTMLInputElement>>) {
   return (
     <input
       {...props}

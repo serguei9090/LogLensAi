@@ -94,9 +94,7 @@ export function AddEditRuleModal({
 
           {ruleType === "choice" && (
             <div className="space-y-1.5">
-              <label className="text-xs font-mono text-text-muted">
-                Options (comma-separated)
-              </label>
+              <label className="text-xs font-mono text-text-muted">Options (comma-separated)</label>
               <input
                 type="text"
                 placeholder="database, network, auth, disk_io, application"

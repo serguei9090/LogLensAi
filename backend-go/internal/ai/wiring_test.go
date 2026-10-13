@@ -222,4 +222,3 @@ func TestProviderAdapter_DynamicResolution(t *testing.T) {
 		t.Errorf("expected dynamically resolved provider to be OpenAICompatibleProvider, got %T", p2)
 	}
 }
-

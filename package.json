@@ -17,7 +17,12 @@
     "typecheck": "tsc --noEmit",
     "type-sync": "uv run scripts/generate_schema.py && bun x json2ts api_schema.json src/lib/types/generated.ts",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "test:contract": "vitest run tests/contract",
+    "test:integration": "vitest run tests/integration",
+    "test:e2e": "playwright test",
+    "test:backend": "cd backend-go && go test -v ./internal/query/... ./internal/drain3/...",
+    "test:bench": "cd backend-go/internal/drain3 && go test -bench=. -benchmem -run=^$"
   },
   "dependencies": {
     "@a2ui/react": "^0.9.1",
@@ -70,6 +75,7 @@
   "devDependencies": {
     "@biomejs/biome": "^1.9.4",
     "@happy-dom/global-registrator": "^20.8.9",
+    "@playwright/test": "^1.64.0",
     "@tailwindcss/postcss": "^4.0.0",
     "@tailwindcss/vite": "^4.0.0",
     "@tauri-apps/cli": "^2.3.0",

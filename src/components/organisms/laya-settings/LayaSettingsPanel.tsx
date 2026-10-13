@@ -1,5 +1,7 @@
 // Assume Role: Frontend Engineer (@frontend)
 
+import { HardwareAcceleration } from "@/components/molecules/HardwareAcceleration";
+import { ModelWeightsStatus } from "@/components/molecules/ModelWeightsStatus";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useLayaStore } from "@/store/layaStore";
@@ -9,10 +11,8 @@ import { Code2, History, Layers, Play, Plus, Sparkles } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { CheckpointsTab } from "./components/CheckpointsTab";
-import { HardwareAcceleration } from "./components/HardwareAcceleration";
 import { JsonEditorTab } from "./components/JsonEditorTab";
 import { LayaHeaderBanner } from "./components/LayaHeaderBanner";
-import { ModelWeightsStatus } from "./components/ModelWeightsStatus";
 import { TestPlaygroundTab } from "./components/TestPlaygroundTab";
 import { VisualRulesTab } from "./components/VisualRulesTab";
 import { AddEditRuleModal } from "./modals/AddEditRuleModal";
@@ -253,7 +253,9 @@ export function LayaSettingsPanel() {
   };
 
   const handleConfirmRollback = async () => {
-    if (!rollbackTargetId) return;
+    if (!rollbackTargetId) {
+      return;
+    }
     try {
       await rollbackCheckpoint(rollbackTargetId, activeWorkspaceId);
       toast.success(`Successfully rolled back to checkpoint ${rollbackTargetId}`);
@@ -287,14 +289,12 @@ export function LayaSettingsPanel() {
       />
 
       {/* Hardware Acceleration Mode (CPU Zero-VRAM vs GPU) */}
-      <HardwareAcceleration
-        currentDevice={settings.device}
-        onDeviceChange={handleDeviceChange}
-      />
+      <HardwareAcceleration currentDevice={settings.device} onDeviceChange={handleDeviceChange} />
 
       {/* Model Weights & Local Cache Status */}
       <ModelWeightsStatus
         modelStatus={modelStatus}
+        isLoading={useLayaStore.getState().isLoading && modelStatus === null}
         onDownloadModel={handleDownloadModel}
       />
 
@@ -436,7 +436,9 @@ export function LayaSettingsPanel() {
         ruleRubric={ruleRubric}
         onOpenChange={(open) => {
           setIsAddRuleOpen(open);
-          if (!open) setEditingRuleName(null);
+          if (!open) {
+            setEditingRuleName(null);
+          }
         }}
         onRuleNameChange={setRuleName}
         onRuleTypeChange={setRuleType}
@@ -462,10 +464,7 @@ export function LayaSettingsPanel() {
         onConfirmRollback={handleConfirmRollback}
       />
 
-      <LayaGuideModal
-        isOpen={isGuideModalOpen}
-        onOpenChange={setIsGuideModalOpen}
-      />
+      <LayaGuideModal isOpen={isGuideModalOpen} onOpenChange={setIsGuideModalOpen} />
     </div>
   );
 }

@@ -118,23 +118,16 @@ export function OrchestratorPickerView({
                 <span className="block text-sm font-medium text-white/90 group-hover:text-white transition-colors">
                   Enable Clustering
                 </span>
-                <span className="block text-xs text-white/40 truncate">
-                  Drain3 Pattern Mining
-                </span>
+                <span className="block text-xs text-white/40 truncate">Drain3 Pattern Mining</span>
               </div>
             </div>
-            <Switch
-              checked={!clusteringStatus?.paused}
-              onCheckedChange={onToggleClustering}
-            />
+            <Switch checked={!clusteringStatus?.paused} onCheckedChange={onToggleClustering} />
           </div>
         </div>
       </div>
 
       <div className="space-y-3">
-        <p className="text-xs text-white/40 font-medium px-0.5 uppercase tracking-widest">
-          Engine
-        </p>
+        <p className="text-xs text-white/40 font-medium px-0.5 uppercase tracking-widest">Engine</p>
         <div className="flex items-center justify-between p-3 rounded-lg border border-white/5 bg-white/[0.02] hover:bg-white/[0.04] transition-all group">
           <div className="flex items-center gap-3">
             <div className="size-8 rounded-md bg-white/5 border border-white/10 flex items-center justify-center group-hover:bg-white/10 transition-all text-white/40 group-hover:text-white">
@@ -144,9 +137,7 @@ export function OrchestratorPickerView({
               <span className="block text-sm font-medium text-white/90 group-hover:text-white transition-colors">
                 Core Parser
               </span>
-              <span className="block text-xs text-white/40 truncate">
-                Drain3 Configuration
-              </span>
+              <span className="block text-xs text-white/40 truncate">Drain3 Configuration</span>
             </div>
           </div>
           <button

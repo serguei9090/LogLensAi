@@ -5,20 +5,34 @@ import { Check, Cpu } from "lucide-react";
 export interface HardwareAccelerationProps {
   readonly currentDevice: "cpu" | "gpu";
   readonly onDeviceChange: (device: "cpu" | "gpu") => void;
+  readonly title?: string;
+  readonly tooltip?: string;
+  readonly cpuRamText?: string;
+  readonly gpuRamText?: string;
+  readonly gpuVramText?: string;
+  readonly latencyTextCpu?: string;
+  readonly latencyTextGpu?: string;
 }
 
 export function HardwareAcceleration({
   currentDevice,
   onDeviceChange,
+  title = "Hardware Acceleration & Runtime",
+  tooltip = "Select CPU execution to keep all GPU VRAM available for local generative LLMs, or GPU acceleration for lowest latency.",
+  cpuRamText = "RAM: ~520 MB",
+  gpuRamText = "RAM: ~120 MB",
+  gpuVramText = "VRAM: ~550 MB",
+  latencyTextCpu = "Latency: ~45–70 ms",
+  latencyTextGpu = "Latency: ~18–25 ms",
 }: Readonly<HardwareAccelerationProps>) {
   return (
     <div className="space-y-3">
       <div className="flex items-center gap-2">
         <Cpu className="h-4 w-4 text-primary" />
         <h4 className="text-xs font-semibold uppercase tracking-wider text-text-muted font-mono">
-          Hardware Acceleration & Runtime
+          {title}
         </h4>
-        <HelpTooltip content="Select CPU execution to keep all GPU VRAM available for local generative LLMs, or GPU acceleration for lowest latency." />
+        <HelpTooltip content={tooltip} />
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
@@ -50,13 +64,13 @@ export function HardwareAcceleration({
 
           <div className="flex items-center gap-2 text-xs font-mono flex-wrap pt-1">
             <span className="px-2 py-0.5 rounded bg-bg-base/80 border border-border/60 text-text-muted">
-              RAM: ~520 MB
+              {cpuRamText}
             </span>
             <span className="px-2 py-0.5 rounded bg-primary/10 border border-primary/20 text-primary font-medium">
               VRAM: 0 MB
             </span>
             <span className="px-2 py-0.5 rounded bg-bg-base/80 border border-border/60 text-text-muted">
-              Latency: ~45–70 ms
+              {latencyTextCpu}
             </span>
           </div>
         </button>
@@ -89,13 +103,13 @@ export function HardwareAcceleration({
 
           <div className="flex items-center gap-2 text-xs font-mono flex-wrap pt-1">
             <span className="px-2 py-0.5 rounded bg-bg-base/80 border border-border/60 text-text-muted">
-              RAM: ~120 MB
+              {gpuRamText}
             </span>
             <span className="px-2 py-0.5 rounded bg-bg-base/80 border border-border/60 text-text-muted">
-              VRAM: ~550 MB
+              {gpuVramText}
             </span>
             <span className="px-2 py-0.5 rounded bg-primary/10 border border-primary/20 text-primary font-medium">
-              Latency: ~18–25 ms
+              {latencyTextGpu}
             </span>
           </div>
         </button>

@@ -6,11 +6,7 @@ export interface JsonEditorTabProps {
   readonly onJsonChange: (text: string) => void;
 }
 
-export function JsonEditorTab({
-  jsonText,
-  jsonError,
-  onJsonChange,
-}: Readonly<JsonEditorTabProps>) {
+export function JsonEditorTab({ jsonText, jsonError, onJsonChange }: Readonly<JsonEditorTabProps>) {
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between text-xs text-text-muted">

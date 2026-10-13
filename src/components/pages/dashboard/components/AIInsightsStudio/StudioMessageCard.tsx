@@ -1,11 +1,11 @@
-import { Check, Copy, Loader2, Sparkles, Wrench } from "lucide-react";
-import { useState } from "react";
 import { A2UIRenderer } from "@/components/atoms/A2UIRenderer";
 import { MarkdownContent } from "@/components/atoms/MarkdownContent";
 import { ThinkingBlock } from "@/components/atoms/ThinkingBlock";
 import { TypingIndicator } from "@/components/atoms/TypingIndicator";
 import { stripA2UITags } from "@/components/organisms/ai-sidebar/utils/parseThinking";
 import { cn } from "@/lib/utils";
+import { Check, Copy, Loader2, Sparkles, Wrench } from "lucide-react";
+import { useState } from "react";
 
 export interface StudioMessageCardProps {
   readonly isUser: boolean;
@@ -124,45 +124,47 @@ export function StudioMessageCard({
             </div>
           )}
 
-          {isUser ? (() => {
-            // Check for attached scopes in prefix
-            const targetScopeMatch = content.match(/^\[TARGET CATALOGS?: (.*?)\]\s*(.*)$/s);
-            if (targetScopeMatch) {
-              const scopeRaw = targetScopeMatch[1];
-              const userQuestion = targetScopeMatch[2];
-              // Extract names from e.g. "server2.log (source_id: ...), test.log (source_id: ...)"
-              const scopeItems = scopeRaw.split("),").map((part) => {
-                const trimmed = part.trim();
-                const nameMatch = trimmed.match(/^(.*?)\s*\(source_id:/);
-                return nameMatch ? nameMatch[1].trim() : trimmed;
-              });
+          {isUser ? (
+            (() => {
+              // Check for attached scopes in prefix
+              const targetScopeMatch = content.match(/^\[TARGET CATALOGS?: (.*?)\]\s*(.*)$/s);
+              if (targetScopeMatch) {
+                const scopeRaw = targetScopeMatch[1];
+                const userQuestion = targetScopeMatch[2];
+                // Extract names from e.g. "server2.log (source_id: ...), test.log (source_id: ...)"
+                const scopeItems = scopeRaw.split("),").map((part) => {
+                  const trimmed = part.trim();
+                  const nameMatch = trimmed.match(/^(.*?)\s*\(source_id:/);
+                  return nameMatch ? nameMatch[1].trim() : trimmed;
+                });
+
+                return (
+                  <div className="prose prose-invert max-w-none text-right flex flex-wrap items-center justify-end gap-2">
+                    <span className="whitespace-pre-wrap font-sans text-sm text-text-primary leading-relaxed">
+                      {userQuestion}
+                    </span>
+                    {scopeItems.map((name, i) => (
+                      <span
+                        key={`${name}-${i}`}
+                        className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-lg bg-cyan-500/15 border border-cyan-500/30 text-xs font-mono text-cyan-300 shadow-sm align-middle select-none"
+                      >
+                        <span className="text-cyan-400 font-bold">∞</span>
+                        <span className="font-semibold">{name}</span>
+                      </span>
+                    ))}
+                  </div>
+                );
+              }
 
               return (
-                <div className="prose prose-invert max-w-none text-right flex flex-wrap items-center justify-end gap-2">
-                  <span className="whitespace-pre-wrap font-sans text-sm text-text-primary leading-relaxed">
-                    {userQuestion}
-                  </span>
-                  {scopeItems.map((name, i) => (
-                    <span
-                      key={`${name}-${i}`}
-                      className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-lg bg-cyan-500/15 border border-cyan-500/30 text-xs font-mono text-cyan-300 shadow-sm align-middle select-none"
-                    >
-                      <span className="text-cyan-400 font-bold">∞</span>
-                      <span className="font-semibold">{name}</span>
-                    </span>
-                  ))}
+                <div className="prose prose-invert max-w-none text-right">
+                  <p className="whitespace-pre-wrap font-sans text-sm text-text-primary leading-relaxed">
+                    {content}
+                  </p>
                 </div>
               );
-            }
-
-            return (
-              <div className="prose prose-invert max-w-none text-right">
-                <p className="whitespace-pre-wrap font-sans text-sm text-text-primary leading-relaxed">
-                  {content}
-                </p>
-              </div>
-            );
-          })() : (
+            })()
+          ) : (
             <div className="space-y-4">
               <div className="prose prose-invert max-w-none">
                 <MarkdownContent

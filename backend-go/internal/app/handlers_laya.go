@@ -177,3 +177,17 @@ func (a *App) DownloadLayaModel(_ models.DownloadLayaModelRequest) (any, *models
 	return a.LayaModels.GetStatus(), nil
 }
 
+// DeleteLayaModel implements the delete_laya_model JSON-RPC 2.0 method,
+// deleting locally cached Laya weights from disk and falling back to simulated inference.
+func (a *App) DeleteLayaModel(_ models.DeleteLayaModelRequest) (any, *models.RPCError) {
+	if a.LayaModels == nil {
+		return nil, &models.RPCError{Code: errInternal, Message: "laya model manager not initialized"}
+	}
+
+	if err := a.LayaModels.DeleteModel(); err != nil {
+		return nil, &models.RPCError{Code: errInternal, Message: err.Error()}
+	}
+
+	_ = a.ReloadLayaEngine()
+	return a.LayaModels.GetStatus(), nil
+}

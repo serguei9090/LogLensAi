@@ -21,12 +21,12 @@ type DocumentChunk struct {
 
 // KnowledgeSearchResult represents a match returned by SearchKnowledge.
 type KnowledgeSearchResult struct {
-	ID       string    `json:"id"`
-	FilePath string    `json:"file_path"`
-	FileType string    `json:"file_type"`
-	Content  string    `json:"content"`
-	Distance float64   `json:"distance"`
-	Score    float64   `json:"score"`
+	ID       string  `json:"id"`
+	FilePath string  `json:"file_path"`
+	FileType string  `json:"file_type"`
+	Content  string  `json:"content"`
+	Distance float64 `json:"distance"`
+	Score    float64 `json:"score"`
 }
 
 // IngestKnowledgeFile reads a supported file (.md, .txt, .pdf, or image metadata),

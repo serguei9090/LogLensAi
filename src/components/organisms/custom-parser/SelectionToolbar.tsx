@@ -8,11 +8,7 @@ interface SelectionToolbarProps {
   onMapLevel: () => void;
 }
 
-export function SelectionToolbar({
-  selection,
-  onMapTimestamp,
-  onMapLevel,
-}: SelectionToolbarProps) {
+export function SelectionToolbar({ selection, onMapTimestamp, onMapLevel }: SelectionToolbarProps) {
   return (
     <div
       style={{

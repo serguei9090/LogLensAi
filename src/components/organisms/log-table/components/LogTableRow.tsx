@@ -1,7 +1,7 @@
 import { cn } from "@/lib/utils";
 import type { LogEntry } from "@/types/log";
 import type { VirtualItem } from "@tanstack/react-virtual";
-import * as React from "react";
+import type * as React from "react";
 import { memo } from "react";
 import { getRowLevelStyles } from "../utils/styleUtils";
 import { LogTableCell } from "./LogTableCells";

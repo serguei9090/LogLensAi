@@ -1,13 +1,13 @@
 // Assume Role: Frontend Engineer (@frontend)
 
-import { AtSign, FileText, Lightbulb, LightbulbOff, Send, Slash, Square, X } from "lucide-react";
-import { type KeyboardEvent, useRef, useState } from "react";
 import { ModelDropdownMenu } from "@/components/organisms/ai-sidebar/components/ModelDropdownMenu";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import type { Workspace } from "@/store/workspaceStore";
-import { AtMentionItem, AtMentionMenu } from "./AtMentionMenu";
-import { SkillCommandItem, SlashCommandMenu } from "./SlashCommandMenu";
+import { AtSign, FileText, Lightbulb, LightbulbOff, Send, Slash, Square, X } from "lucide-react";
+import { type KeyboardEvent, useRef, useState } from "react";
+import { type AtMentionItem, AtMentionMenu } from "./AtMentionMenu";
+import { type SkillCommandItem, SlashCommandMenu } from "./SlashCommandMenu";
 
 export interface TargetCatalogScope {
   id: string;
@@ -124,7 +124,8 @@ export function StudioPromptInput({
     const cursor = textareaRef.current?.selectionStart || input.length;
     const textBeforeCursor = input.slice(0, cursor);
     const lastAtIdx = textBeforeCursor.lastIndexOf("@");
-    const remainingText = lastAtIdx !== -1 ? input.slice(0, lastAtIdx) + input.slice(cursor) : input;
+    const remainingText =
+      lastAtIdx !== -1 ? input.slice(0, lastAtIdx) + input.slice(cursor) : input;
 
     setInput(remainingText.trim());
     setIsAtMenuOpen(false);
@@ -225,7 +226,9 @@ export function StudioPromptInput({
       }
       if (e.key === "Enter" || e.key === "Tab") {
         e.preventDefault();
-        const menuEl = document.querySelector(".custom-scrollbar button") as HTMLButtonElement | null;
+        const menuEl = document.querySelector(
+          ".custom-scrollbar button",
+        ) as HTMLButtonElement | null;
         if (menuEl) {
           menuEl.click();
         }
@@ -251,7 +254,9 @@ export function StudioPromptInput({
       }
       if (e.key === "Enter" || e.key === "Tab") {
         e.preventDefault();
-        const menuEl = document.querySelector(".custom-scrollbar button") as HTMLButtonElement | null;
+        const menuEl = document.querySelector(
+          ".custom-scrollbar button",
+        ) as HTMLButtonElement | null;
         if (menuEl) {
           menuEl.click();
         }
@@ -300,7 +305,9 @@ export function StudioPromptInput({
                   className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-cyan-500/10 border border-cyan-500/30 text-xs font-mono text-cyan-300 hover:bg-cyan-500/15 transition-colors group shadow-sm"
                 >
                   <FileText className="size-3 text-cyan-400 shrink-0" />
-                  <span className="font-semibold text-cyan-200 truncate max-w-[150px]">{scope.name}</span>
+                  <span className="font-semibold text-cyan-200 truncate max-w-[150px]">
+                    {scope.name}
+                  </span>
                   {scope.workspaceName && (
                     <span className="text-[10px] text-cyan-400/70 border-l border-cyan-500/20 pl-1.5">
                       {scope.workspaceName}

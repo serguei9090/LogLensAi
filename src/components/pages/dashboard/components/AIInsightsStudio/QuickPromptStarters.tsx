@@ -1,5 +1,5 @@
-import { Activity, AlertTriangle, Layers, Sparkles, TrendingUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Activity, AlertTriangle, Layers, Sparkles, TrendingUp } from "lucide-react";
 
 interface QuickPromptCardProps {
   readonly onSelectPrompt: (prompt: string) => void;

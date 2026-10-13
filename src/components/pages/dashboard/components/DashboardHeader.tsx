@@ -1,8 +1,8 @@
-import { Sparkles } from "lucide-react";
 import {
   type DashboardMode,
   DashboardModeToggle,
 } from "@/components/molecules/DashboardModeToggle";
+import { Sparkles } from "lucide-react";
 
 export interface DashboardHeaderProps {
   readonly mode: DashboardMode;

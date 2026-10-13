@@ -1,10 +1,10 @@
-import { useCallback, useEffect, useRef, useState } from "react";
 import { callSidecar } from "@/lib/hooks/useSidecarBridge";
 import { useAiStore } from "@/store/aiStore";
 import { useInvestigationStore } from "@/store/investigationStore";
 import { useSettingsStore } from "@/store/settingsStore";
 import { useUIStore } from "@/store/uiStore";
 import { selectActiveWorkspace, useWorkspaceStore } from "@/store/workspaceStore";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { QuickPromptStarters } from "./QuickPromptStarters";
 import { StudioDiagramHelperModal } from "./StudioDiagramHelperModal";
 import { StudioFloatingControls } from "./StudioFloatingControls";
@@ -42,7 +42,9 @@ export function AIInsightsStudio() {
 
   const [isReasoningEnabled, setIsReasoningEnabled] = useState(true);
   const [isFetchingModels, setIsFetchingModels] = useState(false);
-  const [activeCatalogScopes, setActiveCatalogScopes] = useState<{ id: string; name: string; workspaceName?: string }[]>([]);
+  const [activeCatalogScopes, setActiveCatalogScopes] = useState<
+    { id: string; name: string; workspaceName?: string }[]
+  >([]);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const workspaces = useWorkspaceStore((state) => state.workspaces);

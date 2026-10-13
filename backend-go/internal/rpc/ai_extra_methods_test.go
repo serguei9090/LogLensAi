@@ -122,3 +122,33 @@ func TestRegisterAIExtraMethods_ListAIModelsDispatch(t *testing.T) {
 		t.Fatalf("list_ai_models is still dispatching to the stub handler")
 	}
 }
+
+func TestRegisterAIExtraMethods_AnalyzeClusterDispatch(t *testing.T) {
+	a := newTestApp(t)
+	extra, err := ai.NewExtra(a)
+	if err != nil {
+		t.Fatalf("ai.NewExtra: %v", err)
+	}
+
+	reg := NewRegistry()
+	RegisterStubs(reg)
+	RegisterAIExtraMethods(reg, a, extra)
+
+	thresh := 0.80
+	params, _ := json.Marshal(models.AnalyzeClusterRequest{
+		WorkspaceID:         "ws1",
+		ClusterID:           "42",
+		SampleSize:          5,
+		SimilarityThreshold: &thresh,
+	})
+	resp := reg.Dispatch(models.JSONRPCRequest{JSONRPC: "2.0", ID: 2, Method: "analyze_cluster", Params: params})
+
+	// Since Ollama might not be running in test environment, it returns either a valid AnalyzeClusterResponse or an RPC error from provider.
+	// What matters is that the method is registered, params parse properly, and it does NOT return method_not_found (-32601) or stub.
+	if resp.Error != nil && resp.Error.Code == -32601 {
+		t.Fatalf("analyze_cluster method not found: %+v", resp.Error)
+	}
+	if m, ok := resp.Result.(map[string]any); ok && m["status"] == "not_implemented" {
+		t.Fatalf("analyze_cluster dispatched to stub handler")
+	}
+}

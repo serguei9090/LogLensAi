@@ -62,9 +62,7 @@ export function DrainSettingsSection({
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h3 className="text-base font-bold text-text-primary">
-                  Drain3 Clustering Engine
-                </h3>
+                <h3 className="text-base font-bold text-text-primary">Drain3 Clustering Engine</h3>
                 <span className="text-xs font-mono uppercase px-2 py-0.5 rounded-full bg-primary/15 text-primary border border-primary/25">
                   Active
                 </span>
@@ -97,11 +95,7 @@ export function DrainSettingsSection({
                   max="1"
                   value={settings.drain_similarity_threshold}
                   onChange={(e) =>
-                    update(
-                      "drain_similarity_threshold",
-                      Number.parseFloat(e.target.value),
-                      false,
-                    )
+                    update("drain_similarity_threshold", Number.parseFloat(e.target.value), false)
                   }
                   onBlur={() => onSave(settings)}
                 />
@@ -154,8 +148,8 @@ export function DrainSettingsSection({
                 className="w-full h-2 bg-border rounded-lg appearance-none cursor-pointer accent-primary"
               />
               <p className="text-xs text-text-muted/60 mt-4 leading-relaxed">
-                The similarity threshold determines how 'close' two log lines must be to share
-                a template. Lower values 0.1–0.4 are better for high-variance logs.
+                The similarity threshold determines how 'close' two log lines must be to share a
+                template. Lower values 0.1–0.4 are better for high-variance logs.
               </p>
             </div>
 
@@ -173,8 +167,8 @@ export function DrainSettingsSection({
               </div>
               <div className="space-y-2">
                 <p className="text-xs text-text-muted px-1 -mt-2">
-                  Sanitize logs by replacing dynamic variables like IPs or IDs with tokens
-                  before clustering.
+                  Sanitize logs by replacing dynamic variables like IPs or IDs with tokens before
+                  clustering.
                 </p>
 
                 {/* Standard Heuristics Visibility */}
@@ -183,17 +177,13 @@ export function DrainSettingsSection({
                     Standard System Heuristics
                   </p>
                   <div className="flex items-center justify-between gap-4 py-1 border-b border-primary/10">
-                    <span className="text-xs font-semibold text-text-primary">
-                      IP ADDRESS
-                    </span>
+                    <span className="text-xs font-semibold text-text-primary">IP ADDRESS</span>
                     <span className="text-xs font-mono text-text-muted truncate">
                       IPv4 / IPv6 Formats
                     </span>
                   </div>
                   <div className="flex items-center justify-between gap-4 py-1 border-b border-primary/10">
-                    <span className="text-xs font-semibold text-text-primary">
-                      UUID / GUID
-                    </span>
+                    <span className="text-xs font-semibold text-text-primary">UUID / GUID</span>
                     <span className="text-xs font-mono text-text-muted truncate">
                       Standard 36-char markers
                     </span>
@@ -207,9 +197,7 @@ export function DrainSettingsSection({
                     </span>
                   </div>
                   <div className="flex items-center justify-between gap-4 py-1 border-b border-primary/10">
-                    <span className="text-xs font-semibold text-text-primary">
-                      DURATION
-                    </span>
+                    <span className="text-xs font-semibold text-text-primary">DURATION</span>
                     <span className="text-xs font-mono text-text-muted truncate">
                       took ...ms / ...s latencies
                     </span>
@@ -221,17 +209,13 @@ export function DrainSettingsSection({
                     </span>
                   </div>
                   <div className="flex items-center justify-between gap-4 py-1 border-b border-primary/10">
-                    <span className="text-xs font-semibold text-text-primary">
-                      MAC ADDRESS
-                    </span>
+                    <span className="text-xs font-semibold text-text-primary">MAC ADDRESS</span>
                     <span className="text-xs font-mono text-text-muted truncate">
                       xx:xx:xx:xx:xx:xx hardware IDs
                     </span>
                   </div>
                   <div className="flex items-center justify-between gap-4 py-1">
-                    <span className="text-xs font-semibold text-text-primary">
-                      DATETIME
-                    </span>
+                    <span className="text-xs font-semibold text-text-primary">DATETIME</span>
                     <span className="text-xs font-mono text-text-muted truncate">
                       ISO / RFC3339 timestamps
                     </span>
@@ -385,7 +369,8 @@ export function DrainSettingsSection({
                 <div>
                   <p className="text-sm font-bold text-text-primary">Auto-Detect Timestamps</p>
                   <p className="text-xs text-text-muted mt-0.5">
-                    Scan log messages automatically for standard date formats (ISO, Apache, Syslog, etc.).
+                    Scan log messages automatically for standard date formats (ISO, Apache, Syslog,
+                    etc.).
                   </p>
                 </div>
                 <Switch
@@ -457,7 +442,8 @@ export function DrainSettingsSection({
                 </span>
               </div>
               <p className="text-xs text-text-muted mt-0.5">
-                Regex rules and capturing groups to extract structured fields from raw text into queryable facets.
+                Regex rules and capturing groups to extract structured fields from raw text into
+                queryable facets.
               </p>
             </div>
           </div>

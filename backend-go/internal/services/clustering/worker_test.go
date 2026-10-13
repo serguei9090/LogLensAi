@@ -383,4 +383,3 @@ func TestWorker_StartStopProcessesBacklog(t *testing.T) {
 		t.Fatalf("ProcessedSession = %d, want 10", status.ProcessedSession)
 	}
 }
-

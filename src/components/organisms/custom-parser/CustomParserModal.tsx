@@ -20,7 +20,9 @@ export function CustomParserModal({
   const [samples, setSamples] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [regexPattern, setRegexPattern] = useState("");
-  const [previewResults, setPreviewResults] = useState<{ timestamp?: string; level?: string }[]>([]);
+  const [previewResults, setPreviewResults] = useState<{ timestamp?: string; level?: string }[]>(
+    [],
+  );
 
   const [activeSelection, setActiveSelection] = useState<ActiveSelection | null>(null);
   const [mapping, setMapping] = useState<{
@@ -144,7 +146,9 @@ export function CustomParserModal({
   };
 
   const handleMapTimestamp = () => {
-    if (!activeSelection) return;
+    if (!activeSelection) {
+      return;
+    }
     setMapping((prev) => ({
       ...prev,
       timestamp: { start: activeSelection.start, end: activeSelection.end },
@@ -154,7 +158,9 @@ export function CustomParserModal({
   };
 
   const handleMapLevel = () => {
-    if (!activeSelection) return;
+    if (!activeSelection) {
+      return;
+    }
     setMapping((prev) => ({
       ...prev,
       level: { start: activeSelection.start, end: activeSelection.end },
@@ -171,10 +177,7 @@ export function CustomParserModal({
     <TooltipProvider delay={200}>
       <div className="fixed inset-0 z-[200] flex flex-col overflow-y-auto py-8 px-4 bg-black/85 backdrop-blur-md animate-in fade-in duration-300">
         <div className="max-w-5xl w-full my-auto mx-auto min-h-[520px] flex flex-col bg-bg-app border border-border-subtle rounded-2xl shadow-2xl overflow-hidden ring-1 ring-white/10">
-          <ParserHeader
-            hasTimestampMapping={Boolean(mapping.timestamp)}
-            onClose={onClose}
-          />
+          <ParserHeader hasTimestampMapping={Boolean(mapping.timestamp)} onClose={onClose} />
 
           <div className="flex-1 flex min-h-0 divide-x divide-border/40">
             <SampleViewer

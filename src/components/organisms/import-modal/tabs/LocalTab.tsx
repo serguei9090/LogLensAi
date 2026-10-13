@@ -33,9 +33,7 @@ export function LocalTab({
                 <span className="text-xs font-bold text-text-primary truncate">
                   {localPath.split(/[/\\]/).pop() || localPath}
                 </span>
-                <span className="text-xs text-text-muted/60 truncate font-mono">
-                  {localPath}
-                </span>
+                <span className="text-xs text-text-muted/60 truncate font-mono">{localPath}</span>
               </div>
             </div>
             <Button

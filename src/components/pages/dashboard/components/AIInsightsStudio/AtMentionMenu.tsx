@@ -1,9 +1,9 @@
 // Assume Role: Frontend Engineer (@frontend)
 
+import { cn } from "@/lib/utils";
+import type { Workspace } from "@/store/workspaceStore";
 import { Check, Database, FileText, Layers, Search } from "lucide-react";
 import { useEffect, useRef } from "react";
-import type { Workspace } from "@/store/workspaceStore";
-import { cn } from "@/lib/utils";
 
 export interface AtMentionItem {
   id: string;
@@ -94,16 +94,18 @@ export function AtMentionMenu({
     });
 
   // 3. Global quick action items
-  const actionItems: AtMentionItem[] = ([
-    {
-      id: "act-all",
-      type: "action" as const,
-      title: "All Catalogs (Full Workspace)",
-      subtitle: "Scope across all log catalogs in this workspace",
-      badge: "All",
-      data: { actionType: "all_catalogs" },
-    },
-  ] as AtMentionItem[]).filter(
+  const actionItems: AtMentionItem[] = (
+    [
+      {
+        id: "act-all",
+        type: "action" as const,
+        title: "All Catalogs (Full Workspace)",
+        subtitle: "Scope across all log catalogs in this workspace",
+        badge: "All",
+        data: { actionType: "all_catalogs" },
+      },
+    ] as AtMentionItem[]
+  ).filter(
     (a) =>
       filter === "" ||
       a.title.toLowerCase().includes(filter) ||
@@ -128,7 +130,9 @@ export function AtMentionMenu({
           <Search className="size-4 text-text-muted/60" />
           <span>No catalogs or workspaces matching &ldquo;{query}&rdquo;</span>
         </div>
-        <p className="text-[11px] text-text-muted/60">Type a filename or workspace name to search</p>
+        <p className="text-[11px] text-text-muted/60">
+          Type a filename or workspace name to search
+        </p>
       </div>
     );
   }
@@ -192,9 +196,7 @@ export function AtMentionMenu({
                       </span>
                     )}
                   </div>
-                  <span className="text-[11px] text-text-muted truncate">
-                    {item.subtitle}
-                  </span>
+                  <span className="text-[11px] text-text-muted truncate">{item.subtitle}</span>
                 </div>
               </div>
 

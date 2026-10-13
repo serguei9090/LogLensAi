@@ -24,6 +24,8 @@ tokens:
     text-inverse: "#0D0F0E"
     accent-violet: "#8B5CF6"
     accent-violet-bg: "#8B5CF610"
+    badge-known-issue: "#F59E0B"
+    badge-new-anomaly: "#F43F5E"
   typography:
     sans: "Inter Variable, system-ui, sans-serif"
     mono: "JetBrains Mono, monospace"
@@ -119,6 +121,8 @@ Shapes are generally **Geometric with Softened Corners**.
 
 ### Organisms
 - **Virtual Log Table**: High-density list with alternating row hovers for better tracking.
+- **Diagnostic Sidebar**: Contextual inspection panel displaying root cause, recommended actions, and automated RAG triage status (`🟡 KNOWN ISSUE` with prior resolution vs `🔴 NEW ANOMALY`).
+- **AI Insights Studio (A2UI)**: Dynamic declarative telemetry cards, timelines, and blueprint visualizers rendered in AI insights mode.
 
 ## Do's and Don'ts
 - **DO** use `border-white/10` for subtle separation.

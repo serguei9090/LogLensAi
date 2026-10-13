@@ -2,12 +2,19 @@ import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
-import { Activity, AlertTriangle, Lightbulb, X } from "lucide-react";
+import { useAiStore } from "@/store/aiStore";
+import { Activity, AlertTriangle, Lightbulb, MessageSquare, X } from "lucide-react";
 
 export interface DiagnosticData {
   summary: string;
   root_cause: string;
   recommended_actions: string[];
+  is_known_issue?: boolean;
+  classification?: string;
+  tag?: string;
+  match_score?: number;
+  matched_signature?: string;
+  known_resolution?: string;
 }
 
 interface DiagnosticSidebarProps {
@@ -49,6 +56,39 @@ export function DiagnosticSidebar({ open, onClose, data, loading }: DiagnosticSi
           </div>
         ) : data ? (
           <div className="space-y-6">
+            {data.tag && (
+              <div
+                className={cn(
+                  "p-3.5 rounded-lg border flex flex-col gap-2",
+                  data.is_known_issue
+                    ? "bg-amber-500/10 border-amber-500/30 text-amber-200"
+                    : "bg-rose-500/10 border-rose-500/30 text-rose-200",
+                )}
+              >
+                <div className="flex items-center justify-between">
+                  <span className="font-semibold text-xs tracking-wider uppercase flex items-center gap-1.5">
+                    {data.tag}
+                  </span>
+                  {data.match_score !== undefined && data.match_score > 0 && (
+                    <span className="font-mono text-xs px-2 py-0.5 rounded bg-black/40 border border-white/10 font-bold">
+                      {(data.match_score * 100).toFixed(0)}% match
+                    </span>
+                  )}
+                </div>
+                {data.is_known_issue && data.known_resolution && (
+                  <div className="text-xs text-text-secondary mt-1 bg-black/30 p-2.5 rounded border border-white/5 space-y-1">
+                    <div className="font-semibold text-amber-300">Prior Resolution in Memory:</div>
+                    <div className="leading-relaxed text-text-primary">{data.known_resolution}</div>
+                  </div>
+                )}
+                {data.is_known_issue && data.matched_signature && (
+                  <div className="text-[11px] text-text-muted truncate">
+                    Matched: <span className="font-mono">{data.matched_signature}</span>
+                  </div>
+                )}
+              </div>
+            )}
+
             <div className="space-y-2">
               <h3 className="text-sm font-semibold text-text-secondary uppercase tracking-wider flex items-center gap-2">
                 <AlertTriangle className="h-4 w-4 text-warning" />
@@ -87,6 +127,18 @@ export function DiagnosticSidebar({ open, onClose, data, loading }: DiagnosticSi
                 ))}
               </ul>
             </div>
+
+            <Button
+              variant="outline"
+              className="w-full flex items-center justify-center gap-2 border-primary/30 text-primary hover:bg-primary/10"
+              onClick={() => {
+                onClose();
+                useAiStore.getState().setSidebarOpen(true);
+              }}
+            >
+              <MessageSquare className="h-4 w-4" />
+              Continue in AI Chat
+            </Button>
           </div>
         ) : (
           <div className="flex flex-col items-center justify-center h-full text-text-muted space-y-4 pt-20">

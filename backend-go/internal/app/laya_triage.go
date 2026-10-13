@@ -14,10 +14,10 @@ import (
 
 // LayaClusterTriager implements clustering.ClusterTriageHandler using the Laya System 1 engine.
 type LayaClusterTriager struct {
-	app        *App
-	seenMu     sync.RWMutex
-	seenTmpls  map[string]string // key: workspaceID + ":" + clusterID -> template text
-	sem        chan struct{}     // bounded concurrency limiter (max 4 parallel Laya inferences)
+	app       *App
+	seenMu    sync.RWMutex
+	seenTmpls map[string]string // key: workspaceID + ":" + clusterID -> template text
+	sem       chan struct{}     // bounded concurrency limiter (max 4 parallel Laya inferences)
 }
 
 // NewLayaClusterTriager creates a triager bound to the application instance.

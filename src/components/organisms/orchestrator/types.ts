@@ -15,11 +15,7 @@ export interface DiscoveryTemplate {
   created_at: string;
 }
 
-export type OrchestratorView =
-  | "picker"
-  | "fusion-form"
-  | "ai-context-form"
-  | "time-alignment-form";
+export type OrchestratorView = "picker" | "fusion-form" | "ai-context-form" | "time-alignment-form";
 
 export interface OrchestratorHubProps {
   readonly isOpen: boolean;

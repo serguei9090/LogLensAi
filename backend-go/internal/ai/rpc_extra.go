@@ -19,6 +19,7 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
+	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
@@ -59,7 +60,38 @@ type Extra struct {
 	app                *app.App
 	provider           providers.Provider
 	memory             *lazyMemoryService
+	memorySearcher     ClusterMemorySearcher
+	ragModels          *rag.ModelManager
 	isExplicitProvider bool
+}
+
+// ClusterMemorySearcher queries the RAG vector store for similar issue signatures.
+type ClusterMemorySearcher interface {
+	SearchMemory(ctx context.Context, workspaceID, query string, limit int) ([]rag.MemoryResult, error)
+}
+
+// DefaultClusterMemorySimilarityThreshold is the cosine similarity score threshold (1.0 - distance)
+// required to classify a cluster as a KNOWN ISSUE rather than a NEW ANOMALY.
+const DefaultClusterMemorySimilarityThreshold = 0.70
+
+const (
+	TagKnownIssue = "🟡 KNOWN ISSUE (Matches resolution in memory)"
+	TagNewAnomaly = "🔴 NEW ANOMALY (First occurrence)"
+)
+
+// SetMemorySearcher sets or overrides the memory searcher for testing or custom wiring.
+func (e *Extra) SetMemorySearcher(s ClusterMemorySearcher) {
+	e.memorySearcher = s
+}
+
+func (e *Extra) getMemorySearcher() (ClusterMemorySearcher, error) {
+	if e.memorySearcher != nil {
+		return e.memorySearcher, nil
+	}
+	if e.memory != nil {
+		return e.memory.get()
+	}
+	return nil, fmt.Errorf("memory service not configured")
 }
 
 // NewExtra constructs an Extra for a. Like Wire, it does no network/model
@@ -69,10 +101,12 @@ func NewExtra(a *app.App) (*Extra, error) {
 	if err != nil {
 		return nil, fmt.Errorf("ai: constructing provider for extra RPC methods: %w", err)
 	}
+	ragModelDir := filepath.Join(a.DataDir(), "rag_model")
 	return &Extra{
-		app:      a,
-		provider: provider,
-		memory:   newLazyMemoryService(a.DataDir(), a.DB.Conn),
+		app:       a,
+		provider:  provider,
+		memory:    newLazyMemoryService(a.DataDir(), a.DB.Conn),
+		ragModels: rag.NewModelManager(ragModelDir),
 	}, nil
 }
 
@@ -92,16 +126,21 @@ func (e *Extra) getProvider() providers.Provider {
 
 // --- analyze_cluster ------------------------------------------------------
 
-// AnalyzeCluster implements the analyze_cluster RPC method, mirroring
-// api.py's App.method_analyze_cluster: fetch up to sample_size raw log
-// lines belonging to cluster_id (hydrated via the fast-path mmap reader,
-// same as api.py's fast_path.get_line), resolve the cluster's current
-// template from workspace_id's Drain3 miner, and hand both to the AI
-// provider's one-off log analysis prompt.
+// AnalyzeCluster implements the analyze_cluster RPC method:
+// 1. Fetches up to sample_size raw log lines belonging to cluster_id.
+// 2. Resolves the cluster's current template from workspace_id's Drain3 miner.
+// 3. Automatically queries the RAG memory store (DuckDB-VSS) for semantic matches against prior known issues.
+// 4. Distinguishes KNOWN ISSUE (similarity >= threshold) vs NEW ANOMALY (below threshold).
+// 5. Injects prior known resolution context into the prompt & recommended actions, and returns tagged status.
 func (e *Extra) AnalyzeCluster(ctx context.Context, req models.AnalyzeClusterRequest) (any, *models.RPCError) {
 	sampleSize := req.SampleSize
 	if sampleSize <= 0 {
 		sampleSize = 20
+	}
+
+	threshold := DefaultClusterMemorySimilarityThreshold
+	if req.SimilarityThreshold != nil && *req.SimilarityThreshold >= 0.0 && *req.SimilarityThreshold <= 1.0 {
+		threshold = *req.SimilarityThreshold
 	}
 
 	rows, err := e.app.DB.Conn.QueryContext(ctx,
@@ -136,15 +175,104 @@ func (e *Extra) AnalyzeCluster(ctx context.Context, req models.AnalyzeClusterReq
 			}
 		}
 	}
+	if template == "" && e.app != nil && e.app.DB != nil {
+		if tr, err := e.app.DB.GetClusterTriage(req.WorkspaceID, req.ClusterID); err == nil && tr != nil {
+			template = tr.Template
+		}
+	}
 
-	result, err := e.getProvider().AnalyzeLogs(ctx, template, samples)
+	// Automatic RAG Cluster Memory Pre-Check
+	isKnownIssue := false
+	classification := "NEW ANOMALY"
+	tag := TagNewAnomaly
+	matchScore := 0.0
+	matchedSignature := ""
+	knownResolution := ""
+
+	queryText := template
+	if queryText == "" && len(samples) > 0 {
+		queryText = samples[0]
+	}
+
+	if queryText != "" {
+		if searcher, sErr := e.getMemorySearcher(); sErr == nil && searcher != nil {
+			if memResults, mErr := searcher.SearchMemory(ctx, req.WorkspaceID, queryText, 3); mErr == nil && len(memResults) > 0 {
+				top := memResults[0]
+				// Cosine distance to similarity: similarity = 1.0 - distance
+				sim := 1.0 - top.Distance
+				if sim < 0.0 {
+					sim = 0.0
+				} else if sim > 1.0 {
+					sim = 1.0
+				}
+				if sim >= threshold {
+					isKnownIssue = true
+					classification = "KNOWN ISSUE"
+					tag = TagKnownIssue
+					matchScore = sim
+					matchedSignature = top.IssueSignature
+					knownResolution = top.Resolution
+				} else if sim > 0 {
+					matchScore = sim
+				}
+			}
+		}
+	}
+
+	// Persist RAG evaluation to cluster_triage in DB if available
+	if e.app != nil && e.app.DB != nil {
+		_ = e.app.DB.UpsertClusterRAGTag(req.WorkspaceID, req.ClusterID, template, isKnownIssue, tag, matchedSignature, knownResolution, matchScore)
+	}
+
+	// If known issue with resolution, enrich template prompt passed to AI provider
+	promptTemplate := template
+	if isKnownIssue && knownResolution != "" {
+		if promptTemplate != "" {
+			promptTemplate = fmt.Sprintf("%s\n\n[PRIOR KNOWN INCIDENT IN MEMORY]:\nIssue Signature: %s\nPrior Resolution: %s", template, matchedSignature, knownResolution)
+		} else {
+			promptTemplate = fmt.Sprintf("[PRIOR KNOWN INCIDENT IN MEMORY]:\nIssue Signature: %s\nPrior Resolution: %s", matchedSignature, knownResolution)
+		}
+	}
+
+	result, err := e.getProvider().AnalyzeLogs(ctx, promptTemplate, samples)
 	if err != nil {
 		return nil, &models.RPCError{Code: extraErrInternal, Message: err.Error()}
 	}
-	return map[string]any{
-		"summary":             result.Summary,
-		"root_cause":          result.RootCause,
-		"recommended_actions": result.RecommendedActions,
+
+	recommendedActions := result.RecommendedActions
+	if isKnownIssue && knownResolution != "" {
+		hasResolution := false
+		for _, action := range recommendedActions {
+			if strings.Contains(strings.ToLower(action), strings.ToLower(knownResolution)) {
+				hasResolution = true
+				break
+			}
+		}
+		if !hasResolution {
+			// Prepend the verified prior resolution as the primary action
+			recommendedActions = append([]string{fmt.Sprintf("Proven Resolution from Memory: %s", knownResolution)}, recommendedActions...)
+		}
+	}
+
+	rootCause := result.RootCause
+	if isKnownIssue && matchedSignature != "" && !strings.Contains(strings.ToLower(rootCause), strings.ToLower(matchedSignature)) {
+		if rootCause == "" {
+			rootCause = fmt.Sprintf("Matches known issue: %s", matchedSignature)
+		} else {
+			rootCause = fmt.Sprintf("%s (Matches known issue: %s)", rootCause, matchedSignature)
+		}
+	}
+
+	return models.AnalyzeClusterResponse{
+		Summary:            result.Summary,
+		RootCause:          rootCause,
+		RecommendedActions: recommendedActions,
+		IsKnownIssue:       isKnownIssue,
+		Classification:     classification,
+		Tag:                tag,
+		MatchScore:         matchScore,
+		MatchedSignature:   matchedSignature,
+		KnownResolution:    knownResolution,
 	}, nil
 }
 
@@ -300,6 +428,45 @@ func (e *Extra) SyncKnowledgeBase(ctx context.Context, req models.SyncKnowledgeB
 		"total_files":  totalFiles,
 		"total_chunks": totalChunks,
 	}, nil
+}
+
+// GetRAGModelStatus implements the get_rag_model_status JSON-RPC 2.0 method,
+// reporting local availability and download progress for RAG embedding weights.
+func (e *Extra) GetRAGModelStatus(_ context.Context, _ models.GetRAGModelStatusRequest) (any, *models.RPCError) {
+	if e.ragModels == nil {
+		ragModelDir := filepath.Join(e.app.DataDir(), "rag_model")
+		e.ragModels = rag.NewModelManager(ragModelDir)
+	}
+	return e.ragModels.GetStatus(), nil
+}
+
+// DownloadRAGModel implements the download_rag_model JSON-RPC 2.0 method,
+// initiating an asynchronous background download of RAG weights from Hugging Face.
+func (e *Extra) DownloadRAGModel(_ context.Context, _ models.DownloadRAGModelRequest) (any, *models.RPCError) {
+	if e.ragModels == nil {
+		ragModelDir := filepath.Join(e.app.DataDir(), "rag_model")
+		e.ragModels = rag.NewModelManager(ragModelDir)
+	}
+	err := e.ragModels.StartDownload(func() {
+		log.Printf("[RAG] embedding model download completed successfully")
+	})
+	if err != nil {
+		return nil, &models.RPCError{Code: extraErrInternal, Message: err.Error()}
+	}
+	return e.ragModels.GetStatus(), nil
+}
+
+// DeleteRAGModel implements the delete_rag_model JSON-RPC 2.0 method,
+// deleting locally cached RAG weights from disk.
+func (e *Extra) DeleteRAGModel(_ context.Context, _ models.DeleteRAGModelRequest) (any, *models.RPCError) {
+	if e.ragModels == nil {
+		ragModelDir := filepath.Join(e.app.DataDir(), "rag_model")
+		e.ragModels = rag.NewModelManager(ragModelDir)
+	}
+	if err := e.ragModels.DeleteModel(); err != nil {
+		return nil, &models.RPCError{Code: extraErrInternal, Message: err.Error()}
+	}
+	return e.ragModels.GetStatus(), nil
 }
 
 // --- lazy rag.Service handle -----------------------------------------------

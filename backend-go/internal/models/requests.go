@@ -255,9 +255,23 @@ type TestAiConnectionRequest struct {
 
 // AnalyzeClusterRequest mirrors models.py AnalyzeClusterRequest.
 type AnalyzeClusterRequest struct {
-	ClusterID   string `json:"cluster_id"`
-	WorkspaceID string `json:"workspace_id"`
-	SampleSize  int    `json:"sample_size"` // default 20 in Python
+	ClusterID           string   `json:"cluster_id"`
+	WorkspaceID         string   `json:"workspace_id"`
+	SampleSize          int      `json:"sample_size"` // default 20 in Python
+	SimilarityThreshold *float64 `json:"similarity_threshold,omitempty"`
+}
+
+// AnalyzeClusterResponse describes the result of analyze_cluster.
+type AnalyzeClusterResponse struct {
+	Summary            string   `json:"summary"`
+	RootCause          string   `json:"root_cause"`
+	RecommendedActions []string `json:"recommended_actions"`
+	IsKnownIssue       bool     `json:"is_known_issue"`
+	Classification     string   `json:"classification"`
+	Tag                string   `json:"tag"`
+	MatchScore         float64  `json:"match_score"`
+	MatchedSignature   string   `json:"matched_signature"`
+	KnownResolution    string   `json:"known_resolution"`
 }
 
 // SendAiMessageRequest mirrors models.py SendAiMessageRequest.
@@ -364,4 +378,20 @@ type LogTraceRequest struct {
 type SyncKnowledgeBaseRequest struct {
 	WorkspaceID   string  `json:"workspace_id"`
 	KnowledgePath *string `json:"knowledge_path,omitempty"`
+}
+
+// GetRAGModelStatusRequest defines parameters for querying local RAG embedding model weight readiness.
+type GetRAGModelStatusRequest struct {
+	WorkspaceID *string `json:"workspace_id,omitempty"`
+}
+
+// DownloadRAGModelRequest defines parameters for requesting background download of RAG embedding weights.
+type DownloadRAGModelRequest struct {
+	Force       *bool   `json:"force,omitempty"`
+	WorkspaceID *string `json:"workspace_id,omitempty"`
+}
+
+// DeleteRAGModelRequest defines parameters for deleting local RAG embedding weights.
+type DeleteRAGModelRequest struct {
+	WorkspaceID *string `json:"workspace_id,omitempty"`
 }

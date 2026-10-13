@@ -9,10 +9,7 @@ export interface AIObservationCardProps {
   readonly setMode: (mode: DashboardMode) => void;
 }
 
-export function AIObservationCard({
-  stats,
-  setMode,
-}: Readonly<AIObservationCardProps>) {
+export function AIObservationCard({ stats, setMode }: Readonly<AIObservationCardProps>) {
   if (!stats.latest_ai_insight) {
     return null;
   }
