@@ -1,5 +1,5 @@
+import { parseThinking } from "@/features/investigation/ai-sidebar";
 import { describe, expect, it } from "vitest";
-import { parseThinking } from "../../components/organisms/ai-sidebar";
 
 describe("parseThinking Logic", () => {
   it("should handle standard <think> tags", () => {

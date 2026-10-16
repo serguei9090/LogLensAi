@@ -1,2 +1,1 @@
-export * from "./orchestrator";
-export { OrchestratorHub } from "./orchestrator";
+export * from "@/features/orchestrator/OrchestratorHub";

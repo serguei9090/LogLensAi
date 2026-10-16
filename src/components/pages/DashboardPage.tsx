@@ -1,2 +1,1 @@
-export { DashboardPage as default, DashboardPage } from "./dashboard";
-export * from "./dashboard";
+export { DashboardPage as default, DashboardPage } from "@/features/dashboard/DashboardPage";

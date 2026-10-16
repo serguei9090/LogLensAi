@@ -1,1 +1,1 @@
-export { VirtualLogTable, type VirtualLogTableProps } from "./log-table";
+export * from "@/features/investigation/VirtualLogTable";

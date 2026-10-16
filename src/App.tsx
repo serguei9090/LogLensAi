@@ -1,17 +1,19 @@
-import { CommandPalette } from "@/components/organisms/CommandPalette";
-import { SidecarStartupGateway } from "@/components/organisms/SidecarStartupGateway";
-import { SystemDiagnosticConsole } from "@/components/organisms/SystemDiagnosticConsole";
-import { AppLayout } from "@/components/templates/AppLayout";
+import {
+  AppLayout,
+  CommandPalette,
+  SidecarStartupGateway,
+  SystemDiagnosticConsole,
+} from "@/features/shell";
 import { Suspense, lazy, useCallback, useEffect, useRef, useState } from "react";
 
-const DashboardPage = lazy(() => import("@/components/pages/DashboardPage"));
+const DashboardPage = lazy(() => import("@/features/dashboard/DashboardPage"));
 const InvestigationPage = lazy(() =>
-  import("@/components/pages/InvestigationPage").then((module) => ({
+  import("@/features/investigation/InvestigationPage").then((module) => ({
     default: module.InvestigationPage,
   })),
 );
 const SettingsPage = lazy(() =>
-  import("@/components/pages/SettingsPage").then((module) => ({
+  import("@/features/settings/SettingsPage").then((module) => ({
     default: module.SettingsPage,
   })),
 );

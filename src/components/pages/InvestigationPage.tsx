@@ -1,2 +1,1 @@
-export * from "./investigation";
-export { InvestigationPage } from "./investigation";
+export { InvestigationPage } from "@/features/investigation/InvestigationPage";

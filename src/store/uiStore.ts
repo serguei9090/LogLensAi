@@ -1,4 +1,4 @@
-import type { DiagnosticData } from "@/components/organisms/DiagnosticSidebar";
+import type { DiagnosticData } from "@/features/shell/DiagnosticSidebar";
 import { callSidecar } from "@/lib/hooks/useSidecarBridge";
 import { create } from "zustand";
 import { persist } from "zustand/middleware";

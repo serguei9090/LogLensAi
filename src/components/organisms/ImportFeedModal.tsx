@@ -1,2 +1,1 @@
-export * from "./import-modal";
-export { ImportFeedModal } from "./import-modal";
+export * from "@/features/investigation/ImportFeedModal";

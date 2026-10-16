@@ -1,5 +1,4 @@
-import type { FilterEntry } from "@/components/molecules/FilterBuilder";
-import type { HighlightEntry } from "@/components/molecules/HighlightBuilder";
+import type { FilterEntry, HighlightEntry } from "@/components/common";
 import type { LogEntry } from "@/types/log";
 import { create } from "zustand";
 
