@@ -1,6 +1,6 @@
-import { HelpTooltip } from "@/components/atoms/HelpTooltip";
 import { cn } from "@/lib/utils";
 import { Check, Cpu } from "lucide-react";
+import { HelpTooltip } from "./HelpTooltip";
 
 export interface HardwareAccelerationProps {
   readonly currentDevice: "cpu" | "gpu";

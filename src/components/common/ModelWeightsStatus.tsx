@@ -1,6 +1,6 @@
-import { HelpTooltip } from "@/components/atoms/HelpTooltip";
 import { Button } from "@/components/ui/button";
 import { AlertCircle, CheckCircle2, Download, HardDrive, Loader2 } from "lucide-react";
+import { HelpTooltip } from "./HelpTooltip";
 
 export interface ModelWeightsStatusData {
   state: "ready" | "downloading" | "idle" | "error";

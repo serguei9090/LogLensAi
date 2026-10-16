@@ -1,13 +1,10 @@
-import {
-  IngestionProgressBadge,
-  type IngestionStatus,
-} from "@/components/atoms/IngestionProgressBadge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useIngestionStore } from "@/store/ingestion";
 import type { LogSource } from "@/store/workspaceStore";
 import { Copy, FileText, Pencil, Trash2 } from "lucide-react";
 import { memo, useEffect, useMemo, useState } from "react";
+import { IngestionProgressBadge, type IngestionStatus } from "./IngestionProgressBadge";
 
 interface SourceItemProps {
   source: LogSource;

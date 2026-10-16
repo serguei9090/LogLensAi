@@ -1,6 +1,6 @@
-import { SpotlightCard } from "@/components/atoms/SpotlightCard";
 import { cn } from "@/lib/utils";
 import type React from "react";
+import { SpotlightCard } from "./SpotlightCard";
 
 interface StatCardProps {
   icon: React.ReactNode;

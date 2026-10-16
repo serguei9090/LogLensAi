@@ -1,8 +1,8 @@
-import { HelpTooltip } from "@/components/atoms/HelpTooltip";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 import { Plus, Trash2 } from "lucide-react";
+import { HelpTooltip } from "./HelpTooltip";
 
 export interface FacetExtractionRule {
   name: string;

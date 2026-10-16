@@ -1,7 +1,7 @@
-import { DecryptedText } from "@/components/atoms/DecryptedText";
 import { cn } from "@/lib/utils";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { DecryptedText } from "./DecryptedText";
 
 interface ThinkingBlockProps {
   /** The raw thinking content extracted from <think> tags. */

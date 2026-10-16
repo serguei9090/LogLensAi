@@ -1,4 +1,4 @@
-import { LayaSettingsPanel } from "@/components/organisms/laya-settings";
+import { LayaSettingsPanel } from "@/features/laya";
 
 export function LayaSettingsSection() {
   return (

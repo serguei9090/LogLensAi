@@ -1,7 +1,5 @@
 import type { NavTab } from "@/App";
-import { SidebarNavItem } from "@/components/atoms/SidebarNavItem";
-import { ConfirmationDialog } from "@/components/common/ConfirmationDialog";
-import { HierarchyTree } from "@/components/common/HierarchyTree";
+import { ConfirmationDialog, HierarchyTree, SidebarNavItem } from "@/components/common";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
