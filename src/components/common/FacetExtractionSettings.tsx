@@ -85,27 +85,29 @@ export function FacetExtractionSettings({
   onChange,
   title = "Custom Facet Extraction",
 }: FacetExtractionSettingsProps) {
+  const safeRules = Array.isArray(rules) ? rules : [];
+
   const removeRule = (index: number) => {
-    const nextRules = [...rules];
+    const nextRules = [...safeRules];
     nextRules.splice(index, 1);
     onChange(nextRules);
   };
 
   const toggleRule = (index: number) => {
-    const nextRules = [...rules];
+    const nextRules = [...safeRules];
     nextRules[index] = { ...nextRules[index], enabled: !nextRules[index].enabled };
     onChange(nextRules);
   };
 
   const togglePreset = (preset: (typeof COMMON_FACET_PRESETS)[number]) => {
-    const existingIndex = rules.findIndex((r) => r.name === preset.name);
+    const existingIndex = safeRules.findIndex((r) => r.name === preset.name);
     if (existingIndex >= 0) {
-      const nextRules = [...rules];
+      const nextRules = [...safeRules];
       nextRules.splice(existingIndex, 1);
       onChange(nextRules);
     } else {
       onChange([
-        ...rules,
+        ...safeRules,
         {
           name: preset.name,
           regex: preset.regex,
@@ -117,7 +119,7 @@ export function FacetExtractionSettings({
   };
 
   const updateRule = (index: number, updates: Partial<FacetExtractionRule>) => {
-    const nextRules = [...rules];
+    const nextRules = [...safeRules];
     nextRules[index] = { ...nextRules[index], ...updates };
     onChange(nextRules);
   };
@@ -139,7 +141,7 @@ export function FacetExtractionSettings({
       <div className="flex items-center gap-1.5 flex-wrap pt-1">
         <span className="text-xs uppercase font-bold text-text-muted mr-1">Standard Facets:</span>
         {COMMON_FACET_PRESETS.map((preset) => {
-          const matchedRule = rules.find((r) => r.name === preset.name);
+          const matchedRule = safeRules.find((r) => r.name === preset.name);
           const isAdded = Boolean(matchedRule);
           const isEnabled = matchedRule ? matchedRule.enabled : false;
 
@@ -227,7 +229,9 @@ export function FacetExtractionSettings({
                       max={9}
                       value={rule.group}
                       onChange={(e) =>
-                        updateRule(idx, { group: Number.parseInt(e.target.value, 10) || 1 })
+                        updateRule(idx, {
+                          group: Math.min(9, Math.max(1, Number.parseInt(e.target.value, 10) || 1)),
+                        })
                       }
                       className="w-full bg-transparent border-none focus:ring-0 text-sm text-text-primary text-center font-mono h-6"
                     />
@@ -261,7 +265,7 @@ export function FacetExtractionSettings({
         variant="ghost"
         onClick={() => {
           onChange([
-            ...rules,
+            ...safeRules,
             { name: "custom_facet", regex: String.raw`(\w+)`, group: 1, enabled: true },
           ]);
         }}

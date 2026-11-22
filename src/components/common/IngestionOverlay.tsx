@@ -13,9 +13,9 @@ interface IngestionOverlayProps {
  * Features a circular progress arrow and a linear progress bar.
  */
 export function IngestionOverlay({ job, className }: IngestionOverlayProps) {
-  const processed = job?.processed_lines ?? 0;
-  const total = job?.total_lines ?? 1;
-  const progress = Math.min(Math.round((processed / total) * 100), 100);
+  const processed = Math.max(0, job?.processed_lines ?? 0);
+  const total = Math.max(1, job?.total_lines ?? 1);
+  const progress = Math.min(100, Math.max(0, Math.round((processed / total) * 100)));
 
   return (
     <div

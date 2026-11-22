@@ -192,8 +192,11 @@ func (a *App) FactoryReset() (any, *models.RPCError) {
 	a.miners = make(map[string]*drain3.Miner)
 	a.minersMu.Unlock()
 
+	_ = a.DB.InitClusterTriageTable()
+
 	extractor := clustering.NewMetadataAdapter(a.metaResolver)
 	worker := clustering.NewWorker(a.DB, a.FastPath, extractor, a.GetDrainParser, clusterWorkerBatchSize, 0, 0)
+	worker.SetTriageHandler(NewLayaClusterTriager(a))
 	a.Cluster = worker
 	worker.Start()
 

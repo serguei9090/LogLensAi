@@ -42,10 +42,12 @@ export function DashboardFilters({
   const selectedWorkspace = workspaces.find((w) => w.id === selectedWorkspaceId);
   const selectedSource = sources.find((s) => s.id === selectedSourceId);
 
-  const isFiltered =
+  const isFiltered = Boolean(
     timeBounds &&
-    ((timeRange.start && timeRange.start !== timeBounds.min) ||
-      (timeRange.end && timeRange.end !== timeBounds.max));
+      ((timeRange.start && timeRange.start !== timeBounds.min) ||
+        (timeRange.end && timeRange.end !== timeBounds.max) ||
+        (timeRange.start && !timeRange.end)),
+  );
 
   return (
     <div className="flex flex-wrap items-center gap-3 bg-bg-surface/30 p-2 rounded-xl border border-border/50 backdrop-blur-sm">

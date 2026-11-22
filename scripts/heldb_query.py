@@ -37,70 +37,72 @@ def run_diagnostic():
 
     result = {"timestamp": datetime.now().isoformat(), "database_path": DB_PATH, "tables": {}}
 
-    for table in tables:
-        try:
-            # Check if table exists
-            table_check = conn.execute(
-                f"SELECT count(*) FROM information_schema.tables WHERE table_name = '{table}'"
-            ).fetchone()[0]
-            if not table_check:
-                result["tables"][table] = {"status": "missing"}
-                continue
+    try:
+        for table in tables:
+            try:
+                # Check if table exists
+                table_check = conn.execute(
+                    f"SELECT count(*) FROM information_schema.tables WHERE table_name = '{table}'"
+                ).fetchone()[0]
+                if not table_check:
+                    result["tables"][table] = {"status": "missing"}
+                    continue
 
-            # Count rows
-            count = conn.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0]
+                # Count rows
+                count = conn.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0]
 
-            # Get columns
-            desc = conn.execute(f"SELECT * FROM {table} LIMIT 0").description
-            columns = [d[0] for d in desc]
+                # Get columns
+                desc = conn.execute(f"SELECT * FROM {table} LIMIT 0").description
+                columns = [d[0] for d in desc]
 
-            # Get sample rows (up to 5)
-            rows = conn.execute(f"SELECT * FROM {table} LIMIT 5").fetchall()
+                # Get sample rows (up to 5)
+                rows = conn.execute(f"SELECT * FROM {table} LIMIT 5").fetchall()
 
-            result["tables"][table] = {
-                "count": count,
-                "columns": columns,
-                "samples": [dict(zip(columns, r, strict=False)) for r in rows],
-            }
-
-            # Special aggregation for logs and log_sources
-            if table == "logs":
-                ws_counts = conn.execute(
-                    "SELECT workspace_id, COUNT(*) FROM logs GROUP BY workspace_id"
-                ).fetchall()
-                result["tables"][table]["workspace_breakdown"] = {
-                    str(r[0]): r[1] for r in ws_counts
+                result["tables"][table] = {
+                    "count": count,
+                    "columns": columns,
+                    "samples": [dict(zip(columns, r, strict=False)) for r in rows],
                 }
 
-                source_counts = conn.execute(
-                    "SELECT workspace_id, source_id, COUNT(*) FROM logs GROUP BY workspace_id, source_id"
-                ).fetchall()
-                result["tables"][table]["source_breakdown"] = [
-                    {"workspace": str(r[0]), "source": str(r[1]), "count": r[2]}
-                    for r in source_counts
-                ]
+                # Special aggregation for logs and log_sources
+                if table == "logs":
+                    ws_counts = conn.execute(
+                        "SELECT workspace_id, COUNT(*) FROM logs GROUP BY workspace_id"
+                    ).fetchall()
+                    result["tables"][table]["workspace_breakdown"] = {
+                        str(r[0]): r[1] for r in ws_counts
+                    }
 
-            if table == "log_sources":
-                ls_details = conn.execute(
-                    "SELECT workspace_id, id, name, path FROM log_sources"
-                ).fetchall()
-                result["tables"][table]["details"] = [
-                    {"workspace": str(r[0]), "id": str(r[1]), "name": r[2], "path": r[3]}
-                    for r in ls_details
-                ]
+                    source_counts = conn.execute(
+                        "SELECT workspace_id, source_id, COUNT(*) FROM logs GROUP BY workspace_id, source_id"
+                    ).fetchall()
+                    result["tables"][table]["source_breakdown"] = [
+                        {"workspace": str(r[0]), "source": str(r[1]), "count": r[2]}
+                        for r in source_counts
+                    ]
 
-            if table == "workspace_settings":
-                ws_settings = conn.execute(
-                    "SELECT workspace_id, key, value FROM workspace_settings"
-                ).fetchall()
-                result["tables"][table]["all_settings"] = [
-                    {"workspace": str(r[0]), "key": r[1], "value": r[2]} for r in ws_settings
-                ]
+                if table == "log_sources":
+                    ls_details = conn.execute(
+                        "SELECT workspace_id, id, name, path FROM log_sources"
+                    ).fetchall()
+                    result["tables"][table]["details"] = [
+                        {"workspace": str(r[0]), "id": str(r[1]), "name": r[2], "path": r[3]}
+                        for r in ls_details
+                    ]
 
-        except Exception as e:
-            result["tables"][table] = {"error": str(e)}
+                if table == "workspace_settings":
+                    ws_settings = conn.execute(
+                        "SELECT workspace_id, key, value FROM workspace_settings"
+                    ).fetchall()
+                    result["tables"][table]["all_settings"] = [
+                        {"workspace": str(r[0]), "key": r[1], "value": r[2]} for r in ws_settings
+                    ]
 
-    conn.close()
+            except Exception as e:
+                result["tables"][table] = {"error": str(e)}
+    finally:
+        conn.close()
+
     return result
 
 

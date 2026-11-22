@@ -232,11 +232,11 @@ export const createPollingSlice: StateCreator<
       );
 
       if (!wsActiveJob && liveSourceCount === 0) {
+        currentSession.timer = null;
         const anyActive = [...pollSessions.values()].some((s) => s.timer !== null);
         if (!anyActive) {
           set({ isPolling: false });
         }
-        currentSession.timer = null;
         return;
       }
 

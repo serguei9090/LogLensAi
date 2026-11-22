@@ -100,6 +100,8 @@ export function CustomParserModal({
           text: selection.toString(),
           rect,
         });
+      } else {
+        setActiveSelection(null);
       }
     } else {
       setActiveSelection(null);

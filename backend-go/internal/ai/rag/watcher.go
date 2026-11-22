@@ -20,6 +20,7 @@ type KnowledgeWatcher struct {
 	service     *Service
 	watcher     *fsnotify.Watcher
 	stopCh      chan struct{}
+	stopOnce    sync.Once
 	mu          sync.Mutex
 	isScanning  bool
 }
@@ -63,8 +64,10 @@ func NewKnowledgeWatcher(workspaceID, folderPath string, service *Service) (*Kno
 
 // Stop cleanly terminates the watcher.
 func (kw *KnowledgeWatcher) Stop() {
-	close(kw.stopCh)
-	_ = kw.watcher.Close()
+	kw.stopOnce.Do(func() {
+		close(kw.stopCh)
+		_ = kw.watcher.Close()
+	})
 }
 
 // ScanAll scans and indexes every supported file in the folder.

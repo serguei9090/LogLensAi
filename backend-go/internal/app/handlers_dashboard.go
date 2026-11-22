@@ -151,7 +151,7 @@ func (a *App) prepareDashboardWhere(workspaceID, sourceID, startTime, endTime st
 
 func (a *App) getDashboardBucketParams(whereSQL string, params []any) (bucketIntervalStr, bucketFormat, tsMin, tsMax string) {
 	bucketIntervalStr = "1 hour"
-	bucketFormat = "%Y-%m-%d %H:00:00"
+	bucketFormat = "%Y-%m-%d %H:00"
 
 	var minRaw, maxRaw sql.NullString
 	if err := a.DB.Conn.QueryRow(`SELECT MIN(l.timestamp), MAX(l.timestamp) FROM logs l`+whereSQL, params...).Scan(&minRaw, &maxRaw); err != nil {

@@ -13,7 +13,7 @@ import {
   TrendingUp,
   X,
 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 export interface VisualPreset {
   id: string;
@@ -113,6 +113,21 @@ export function StudioDiagramHelperModal({
     onSelectPrompt(prompt);
     setIsOpen(false);
   };
+
+  useEffect(() => {
+    if (!isOpen) {
+      return;
+    }
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setIsOpen(false);
+      }
+    };
+    globalThis.addEventListener("keydown", handleKeyDown);
+    return () => {
+      globalThis.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [isOpen]);
 
   return (
     <>

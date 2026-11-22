@@ -130,7 +130,7 @@ func (a *App) detectAnomalies(workspaceID string) error {
 			continue
 		}
 		sd := stddev.Float64
-		if sd == 0 {
+		if sd < 0.1 {
 			sd = 0.1
 		}
 		baselines[[2]string{ws.String, cid.String}] = baselineStat{mean: mean.Float64, stddev: sd}

@@ -162,7 +162,11 @@ func (p *OpenAICompatibleProvider) formatMessages(messages []ChatMessage) []open
 		out = append(out, openAIChatMessageWire{Role: "system", Content: p.systemPrompt})
 	}
 	for _, m := range messages {
-		wire := openAIChatMessageWire{Role: m.Role, Content: m.Content}
+		content := m.Content
+		if m.Role == "assistant" {
+			content = cleanThinkingMarkers(content)
+		}
+		wire := openAIChatMessageWire{Role: m.Role, Content: content}
 		if len(m.ToolCalls) > 0 {
 			wire.ToolCalls = denormalizeToOpenAIToolCalls(m.ToolCalls)
 		}

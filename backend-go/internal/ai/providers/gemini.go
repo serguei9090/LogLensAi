@@ -249,10 +249,24 @@ func normalizeGeminiToolCalls(parts []geminiPart) []ToolCall {
 
 func extractGeminiText(parts []geminiPart) string {
 	var b strings.Builder
+	emittedThink := false
 	for _, part := range parts {
-		if part.FunctionCall == nil && part.FunctionResponse == nil {
-			b.WriteString(part.Text)
+		if part.FunctionCall != nil || part.FunctionResponse != nil || part.Text == "" {
+			continue
 		}
+		if part.Thought {
+			if !emittedThink {
+				b.WriteString(thinkOpen)
+				emittedThink = true
+			}
+		} else if emittedThink {
+			b.WriteString(thinkClose)
+			emittedThink = false
+		}
+		b.WriteString(part.Text)
+	}
+	if emittedThink {
+		b.WriteString(thinkClose)
 	}
 	return b.String()
 }

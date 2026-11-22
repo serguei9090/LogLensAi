@@ -156,21 +156,33 @@ function HierarchyTreeImpl({
             )}
           </div>
         </DroppableArea>
-        {deleteTarget && (
-          <ConfirmationDialog
-            isOpen={!!deleteTarget}
-            onOpenChange={(open) => !open && setDeleteTarget(null)}
-            onConfirm={handleConfirmDelete}
-            title={deleteTarget.type === "folder" ? "Delete Folder?" : "Delete Source?"}
-            description={
-              deleteTarget.type === "folder"
-                ? `This will permanently delete the folder "${deleteTarget.name}" and ALL its subfolders and files. This action cannot be undone.`
-                : `This will remove "${deleteTarget.name}" from the workspace. Annotations and parsed data for this source will be deleted.`
-            }
-            variant="destructive"
-            confirmText="Delete"
-          />
-        )}
+        {deleteTarget &&
+          (() => {
+            const isTargetIngesting =
+              deleteTarget.type === "source" &&
+              jobs.some(
+                (j) =>
+                  j.source_id === deleteTarget.id &&
+                  (j.status === "queued" || j.status === "pending" || j.status === "processing"),
+              );
+            return (
+              <ConfirmationDialog
+                isOpen={!!deleteTarget}
+                onOpenChange={(open) => !open && setDeleteTarget(null)}
+                onConfirm={handleConfirmDelete}
+                title={deleteTarget.type === "folder" ? "Delete Folder?" : "Delete Source?"}
+                description={
+                  deleteTarget.type === "folder"
+                    ? `This will permanently delete the folder "${deleteTarget.name}" and ALL its subfolders and files. This action cannot be undone.`
+                    : isTargetIngesting
+                      ? "Warning: This log source is currently importing logs. Deleting it will cancel the ingestion and wipe all partially written log lines. Are you sure you want to proceed?"
+                      : `This will remove "${deleteTarget.name}" from the workspace. Annotations and parsed data for this source will be deleted.`
+                }
+                variant="destructive"
+                confirmText="Delete"
+              />
+            );
+          })()}
       </>
     );
   }

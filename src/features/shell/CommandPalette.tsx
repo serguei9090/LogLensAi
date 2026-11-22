@@ -118,14 +118,20 @@ export function CommandPalette({ open, onOpenChange, onNavSelect }: CommandPalet
       .filter((group) => group.items.length > 0);
   }, [search, commands]);
 
+  const handleOpenChange = (nextOpen: boolean) => {
+    if (!nextOpen) {
+      setSearch("");
+    }
+    onOpenChange(nextOpen);
+  };
+
   const handleAction = (action: () => void) => {
     action();
-    onOpenChange(false);
-    setSearch("");
+    handleOpenChange(false);
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="sm:max-w-2xl w-full bg-zinc-950/90 border-zinc-800/60 backdrop-blur-xl p-0 overflow-hidden outline-none">
         <DialogHeader className="p-4 border-b border-zinc-800/40">
           <DialogTitle className="sr-only">Command Palette</DialogTitle>
