@@ -42,10 +42,6 @@ export function setBridgeInitialized(initialized: boolean) {
   isBridgeInitialized = initialized;
 }
 
-export function getBridgeInitialized(): boolean {
-  return isBridgeInitialized;
-}
-
 /**
  * Dispatches a JSON-RPC request to the Python sidecar.
  *

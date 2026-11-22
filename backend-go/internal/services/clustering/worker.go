@@ -305,12 +305,3 @@ func (w *Worker) SetPaused(paused bool) {
 		w.forceCycle = true
 	}
 }
-
-// TriggerCycle requests one processing cycle run as soon as possible, even
-// if the worker is currently paused. Mirrors
-// ClusteringWorker.trigger_cycle (clustering.py:996-998).
-func (w *Worker) TriggerCycle() {
-	w.mu.Lock()
-	w.forceCycle = true
-	w.mu.Unlock()
-}

@@ -1,0 +1,7 @@
+# .vibetrace/quality.toml
+# Code quality exceptions and approved complexity baseline.
+
+[quality]
+version = "1.0"
+default_complexity_threshold = 15
+

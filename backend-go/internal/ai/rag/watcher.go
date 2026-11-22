@@ -62,11 +62,6 @@ func NewKnowledgeWatcher(workspaceID, folderPath string, service *Service) (*Kno
 	return kw, nil
 }
 
-// Start begins the background event loop watching for file system changes.
-func (kw *KnowledgeWatcher) Start() {
-	go kw.eventLoop()
-}
-
 // Stop cleanly terminates the watcher.
 func (kw *KnowledgeWatcher) Stop() {
 	close(kw.stopCh)

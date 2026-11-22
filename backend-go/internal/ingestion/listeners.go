@@ -91,14 +91,6 @@ func (s *Server) SyslogAddr() string {
 	return s.udpConn.LocalAddr().String()
 }
 
-// HTTPAddr returns the HTTP push listener's actual bound address (useful
-// when constructed with port 0), or "" if it isn't currently listening.
-func (s *Server) HTTPAddr() string {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	return s.httpAddr
-}
-
 // mux builds the HTTP push listener's routes. Split out from Start so tests
 // can exercise routing/handler behavior via httptest without binding a real
 // port.

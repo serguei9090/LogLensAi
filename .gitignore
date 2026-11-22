@@ -85,3 +85,11 @@ drain/
 models/
 laya_rules.json
 
+# VibeTrace Code Intelligence
+vibetrace.db
+vibetrace.db-wal
+vibetrace.db-shm
+.vibetrace/*
+!.vibetrace/splits.toml
+!.vibetrace/security.toml
+!.vibetrace/quality.toml

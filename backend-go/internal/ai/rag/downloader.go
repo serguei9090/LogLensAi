@@ -224,21 +224,6 @@ func (m *ModelManager) DeleteModel() error {
 	return nil
 }
 
-// CancelDownload terminates any ongoing download.
-func (m *ModelManager) CancelDownload() {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	if m.cancelFunc != nil {
-		m.cancelFunc()
-		m.cancelFunc = nil
-	}
-	if m.state == ModelStateDownloading {
-		m.state = ModelStateIdle
-		m.progress = 0.0
-		m.errorMessage = "download cancelled"
-	}
-}
-
 // downloadLoop executes sequential downloads of the RAG model components.
 func (m *ModelManager) downloadLoop(ctx context.Context, baseURL string, onComplete func()) {
 	files := []struct {

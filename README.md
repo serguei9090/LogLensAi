@@ -8,6 +8,11 @@ LogLensAi is a state-of-the-art diagnostic desktop application designed for high
 
 ---
 
+## System Overview
+LogLensAi is a multi-runtime desktop log analysis cockpit comprising a React 19 + TypeScript frontend (`src/`), a Rust Tauri v2 desktop supervisor (`src-tauri/`), a Go 1.26.4 sidecar engine (`backend-go/`) backed by DuckDB, Drain3 template mining, local ONNX Laya/RAG models, and LLM orchestration, and Python/PowerShell operational utilities (`scripts/`).
+
+---
+
 ## 🏗️ Technical Architecture
 
 LogLensAi is built on a high-throughput **Sidecar Architecture**:
@@ -271,3 +276,32 @@ cd backend-go && go vet ./...
   - Automatic `fsnotify` directory watcher & on-demand "Re-index" for runbooks, PDFs, and error diagrams.
 - [ ] **Laya Fast Chat Router Benchmarking**:
   - Evaluating Laya's zero-VRAM choice/score heuristics as a pre-selection filter for chat agent tool routing and intent steering.
+
+---
+
+## Local Interface & Invariants
+- `[vite.config.ts:default]`: Configures Vite (`@vitejs/plugin-react-swc`, `@tailwindcss/vite`), `@ -> ./src` path alias, manual vendor chunking (`echarts`, `react-vendor`, `ui-vendor`, `lucide`), `chunkSizeWarningLimit: 1200`, dev server port `4000`, and file-watch exclusions for runtime artifacts (`*.duckdb*`, `*.wal`, `*.log`, `*.index`, `backend-go/**`, `src-tauri/**`, `storage/**`, `models/**`, `rag_model/**`).
+- `[vitest.config.ts:default]`: Configures Vitest with `jsdom` environment, `./vitest.setup.ts`, `globals: true`, `@ -> ./src` alias, and exclusions for `tests/e2e/**`.
+- `[playwright.config.ts:default]`: Configures Playwright E2E tests in `./tests/e2e` against `BASE_URL` (default `http://localhost:4000`), automatically booting `bun run dev --port 4000` with `reuseExistingServer: true`.
+- `[package.json:scripts]`: Defines frontend/dev/verification commands (`dev`, `dev:api`, `dev:all`, `dev:web`, `build`, `lint`, `typecheck`, `type-sync`, `test`, `test:e2e`, `test:backend`).
+
+## Subdirectories & System Boundaries
+- `backend-go`: [./backend-go/README.md](./backend-go/README.md) — Go 1.26.4 sidecar module (`cmd/sidecar` and `internal/*`) implementing DuckDB storage, disk-first `.log`/`.index` log store + mmap hydration, Drain3 template mining, LLQL query parsing, file/SSH/syslog/HTTP ingestion, Laya ONNX triage, DuckDB-VSS RAG, multi-provider AI orchestration, and JSON-RPC 2.0 + SSE transports.
+- `scripts`: [./scripts/README.md](./scripts/README.md) — Python and PowerShell diagnostic, DuckDB inspection/wiping, schema generation (`generate_schema.py`), HTTP log ingestion, Drain3 benchmarks (`./scripts/drain3/README.md`), and git hook triggers (`./scripts/hooks/README.md`).
+- `src`: [./src/README.md](./src/README.md) — React 19 + TypeScript frontend cockpit (`App.tsx`, `main.tsx`) organizing UI components (`./src/components/README.md`), domain features (`./src/features/README.md`), hooks/sidecar IPC bridge (`./src/lib/README.md`), Zustand stores (`./src/store/README.md`), and domain types (`./src/types/README.md`).
+- `src-tauri`: [./src-tauri/README.md](./src-tauri/README.md) — Rust Tauri v2 desktop shell (`app`/`app_lib`) managing the `"main"` window (`1280x720`), default plugin capabilities, Go sidecar process supervision (`SidecarManager`), and the `dispatch_sidecar` IPC command.
+
+## Global Invariants
+- **JSON-RPC 2.0 Sidecar Boundary**: Frontend callers (`src/lib/hooks/useSidecarBridge.ts`) communicate via `dispatch_sidecar` (Tauri stdio IPC) in desktop builds or HTTP `POST` (`http://127.0.0.1:5000/rpc`) in web/dev mode, validated by `backend-go/internal/rpc` and `internal/models` structs; AI streaming uses HTTP SSE at `/api/stream_chat`.
+- **Single-Writer DuckDB & Disk-First Hydration**: `backend-go/internal/db` enforces singleton DB opening and WAL recovery; raw lines append to `.log`/`.index` files in `DiskLogStore` and hydrate missing text via `FastPathService` (`mmap`).
+- **Tauri Sidecar Lifecycle**: In debug mode, `src-tauri` spawns `go run ./cmd/sidecar --stdio --with-http --db ../loglens.duckdb` in `../backend-go`; in release mode it spawns the bundled `"sidecar"` binary, retrying `write_and_read` once on broken pipe/EOF.
+- **Test & Quality Separation**: Vitest (`vitest.config.ts`) excludes `tests/e2e/**`, while Playwright (`playwright.config.ts`) targets `./tests/e2e`.
+
+## Global Side Effects
+- **OS Subprocesses & Network Listeners**: `src-tauri` spawns and supervises the Go sidecar OS process; `backend-go` opens stdio streams, HTTP listeners (`:5000` by default), UDP/HTTP ingestion ports, and outbound connections to SSH targets, Hugging Face, and configured LLM providers (Ollama, OpenAI-compatible, Gemini).
+- **Local Disk & Browser Persistence**: `backend-go` creates/mutates DuckDB databases (`*.duckdb`, `.wal`), `.log`/`.index` log store files, Drain3 state, `laya_rules.json` checkpoints, downloaded ONNX models, and exported CSV/JSON/Markdown files; the frontend persists workspace/UI/provider state in browser `localStorage`.
+
+## System Verification
+- Run: `bun test` (Frontend Vitest suite)
+- Run: `cd backend-go && go test ./...` (Go backend unit & integration suite)
+- Run: `cd src-tauri && cargo test` (Rust Tauri shell tests)
