@@ -88,13 +88,6 @@ func NewModelManager(modelDir string) *ModelManager {
 	return mm
 }
 
-// SetBaseURL overrides the download endpoint (primarily for mock HTTP tests).
-func (m *ModelManager) SetBaseURL(url string) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	m.baseURL = url
-}
-
 // GetPaths returns the resolved absolute paths for onnx model and tokenizer.
 func (m *ModelManager) GetPaths() (modelPath, tokenizerPath string) {
 	return filepath.Join(m.modelDir, "onnx", RAGModelFileName),

@@ -1,11 +1,10 @@
 # Common Components
 
 ## Overview
-Canonical shared UI component implementations for LogLensAi (re-exported by `@/components/atoms` and `@/components/molecules`), spanning log severity/status primitives, interactive search/filter/highlight builders, ECharts wrappers, workspace navigation, hierarchical file/source trees, and ingestion/model weight overlays.
+Canonical shared UI component implementations for LogLensAi, spanning log severity/status primitives, interactive search/filter/highlight builders, ECharts wrappers, workspace navigation, hierarchical file/source trees, and ingestion/model weight overlays.
 
 ## Interface
 - `[index.ts:export *]` - Barrel re-exporting core shared components and types (`DecryptedText`, `GridPattern`, `HelpTooltip`, `IconButton`, `IngestionProgressBadge`, `LogLevelBadge`, `MarkdownContent`, `ReactECharts`, `SidebarNavItem`, `SpotlightCard`, `StatCard`, `StatusDot`, `TailSwitch`, `ThinkingBlock`, `TypingIndicator`, `AddColumnModal`, `ClusterRow`, `ConfirmationDialog`, `DashboardModeToggle`, `DashboardMode`, `FacetExtractionSettings`, `FacetList`, `FilterBuilder`, `FilterEntry`, `HardwareAcceleration`, `HardwareAccelerationProps`, `HierarchyTree`, `HighlightBuilder`, `HighlightEntry`, `IngestionOverlay`, `LevelBar`, `ModelWeightsStatus`, `ModelWeightsStatusData`, `ModelWeightsStatusProps`, `NativeFilePicker`, `ProcessingNotification`, `SearchBar`, `SourceItem`, `SourceSelector`, `TimeRangePicker`, `TimeRange`, `WorkspaceTabs`).
-- `[A2UIRenderer.tsx:A2UIRenderer]` - Re-exports `A2UIRenderer` and type `A2UIRendererProps` from `../organisms/a2ui`.
 - `[TimeRangePicker.tsx:TimeRangePicker]` - Re-exports `TimeRangePicker` and all exports from `./time-picker`.
 - `[AddColumnModal.tsx:AddColumnModal]` - Exported modal component creating custom regex-extracted log table columns with live sample preview.
 - `[ClusterRow.tsx:ClusterRow]` - Exported `Readonly<ClusterRowProps>` expandable cluster summary row with sample fetching and AI diagnosis trigger.

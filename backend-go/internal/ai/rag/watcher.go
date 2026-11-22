@@ -8,7 +8,6 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
-	"time"
 
 	"github.com/fsnotify/fsnotify"
 )
@@ -104,33 +103,6 @@ func (kw *KnowledgeWatcher) ScanAll(ctx context.Context) (totalFiles int, totalC
 	})
 
 	return totalFiles, totalChunks, err
-}
-
-func (kw *KnowledgeWatcher) eventLoop() {
-	for {
-		select {
-		case <-kw.stopCh:
-			return
-		case event, ok := <-kw.watcher.Events:
-			if !ok {
-				return
-			}
-			if event.Op&(fsnotify.Write|fsnotify.Create) != 0 {
-				ext := strings.ToLower(filepath.Ext(event.Name))
-				switch ext {
-				case ".md", ".txt", ".pdf", ".png", ".jpg", ".jpeg":
-					ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-					_, _ = kw.service.IngestKnowledgeFile(ctx, kw.workspaceID, event.Name)
-					cancel()
-				}
-			}
-		case err, ok := <-kw.watcher.Errors:
-			if !ok {
-				return
-			}
-			log.Printf("[RAG] watcher error: %v", err)
-		}
-	}
 }
 
 func (kw *KnowledgeWatcher) addWatchRecursive(root string) error {

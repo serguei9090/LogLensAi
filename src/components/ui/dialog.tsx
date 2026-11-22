@@ -8,16 +8,8 @@ function Dialog({ ...props }: Readonly<DialogPrimitive.Root.Props>) {
   return <DialogPrimitive.Root data-slot="dialog" {...props} />;
 }
 
-function DialogTrigger({ ...props }: Readonly<DialogPrimitive.Trigger.Props>) {
-  return <DialogPrimitive.Trigger data-slot="dialog-trigger" {...props} />;
-}
-
 function DialogPortal({ ...props }: Readonly<DialogPrimitive.Portal.Props>) {
   return <DialogPrimitive.Portal data-slot="dialog-portal" {...props} />;
-}
-
-function DialogClose({ ...props }: Readonly<DialogPrimitive.Close.Props>) {
-  return <DialogPrimitive.Close data-slot="dialog-close" {...props} />;
 }
 
 function DialogOverlay({ className, ...props }: Readonly<DialogPrimitive.Backdrop.Props>) {
@@ -128,7 +120,6 @@ function DialogDescription({ className, ...props }: Readonly<DialogPrimitive.Des
 
 export {
   Dialog,
-  DialogClose,
   DialogContent,
   DialogDescription,
   DialogFooter,
@@ -136,5 +127,4 @@ export {
   DialogOverlay,
   DialogPortal,
   DialogTitle,
-  DialogTrigger,
 };

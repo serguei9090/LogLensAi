@@ -24,11 +24,6 @@ const (
 	listenerFlushInterval = 1 * time.Second
 )
 
-// portReleasePause mirrors ingestion.py's `reconfigure`'s
-// `time.sleep(0.2)` between stop and restart, giving the OS a moment to
-// release the previously bound ports.
-const portReleasePause = 200 * time.Millisecond
-
 // Server runs the syslog UDP and HTTP push listeners, batching everything
 // they receive into a shared BatchIngester. Ports ingestion.py's
 // IngestionServer.
@@ -212,35 +207,6 @@ func (s *Server) Stop() {
 
 	s.wg.Wait()
 	log.Println("Ingestion Server: Stopped")
-}
-
-// Reconfigure stops (if running), updates syslog/http enabled+port
-// settings, pauses briefly for the OS to release the old ports, and
-// restarts. A no-op if nothing changed and the server is already running.
-// Ports IngestionServer.reconfigure.
-func (s *Server) Reconfigure(syslogEnabled bool, syslogPort int, httpEnabled bool, httpPort int) error {
-	s.mu.Lock()
-	changed := s.syslogEnabled != syslogEnabled || s.syslogPort != syslogPort ||
-		s.httpEnabled != httpEnabled || s.httpPort != httpPort
-	running := s.running
-	s.mu.Unlock()
-
-	if !changed && running {
-		return nil
-	}
-
-	log.Println("Ingestion Server: Reconfiguring listeners...")
-	s.Stop()
-	time.Sleep(portReleasePause)
-
-	s.mu.Lock()
-	s.syslogEnabled = syslogEnabled
-	s.syslogPort = syslogPort
-	s.httpEnabled = httpEnabled
-	s.httpPort = httpPort
-	s.mu.Unlock()
-
-	return s.Start()
 }
 
 // runFlushWorker drains the shared queue into ingester whenever it fills up

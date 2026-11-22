@@ -7,7 +7,7 @@ import { useIngestionStore } from "@/store/ingestion";
 import { type HierarchyNode, useWorkspaceStore } from "@/store/workspaceStore";
 import { ChevronDown, ChevronRight, Folder, FolderPlus, Pencil, Trash2 } from "lucide-react";
 import { memo, useState } from "react";
-import { ConfirmationDialog } from "../molecules/ConfirmationDialog";
+import { ConfirmationDialog } from "./ConfirmationDialog";
 import { SourceItem } from "./SourceItem";
 
 interface HierarchyTreeProps {
